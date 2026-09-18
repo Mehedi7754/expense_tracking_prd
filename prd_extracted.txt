@@ -1,0 +1,673 @@
+PRODUCT REQUIREMENTS DOCUMENT
+
+Employee Expense Tracking & Finance Management
+
+Mobile Application — Flutter Frontend
+
+This document describes what the mobile application must do, who uses it, and what each screen contains. It is written so a frontend developer can design and build the app without needing to guess any requirement.
+
+Version 1.0
+
+Prepared for: Frontend Development Team
+
+Table of Contents
+
+1. Purpose of This Document	3
+
+2. Application Overview	3
+
+2.1 Technical Foundation	3
+
+2.2 User Roles and What Each Role Can See	3
+
+3. How the App Is Organised (Navigation Map)	4
+
+4. Screens in Detail	4
+
+4.1 Sign-In and Account Recovery	4
+
+4.2 Shared Screens (Available to Everyone)	5
+
+4.3 Employee Screens: Submitting and Tracking Expenses	6
+
+4.4 Manager and Finance Screens: Approvals and Projects	7
+
+4.5 Reporting Screens	8
+
+4.6 Administrator Screens	9
+
+5. Reusable Screen Components	9
+
+6. States Every List or Data Screen Must Handle	10
+
+7. Device Permissions Required	11
+
+8. Not Included in This Version	11
+
+9. Recommended Order of Development	11
+
+1. Purpose of This Document
+
+This document defines the requirements for the mobile application that employees, managers, finance staff, and administrators will use to submit, review, approve, and track business expenses, and to record project revenue and profitability. It is intended to give the frontend development team a complete and unambiguous reference: every screen the app needs, every piece of information each screen must show, and every action a user can take on it.
+
+The goal is a single application that adapts to the person using it. Depending on whether someone signs in as an Employee, a Manager, a Finance team member, or an Administrator, the app shows only the screens and actions relevant to that role.
+
+2. Application Overview
+
+The application is a single mobile app built with Flutter, meaning one codebase runs on both iOS and Android. The screens a person sees and the actions available to them change automatically based on their assigned role.
+
+2.1 Technical Foundation
+
+The table below summarises the underlying technology choices that the frontend team should build against.
+
+Area
+
+Approach
+
+What It Means in Practice
+
+App state management
+
+Riverpod
+
+Keeps the existing technical approach used elsewhere in the product, so the app stays consistent with other tools the team maintains.
+
+Screen navigation
+
+GoRouter with role-based guards
+
+Users are automatically kept away from screens their role is not allowed to see, rather than relying on hiding buttons alone.
+
+Backend connection
+
+REST API with secure sign-in tokens
+
+The app talks to the existing company server. Login credentials are exchanged for a secure token, which is stored safely on the device rather than re-entered each time.
+
+Push notifications
+
+Firebase Cloud Messaging
+
+Used to alert users when an expense is approved, rejected, or needs attention, and to flag budget concerns.
+
+Receipt photos
+
+Camera or photo library picker, compressed before upload
+
+Keeps uploads fast and avoids using excessive mobile data or storage.
+
+2.2 User Roles and What Each Role Can See
+
+There are four roles. A person's role is detected automatically when they log in, and the bottom navigation bar changes to show only the sections that role is allowed to use.
+
+Role
+
+What They Use the App For
+
+Employee
+
+Submitting their own expenses and tracking the status of each one.
+
+Manager
+
+Everything an Employee can do, plus reviewing and approving expenses, and monitoring the projects they manage.
+
+Finance
+
+Reviewing and approving expenses, recording project revenue, and producing financial reports.
+
+Administrator
+
+Everything above, plus setting up the company profile, managing user accounts, and managing expense categories.
+
+3. How the App Is Organised (Navigation Map)
+
+After logging in, every user lands on a Home screen with a bottom navigation bar. The tabs on that bar depend on the person's role, as shown below.
+
+User Type
+
+Bottom Navigation Tabs (left to right)
+
+Employee
+
+Home, Submit Expense, My Expenses, Notifications, Profile
+
+Manager / Finance
+
+Home, Approvals, Projects, Reports, Profile
+
+Administrator
+
+Home, Approvals, Company, Reports, Profile
+
+Some screens are not part of the bottom navigation. Instead, they open on top of the current screen when a user taps into something specific, and closing them returns to where they were. Examples include:
+
+Opening a project, then a task inside that project, then an expense inside that task
+
+Opening an employee's individual profile from a manager or admin view
+
+Add or edit forms for projects, tasks, categories, and user accounts
+
+Viewing the detail behind a single notification
+
+The Settings screen, reached from Profile, covering currency, categories, and roles
+
+4. Screens in Detail
+
+This section lists every screen in the application, grouped by area of the app. For each screen, the purpose is explained in plain terms, followed by exactly what the screen must contain or allow the user to do.
+
+4.1 Sign-In and Account Recovery
+
+Splash Screen
+
+The first screen a user sees when opening the app. It checks whether the person is already signed in.
+
+Displays the company or app logo while the check happens
+
+If a valid sign-in token is already stored on the device, the user is taken straight to their Home screen
+
+Otherwise, the user is taken to the Login screen
+
+Login Screen
+
+Where users enter their credentials to access the app.
+
+Email and password entry fields
+
+A clear error message if the email or password is incorrect
+
+A "Forgot Password" link
+
+Forgot Password Screen
+
+Lets a user request a password reset without needing to contact an administrator.
+
+Field to enter the email address on file
+
+Confirmation message once a reset link has been sent
+
+Reset Password Screen
+
+Reached by tapping the reset link sent by email; lets the user set a new password.
+
+Field for the new password and a second field to confirm it
+
+Validation to ensure both fields match before allowing submission
+
+4.2 Shared Screens (Available to Everyone)
+
+Home Dashboard
+
+The main landing screen after login. What it shows depends on the user's role.
+
+Employee view: totals for their own submitted, approved, pending, and rejected expenses, a shortcut button to add a new expense, and a list of recent activity
+
+Manager or Finance view: the number of expenses waiting for approval, a list of projects at risk of going over budget, and summary cards for overall company totals
+
+Administrator view: everything a Manager sees, plus a snapshot of system activity such as the number of active users and active projects
+
+Notifications Screen
+
+A list of alerts sent to the user, such as an expense being approved or rejected, or a budget warning.
+
+List of notifications, most recent first
+
+Tapping a notification opens the relevant screen, for example the expense it refers to
+
+Notification Detail Screen
+
+Shown when a notification needs extra context, such as the reason an expense was rejected.
+
+Displays the full explanation behind the notification, not just a short summary
+
+Profile Screen
+
+Where a user views their own account information.
+
+Name, email, and a badge showing their role
+
+Option to change password
+
+Log out option
+
+Settings Screen
+
+Lets a user adjust how the app behaves for them personally.
+
+Preferred currency
+
+Light or dark theme
+
+Toggle for notification preferences
+
+4.3 Employee Screens: Submitting and Tracking Expenses
+
+Submit Expense Screen
+
+The form an employee fills in to claim an expense.
+
+Dropdown to choose a project, limited to projects the employee is actually assigned to
+
+Optional dropdown to choose a task within that project, which updates based on the project selected
+
+Field to enter the amount, with a currency selector if the company uses more than one currency
+
+Dropdown to choose an expense category, showing only categories that are currently active
+
+Required note field where the employee explains the expense
+
+Date picker, defaulting to today's date
+
+Option to attach a receipt photo by taking a new photo or choosing one from the phone's gallery, with a small preview shown and an option to remove it
+
+A warning message if the amount is above a set threshold and no receipt has been attached
+
+A Submit button that shows a confirmation message and returns the employee to their expense list
+
+My Expenses Screen
+
+Where an employee sees every expense they have ever submitted and its current status.
+
+Expenses are grouped into tabs: All, Pending, Approved, and Rejected
+
+Each entry in the list shows the project name, a category icon, the amount, the date, and a colour-coded status label
+
+A filter option to narrow the list by project, category, or date range
+
+A search bar to quickly find a specific expense
+
+Tapping an entry opens its full detail screen
+
+Expense Detail Screen (Employee View)
+
+The full record of a single expense, as seen by the employee who submitted it.
+
+Shows the amount, category, note, date, and receipt photo (which can be tapped to view larger)
+
+Shows the current status, and if rejected, the reason given by the approver
+
+Edit and Withdraw buttons, which are only available while the expense is still Pending
+
+Edit Expense Screen
+
+Allows an employee to correct a mistake on an expense that has not yet been reviewed.
+
+Same layout as the Submit Expense screen, pre-filled with the existing details
+
+Only accessible while the expense status is still Pending
+
+4.4 Manager and Finance Screens: Approvals and Projects
+
+Approvals Queue Screen
+
+Where managers and finance staff review expenses waiting for a decision.
+
+Lists every pending expense across the projects the reviewer is responsible for
+
+Each row shows the employee's name, the project, the category, the amount, a short preview of the note, and the submission date
+
+Approve and Reject actions can be done directly from the list, without opening a separate screen, to keep review fast
+
+Rejecting an expense requires the reviewer to give a reason, entered in a small pop-up form
+
+A multi-select mode allows several expenses to be approved or rejected at once
+
+Filters by project, employee, category, and amount range
+
+Expense Detail Screen (Reviewer View)
+
+The same detail screen an employee sees, with extra tools for the person reviewing it.
+
+Includes everything on the employee's version of this screen
+
+Adds Approve and Reject buttons
+
+Adds a comment thread, so a reviewer can ask the employee a clarifying question without needing to reject the expense outright
+
+Projects List Screen
+
+An overview of every project the user has access to.
+
+Each project appears as a card showing its name, status, how much of its budget has been used (shown as a progress bar), and whether it is currently profitable
+
+Tapping a project opens its detail screen
+
+A button to create a new project, visible only to Managers and Administrators
+
+Project Detail Screen
+
+A full breakdown of a single project's finances and activity.
+
+Header showing budget, amount spent, amount remaining, revenue, profit, and profit margin, each as its own summary card
+
+Organised into tabs: Overview (with charts for cost by category, cost by employee, and spending trend over time), Tasks, Expenses, Revenue, and Team
+
+Button to add revenue, visible to Finance and Administrators
+
+Button to add a task
+
+Add or Edit Project Screen
+
+The form used to create a new project or update an existing one.
+
+Fields for name, description, client, budget, expected revenue, and start and end dates
+
+Option to assign team members from a multi-select list
+
+Task Detail Screen
+
+Details of a single task within a project.
+
+Task description, assignee, and current status
+
+List of expenses linked to this task
+
+Options to edit the task or mark it complete
+
+Add or Edit Task Screen
+
+The form used to create or update a task.
+
+Fields for title, description, assignee, and due date
+
+Optional link to a specific budget line
+
+Add Revenue Screen
+
+Used to record money earned on a project.
+
+Fields for amount, date, and a note describing the source
+
+Project field is pre-filled automatically when opened from within a specific project
+
+Project Team Screen
+
+Shows who is working on a project and what they have spent.
+
+List of employees assigned to the project, each with their individual spend total for that project
+
+Employee Detail Screen (Manager or Administrator View)
+
+A full picture of one employee's activity across every project.
+
+Total spend across all projects, broken down by category
+
+History of that employee's approved and rejected expenses
+
+4.5 Reporting Screens
+
+Reports Screen
+
+Where users generate and export financial summaries.
+
+Filter panel covering project, employee, category, date range, and status
+
+Summary cards at the top showing total cost, total revenue, and total profit
+
+Charts showing cost broken down by category, and spending trend over time
+
+Export button to download the report as an Excel file or PDF, with the option to share it directly
+
+Company Dashboard Screen
+
+A company-wide financial summary, available to Finance and Administrators.
+
+Company-wide totals for revenue, cost, and profit
+
+List of the highest-spending projects
+
+List of projects at risk, defined as having used more than 80% of their budget
+
+Chart showing the top expense categories company-wide
+
+4.6 Administrator Screens
+
+Company Setup Screen
+
+Where the basic company profile is configured.
+
+Company name, base currency, and logo
+
+User Management Screen
+
+Where administrators manage who has access to the app.
+
+List of all employees
+
+Option to add or invite a new user
+
+Option to change a user's role or activate and deactivate their account
+
+Add or Edit User Screen
+
+The form used to create or update a user account.
+
+Fields for name, email, role, and department
+
+Category Management Screen
+
+Where expense categories are maintained.
+
+List of all categories, both default and custom
+
+Option to activate or deactivate a category
+
+Option to add, edit, or rename categories
+
+Audit Log Screen
+
+A searchable record of significant actions taken in the system, for accountability purposes.
+
+Shows who performed each action and when it happened
+
+Searchable to help locate a specific event quickly
+
+5. Reusable Screen Components
+
+To keep the app consistent and speed up development, the following pieces should be built once and reused wherever they are needed, rather than rebuilt separately on each screen.
+
+Component
+
+What It Does
+
+Where It Is Used
+
+Stat Card
+
+Displays a single figure with a label and a trend indicator.
+
+Dashboards, Project Detail
+
+Progress Bar
+
+Shows budget used as a percentage.
+
+Project cards, Project Detail
+
+Status Chip
+
+A small, colour-coded label showing Pending, Approved, or Rejected.
+
+Expense lists and detail screens
+
+Expense List Row
+
+A single row summarising one expense.
+
+My Expenses, Approvals Queue
+
+Project Card
+
+A summary card representing one project.
+
+Projects List
+
+Category Dropdown
+
+Loads and displays active expense categories.
+
+Submit and Edit Expense
+
+Project Dropdown
+
+Loads and displays the projects a user is assigned to.
+
+Submit Expense, filters
+
+Receipt Uploader
+
+Handles taking or choosing a photo, previewing it, and viewing it full-size.
+
+Submit/Edit Expense, Expense Detail
+
+Date Range Picker
+
+Lets a user choose a start and end date.
+
+Filters, Reports
+
+Filter Panel
+
+A pop-up panel for narrowing down a list.
+
+My Expenses, Approvals Queue, Reports
+
+Approve/Reject Controls
+
+Buttons for approving or rejecting, with a reason prompt for rejections.
+
+Approvals Queue, Expense Detail
+
+Comment Thread
+
+A simple back-and-forth message thread.
+
+Expense Detail (reviewer view)
+
+Chart Widget
+
+A shared component for pie charts and line charts.
+
+Project Detail, Reports, Company Dashboard
+
+Empty State
+
+A friendly message and icon shown when a list has nothing to display.
+
+All list screens
+
+Error State
+
+A message and retry button shown when something fails to load.
+
+All screens that load data
+
+Loading Skeleton
+
+A placeholder shown while data is loading.
+
+All list and dashboard screens
+
+Role Badge
+
+A small label showing a user's role.
+
+Profile, Employee Detail
+
+Notification Banner
+
+A brief on-screen message confirming an action succeeded or failed.
+
+Shown app-wide after key actions
+
+Bottom Navigation Bar
+
+The main navigation bar, which changes based on the user's role.
+
+Present throughout the app
+
+Search Bar
+
+A simple search input for filtering a list.
+
+My Expenses, Approvals Queue, User Management
+
+6. States Every List or Data Screen Must Handle
+
+Any screen that loads information from the server must be able to show each of the following, so the app never appears broken or unresponsive:
+
+Loading — shown as a placeholder shape matching the eventual content, not just a spinning icon
+
+Empty — a friendly message with a clear next step, for example "No expenses yet — tap + to add one"
+
+Error — a clear message with a retry option, including a specific message when the device has no internet connection
+
+Populated — the normal, fully loaded view
+
+Pull-to-refresh — available on every list screen so users can manually refresh
+
+7. Device Permissions Required
+
+The app will need the following permissions from the device to function correctly:
+
+Camera and photo library access, for attaching receipt photos
+
+Push notification permission, to deliver approval and budget alerts
+
+Secure local storage, to keep the user signed in safely between sessions
+
+Location access (optional, for a future version) — only needed if travel expenses are tagged with GPS location later
+
+8. Not Included in This Version
+
+The following are intentionally left out of the first version of the app, in line with the current phase of the backend project. They may be added in a future version.
+
+A separate portal for clients outside the company
+
+Invoicing and billing screens
+
+Automatic detection of unusual or suspicious expenses
+
+Switching between multiple companies from one app install — this version supports a single company only
+
+9. Recommended Order of Development
+
+To allow the team to test a working version of the app as early as possible, screens should be built in the following order:
+
+Stage
+
+Focus
+
+Screens Included
+
+Stage 1
+
+Core experience
+
+Splash, Login, Home (Employee view), Submit Expense, My Expenses, Expense Detail
+
+Stage 2
+
+Approval process
+
+Approvals Queue, Expense Detail (reviewer view), Notifications
+
+Stage 3
+
+Projects and management
+
+Projects List, Project Detail, Add/Edit Project, Add Revenue
+
+Stage 4
+
+Administration and reporting
+
+User Management, Category Management, Reports, Company Dashboard
+
+Stage 5
+
+Refinement
+
+Tasks, Employee Detail, Audit Log, Settings, and final review of loading/empty/error states across the app
+
+End of document. For questions about any requirement in this document, contact the product owner before making assumptions during development.

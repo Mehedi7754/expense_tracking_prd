@@ -1,0 +1,105 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/widgets/app_bottom_nav_bar.dart';
+import '../models/expense_model.dart';
+import '../models/user_role.dart';
+import '../state/auth_provider.dart';
+import '../state/expense_provider.dart';
+import '../state/notification_provider.dart';
+import 'admin/company_hub_screen.dart';
+import 'approvals/approvals_queue_screen.dart';
+import 'expenses/my_expenses_screen.dart';
+import 'expenses/submit_expense_screen.dart';
+import 'home/home_dashboard_screen.dart';
+import 'notifications/notifications_screen.dart';
+import 'profile/profile_screen.dart';
+import 'projects/projects_list_screen.dart';
+import 'reports/reports_screen.dart';
+
+class MainShellScreen extends ConsumerStatefulWidget {
+  const MainShellScreen({super.key});
+
+  @override
+  ConsumerState<MainShellScreen> createState() => _MainShellScreenState();
+}
+
+class _MainShellScreenState extends ConsumerState<MainShellScreen> {
+  int _currentIndex = 0;
+  UserRole? _lastRole;
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.currentUser;
+    final role = user?.role ?? UserRole.employee;
+
+    // Reset tab to 0 if the role was switched
+    if (_lastRole != role) {
+      _lastRole = role;
+      _currentIndex = 0;
+    }
+
+    final expenses = ref.watch(expenseProvider);
+    final pendingCount = expenses.where((e) => e.status == ExpenseStatus.pending).length;
+
+    final notifications = ref.watch(notificationProvider);
+    final unreadNotifsCount = notifications.where((n) {
+      if (user == null) return false;
+      return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
+    }).length;
+
+    // Build the 5 screens dynamically based on PRD Section 3
+    final List<Widget> screens = _getScreensForRole(role);
+
+    return Scaffold(
+      body: IndexedStack(
+        index: _currentIndex.clamp(0, screens.length - 1),
+        children: screens,
+      ),
+      bottomNavigationBar: AppBottomNavBar(
+        role: role,
+        currentIndex: _currentIndex,
+        pendingApprovalsCount: pendingCount,
+        unreadNotificationsCount: unreadNotifsCount,
+        onTap: (index) {
+          setState(() => _currentIndex = index);
+        },
+      ),
+    );
+  }
+
+  List<Widget> _getScreensForRole(UserRole role) {
+    switch (role) {
+      case UserRole.employee:
+        // Employee: Home, Submit Expense, My Expenses, Notifications, Profile (PRD Section 3)
+        return const [
+          HomeDashboardScreen(),
+          SubmitExpenseScreen(),
+          MyExpensesScreen(),
+          NotificationsScreen(),
+          ProfileScreen(),
+        ];
+
+      case UserRole.manager:
+      case UserRole.finance:
+        // Manager / Finance: Home, Approvals, Projects, Reports, Profile (PRD Section 3)
+        return const [
+          HomeDashboardScreen(),
+          ApprovalsQueueScreen(),
+          ProjectsListScreen(),
+          ReportsScreen(),
+          ProfileScreen(),
+        ];
+
+      case UserRole.admin:
+        // Administrator: Home, Approvals, Company, Reports, Profile (PRD Section 3)
+        return const [
+          HomeDashboardScreen(),
+          ApprovalsQueueScreen(),
+          CompanyHubScreen(),
+          ReportsScreen(),
+          ProfileScreen(),
+        ];
+    }
+  }
+}
