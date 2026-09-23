@@ -77,10 +77,10 @@ class _AddRevenueScreenState extends ConsumerState<AddRevenueScreen> {
   Widget build(BuildContext context) {
     final projects = ref.watch(projectProvider);
     final user = ref.watch(authProvider).currentUser;
-    final role = user?.role ?? UserRole.employee;
+    final role = user?.role ?? UserRole.projectMember;
 
     // Permissions check: Finance and Admin only (PRD Section 4.4)
-    if (role != UserRole.finance && role != UserRole.admin) {
+    if (role != UserRole.finance && role != UserRole.mainAdmin) {
       return Scaffold(
         appBar: AppBar(title: const Text('Add Revenue')),
         body: const Center(child: Text('Only Finance and Administrators can record revenue.')),

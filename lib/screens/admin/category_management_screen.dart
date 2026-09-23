@@ -148,6 +148,7 @@ class CategoryManagementScreen extends ConsumerWidget {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'admin_add_category_fab',
         onPressed: () => _showAddEditDialog(context, ref),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textWhite,

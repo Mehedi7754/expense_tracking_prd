@@ -1,20 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/approve_reject_dialog.dart';
-import '../../core/widgets/custom_filter_panel.dart';
-import '../../core/widgets/custom_search_bar.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
-import '../../state/category_provider.dart';
 import '../../state/expense_provider.dart';
-import '../../state/project_provider.dart';
-import '../../state/user_management_provider.dart';
 
 class ApprovalsQueueScreen extends ConsumerStatefulWidget {
   const ApprovalsQueueScreen({super.key});
@@ -24,260 +17,162 @@ class ApprovalsQueueScreen extends ConsumerStatefulWidget {
 }
 
 class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
-  bool _isMultiSelectMode = false;
-  final Set<String> _selectedExpenseIds = {};
+  String _activeFilter = 'all'; // all, highAmount, noReceipt, hasReceipt
   String _searchQuery = '';
-  FilterCriteria _filterCriteria = const FilterCriteria();
 
-  void _toggleSelectAll(List<ExpenseModel> pendingList) {
-    setState(() {
-      if (_selectedExpenseIds.length == pendingList.length) {
-        _selectedExpenseIds.clear();
-      } else {
-        _selectedExpenseIds.clear();
-        _selectedExpenseIds.addAll(pendingList.map((e) => e.id));
-      }
-    });
-  }
-
-  void _openFilter(List<dynamic> projects, List<dynamic> categories, List<dynamic> users) {
-    CustomFilterPanel.show(
-      context,
-      initialCriteria: _filterCriteria,
-      projects: projects.map((p) => {'id': p.id as String, 'name': p.name as String}).toList(),
-      categories: categories.map((c) => {'id': c.id as String, 'name': c.name as String}).toList(),
-      employees: users.map((u) => {'id': u.id as String, 'name': u.name as String}).toList(),
-      showEmployeeFilter: true,
-      showStatusFilter: false, // Queue is exclusively pending
-      onApply: (criteria) => setState(() => _filterCriteria = criteria),
-    );
-  }
-
-  Future<void> _handleInlineApprove(ExpenseModel expense) async {
+  Future<void> _handleApprove(ExpenseModel expense) async {
     final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
       context,
-      title: 'Approve Expense',
+      title: 'Approve Claim',
       message: 'Approve ${CurrencyFormatter.format(expense.amount)} claim by ${expense.employeeName}?',
     );
 
     if (confirm && mounted) {
       ref.read(expenseProvider.notifier).approveExpense(expense.id);
-      NotificationBanner.showSuccess(context, 'Expense approved for ${expense.employeeName}.');
+      NotificationBanner.showSuccess(context, 'Claim approved for ${expense.employeeName}.');
     }
   }
 
-  Future<void> _handleInlineReject(ExpenseModel expense) async {
+  Future<void> _handleReject(ExpenseModel expense) async {
     final reason = await ApproveRejectDialog.showRejectDialog(
       context,
-      title: 'Reject Expense Claim',
+      title: 'Reject Claim',
       subtitle: 'Provide a reason for ${expense.employeeName}.',
     );
 
     if (reason != null && mounted) {
       ref.read(expenseProvider.notifier).rejectExpense(expense.id, reason);
-      NotificationBanner.showWarning(context, 'Expense claim rejected.');
-    }
-  }
-
-  Future<void> _handleBatchApprove() async {
-    if (_selectedExpenseIds.isEmpty) return;
-
-    final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
-      context,
-      title: 'Batch Approve Claims',
-      message: 'Approve ${_selectedExpenseIds.length} selected expenses simultaneously?',
-    );
-
-    if (confirm && mounted) {
-      ref.read(expenseProvider.notifier).batchApprove(_selectedExpenseIds.toList());
-      NotificationBanner.showSuccess(
-        context,
-        '${_selectedExpenseIds.length} expenses approved simultaneously.',
-      );
-      setState(() {
-        _selectedExpenseIds.clear();
-        _isMultiSelectMode = false;
-      });
-    }
-  }
-
-  Future<void> _handleBatchReject() async {
-    if (_selectedExpenseIds.isEmpty) return;
-
-    final reason = await ApproveRejectDialog.showRejectDialog(
-      context,
-      title: 'Batch Reject Claims',
-      subtitle: 'Provide a rejection justification for all ${_selectedExpenseIds.length} claims.',
-    );
-
-    if (reason != null && mounted) {
-      ref.read(expenseProvider.notifier).batchReject(_selectedExpenseIds.toList(), reason);
-      NotificationBanner.showWarning(
-        context,
-        '${_selectedExpenseIds.length} expenses rejected simultaneously.',
-      );
-      setState(() {
-        _selectedExpenseIds.clear();
-        _isMultiSelectMode = false;
-      });
+      NotificationBanner.showWarning(context, 'Claim rejected.');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     final allExpenses = ref.watch(expenseProvider);
-    final allProjects = ref.watch(projectProvider);
-    final allCategories = ref.watch(categoryProvider);
-    final allUsers = ref.watch(userManagementProvider);
+    final pendingExpenses = allExpenses.where((e) => e.status == ExpenseStatus.pending).toList();
 
-    // Filter pending expenses across projects reviewer is assigned to
-    final pendingExpenses = allExpenses.where((e) {
-      if (e.status != ExpenseStatus.pending) return false;
-
-      // Search filter
+    // Filter logic
+    final filtered = pendingExpenses.where((e) {
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final match = e.employeeName.toLowerCase().contains(q) ||
             e.projectName.toLowerCase().contains(q) ||
-            e.categoryName.toLowerCase().contains(q) ||
-            e.note.toLowerCase().contains(q) ||
-            e.amount.toString().contains(q);
+            e.categoryName.toLowerCase().contains(q);
         if (!match) return false;
       }
-
-      // Filter panel filters
-      if (_filterCriteria.projectId != null && e.projectId != _filterCriteria.projectId) return false;
-      if (_filterCriteria.categoryId != null && e.categoryId != _filterCriteria.categoryId) return false;
-      if (_filterCriteria.employeeId != null && e.employeeId != _filterCriteria.employeeId) return false;
-
+      if (_activeFilter == 'highAmount' && e.amount < 10000) return false;
+      if (_activeFilter == 'noReceipt' && e.hasReceipt) return false;
+      if (_activeFilter == 'hasReceipt' && !e.hasReceipt) return false;
       return true;
     }).toList();
 
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: AppColors.getBackground(context),
+      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Row(
           children: [
-            const Text('Approvals Queue'),
             Text(
-              '${pendingExpenses.length} claims waiting for decision',
-              style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
+              'Approvals (${pendingExpenses.length})',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
             ),
+            if (pendingExpenses.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${pendingExpenses.length} Pending',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFEF4444),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
-        actions: [
-          // Toggle Multi-Select Mode
-          IconButton(
-            icon: Icon(
-              _isMultiSelectMode ? Icons.checklist_rtl_rounded : Icons.checklist_rounded,
-              color: _isMultiSelectMode ? AppColors.indigo : (isDark ? AppColors.darkTextPrimary : AppColors.textPrimary),
-            ),
-            tooltip: _isMultiSelectMode ? 'Exit Batch Mode' : 'Batch Select Mode',
-            onPressed: () {
-              setState(() {
-                _isMultiSelectMode = !_isMultiSelectMode;
-                if (!_isMultiSelectMode) _selectedExpenseIds.clear();
-              });
-            },
-          ),
-          IconButton(
-            icon: Badge(
-              isLabelVisible: _filterCriteria.isActive,
-              child: const Icon(Icons.filter_list_rounded),
-            ),
-            tooltip: 'Filter Queue',
-            onPressed: () => _openFilter(allProjects, allCategories, allUsers),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Search Input
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: CustomSearchBar(
-              hintText: 'Search by employee, project, or amount...',
-              initialValue: _searchQuery,
-              onChanged: (q) => setState(() => _searchQuery = q),
-            ),
-          ),
-
-          // Multi-Select Action Banner
-          if (_isMultiSelectMode) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: isDark ? AppColors.indigo.withValues(alpha: 0.2) : AppColors.indigoLight,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+                ),
+              ),
               child: Row(
                 children: [
-                  Checkbox(
-                    value: pendingExpenses.isNotEmpty &&
-                        _selectedExpenseIds.length == pendingExpenses.length,
-                    onChanged: (_) => _toggleSelectAll(pendingExpenses),
-                  ),
-                  Text(
-                    '${_selectedExpenseIds.length} Selected',
-                    style: AppTextStyles.labelMedium.copyWith(color: AppColors.indigoDark),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.crimson),
-                    label: Text('Reject (${_selectedExpenseIds.length})',
-                        style: AppTextStyles.labelSmall.copyWith(color: AppColors.crimson)),
-                    onPressed: _selectedExpenseIds.isEmpty ? null : _handleBatchReject,
-                  ),
-                  const SizedBox(width: 6),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.check_rounded, size: 16),
-                    label: Text('Approve (${_selectedExpenseIds.length})'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.emerald,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      onChanged: (q) => setState(() => _searchQuery = q),
+                      style: const TextStyle(fontSize: 13),
+                      decoration: const InputDecoration(
+                        hintText: 'Search claimant, project...',
+                        hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                    onPressed: _selectedExpenseIds.isEmpty ? null : _handleBatchApprove,
                   ),
                 ],
               ),
             ),
-          ],
+          ),
 
-          // Queue List
+          // Filter Pills
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Row(
+              children: [
+                _buildFilterPill('All (${pendingExpenses.length})', 'all', isDark),
+                const SizedBox(width: 6),
+                _buildFilterPill('High Amount (>৳10k)', 'highAmount', isDark),
+                const SizedBox(width: 6),
+                _buildFilterPill('No Receipt', 'noReceipt', isDark),
+                const SizedBox(width: 6),
+                _buildFilterPill('With Receipt', 'hasReceipt', isDark),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          // Minimalist Approval Cards List
           Expanded(
-            child: pendingExpenses.isEmpty
+            child: filtered.isEmpty
                 ? EmptyStateWidget(
                     icon: Icons.done_all_rounded,
-                    title: 'Approvals Queue Clear',
-                    message: _searchQuery.isNotEmpty || _filterCriteria.isActive
-                        ? 'No pending claims matched your filter criteria.'
-                        : 'No pending expense claims currently require your review.',
+                    title: 'All Caught Up!',
+                    message: pendingExpenses.isEmpty
+                        ? 'There are no pending expense claims requiring your approval.'
+                        : 'No pending claims match your search/filter.',
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                    itemCount: pendingExpenses.length,
+                    padding: const EdgeInsets.only(bottom: 24, top: 4),
+                    itemCount: filtered.length,
                     itemBuilder: (ctx, i) {
-                      final exp = pendingExpenses[i];
-                      final isSelected = _selectedExpenseIds.contains(exp.id);
-
-                      return _QueueItemCard(
-                        expense: exp,
-                        isMultiSelectMode: _isMultiSelectMode,
-                        isSelected: isSelected,
-                        onToggleSelect: () {
-                          setState(() {
-                            if (isSelected) {
-                              _selectedExpenseIds.remove(exp.id);
-                            } else {
-                              _selectedExpenseIds.add(exp.id);
-                            }
-                          });
-                        },
-                        onTap: () => context.push('/expenses/${exp.id}'),
-                        onApprove: () => _handleInlineApprove(exp),
-                        onReject: () => _handleInlineReject(exp),
-                      );
+                      final exp = filtered[i];
+                      return _buildApprovalCard(context, exp, isDark);
                     },
                   ),
           ),
@@ -285,170 +180,228 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
       ),
     );
   }
-}
 
-class _QueueItemCard extends StatelessWidget {
-  final ExpenseModel expense;
-  final bool isMultiSelectMode;
-  final bool isSelected;
-  final VoidCallback onToggleSelect;
-  final VoidCallback onTap;
-  final VoidCallback onApprove;
-  final VoidCallback onReject;
+  Widget _buildApprovalCard(BuildContext context, ExpenseModel exp, bool isDark) {
+    Color iconColor;
+    Color iconBg;
+    IconData icon;
 
-  const _QueueItemCard({
-    required this.expense,
-    required this.isMultiSelectMode,
-    required this.isSelected,
-    required this.onToggleSelect,
-    required this.onTap,
-    required this.onApprove,
-    required this.onReject,
-  });
+    switch (exp.categoryId.toLowerCase()) {
+      case 'food':
+        iconColor = const Color(0xFFF59E0B);
+        iconBg = const Color(0xFFFFFBEB);
+        icon = Icons.restaurant_rounded;
+        break;
+      case 'transportation':
+        iconColor = const Color(0xFF0D9488);
+        iconBg = const Color(0xFFF0FDFA);
+        icon = Icons.directions_car_rounded;
+        break;
+      case 'equipment':
+        iconColor = const Color(0xFF4F46E5);
+        iconBg = const Color(0xFFEEF2FF);
+        icon = Icons.construction_rounded;
+        break;
+      case 'accommodation':
+        iconColor = const Color(0xFF8B5CF6);
+        iconBg = const Color(0xFFF5F3FF);
+        icon = Icons.hotel_rounded;
+        break;
+      default:
+        iconColor = const Color(0xFF0284C7);
+        iconBg = const Color(0xFFF0F9FF);
+        icon = Icons.receipt_rounded;
+        break;
+    }
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (isDark) {
+      iconBg = iconColor.withAlpha(25);
+    }
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isSelected
-            ? (isDark ? AppColors.indigo.withValues(alpha: 0.25) : AppColors.indigoLight.withValues(alpha: 0.3))
-            : AppColors.getSurface(context),
-        borderRadius: BorderRadius.circular(16),
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isSelected ? AppColors.indigo : AppColors.getBorder(context),
-          width: isSelected ? 1.5 : 1,
+          color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9),
+          width: 1.0,
         ),
-        boxShadow: AppColors.cardShadow,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(isDark ? 25 : 8),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: isMultiSelectMode ? onToggleSelect : onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top Row: Squircle icon + Employee & Project + Amount
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Employee header & Amount
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isMultiSelectMode) ...[
-                    Checkbox(
-                      value: isSelected,
-                      onChanged: (_) => onToggleSelect(),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Center(child: Icon(icon, color: iconColor, size: 22)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exp.employeeName,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
-                  // Avatar initials
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
-                    child: Text(
-                      expense.employeeName.isNotEmpty ? expense.employeeName[0] : 'U',
-                      style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    CurrencyFormatter.format(exp.amount),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          expense.employeeName,
-                          style: AppTextStyles.titleSmall.copyWith(fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                         ),
-                        Text(
-                          '${expense.projectName} • ${DateFormatter.formatShort(expense.date)}',
-                          style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        exp.hasReceipt ? 'Receipt' : 'No Receipt',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                         ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 110),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            CurrencyFormatter.format(expense.amount, currency: expense.currency),
-                            style: AppTextStyles.currencySmall.copyWith(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          expense.categoryName,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            fontSize: 11,
-                            color: AppColors.getTextMuted(context),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              // Note preview
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkSurfaceElevated : AppColors.surfaceSubtle,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  expense.note,
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextSecondary(context)),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+            ],
+          ),
+
+          if (exp.note.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              exp.note,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          // Action Buttons: Approve (soft green) & Reject (soft red)
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _handleReject(exp),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFFEF4444),
+                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: EdgeInsets.zero,
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  ),
                 ),
               ),
-
-              // Inline Action Buttons (PRD Section 4.4: quick review directly from list)
-              if (!isMultiSelectMode) ...[
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.close_rounded, size: 16, color: AppColors.crimson),
-                      label: Text('Reject', style: AppTextStyles.labelSmall.copyWith(color: AppColors.crimson)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        side: const BorderSide(color: AppColors.crimsonBorder),
-                      ),
-                      onPressed: onReject,
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _handleApprove(exp),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: EdgeInsets.zero,
                     ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.check_rounded, size: 16),
-                      label: const Text('Approve'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.emerald,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      ),
-                      onPressed: onApprove,
-                    ),
-                  ],
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  ),
                 ),
-              ],
+              ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterPill(String label, String value, bool isDark) {
+    final isSelected = _activeFilter == value;
+
+    return InkWell(
+      onTap: () => setState(() => _activeFilter = value),
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF4F46E5)
+              : (isDark ? AppColors.darkSurface : Colors.white),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF4F46E5)
+                : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected
+                ? Colors.white
+                : (isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
           ),
         ),
       ),

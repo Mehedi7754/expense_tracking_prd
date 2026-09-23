@@ -92,7 +92,7 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (ctx, index) {
                 final c = widget.comments[index];
-                final isReviewer = c.authorRole != UserRole.employee;
+                final isReviewer = c.authorRole != UserRole.projectMember;
 
                 return Container(
                   padding: const EdgeInsets.all(12),

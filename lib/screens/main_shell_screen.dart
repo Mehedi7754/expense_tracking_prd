@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../core/routing/route_paths.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
 import '../models/expense_model.dart';
 import '../models/user_role.dart';
 import '../state/auth_provider.dart';
 import '../state/expense_provider.dart';
 import '../state/notification_provider.dart';
-import 'admin/company_hub_screen.dart';
 import 'approvals/approvals_queue_screen.dart';
 import 'expenses/my_expenses_screen.dart';
-import 'expenses/submit_expense_screen.dart';
+import 'expenses/receipt_compliance_screen.dart';
 import 'home/home_dashboard_screen.dart';
-import 'notifications/notifications_screen.dart';
 import 'profile/profile_screen.dart';
 import 'projects/projects_list_screen.dart';
 import 'reports/reports_screen.dart';
@@ -31,7 +31,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.currentUser;
-    final role = user?.role ?? UserRole.employee;
+    final role = user?.role ?? UserRole.projectMember;
 
     // Reset tab to 0 if the role was switched
     if (_lastRole != role) {
@@ -48,7 +48,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
     }).length;
 
-    // Build the 5 screens dynamically based on PRD Section 3
     final List<Widget> screens = _getScreensForRole(role);
 
     return Scaffold(
@@ -64,39 +63,38 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         onTap: (index) {
           setState(() => _currentIndex = index);
         },
+        onAddTap: () {
+          // Centered Floating '+' Button action
+          context.push(RoutePaths.submitExpense);
+        },
       ),
     );
   }
 
   List<Widget> _getScreensForRole(UserRole role) {
     switch (role) {
-      case UserRole.employee:
-        // Employee: Home, Submit Expense, My Expenses, Notifications, Profile (PRD Section 3)
+      case UserRole.projectMember:
         return const [
           HomeDashboardScreen(),
-          SubmitExpenseScreen(),
           MyExpensesScreen(),
-          NotificationsScreen(),
+          ReceiptComplianceScreen(),
           ProfileScreen(),
         ];
 
-      case UserRole.manager:
+      case UserRole.projectManager:
       case UserRole.finance:
-        // Manager / Finance: Home, Approvals, Projects, Reports, Profile (PRD Section 3)
+      case UserRole.mainAdmin:
         return const [
           HomeDashboardScreen(),
-          ApprovalsQueueScreen(),
           ProjectsListScreen(),
-          ReportsScreen(),
+          ApprovalsQueueScreen(),
           ProfileScreen(),
         ];
 
-      case UserRole.admin:
-        // Administrator: Home, Approvals, Company, Reports, Profile (PRD Section 3)
+      case UserRole.viewer:
         return const [
           HomeDashboardScreen(),
-          ApprovalsQueueScreen(),
-          CompanyHubScreen(),
+          ProjectsListScreen(),
           ReportsScreen(),
           ProfileScreen(),
         ];

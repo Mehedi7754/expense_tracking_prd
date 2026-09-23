@@ -170,6 +170,7 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
         ),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'my_expenses_fab',
         onPressed: () => context.push(RoutePaths.submitExpense),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textWhite,

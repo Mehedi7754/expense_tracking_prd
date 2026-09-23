@@ -24,34 +24,38 @@ void main() {
   test('Domain Model and Role-based permissions test', () {
     final container = ProviderContainer();
 
-    // Verify initial auth state starts unauthenticated (showing Splash -> Login)
+    // Verify initial auth state starts authenticated with Demo Main Admin
     final initialAuth = container.read(authProvider);
-    expect(initialAuth.isAuthenticated, false);
-    expect(initialAuth.currentUser, null);
+    expect(initialAuth.isAuthenticated, true);
+    expect(initialAuth.currentUser?.role, UserRole.mainAdmin);
 
-    // Switch to employee or perform login
-    container.read(authProvider.notifier).switchRole(UserRole.employee);
+    // Switch to Project Member (Fahim)
+    container.read(authProvider.notifier).switchRole(UserRole.projectMember);
     final auth = container.read(authProvider);
     expect(auth.isAuthenticated, true);
-    expect(auth.currentUser?.role, UserRole.employee);
+    expect(auth.currentUser?.role, UserRole.projectMember);
 
-    // Verify projects and expenses providers are pre-seeded
+    // Verify projects and expenses providers are pre-seeded with Bangladesh consultancy data
     final projects = container.read(projectProvider);
     expect(projects.isNotEmpty, true);
 
     final expenses = container.read(expenseProvider);
     expect(expenses.isNotEmpty, true);
 
-    // Test role switching to Manager
-    container.read(authProvider.notifier).switchRole(UserRole.manager);
-    expect(container.read(authProvider).currentUser?.role, UserRole.manager);
+    // Test role switching to Project Manager
+    container.read(authProvider.notifier).switchRole(UserRole.projectManager);
+    expect(container.read(authProvider).currentUser?.role, UserRole.projectManager);
 
     // Test role switching to Finance
     container.read(authProvider.notifier).switchRole(UserRole.finance);
     expect(container.read(authProvider).currentUser?.role, UserRole.finance);
 
-    // Test role switching to Administrator
-    container.read(authProvider.notifier).switchRole(UserRole.admin);
-    expect(container.read(authProvider).currentUser?.role, UserRole.admin);
+    // Test role switching to Main Admin
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+    expect(container.read(authProvider).currentUser?.role, UserRole.mainAdmin);
+
+    // Test role switching to Viewer
+    container.read(authProvider.notifier).switchRole(UserRole.viewer);
+    expect(container.read(authProvider).currentUser?.role, UserRole.viewer);
   });
 }

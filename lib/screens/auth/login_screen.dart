@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/routing/route_paths.dart';
-import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -15,7 +15,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController(text: 'alex.morgan@company.com');
+  final _emailController = TextEditingController(text: 'admin@pfis.com');
   final _passwordController = TextEditingController(text: 'password123');
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
@@ -40,176 +40,207 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _selectDemoPersona(UserRole role) {
-    ref.read(authProvider.notifier).switchRole(role);
-    final user = ref.read(authProvider).currentUser;
-    if (user != null) {
-      _emailController.text = user.email;
-      _passwordController.text = 'password123';
-      context.go(RoutePaths.home);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: AppColors.getBackground(context),
+      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
+              constraints: const BoxConstraints(maxWidth: 460),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Logo mark
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: AppColors.cardShadow,
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.account_balance_wallet_rounded,
-                        color: AppColors.textWhite,
-                        size: 26,
+                  // PRD Section 1: Company Logo & Branding
+                  Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF4F46E5).withAlpha(46),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.account_balance_wallet_rounded,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 14),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppConstants.appName,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 1.5,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            AppConstants.appFullName,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
-                  Text('Welcome back', style: AppTextStyles.displayMedium),
+                  Text('Executive Sign In', style: AppTextStyles.displayMedium),
                   const SizedBox(height: 6),
-                  Text(
-                    'Sign in with your enterprise credentials to manage expenses and project budgets.',
-                    style: AppTextStyles.bodyMedium,
+                  const Text(
+                    'Real-time project cost monitoring, receipt compliance, and profitability forecasting.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   // Card Form Container
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: AppColors.getSurface(context),
+                      color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.getBorder(context), width: 1),
-                      boxShadow: AppColors.cardShadow,
+                      border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                     ),
                     child: Form(
                       key: _formKey,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (authState.errorMessage != null) ...[
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: AppColors.crimsonLight,
+                                color: AppColors.error.withAlpha(20),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: AppColors.crimsonBorder),
+                                border: Border.all(color: AppColors.error.withAlpha(60)),
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.error_outline_rounded,
-                                      size: 18, color: AppColors.crimson),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      authState.errorMessage!,
-                                      style: AppTextStyles.bodySmall.copyWith(
-                                        color: AppColors.crimsonDark,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                authState.errorMessage!,
+                                style: const TextStyle(color: AppColors.error, fontSize: 13),
                               ),
                             ),
-                            const SizedBox(height: 18),
+                            const SizedBox(height: 16),
                           ],
-                          Text('Work Email', style: AppTextStyles.labelMedium),
-                          const SizedBox(height: 6),
+
+                          // Email / Username
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
-                              hintText: 'name@company.com',
-                              prefixIcon: Icon(Icons.mail_outline_rounded, size: 20),
+                              labelText: 'Email / Username',
+                              prefixIcon: Icon(Icons.person_outline_rounded),
                             ),
-                            validator: (val) {
-                              if (val == null || val.trim().isEmpty) {
-                                return 'Please enter your work email';
-                              }
-                              if (!val.contains('@') || !val.contains('.')) {
-                                return 'Please enter a valid email address';
-                              }
-                              return null;
-                            },
+                            validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter email' : null,
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text('Password', style: AppTextStyles.labelMedium),
-                              GestureDetector(
-                                onTap: () => context.push(RoutePaths.forgotPassword),
-                                child: Text(
-                                  'Forgot Password?',
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 16),
+
+                          // Password
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             decoration: InputDecoration(
-                              hintText: '••••••••••••',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                              labelText: 'Password',
+                              prefixIcon: const Icon(Icons.lock_outline_rounded),
                               suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  size: 20,
-                                  color: AppColors.textMuted,
-                                ),
-                                onPressed: () {
-                                  setState(() => _obscurePassword = !_obscurePassword);
-                                },
+                                icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                               ),
                             ),
-                            validator: (val) {
-                              if (val == null || val.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              return null;
-                            },
+                            validator: (v) => (v == null || v.length < 3) ? 'Enter password' : null,
                           ),
-                          const SizedBox(height: 26),
-                          SizedBox(
-                            width: double.infinity,
+                          const SizedBox(height: 10),
+
+                          // Forgot Password
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () => context.push(RoutePaths.forgotPassword),
+                              child: const Text('Forgot Password?'),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Sign In Button
+                          Container(
+                            height: 50,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF4F46E5).withAlpha(50),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
                             child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
                               onPressed: authState.isLoading ? null : _handleLogin,
                               child: authState.isLoading
-                                  ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                  : const Text('Sign In to PFIS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Register Link (responsive Wrap to prevent overflow on small screens)
+                          Center(
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  "Don't have an account? ",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () => context.push(RoutePaths.register),
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                                    child: Text(
+                                      'Register / Sign Up',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark ? AppColors.darkPrimary : AppColors.primary,
                                       ),
-                                    )
-                                  : const Text('Sign In to Account'),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -217,117 +248,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 28),
-
-                  // Quick Demo Role Switcher
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? AppColors.darkSurfaceSubtle
-                          : AppColors.surfaceSubtle.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.getBorder(context), width: 1),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.bolt_rounded, size: 16, color: AppColors.amber),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Instant Role Switcher (1-Tap Demo)',
-                              style: AppTextStyles.labelSmall.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.getTextPrimary(context),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _DemoPersonaChip(
-                              label: 'Employee (Alex)',
-                              role: UserRole.employee,
-                              onTap: () => _selectDemoPersona(UserRole.employee),
-                            ),
-                            _DemoPersonaChip(
-                              label: 'Manager (Sarah)',
-                              role: UserRole.manager,
-                              onTap: () => _selectDemoPersona(UserRole.manager),
-                            ),
-                            _DemoPersonaChip(
-                              label: 'Finance (David)',
-                              role: UserRole.finance,
-                              onTap: () => _selectDemoPersona(UserRole.finance),
-                            ),
-                            _DemoPersonaChip(
-                              label: 'Admin (Eleanor)',
-                              role: UserRole.admin,
-                              onTap: () => _selectDemoPersona(UserRole.admin),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DemoPersonaChip extends StatelessWidget {
-  final String label;
-  final UserRole role;
-  final VoidCallback onTap;
-
-  const _DemoPersonaChip({
-    required this.label,
-    required this.role,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: AppColors.getSurface(context),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.getBorder(context)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: role == UserRole.employee
-                    ? AppColors.textSecondary
-                    : role == UserRole.manager
-                        ? AppColors.indigo
-                        : role == UserRole.finance
-                            ? AppColors.emerald
-                            : AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(label, style: AppTextStyles.labelSmall.copyWith(fontSize: 11)),
-          ],
         ),
       ),
     );

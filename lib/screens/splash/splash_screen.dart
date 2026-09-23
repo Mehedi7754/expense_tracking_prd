@@ -61,8 +61,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
       body: Center(
@@ -73,20 +71,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Custom Minimalist Brand Icon
+                // Custom Minimalist Brand Icon (Purple/Indigo Theme)
                 Container(
                   width: 76,
                   height: 76,
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: AppColors.floatingShadow(isDark),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4F46E5).withAlpha(50),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: const Center(
                     child: Icon(
                       Icons.account_balance_wallet_rounded,
                       size: 38,
-                      color: AppColors.textWhite,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -106,7 +114,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   height: 24,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4F46E5)),
                   ),
                 ),
               ],

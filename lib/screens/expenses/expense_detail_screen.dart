@@ -11,7 +11,6 @@ import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/receipt_uploader.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../models/expense_model.dart';
-import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 
@@ -38,10 +37,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
 
     final expense = expenseList.first;
     final isEmployeeOwner = user?.id == expense.employeeId;
-    final isReviewer = user != null &&
-        (user.role == UserRole.manager ||
-            user.role == UserRole.finance ||
-            user.role == UserRole.admin);
+    final isReviewer = user != null && user.role.canApproveExpenses;
 
     final isPending = expense.status == ExpenseStatus.pending;
     final isDark = Theme.of(context).brightness == Brightness.dark;

@@ -24,7 +24,7 @@ class _AddEditUserScreenState extends ConsumerState<AddEditUserScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _deptController = TextEditingController();
-  UserRole _selectedRole = UserRole.employee;
+  UserRole _selectedRole = UserRole.projectMember;
   bool _initialized = false;
   bool _isSaving = false;
 

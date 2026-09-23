@@ -29,6 +29,30 @@ class AppColors {
   static const Color primaryLight = Color(0xFF1E293B);
   static const Color primarySubtle = Color(0xFFE2E8F0);
 
+  // Modern Minimal Fintech Gradients (Reference Style)
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const LinearGradient accentFabGradient = LinearGradient(
+    colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // Convenient Aliases
+  static const Color lightBackground = background;
+  static const Color lightSurface = surface;
+  static const Color lightBorder = border;
+  static const Color lightTextPrimary = textPrimary;
+  static const Color lightTextSecondary = textSecondary;
+  static const Color lightTextMuted = textMuted;
+  static const Color error = crimson;
+  static const Color warning = amber;
+  static const Color success = emeraldAccent;
+
   // ==================== DARK THEME COLORS ====================
   static const Color darkBackground = Color(0xFF0A0F1D); // Deepest obsidian night
   static const Color darkSurface = Color(0xFF121A2C); // Rich elevated navy-slate card

@@ -87,6 +87,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               ],
             ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'admin_add_user_fab',
         onPressed: () => context.push(RoutePaths.addUser),
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.textWhite,

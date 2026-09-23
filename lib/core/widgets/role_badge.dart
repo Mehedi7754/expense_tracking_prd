@@ -20,12 +20,12 @@ class RoleBadge extends StatelessWidget {
     Color border;
 
     switch (role) {
-      case UserRole.employee:
+      case UserRole.projectMember:
         bg = AppColors.surfaceSubtle;
         text = AppColors.textSecondary;
         border = AppColors.border;
         break;
-      case UserRole.manager:
+      case UserRole.projectManager:
         bg = AppColors.indigoLight;
         text = AppColors.indigo;
         border = AppColors.indigoBorder;
@@ -35,10 +35,15 @@ class RoleBadge extends StatelessWidget {
         text = AppColors.emerald;
         border = AppColors.emeraldBorder;
         break;
-      case UserRole.admin:
+      case UserRole.mainAdmin:
         bg = AppColors.primarySubtle;
         text = AppColors.primary;
         border = AppColors.border;
+        break;
+      case UserRole.viewer:
+        bg = Colors.blue.withAlpha(20);
+        text = Colors.blue;
+        border = Colors.blue.withAlpha(60);
         break;
     }
 
@@ -56,7 +61,7 @@ class RoleBadge extends StatelessWidget {
         role.displayName,
         style: (compact ? AppTextStyles.labelSmall : AppTextStyles.labelMedium).copyWith(
           color: text,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
