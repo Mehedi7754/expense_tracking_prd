@@ -91,6 +91,11 @@ class RouterNotifier extends ChangeNotifier {
           role != UserRole.finance) {
         return RoutePaths.home;
       }
+
+      // Receipt Compliance guard (Auditors/Viewers restricted)
+      if (loc == RoutePaths.receiptCompliance && role == UserRole.viewer) {
+        return RoutePaths.home;
+      }
     }
 
     return null;

@@ -239,10 +239,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Project' : 'Create Project (PFIS)'),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(18),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(18),
           children: [
             // Section 1: Basic Information
             _buildSectionHeader(context, '1. Basic Information', Icons.info_outline_rounded),
@@ -556,7 +559,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {

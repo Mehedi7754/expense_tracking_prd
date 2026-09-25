@@ -167,6 +167,7 @@ class ProjectModel {
   final String name;
   final String description;
   final String client;
+  final String? clientId;
   final ClientType clientType;
   final AssignmentType assignmentType;
   final double grossProjectValue; // Contract Value in ৳
@@ -194,6 +195,7 @@ class ProjectModel {
     required this.name,
     required this.description,
     required this.client,
+    this.clientId,
     this.clientType = ClientType.private,
     this.assignmentType = AssignmentType.directConsultancy,
     required this.grossProjectValue,
@@ -225,6 +227,7 @@ class ProjectModel {
     String? name,
     String? description,
     String? client,
+    String? clientId,
     ClientType? clientType,
     AssignmentType? assignmentType,
     double? grossProjectValue,
@@ -252,6 +255,7 @@ class ProjectModel {
       name: name ?? this.name,
       description: description ?? this.description,
       client: client ?? this.client,
+      clientId: clientId ?? this.clientId,
       clientType: clientType ?? this.clientType,
       assignmentType: assignmentType ?? this.assignmentType,
       grossProjectValue: grossProjectValue ?? this.grossProjectValue,

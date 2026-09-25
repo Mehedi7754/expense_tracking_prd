@@ -70,9 +70,12 @@ class _CostEstimatorScreenState extends ConsumerState<CostEstimatorScreen> {
       appBar: AppBar(
         title: const Text('Historical Cost Estimator (PRD Section 22)', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
           // Introductory Banner
           Container(
             padding: const EdgeInsets.all(14),
@@ -301,7 +304,9 @@ class _CostEstimatorScreenState extends ConsumerState<CostEstimatorScreen> {
           ],
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildResultRow(String label, String value, Color color, {bool isBold = false}) {

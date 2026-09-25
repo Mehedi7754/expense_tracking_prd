@@ -10,54 +10,9 @@ class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   void _showChangePasswordDialog(BuildContext context) {
-    final currentPw = TextEditingController();
-    final newPw = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: currentPw,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Current Password'),
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: newPw,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'New Password (min 6 chars)'),
-                validator: (v) => v == null || v.length < 6 ? 'At least 6 characters' : null,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4F46E5),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx);
-                NotificationBanner.showSuccess(context, 'Password updated successfully.');
-              }
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
+      builder: (ctx) => const _ChangePasswordDialog(),
     );
   }
 
@@ -107,11 +62,14 @@ class ProfileScreen extends ConsumerWidget {
           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          children: [
-            // Minimalist Profile Card
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Column(
+              children: [
+                // Minimalist Profile Card
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -281,7 +239,9 @@ class ProfileScreen extends ConsumerWidget {
             ),
 
             const SizedBox(height: 24),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -385,5 +345,78 @@ class ProfileScreen extends ConsumerWidget {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
     return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  }
+}
+
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog();
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  late final TextEditingController _currentPw;
+  late final TextEditingController _newPw;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentPw = TextEditingController();
+    _newPw = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _currentPw.dispose();
+    _newPw.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _currentPw,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Current Password'),
+              validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _newPw,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New Password (min 6 chars)'),
+              validator: (v) => v == null || v.length < 6 ? 'At least 6 characters' : null,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4F46E5),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.pop(context);
+              NotificationBanner.showSuccess(context, 'Password updated successfully.');
+            }
+          },
+          child: const Text('Update'),
+        ),
+      ],
+    );
   }
 }

@@ -156,9 +156,10 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 540),
-          child: Form(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 580),
+            child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,6 +259,7 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

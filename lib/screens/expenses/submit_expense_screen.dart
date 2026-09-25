@@ -286,13 +286,16 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(18),
-          children: [
-            // Project Selector (PRD Section 1: Assigned projects only)
-            DropdownButtonFormField<ProjectModel>(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(18),
+              children: [
+                // Project Selector (PRD Section 1: Assigned projects only)
+                DropdownButtonFormField<ProjectModel>(
               isExpanded: true,
               value: _selectedProject,
               decoration: InputDecoration(
@@ -576,7 +579,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                       ),
                       Switch.adaptive(
                         value: _hasReceipt,
-                        activeColor: const Color(0xFF10B981),
+                        activeTrackColor: const Color(0xFF10B981),
                         onChanged: (v) => setState(() => _hasReceipt = v),
                       ),
                     ],
@@ -710,7 +713,9 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildCategoryChip(String id, String label, IconData icon, bool isDark) {

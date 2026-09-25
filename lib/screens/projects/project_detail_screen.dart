@@ -234,14 +234,19 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildOverviewTab(context, project, projectExpenses),
-          _buildBudgetVsActualTab(context, project, projectExpenses),
-          _buildExpensesTab(context, project, projectExpenses),
-          _buildRevenueAndClosingTab(context, project, projectExpenses, canClose),
-        ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 850),
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildOverviewTab(context, project, projectExpenses),
+              _buildBudgetVsActualTab(context, project, projectExpenses),
+              _buildExpensesTab(context, project, projectExpenses),
+              _buildRevenueAndClosingTab(context, project, projectExpenses, canClose),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -43,11 +43,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         : (role.canViewAllProjects
             ? allProjects
             : allProjects.where((p) => p.teamMemberIds.contains(user.id)).toList());
+    final visibleProjectIds = visibleProjects.map((p) => p.id).toSet();
     final visibleExpenses = user == null
         ? <ExpenseModel>[]
         : (role.canViewAllProjects
             ? allExpenses
-            : allExpenses.where((e) => e.employeeId == user.id || visibleProjects.any((p) => p.id == e.projectId)).toList());
+            : allExpenses.where((e) => e.employeeId == user.id || visibleProjectIds.contains(e.projectId)).toList());
 
     final notifications = ref.watch(notificationProvider);
     final unreadNotifsCount = notifications.where((n) {
@@ -194,17 +195,22 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.only(top: 8, bottom: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Main Body according to Role
-              if (role == UserRole.projectMember)
-                _buildMemberDashboard(context, ref, user!, visibleProjects, visibleExpenses)
-              else if (role == UserRole.viewer)
-                _buildViewerDashboard(context, ref, user!, visibleProjects, visibleExpenses)
-              else
-                _buildCompanyDashboard(context, ref, allProjects, allExpenses),
-            ],
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Main Body according to Role
+                  if (role == UserRole.projectMember)
+                    _buildMemberDashboard(context, ref, user!, visibleProjects, visibleExpenses)
+                  else if (role == UserRole.viewer)
+                    _buildViewerDashboard(context, ref, user!, visibleProjects, visibleExpenses)
+                  else
+                    _buildCompanyDashboard(context, ref, allProjects, allExpenses),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -221,14 +227,18 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Financial calculations
+    // Financial calculations - Optimized O(N+M) single pass direct cost map
     final activeProjects = projects.where((p) => p.status == ProjectStatus.ongoing).toList();
     final totalContractValue = projects.fold<double>(0.0, (sum, p) => sum + p.grossProjectValue);
 
+    final Map<String, double> directCostByProjectId = {};
+    for (final e in expenses) {
+      directCostByProjectId[e.projectId] = (directCostByProjectId[e.projectId] ?? 0.0) + e.amount;
+    }
+
     double totalCostIncurred = 0.0;
     for (final p in projects) {
-      final pExp = expenses.where((e) => e.projectId == p.id);
-      final directCost = pExp.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final directCost = directCostByProjectId[p.id] ?? 0.0;
       final officeBenefit = directCost * p.officeBenefitRate;
       totalCostIncurred += (directCost + officeBenefit);
     }
@@ -239,24 +249,23 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     final projectedProfit = totalContractValue - projectedFinalCost;
     final projectedProfitMargin = totalContractValue > 0 ? (projectedProfit / totalContractValue) * 100 : 0.0;
 
-    // Filter projects
+    // Filter projects using O(1) direct cost lookup
     final profitableProjects = projects.where((p) {
-      final pExp = expenses.where((e) => e.projectId == p.id);
-      final direct = pExp.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final direct = directCostByProjectId[p.id] ?? 0.0;
       final cost = direct * (1 + p.officeBenefitRate) + p.estimatedRemainingCost;
       final profit = p.grossProjectValue - cost;
       return p.grossProjectValue > 0 && (profit / p.grossProjectValue) >= 0.30;
     }).toList();
 
     final approachingProjects = projects.where((p) {
-      final pExp = expenses.where((e) => e.projectId == p.id);
-      final cost = pExp.fold<double>(0.0, (sum, e) => sum + e.amount) * (1 + p.officeBenefitRate);
+      final direct = directCostByProjectId[p.id] ?? 0.0;
+      final cost = direct * (1 + p.officeBenefitRate);
       return p.budget > 0 && cost >= (p.budget * 0.80) && cost <= p.budget;
     }).toList();
 
     final overBudgetProjects = projects.where((p) {
-      final pExp = expenses.where((e) => e.projectId == p.id);
-      final cost = pExp.fold<double>(0.0, (sum, e) => sum + e.amount) * (1 + p.officeBenefitRate);
+      final direct = directCostByProjectId[p.id] ?? 0.0;
+      final cost = direct * (1 + p.officeBenefitRate);
       return p.budget > 0 && cost > p.budget;
     }).toList();
 
@@ -808,15 +817,18 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               ],
             ),
             const SizedBox(height: 3),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+                maxLines: 1,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

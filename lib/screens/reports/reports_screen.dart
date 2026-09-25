@@ -46,9 +46,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 30, top: 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 850),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Minimal Hero Financial Card
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -254,7 +257,9 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildExportPill({

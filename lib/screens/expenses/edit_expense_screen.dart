@@ -199,54 +199,55 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ProjectDropdown(
-                  projects: allProjects,
-                  selectedProjectId: _selectedProject?.id,
-                  onChanged: (proj) {
-                    setState(() {
-                      _selectedProject = proj;
-                      _selectedTask = null;
-                    });
-                  },
-                ),
-                const SizedBox(height: 18),
-
-                if (_selectedProject != null && projectTasks.isNotEmpty) ...[
-                  DropdownButtonFormField<String>(
-                    value: _selectedTask?.id,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Linked Task (Optional)',
-                    ),
-                    items: [
-                      const DropdownMenuItem<String>(
-                        value: null,
-                        child: Text('None (General Project Expense)'),
-                      ),
-                      ...projectTasks.map((t) => DropdownMenuItem<String>(
-                            value: t.id,
-                            child: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          )),
-                    ],
-                    onChanged: (taskId) {
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ProjectDropdown(
+                    projects: allProjects,
+                    selectedProjectId: _selectedProject?.id,
+                    onChanged: (proj) {
                       setState(() {
-                        if (taskId == null) {
-                          _selectedTask = null;
-                        } else {
-                          _selectedTask = projectTasks.firstWhere((t) => t.id == taskId);
-                        }
+                        _selectedProject = proj;
+                        _selectedTask = null;
                       });
                     },
                   ),
                   const SizedBox(height: 18),
-                ],
+
+                  if (_selectedProject != null && projectTasks.isNotEmpty) ...[
+                    DropdownButtonFormField<String?>(
+                      value: _selectedTask?.id,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Linked Task (Optional)',
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('None (General Project Expense)'),
+                        ),
+                        ...projectTasks.map((t) => DropdownMenuItem<String?>(
+                              value: t.id,
+                              child: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            )),
+                      ],
+                      onChanged: (taskId) {
+                        setState(() {
+                          if (taskId == null) {
+                            _selectedTask = null;
+                          } else {
+                            _selectedTask = projectTasks.firstWhere((t) => t.id == taskId);
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                  ],
 
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -383,6 +384,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

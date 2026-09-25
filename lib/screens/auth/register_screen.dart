@@ -211,7 +211,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ),
                           const SizedBox(height: 8),
 
-                          // Role Selector Dropdown
+                          // Role Selector Dropdown (Restricted: Exclude Main Admin & Finance from public registration)
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                             decoration: BoxDecoration(
@@ -224,7 +224,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 value: _selectedRole,
                                 isExpanded: true,
                                 icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                                items: UserRole.values.map((role) {
+                                items: const [
+                                  UserRole.projectMember,
+                                  UserRole.projectManager,
+                                  UserRole.viewer,
+                                ].map((role) {
                                   return DropdownMenuItem<UserRole>(
                                     value: role,
                                     child: Row(
@@ -249,16 +253,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ),
                           const SizedBox(height: 6),
 
-                          // Role description pill
+                          // Role description pill & governance note
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withAlpha(12),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(
-                              _getRoleDescription(_selectedRole),
-                              style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _getRoleDescription(_selectedRole),
+                                  style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  '🔒 Executive roles (Main Admin, Finance) require internal IT provisioning.',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 14),

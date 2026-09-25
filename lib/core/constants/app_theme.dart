@@ -35,7 +35,7 @@ class AppTheme {
           statusBarIconBrightness: Brightness.dark,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -103,7 +103,7 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.crimson, width: 1.5),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surface,
         elevation: 4,
         shape: RoundedRectangleBorder(
@@ -131,7 +131,7 @@ class AppTheme {
         unselectedItemColor: AppColors.textMuted,
         type: BottomNavigationBarType.fixed,
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textMuted,
         labelStyle: AppTextStyles.titleSmall,
@@ -171,7 +171,7 @@ class AppTheme {
           statusBarIconBrightness: Brightness.light,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.darkSurface,
         elevation: 0,
         shape: RoundedRectangleBorder(
@@ -242,7 +242,7 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.crimsonAccent, width: 1.5),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: AppColors.darkSurface,
         elevation: 8,
         shape: RoundedRectangleBorder(
@@ -270,7 +270,7 @@ class AppTheme {
         unselectedItemColor: AppColors.darkTextMuted,
         type: BottomNavigationBarType.fixed,
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: AppColors.darkPrimary,
         unselectedLabelColor: AppColors.darkTextMuted,
         labelStyle: AppTextStyles.titleSmall,

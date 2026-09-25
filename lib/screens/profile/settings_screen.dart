@@ -30,9 +30,12 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Currency
             Text('Currency & Regional Formats', style: AppTextStyles.titleSmall),
             const SizedBox(height: 8),
@@ -160,15 +163,17 @@ class SettingsScreen extends ConsumerWidget {
                   border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Per Person Daily Limit:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        Text('Flags unusually high claims automatically', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      ],
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Per Person Daily Limit:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          Text('Flags unusually high claims automatically', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Text('৳ ${settings.dailyFoodAllowance.toInt()}',
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
                   ],
@@ -198,7 +203,9 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildRateRow(String type, String rate) {
@@ -207,7 +214,8 @@ class SettingsScreen extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(type, style: const TextStyle(fontSize: 12)),
+          Expanded(child: Text(type, style: const TextStyle(fontSize: 12))),
+          const SizedBox(width: 8),
           Text(rate, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
         ],
       ),
@@ -216,10 +224,19 @@ class SettingsScreen extends ConsumerWidget {
 
   Widget _buildThresholdItem(String label, String value, Color color) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          value,
+          textAlign: TextAlign.end,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color),
+        ),
       ],
     );
   }

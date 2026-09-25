@@ -21,6 +21,39 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(() => setState(() {}));
+  }
+
+  int get _passwordStrength {
+    final text = _passwordController.text;
+    if (text.isEmpty) return 0;
+    int score = 0;
+    if (text.length >= 6) score++;
+    if (text.length >= 8) score++;
+    if (RegExp(r'[0-9]').hasMatch(text)) score++;
+    if (RegExp(r'[!@#\$&*~%_\-]').hasMatch(text)) score++;
+    return score;
+  }
+
+  String get _strengthLabel {
+    final s = _passwordStrength;
+    if (s <= 1) return 'Weak';
+    if (s <= 2) return 'Fair';
+    if (s == 3) return 'Good';
+    return 'Strong';
+  }
+
+  Color get _strengthColor {
+    final s = _passwordStrength;
+    if (s <= 1) return AppColors.crimson;
+    if (s <= 2) return AppColors.amber;
+    if (s == 3) return Colors.blue;
+    return AppColors.emerald;
+  }
+
+  @override
   void dispose() {
     _passwordController.dispose();
     _confirmController.dispose();
@@ -113,6 +146,33 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                         return null;
                       },
                     ),
+                    if (_passwordController.text.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: _passwordStrength / 4.0,
+                                backgroundColor: isDark ? AppColors.darkBorder : AppColors.border,
+                                valueColor: AlwaysStoppedAnimation<Color>(_strengthColor),
+                                minHeight: 4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _strengthLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _strengthColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     Text('Confirm New Password', style: AppTextStyles.labelMedium),
                     const SizedBox(height: 6),

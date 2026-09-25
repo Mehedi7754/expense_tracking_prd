@@ -21,8 +21,8 @@ class RoutePaths {
 
   // PFIS Specialized Routes
   static const String receiptCompliance = '/receipt-compliance';
-  static const String clientAnalysis = '/client-analysis';
-  static const String costEstimator = '/cost-estimator';
+  static const String clientAnalysis = '/admin/client-analysis';
+  static const String costEstimator = '/admin/cost-estimator';
 
   // Deep Link Sub-routes
   static const String expenseDetailPattern = '/expenses/:id';

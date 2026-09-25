@@ -24,10 +24,10 @@ void main() {
   test('Domain Model and Role-based permissions test', () {
     final container = ProviderContainer();
 
-    // Verify initial auth state starts authenticated with Demo Main Admin
+    // Verify initial auth state starts unauthenticated (no hardcoded backdoor)
     final initialAuth = container.read(authProvider);
-    expect(initialAuth.isAuthenticated, true);
-    expect(initialAuth.currentUser?.role, UserRole.mainAdmin);
+    expect(initialAuth.isAuthenticated, false);
+    expect(initialAuth.currentUser, isNull);
 
     // Switch to Project Member (Fahim)
     container.read(authProvider.notifier).switchRole(UserRole.projectMember);

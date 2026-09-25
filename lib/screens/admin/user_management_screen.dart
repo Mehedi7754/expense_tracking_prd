@@ -94,10 +94,13 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
         icon: const Icon(Icons.person_add_rounded),
         label: const Text('Add User'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: CustomSearchBar(
               hintText: 'Search user by name, email, or department...',
               initialValue: _searchQuery,
@@ -210,7 +213,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                               ),
                               Switch(
                                 value: user.isActive,
-                                activeColor: AppColors.emerald,
+                                activeTrackColor: AppColors.emerald,
                                 onChanged: (_) {
                                   ref.read(userManagementProvider.notifier).toggleActive(user.id);
                                   NotificationBanner.showWarning(
@@ -233,6 +236,8 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 }

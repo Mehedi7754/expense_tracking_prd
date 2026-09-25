@@ -95,11 +95,8 @@ class DemoUsers {
 class AuthNotifier extends Notifier<AuthState> {
   @override
   AuthState build() {
-    // Default logged in as Main Admin for rich initial presentation
-    return const AuthState(
-      currentUser: DemoUsers.mainAdmin,
-      isAuthenticated: true,
-    );
+    // Default unauthenticated on boot (prevents auth bypass)
+    return const AuthState();
   }
 
   // In-memory registry for users registered dynamically in the app

@@ -50,10 +50,13 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
                 onPressed: () => context.pop(),
               ),
             ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 850),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: CustomSearchBar(
               hintText: 'Search audit records by actor, action, or details...',
               initialValue: _searchQuery,
@@ -129,6 +132,8 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 }

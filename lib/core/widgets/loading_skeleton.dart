@@ -106,34 +106,30 @@ class ProjectCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.getSurface(context),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.getBorder(context)),
       ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: const Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LoadingSkeleton(width: 160, height: 16),
-                  SizedBox(height: 6),
-                  LoadingSkeleton(width: 90, height: 12),
-                ],
-              ),
-              LoadingSkeleton(width: 80, height: 24, borderRadius: 12),
-            ],
+          LoadingSkeleton(width: 44, height: 44, borderRadius: 13),
+          SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LoadingSkeleton(width: 150, height: 15, borderRadius: 4),
+                SizedBox(height: 6),
+                LoadingSkeleton(width: 110, height: 12, borderRadius: 4),
+              ],
+            ),
           ),
-          SizedBox(height: 16),
-          LoadingSkeleton(width: double.infinity, height: 6, borderRadius: 3),
-          SizedBox(height: 16),
-          LoadingSkeleton(width: double.infinity, height: 44, borderRadius: 10),
+          SizedBox(width: 12),
+          LoadingSkeleton(width: 44, height: 44, borderRadius: 22),
         ],
       ),
     );

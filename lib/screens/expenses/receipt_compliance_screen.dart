@@ -34,192 +34,16 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
   }
 
   void _showSubmitJustificationDialog(BuildContext context, ExpenseModel expense) {
-    String selectedReason = 'Rural / Local vendor does not provide printed receipts';
-    final commentController = TextEditingController();
-    String? attachmentName;
-
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Row(
-            children: [
-              const Icon(Icons.assignment_turned_in_rounded, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Submit Justification: ${expense.categoryName}'),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Expense: ${CurrencyFormatter.format(expense.amount)} • ${expense.projectName}',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedReason,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'Reason for No Receipt *'),
-                  items: [
-                    'Rural / Local vendor does not provide printed receipts',
-                    'Local transport operator (CNG / Boat / Rickshaw)',
-                    'Village / Field market purchase without vouchers',
-                    'Emergency repair or field operational necessity',
-                    'Other exceptional field circumstances',
-                  ].map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
-                  onChanged: (v) => setDialogState(() => selectedReason = v!),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: commentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Explanation / Comment *',
-                    hintText: 'Detail why a receipt was unobtainable...',
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isDark ? AppColors.darkSurface : Colors.grey.shade200,
-                        foregroundColor: isDark ? Colors.white : Colors.black87,
-                      ),
-                      icon: const Icon(Icons.attach_file_rounded, size: 16),
-                      label: const Text('Supporting Document/Photo'),
-                      onPressed: () {
-                        setDialogState(() => attachmentName = 'supporting_proof_${DateTime.now().millisecondsSinceEpoch}.jpg');
-                      },
-                    ),
-                  ],
-                ),
-                if (attachmentName != null) ...[
-                  const SizedBox(height: 4),
-                  Text(attachmentName!, style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600)),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-              onPressed: () {
-                if (commentController.text.trim().isEmpty) {
-                  NotificationBanner.showError(context, 'Please enter an explanation');
-                  return;
-                }
-                ref.read(expenseProvider.notifier).submitJustification(
-                      expenseId: expense.id,
-                      reason: selectedReason,
-                      comment: commentController.text.trim(),
-                      attachmentUrl: attachmentName,
-                    );
-                Navigator.pop(ctx);
-                NotificationBanner.showSuccess(context, 'Justification submitted for admin review');
-              },
-              child: const Text('Submit Justification'),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _SubmitJustificationDialog(expense: expense),
     );
   }
 
   void _showAdminReviewDialog(BuildContext context, ExpenseModel expense) {
-    final commentController = TextEditingController();
-
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.rate_review_rounded, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Review Justification'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('${expense.employeeName} — ${expense.projectName}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              const SizedBox(height: 4),
-              Text('Amount: ${CurrencyFormatter.format(expense.amount)} (${expense.categoryName})', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
-              const Divider(height: 18),
-              const Text('Reason:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-              Text(expense.justificationReason ?? 'No reason provided', style: const TextStyle(fontSize: 13)),
-              const SizedBox(height: 8),
-              const Text('Comment:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-              Text(expense.justificationComment ?? 'No comment provided', style: const TextStyle(fontSize: 13)),
-              if (expense.justificationAttachmentUrl != null) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.attachment_rounded, size: 16, color: AppColors.success),
-                    const SizedBox(width: 4),
-                    Text(expense.justificationAttachmentUrl!, style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 14),
-              TextField(
-                controller: commentController,
-                decoration: const InputDecoration(
-                  labelText: 'Admin Review Note (Optional)',
-                  hintText: 'Approval note or reason for rejection...',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            onPressed: () {
-              ref.read(expenseProvider.notifier).rejectJustification(
-                    expenseId: expense.id,
-                    reviewerName: ref.read(authProvider).currentUser?.name ?? 'Admin',
-                    reason: commentController.text.trim().isNotEmpty ? commentController.text.trim() : 'Rejected by admin.',
-                  );
-              Navigator.pop(ctx);
-              NotificationBanner.showSuccess(context, 'Justification rejected');
-            },
-            child: const Text('Reject'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.orange),
-            onPressed: () {
-              ref.read(expenseProvider.notifier).requestClarification(
-                    expenseId: expense.id,
-                    reviewerName: ref.read(authProvider).currentUser?.name ?? 'Admin',
-                    note: commentController.text.trim().isNotEmpty ? commentController.text.trim() : 'Clarification requested.',
-                  );
-              Navigator.pop(ctx);
-              NotificationBanner.showSuccess(context, 'Clarification requested from member');
-            },
-            child: const Text('Clarification'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
-            onPressed: () {
-              ref.read(expenseProvider.notifier).approveJustification(
-                    expenseId: expense.id,
-                    reviewerName: ref.read(authProvider).currentUser?.name ?? 'Admin',
-                    reviewComment: commentController.text.trim().isNotEmpty ? commentController.text.trim() : null,
-                  );
-              Navigator.pop(ctx);
-              NotificationBanner.showSuccess(context, 'Justification approved');
-            },
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _AdminReviewDialog(expense: expense),
     );
   }
 
@@ -247,15 +71,20 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
               )
             : null,
       ),
-      body: isAdminOrFinance
-          ? TabBarView(
-              controller: _tabController,
-              children: [
-                _buildAdminMembersQueue(context),
-                _buildAdminPendingJustifications(context, allExpenses),
-              ],
-            )
-          : _buildMemberComplianceView(context, user!, allExpenses),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 850),
+          child: isAdminOrFinance
+              ? TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildAdminMembersQueue(context),
+                    _buildAdminPendingJustifications(context, allExpenses),
+                  ],
+                )
+              : _buildMemberComplianceView(context, user!, allExpenses),
+        ),
+      ),
     );
   }
 
@@ -512,6 +341,245 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
           ),
         );
       },
+    );
+  }
+}
+
+class _SubmitJustificationDialog extends ConsumerStatefulWidget {
+  final ExpenseModel expense;
+
+  const _SubmitJustificationDialog({required this.expense});
+
+  @override
+  ConsumerState<_SubmitJustificationDialog> createState() => _SubmitJustificationDialogState();
+}
+
+class _SubmitJustificationDialogState extends ConsumerState<_SubmitJustificationDialog> {
+  late final TextEditingController _commentController;
+  String _selectedReason = 'Rural / Local vendor does not provide printed receipts';
+  String? _attachmentName;
+
+  @override
+  void initState() {
+    super.initState();
+    _commentController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final expense = widget.expense;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.assignment_turned_in_rounded, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text('Submit Justification: ${expense.categoryName}'),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Expense: ${CurrencyFormatter.format(expense.amount)} • ${expense.projectName}',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedReason,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Reason for No Receipt *'),
+              items: [
+                'Rural / Local vendor does not provide printed receipts',
+                'Local transport operator (CNG / Boat / Rickshaw)',
+                'Village / Field market purchase without vouchers',
+                'Emergency repair or field operational necessity',
+                'Other exceptional field circumstances',
+              ].map((r) => DropdownMenuItem(value: r, child: Text(r, style: const TextStyle(fontSize: 12)))).toList(),
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => _selectedReason = v);
+                }
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _commentController,
+              decoration: const InputDecoration(
+                labelText: 'Explanation / Comment *',
+                hintText: 'Detail why a receipt was unobtainable...',
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDark ? AppColors.darkSurface : Colors.grey.shade200,
+                    foregroundColor: isDark ? Colors.white : Colors.black87,
+                  ),
+                  icon: const Icon(Icons.attach_file_rounded, size: 16),
+                  label: const Text('Supporting Document/Photo'),
+                  onPressed: () {
+                    setState(() => _attachmentName = 'supporting_proof_${DateTime.now().millisecondsSinceEpoch}.jpg');
+                  },
+                ),
+              ],
+            ),
+            if (_attachmentName != null) ...[
+              const SizedBox(height: 4),
+              Text(_attachmentName!, style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+          onPressed: () {
+            if (_commentController.text.trim().isEmpty) {
+              NotificationBanner.showError(context, 'Please enter an explanation');
+              return;
+            }
+            ref.read(expenseProvider.notifier).submitJustification(
+                  expenseId: expense.id,
+                  reason: _selectedReason,
+                  comment: _commentController.text.trim(),
+                  attachmentUrl: _attachmentName,
+                );
+            Navigator.pop(context);
+            NotificationBanner.showSuccess(context, 'Justification submitted for admin review');
+          },
+          child: const Text('Submit Justification'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdminReviewDialog extends ConsumerStatefulWidget {
+  final ExpenseModel expense;
+
+  const _AdminReviewDialog({required this.expense});
+
+  @override
+  ConsumerState<_AdminReviewDialog> createState() => _AdminReviewDialogState();
+}
+
+class _AdminReviewDialogState extends ConsumerState<_AdminReviewDialog> {
+  late final TextEditingController _commentController;
+
+  @override
+  void initState() {
+    super.initState();
+    _commentController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final expense = widget.expense;
+
+    return AlertDialog(
+      title: const Row(
+        children: [
+          Icon(Icons.rate_review_rounded, color: AppColors.primary),
+          SizedBox(width: 8),
+          Text('Review Justification'),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${expense.employeeName} — ${expense.projectName}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text('Amount: ${CurrencyFormatter.format(expense.amount)} (${expense.categoryName})', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
+            const Divider(height: 18),
+            const Text('Reason:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+            Text(expense.justificationReason ?? 'No reason provided', style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 8),
+            const Text('Comment:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+            Text(expense.justificationComment ?? 'No comment provided', style: const TextStyle(fontSize: 13)),
+            if (expense.justificationAttachmentUrl != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.attachment_rounded, size: 16, color: AppColors.success),
+                  const SizedBox(width: 4),
+                  Text(expense.justificationAttachmentUrl!, style: const TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
+            TextField(
+              controller: _commentController,
+              decoration: const InputDecoration(
+                labelText: 'Admin Review Note (Optional)',
+                hintText: 'Approval note or reason for rejection...',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: AppColors.error),
+          onPressed: () {
+            ref.read(expenseProvider.notifier).rejectJustification(
+                  expenseId: expense.id,
+                  reviewerName: ref.read(authProvider).currentUser?.name ?? 'Admin',
+                  reason: _commentController.text.trim().isNotEmpty ? _commentController.text.trim() : 'Rejected by admin.',
+                );
+            Navigator.pop(context);
+            NotificationBanner.showSuccess(context, 'Justification rejected');
+          },
+          child: const Text('Reject'),
+        ),
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: Colors.orange),
+          onPressed: () {
+            ref.read(expenseProvider.notifier).requestClarification(
+                  expenseId: expense.id,
+                  reviewerName: ref.read(authProvider).currentUser?.name ?? 'Admin',
+                  note: _commentController.text.trim().isNotEmpty ? _commentController.text.trim() : 'Clarification requested.',
+                );
+            Navigator.pop(context);
+            NotificationBanner.showSuccess(context, 'Clarification requested from member');
+          },
+          child: const Text('Clarification'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white),
+          onPressed: () {
+            ref.read(expenseProvider.notifier).approveJustification(
+                  expenseId: expense.id,
+                  reviewerName: ref.read(authProvider).currentUser?.name ?? 'Admin',
+                  reviewComment: _commentController.text.trim().isNotEmpty ? _commentController.text.trim() : null,
+                );
+            Navigator.pop(context);
+            NotificationBanner.showSuccess(context, 'Justification approved');
+          },
+          child: const Text('Approve'),
+        ),
+      ],
     );
   }
 }

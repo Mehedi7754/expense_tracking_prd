@@ -84,105 +84,149 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
           const SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          // Minimalist Search Bar (Pill shaped)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Container(
-              height: 46,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1000),
+          child: Column(
+            children: [
+              // Minimalist Search Bar (Pill shaped)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Container(
+                  height: 46,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSurface : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          onChanged: (q) => setState(() => _searchQuery = q),
+                          style: const TextStyle(fontSize: 13),
+                          decoration: const InputDecoration(
+                            hintText: 'Search project, ID, client...',
+                            hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                      if (_searchQuery.isNotEmpty)
+                        GestureDetector(
+                          onTap: () => setState(() => _searchQuery = ''),
+                          child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      onChanged: (q) => setState(() => _searchQuery = q),
-                      style: const TextStyle(fontSize: 13),
-                      decoration: const InputDecoration(
-                        hintText: 'Search project, ID, client...',
-                        hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ),
-                  if (_searchQuery.isNotEmpty)
-                    GestureDetector(
-                      onTap: () => setState(() => _searchQuery = ''),
-                      child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
-                    ),
-                ],
+
+              // Minimal Horizontal Filter Pills
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Row(
+                  children: [
+                    _buildFilterPill('All', 'all', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterPill('Direct Consultancy', 'directConsultancy', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterPill('Sub-consultancy', 'subConsultancy', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterPill('Government', 'government', isDark),
+                    const SizedBox(width: 6),
+                    _buildFilterPill('Private', 'private', isDark),
+                  ],
+                ),
               ),
-            ),
-          ),
 
-          // Minimal Horizontal Filter Pills
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Row(
-              children: [
-                _buildFilterPill('All', 'all', isDark),
-                const SizedBox(width: 6),
-                _buildFilterPill('Direct Consultancy', 'directConsultancy', isDark),
-                const SizedBox(width: 6),
-                _buildFilterPill('Sub-consultancy', 'subConsultancy', isDark),
-                const SizedBox(width: 6),
-                _buildFilterPill('Government', 'government', isDark),
-                const SizedBox(width: 6),
-                _buildFilterPill('Private', 'private', isDark),
-              ],
-            ),
-          ),
+              const SizedBox(height: 6),
 
-          const SizedBox(height: 6),
-
-          // Project Cards List with Permanent Pie Chart at Top
-          Expanded(
-            child: filteredProjects.isEmpty
-                ? EmptyStateWidget(
-                    icon: Icons.folder_open_rounded,
-                    title: 'No Projects Found',
-                    message: _searchQuery.isNotEmpty
-                        ? 'No projects matching your search criteria.'
-                        : 'No projects available in this category.',
-                    actionLabel: canCreateProject ? 'Create Project' : null,
-                    onAction: canCreateProject ? () => context.push(RoutePaths.addProject) : null,
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 24, top: 4),
-                    itemCount: filteredProjects.length + 1,
-                    itemBuilder: (ctx, i) {
-                      // Item 0 is always the Pie Chart
-                      if (i == 0) {
-                        return _buildProjectPieChartCard(
-                          context,
-                          filteredProjects,
-                          allExpenses,
-                          isDark,
-                        );
-                      }
-                      final proj = filteredProjects[i - 1];
-                      final pExp = allExpenses.where((e) => e.projectId == proj.id).toList();
-                      return ProjectCostCard(
-                        project: proj,
-                        projectExpenses: pExp,
-                        onTap: () => context.push(RoutePaths.projectDetail(proj.id)),
-                      );
-                    },
-                  ),
+              // Project Cards List with Permanent Pie Chart at Top
+              Expanded(
+                child: filteredProjects.isEmpty
+                    ? EmptyStateWidget(
+                        icon: Icons.folder_open_rounded,
+                        title: 'No Projects Found',
+                        message: _searchQuery.isNotEmpty
+                            ? 'No projects matching your search criteria.'
+                            : 'No projects available in this category.',
+                        actionLabel: canCreateProject ? 'Create Project' : null,
+                        onAction: canCreateProject ? () => context.push(RoutePaths.addProject) : null,
+                      )
+                    : Builder(
+                        builder: (ctx) {
+                          final isTablet = MediaQuery.sizeOf(ctx).width >= 768;
+                          return CustomScrollView(
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: _buildProjectPieChartCard(
+                                  context,
+                                  filteredProjects,
+                                  allExpenses,
+                                  isDark,
+                                ),
+                              ),
+                              SliverPadding(
+                                padding: EdgeInsets.only(
+                                  bottom: 24,
+                                  top: 4,
+                                  left: isTablet ? 16 : 0,
+                                  right: isTablet ? 16 : 0,
+                                ),
+                                sliver: isTablet
+                                    ? SliverGrid(
+                                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                          crossAxisCount: 2,
+                                          crossAxisSpacing: 10,
+                                          mainAxisSpacing: 10,
+                                          mainAxisExtent: 74,
+                                        ),
+                                        delegate: SliverChildBuilderDelegate(
+                                          (ctx, i) {
+                                            final proj = filteredProjects[i];
+                                            final pExp = allExpenses.where((e) => e.projectId == proj.id).toList();
+                                            return ProjectCostCard(
+                                              project: proj,
+                                              projectExpenses: pExp,
+                                              margin: EdgeInsets.zero,
+                                              onTap: () => context.push(RoutePaths.projectDetail(proj.id)),
+                                            );
+                                          },
+                                          childCount: filteredProjects.length,
+                                        ),
+                                      )
+                                    : SliverList(
+                                        delegate: SliverChildBuilderDelegate(
+                                          (ctx, i) {
+                                            final proj = filteredProjects[i];
+                                            final pExp = allExpenses.where((e) => e.projectId == proj.id).toList();
+                                            return ProjectCostCard(
+                                              project: proj,
+                                              projectExpenses: pExp,
+                                              onTap: () => context.push(RoutePaths.projectDetail(proj.id)),
+                                            );
+                                          },
+                                          childCount: filteredProjects.length,
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

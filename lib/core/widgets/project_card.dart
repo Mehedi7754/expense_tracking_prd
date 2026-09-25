@@ -1,16 +1,27 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../models/project_model.dart';
 import '../constants/app_colors.dart';
-import '../constants/app_text_styles.dart';
 import '../utils/currency_formatter.dart';
-import 'budget_progress_bar.dart';
-import 'status_chip.dart';
+
+class _CardPalette {
+  final Color accent;
+  final Color lightBg;
+  final IconData icon;
+
+  const _CardPalette({
+    required this.accent,
+    required this.lightBg,
+    required this.icon,
+  });
+}
 
 class ProjectCard extends StatelessWidget {
   final ProjectModel project;
   final double spent;
   final double revenue;
   final VoidCallback onTap;
+  final EdgeInsetsGeometry? margin;
 
   const ProjectCard({
     super.key,
@@ -18,131 +29,194 @@ class ProjectCard extends StatelessWidget {
     required this.spent,
     required this.revenue,
     required this.onTap,
+    this.margin,
   });
+
+  static const List<_CardPalette> _curatedPalettes = [
+    _CardPalette(
+      accent: Color(0xFFF97316), // Peach / Warm Coral
+      lightBg: Color(0xFFFFEDD5),
+      icon: Icons.business_center_rounded,
+    ),
+    _CardPalette(
+      accent: Color(0xFF8B5CF6), // Soft Violet / Lavender
+      lightBg: Color(0xFFF3E8FF),
+      icon: Icons.school_rounded,
+    ),
+    _CardPalette(
+      accent: Color(0xFF0284C7), // Sky Blue
+      lightBg: Color(0xFFE0F2FE),
+      icon: Icons.domain_rounded,
+    ),
+    _CardPalette(
+      accent: Color(0xFF10B981), // Fresh Mint Emerald
+      lightBg: Color(0xFFDCFCE7),
+      icon: Icons.analytics_rounded,
+    ),
+    _CardPalette(
+      accent: Color(0xFF6366F1), // Royal Indigo
+      lightBg: Color(0xFFEEF2FF),
+      icon: Icons.layers_rounded,
+    ),
+    _CardPalette(
+      accent: Color(0xFFEC4899), // Soft Rose Pink
+      lightBg: Color(0xFFFCE7F3),
+      icon: Icons.rocket_launch_rounded,
+    ),
+    _CardPalette(
+      accent: Color(0xFF0D9488), // Ocean Teal
+      lightBg: Color(0xFFCCFBF1),
+      icon: Icons.pie_chart_rounded,
+    ),
+    _CardPalette(
+      accent: Color(0xFFD97706), // Warm Amber
+      lightBg: Color(0xFFFEF3C7),
+      icon: Icons.folder_special_rounded,
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final isDark = AppColors.isDark(context);
-    final double profit = revenue - spent;
-    final bool isProfitable = profit >= 0;
-    final double percentUsed = project.budget > 0 ? (spent / project.budget) : 0.0;
-    final bool isAtRisk = percentUsed >= 0.80;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final borderColor = isAtRisk
-        ? (isDark ? AppColors.darkCrimsonBorder : AppColors.crimsonBorder)
-        : AppColors.getBorder(context);
+    final totalBudget = project.budget > 0 ? project.budget : (project.grossProjectValue * 0.85);
+    final budgetRatio = totalBudget > 0 ? (spent / totalBudget) : 0.0;
+    final isOverBudget = spent > totalBudget && totalBudget > 0;
+    final isApproachingBudget = budgetRatio >= 0.80 && !isOverBudget;
+    final isCompleted = project.status == ProjectStatus.completed;
+
+    // Pick Palette
+    final int hash = project.id.hashCode.abs();
+    final defaultPalette = _curatedPalettes[hash % _curatedPalettes.length];
+
+    Color accentColor;
+    Color iconBg;
+    IconData iconData;
+
+    if (isCompleted) {
+      accentColor = const Color(0xFF10B981);
+      iconBg = isDark ? accentColor.withValues(alpha: 0.16) : const Color(0xFFDCFCE7);
+      iconData = Icons.task_alt_rounded;
+    } else if (isOverBudget) {
+      accentColor = const Color(0xFFEF4444);
+      iconBg = isDark ? accentColor.withValues(alpha: 0.16) : const Color(0xFFFEE2E2);
+      iconData = Icons.warning_amber_rounded;
+    } else if (isApproachingBudget) {
+      accentColor = const Color(0xFFF59E0B);
+      iconBg = isDark ? accentColor.withValues(alpha: 0.16) : const Color(0xFFFEF3C7);
+      iconData = Icons.trending_up_rounded;
+    } else {
+      accentColor = defaultPalette.accent;
+      iconBg = isDark ? accentColor.withValues(alpha: 0.16) : defaultPalette.lightBg;
+      iconData = defaultPalette.icon;
+    }
+
+    final Color trackColor = isDark
+        ? accentColor.withValues(alpha: 0.16)
+        : accentColor.withValues(alpha: 0.12);
+
+    final displayPercent = (budgetRatio * 100).round();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: margin ?? const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: AppColors.getSurface(context),
+        color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: borderColor,
-          width: isAtRisk ? 1.2 : 1,
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+          width: 1.0,
         ),
         boxShadow: isDark
-            ? AppColors.darkCardShadow(isAtRisk ? AppColors.crimson : null)
-            : AppColors.cardShadow,
+            ? []
+            : [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ],
       ),
       child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          onTap: onTap,
           borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
               children: [
-                // Header: Project Name, Client, Status Chip
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.business_center_rounded,
-                        size: 19,
-                        color: isDark ? AppColors.darkPrimary : AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            project.name,
-                            style: AppTextStyles.titleMedium.copyWith(
-                              fontSize: 15.5,
-                              color: AppColors.getTextPrimary(context),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            project.client,
-                            style: AppTextStyles.bodySmall.copyWith(
-                              color: AppColors.getTextMuted(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (isAtRisk)
-                      StatusChip.atRisk()
-                    else
-                      StatusChip.profitable(isProfitable: isProfitable),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                // Budget Progress Bar
-                BudgetProgressBar(
-                  budget: project.budget,
-                  spent: spent,
-                  showLabels: true,
-                  height: 6,
-                ),
-                const SizedBox(height: 14),
-                // Financial summary breakdown row
+                // 1. Left squircle icon with soft tinted pastel background
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(12),
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Center(
+                    child: Icon(
+                      iconData,
+                      size: 21,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // 2. Middle Column: Project Name & Minimal Financials
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _FinancialMetric(
-                        label: 'Budget',
-                        value: CurrencyFormatter.format(project.budget, compact: true),
+                      Text(
+                        project.name,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      _FinancialMetric(
-                        label: 'Spent',
-                        value: CurrencyFormatter.format(spent, compact: true),
-                      ),
-                      _FinancialMetric(
-                        label: 'Revenue',
-                        value: CurrencyFormatter.format(revenue, compact: true),
-                      ),
-                      _FinancialMetric(
-                        label: 'Profit',
-                        value: CurrencyFormatter.format(profit, compact: true),
-                        valueColor: isProfitable
-                            ? (isDark ? AppColors.emeraldAccent : AppColors.emeraldDark)
-                            : (isDark ? AppColors.crimsonAccent : AppColors.crimson),
+                      const SizedBox(height: 3),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '${CurrencyFormatter.format(spent, compact: true)} ',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
+                                fontSize: 12.5,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'of ${CurrencyFormatter.format(totalBudget, compact: true)}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: 12),
+
+                // 3. Right: Sleek Circular Progress Ring with Percentage
+                _MinimalProjectProgress(
+                  progress: isCompleted ? 1.0 : budgetRatio,
+                  color: accentColor,
+                  trackColor: trackColor,
+                  label: isCompleted ? '100%' : '$displayPercent%',
                 ),
               ],
             ),
@@ -153,39 +227,97 @@ class ProjectCard extends StatelessWidget {
   }
 }
 
-class _FinancialMetric extends StatelessWidget {
+class _MinimalProjectProgress extends StatelessWidget {
+  final double progress;
+  final Color color;
+  final Color trackColor;
   final String label;
-  final String value;
-  final Color? valueColor;
 
-  const _FinancialMetric({
+  const _MinimalProjectProgress({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
     required this.label,
-    required this.value,
-    this.valueColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: AppTextStyles.labelSmall.copyWith(
-            fontSize: 10,
-            color: AppColors.getTextMuted(context),
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: CustomPaint(
+        painter: _ProjectRingPainter(
+          progress: progress.clamp(0.0, 1.0),
+          color: color,
+          trackColor: trackColor,
+          strokeWidth: 3.5,
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: label.length > 3 ? 10.0 : 11.5,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: -0.3,
+            ),
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: AppTextStyles.currencySmall.copyWith(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w700,
-            color: valueColor ?? AppColors.getTextPrimary(context),
-          ),
-        ),
-      ],
+      ),
     );
+  }
+}
+
+class _ProjectRingPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color trackColor;
+  final double strokeWidth;
+
+  _ProjectRingPainter({
+    required this.progress,
+    required this.color,
+    required this.trackColor,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
+
+    // Track circle
+    final trackPaint = Paint()
+      ..color = trackColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // Progress Arc
+    if (progress > 0) {
+      final progressPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..strokeCap = StrokeCap.round;
+
+      const startAngle = -math.pi / 2; // 12 o'clock
+      final sweepAngle = 2 * math.pi * progress;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweepAngle,
+        false,
+        progressPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProjectRingPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }

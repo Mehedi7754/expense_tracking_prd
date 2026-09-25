@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
@@ -16,20 +17,38 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _submitted = false;
   bool _isLoading = false;
+  int _cooldownSeconds = 0;
+  Timer? _cooldownTimer;
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _emailController.dispose();
     super.dispose();
   }
 
+  void _startCooldown() {
+    setState(() => _cooldownSeconds = 30);
+    _cooldownTimer?.cancel();
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_cooldownSeconds <= 1) {
+        timer.cancel();
+        if (mounted) setState(() => _cooldownSeconds = 0);
+      } else {
+        if (mounted) setState(() => _cooldownSeconds--);
+      }
+    });
+  }
+
   Future<void> _handleSubmit() async {
+    if (_cooldownSeconds > 0) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     await Future.delayed(const Duration(milliseconds: 700));
 
     if (mounted) {
+      _startCooldown();
       setState(() {
         _isLoading = false;
         _submitted = true;
@@ -163,7 +182,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             style: AppTextStyles.bodyMedium,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
+          if (_cooldownSeconds > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Rate limited: You can request another link in $_cooldownSeconds seconds.',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            )
+          else
+            TextButton(
+              onPressed: () {
+                setState(() => _submitted = false);
+              },
+              child: const Text('Resend Reset Link'),
+            ),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(

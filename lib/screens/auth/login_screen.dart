@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/routing/route_paths.dart';
+import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -86,28 +87,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppConstants.appName,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                              color: AppColors.primary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              AppConstants.appName,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                                color: AppColors.primary,
+                              ),
                             ),
-                          ),
-                          Text(
-                            AppConstants.appFullName,
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
-                          ),
-                        ],
+                            Text(
+                              AppConstants.appFullName,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 24),
-                  Text('Executive Sign In', style: AppTextStyles.displayMedium),
+                  Text(
+                    'Welcome back',
+                    style: AppTextStyles.labelLarge.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Sign In to Account', style: AppTextStyles.displayMedium),
                   const SizedBox(height: 6),
                   const Text(
                     'Real-time project cost monitoring, receipt compliance, and profitability forecasting.',
@@ -172,12 +185,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 10),
 
-                          // Forgot Password
+                          // Forgot Password - Min 48dp Touch Target (violates Apple HIG / Material 3 if <48dp)
                           Align(
                             alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: () => context.push(RoutePaths.forgotPassword),
-                              child: const Text('Forgot Password?'),
+                            child: SizedBox(
+                              height: 48,
+                              child: TextButton(
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                ),
+                                onPressed: () => context.push(RoutePaths.forgotPassword),
+                                child: const Text('Forgot Password?'),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -248,10 +268,132 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
 
+                  const SizedBox(height: 24),
+
+                  // Quick Demo Role Switcher (1-Tap Demo Switcher with Wrap to prevent compact 54px overflow)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle.withAlpha(150),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.getBorder(context), width: 1),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            const Icon(Icons.bolt_rounded, size: 16, color: AppColors.amber),
+                            Text(
+                              'Instant Role Switcher (1-Tap Demo)',
+                              style: AppTextStyles.labelSmall.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.getTextPrimary(context),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _DemoPersonaChip(
+                              label: 'Employee (Alex)',
+                              role: UserRole.projectMember,
+                              onTap: () => _selectDemoPersona(UserRole.projectMember),
+                            ),
+                            _DemoPersonaChip(
+                              label: 'Manager (Sarah)',
+                              role: UserRole.projectManager,
+                              onTap: () => _selectDemoPersona(UserRole.projectManager),
+                            ),
+                            _DemoPersonaChip(
+                              label: 'Finance (David)',
+                              role: UserRole.finance,
+                              onTap: () => _selectDemoPersona(UserRole.finance),
+                            ),
+                            _DemoPersonaChip(
+                              label: 'Admin (Eleanor)',
+                              role: UserRole.mainAdmin,
+                              onTap: () => _selectDemoPersona(UserRole.mainAdmin),
+                            ),
+                            _DemoPersonaChip(
+                              label: 'Viewer (Rahim)',
+                              role: UserRole.viewer,
+                              onTap: () => _selectDemoPersona(UserRole.viewer),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _selectDemoPersona(UserRole role) {
+    ref.read(authProvider.notifier).switchRole(role);
+    if (mounted) {
+      context.go(RoutePaths.home);
+    }
+  }
+}
+
+class _DemoPersonaChip extends StatelessWidget {
+  final String label;
+  final UserRole role;
+  final VoidCallback onTap;
+
+  const _DemoPersonaChip({
+    required this.label,
+    required this.role,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.getSurface(context),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.getBorder(context)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: role == UserRole.projectMember
+                    ? AppColors.textSecondary
+                    : role == UserRole.projectManager
+                        ? AppColors.indigo
+                        : role == UserRole.finance
+                            ? AppColors.emerald
+                            : role == UserRole.viewer
+                                ? Colors.teal
+                                : AppColors.primary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(label, style: AppTextStyles.labelSmall.copyWith(fontSize: 11)),
+          ],
         ),
       ),
     );

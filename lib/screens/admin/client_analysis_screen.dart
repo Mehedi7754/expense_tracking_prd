@@ -33,9 +33,9 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
       _selectedClient = clients.first;
     }
 
-    // Filter projects for selected client
+    // Filter projects for selected client (Fix Pillar 4: Exact client ID / name match to prevent cross-client contamination)
     final clientProjects = _selectedClient != null
-        ? projects.where((p) => p.client.toLowerCase().contains(_selectedClient!.name.toLowerCase().split(' ').first)).toList()
+        ? projects.where((p) => p.clientId == _selectedClient!.id || p.client.trim().toLowerCase() == _selectedClient!.name.trim().toLowerCase()).toList()
         : <ProjectModel>[];
 
     // Compute Client-Level Metrics (PRD Section 21)
@@ -60,8 +60,11 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
       appBar: AppBar(
         title: const Text('Client-Level Analysis (PRD Section 21)', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 850),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
         children: [
           // Client Dropdown Selector
           DropdownButtonFormField<ClientModel>(
@@ -207,8 +210,10 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
                   ),
                 );
               }),
+            ],
           ],
-        ],
+          ),
+        ),
       ),
     );
   }

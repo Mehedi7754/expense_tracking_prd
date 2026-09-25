@@ -19,6 +19,8 @@ class ApprovalsQueueScreen extends ConsumerStatefulWidget {
 class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
   String _activeFilter = 'all'; // all, highAmount, noReceipt, hasReceipt
   String _searchQuery = '';
+  bool _isBatchMode = false;
+  final Set<String> _selectedExpenseIds = {};
 
   Future<void> _handleApprove(ExpenseModel expense) async {
     final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
@@ -43,6 +45,27 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
     if (reason != null && mounted) {
       ref.read(expenseProvider.notifier).rejectExpense(expense.id, reason);
       NotificationBanner.showWarning(context, 'Claim rejected.');
+    }
+  }
+
+  Future<void> _handleBatchApprove() async {
+    if (_selectedExpenseIds.isEmpty) return;
+    final count = _selectedExpenseIds.length;
+    final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
+      context,
+      title: 'Batch Approve Claims',
+      message: 'Approve all $count selected claims at once?',
+    );
+
+    if (confirm && mounted) {
+      for (final id in _selectedExpenseIds) {
+        ref.read(expenseProvider.notifier).approveExpense(id);
+      }
+      NotificationBanner.showSuccess(context, 'Successfully batch approved $count claims.');
+      setState(() {
+        _selectedExpenseIds.clear();
+        _isBatchMode = false;
+      });
     }
   }
 
@@ -100,9 +123,74 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
             ],
           ],
         ),
+        actions: [
+          if (pendingExpenses.isNotEmpty)
+            TextButton.icon(
+              icon: Icon(_isBatchMode ? Icons.close_rounded : Icons.checklist_rounded, size: 18),
+              label: Text(_isBatchMode ? 'Cancel' : 'Batch Approve'),
+              onPressed: () {
+                setState(() {
+                  _isBatchMode = !_isBatchMode;
+                  _selectedExpenseIds.clear();
+                });
+              },
+            ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: Column(
-        children: [
+      bottomNavigationBar: _isBatchMode
+          ? SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(20),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: filtered.isNotEmpty && _selectedExpenseIds.length == filtered.length,
+                      activeColor: const Color(0xFF10B981),
+                      onChanged: (val) {
+                        setState(() {
+                          if (val == true) {
+                            _selectedExpenseIds.addAll(filtered.map((e) => e.id));
+                          } else {
+                            _selectedExpenseIds.clear();
+                          }
+                        });
+                      },
+                    ),
+                    Text(
+                      '${_selectedExpenseIds.length} of ${filtered.length} Selected',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: _selectedExpenseIds.isEmpty ? null : _handleBatchApprove,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.done_all_rounded, size: 18),
+                      label: Text('Approve (${_selectedExpenseIds.length})'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 850),
+          child: Column(
+            children: [
           // Search Input
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -178,7 +266,9 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildApprovalCard(BuildContext context, ExpenseModel exp, bool isDark) {
@@ -218,158 +308,209 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
       iconBg = iconColor.withAlpha(25);
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9),
-          width: 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 25 : 8),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+    final isSelected = _selectedExpenseIds.contains(exp.id);
+
+    return InkWell(
+      onTap: _isBatchMode
+          ? () {
+              setState(() {
+                if (isSelected) {
+                  _selectedExpenseIds.remove(exp.id);
+                } else {
+                  _selectedExpenseIds.add(exp.id);
+                }
+              });
+            }
+          : null,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF10B981)
+                : (isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9)),
+            width: isSelected ? 1.8 : 1.0,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Squircle icon + Employee & Project + Amount
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Center(child: Icon(icon, color: iconColor, size: 22)),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      exp.employeeName,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    CurrencyFormatter.format(exp.amount),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.3,
-                    ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 25 : 8),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Row: Squircle icon + Employee & Project + Amount
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (_isBatchMode) ...[
+                  Checkbox(
+                    value: isSelected,
+                    activeColor: const Color(0xFF10B981),
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == true) {
+                          _selectedExpenseIds.add(exp.id);
+                        } else {
+                          _selectedExpenseIds.remove(exp.id);
+                        }
+                      });
+                    },
                   ),
-                  const SizedBox(height: 3),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  const SizedBox(width: 4),
+                ],
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(child: Icon(icon, color: iconColor, size: 22)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        exp.hasReceipt ? 'Receipt' : 'No Receipt',
+                        exp.employeeName,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w600,
-                          color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          fontSize: 11,
+                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
-                ],
-              ),
-            ],
-          ),
-
-          if (exp.note.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              exp.note,
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      CurrencyFormatter.format(exp.amount),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          exp.hasReceipt ? 'Receipt' : 'No Receipt',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
 
-          const SizedBox(height: 14),
-
-          // Action Buttons: Approve (soft green) & Reject (soft red)
-          Row(
-            children: [
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _handleReject(exp),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFEF4444),
-                      side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: EdgeInsets.zero,
-                    ),
-                    icon: const Icon(Icons.close_rounded, size: 16),
-                    label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                  ),
+            if (exp.note.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                exp.note,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 38,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _handleApprove(exp),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: EdgeInsets.zero,
-                    ),
-                    icon: const Icon(Icons.check_rounded, size: 16),
-                    label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                  ),
-                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
-        ],
+
+            if (!_isBatchMode) ...[
+              const SizedBox(height: 14),
+              // Action Buttons: Approve & Reject grouped closely on wide devices
+              LayoutBuilder(
+                builder: (ctx, constraints) {
+                  final isWide = constraints.maxWidth >= 500;
+                  final rejectBtn = SizedBox(
+                    height: 38,
+                    width: isWide ? 120 : null,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _handleReject(exp),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEF4444),
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                    ),
+                  );
+
+                  final approveBtn = SizedBox(
+                    height: 38,
+                    width: isWide ? 130 : null,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _handleApprove(exp),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: const Icon(Icons.check_rounded, size: 16),
+                      label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                    ),
+                  );
+
+                  return isWide
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            rejectBtn,
+                            const SizedBox(width: 10),
+                            approveBtn,
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(child: rejectBtn),
+                            const SizedBox(width: 10),
+                            Expanded(child: approveBtn),
+                          ],
+                        );
+                },
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

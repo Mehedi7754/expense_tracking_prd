@@ -180,26 +180,31 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
       body: Column(
         children: [
           // Search & Filter Status Bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: CustomSearchBar(
-                    hintText: 'Search my expenses...',
-                    initialValue: _searchQuery,
-                    onChanged: (q) => setState(() => _searchQuery = q),
-                  ),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1000),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CustomSearchBar(
+                        hintText: 'Search my expenses...',
+                        initialValue: _searchQuery,
+                        onChanged: (q) => setState(() => _searchQuery = q),
+                      ),
+                    ),
+                    if (_filterCriteria.isActive) ...[
+                      const SizedBox(width: 8),
+                      TextButton.icon(
+                        icon: const Icon(Icons.close_rounded, size: 14),
+                        label: const Text('Clear'),
+                        onPressed: () => setState(() => _filterCriteria = const FilterCriteria()),
+                      ),
+                    ],
+                  ],
                 ),
-                if (_filterCriteria.isActive) ...[
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    icon: const Icon(Icons.close_rounded, size: 14),
-                    label: const Text('Clear'),
-                    onPressed: () => setState(() => _filterCriteria = const FilterCriteria()),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
 
@@ -236,19 +241,44 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
                   );
                 }
 
+                final isTablet = MediaQuery.sizeOf(context).width >= 768;
+
                 return RefreshIndicator(
                   onRefresh: _handleRefresh,
                   color: AppColors.primary,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                    itemCount: filtered.length,
-                    itemBuilder: (ctx, i) {
-                      final exp = filtered[i];
-                      return ExpenseListRow(
-                        expense: exp,
-                        onTap: () => context.push('/expenses/${exp.id}'),
-                      );
-                    },
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: isTablet
+                          ? GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 4,
+                                mainAxisExtent: 84,
+                              ),
+                              itemCount: filtered.length,
+                              itemBuilder: (ctx, i) {
+                                final exp = filtered[i];
+                                return ExpenseListRow(
+                                  expense: exp,
+                                  onTap: () => context.push('/expenses/${exp.id}'),
+                                );
+                              },
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                              itemCount: filtered.length,
+                              itemBuilder: (ctx, i) {
+                                final exp = filtered[i];
+                                return ExpenseListRow(
+                                  expense: exp,
+                                  onTap: () => context.push('/expenses/${exp.id}'),
+                                );
+                              },
+                            ),
+                    ),
                   ),
                 );
               }),
