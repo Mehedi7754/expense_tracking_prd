@@ -93,11 +93,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           children: [
                             Text(
                               AppConstants.appName,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: 1.5,
-                                color: AppColors.primary,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
                               ),
                             ),
                             Text(
@@ -115,7 +115,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Text(
                     'Welcome back',
                     style: AppTextStyles.labelLarge.copyWith(
-                      color: AppColors.primary,
+                      color: AppColors.getPrimary(context),
                       fontWeight: FontWeight.w700,
                     ),
                   ),

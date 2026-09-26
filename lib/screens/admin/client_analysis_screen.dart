@@ -99,12 +99,12 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withAlpha(20),
+                          color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.16 : 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           _selectedClient!.clientType.displayName,
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.getPrimary(context)),
                         ),
                       ),
                     ],

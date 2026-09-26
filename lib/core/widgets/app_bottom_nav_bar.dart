@@ -79,6 +79,20 @@ class AppBottomNavBar extends StatelessWidget {
         ),
       ];
     }
+    if (role == UserRole.viewer) {
+      return [
+        const NavItemData(
+          label: 'Reports',
+          icon: Icons.bar_chart_outlined,
+          activeIcon: Icons.bar_chart_rounded,
+        ),
+        const NavItemData(
+          label: 'Profile',
+          icon: Icons.person_outline_rounded,
+          activeIcon: Icons.person_rounded,
+        ),
+      ];
+    }
     return [
       NavItemData(
         label: 'Approvals',

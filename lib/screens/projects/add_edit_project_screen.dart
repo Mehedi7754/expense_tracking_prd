@@ -407,7 +407,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   const Text('Expected Net Revenue:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   Text(
                     '৳ ${_calculatedNetRevenue.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.getPrimary(context)),
                   ),
                 ],
               ),
@@ -466,9 +466,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.primary.withAlpha(15),
+                color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.16 : 0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withAlpha(50)),
+                border: Border.all(color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.3 : 0.2)),
               ),
               child: Column(
                 children: [
@@ -481,7 +481,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       ),
                       Text(
                         'Auto-calculated',
-                        style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        style: TextStyle(fontSize: 11, color: AppColors.getPrimary(context), fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
@@ -492,7 +492,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       const Text('Total Budget with Office Benefit:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                       Text(
                         '৳ ${_calculatedTotalBudget.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.primary),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.getPrimary(context)),
                       ),
                     ],
                   ),
@@ -568,7 +568,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     final theme = Theme.of(context);
     return Row(
       children: [
-        Icon(icon, size: 20, color: AppColors.primary),
+        Icon(icon, size: 20, color: AppColors.getPrimary(context)),
         const SizedBox(width: 8),
         Text(
           title,

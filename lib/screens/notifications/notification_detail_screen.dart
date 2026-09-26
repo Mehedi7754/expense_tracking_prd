@@ -30,8 +30,8 @@ class NotificationDetailScreen extends ConsumerWidget {
 
     final notif = notifList.first;
 
-    Color badgeBg = isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle;
-    Color badgeTextColor = isDark ? AppColors.darkPrimary : AppColors.primary;
+    Color badgeBg = isDark ? AppColors.brandPrimary.withAlpha(40) : AppColors.brandPrimary.withAlpha(25);
+    Color badgeTextColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
     switch (notif.type) {
       case NotificationType.expenseRejected:
         badgeBg = isDark ? AppColors.darkCrimsonLight : AppColors.crimsonLight;
@@ -50,8 +50,8 @@ class NotificationDetailScreen extends ConsumerWidget {
         badgeTextColor = isDark ? AppColors.indigoAccent : AppColors.indigoDark;
         break;
       case NotificationType.general:
-        badgeBg = isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle;
-        badgeTextColor = isDark ? AppColors.darkPrimary : AppColors.primary;
+        badgeBg = isDark ? AppColors.brandPrimary.withAlpha(40) : AppColors.brandPrimary.withAlpha(25);
+        badgeTextColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
         break;
     }
 

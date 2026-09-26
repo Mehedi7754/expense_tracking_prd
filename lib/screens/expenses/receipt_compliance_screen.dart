@@ -379,7 +379,7 @@ class _SubmitJustificationDialogState extends ConsumerState<_SubmitJustification
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.assignment_turned_in_rounded, color: AppColors.primary),
+          Icon(Icons.assignment_turned_in_rounded, color: AppColors.getPrimary(context)),
           const SizedBox(width: 8),
           Expanded(
             child: Text('Submit Justification: ${expense.categoryName}'),
@@ -497,11 +497,11 @@ class _AdminReviewDialogState extends ConsumerState<_AdminReviewDialog> {
     final expense = widget.expense;
 
     return AlertDialog(
-      title: const Row(
+      title: Row(
         children: [
-          Icon(Icons.rate_review_rounded, color: AppColors.primary),
-          SizedBox(width: 8),
-          Text('Review Justification'),
+          Icon(Icons.rate_review_rounded, color: AppColors.getPrimary(context)),
+          const SizedBox(width: 8),
+          const Text('Review Justification'),
         ],
       ),
       content: SingleChildScrollView(
@@ -511,7 +511,7 @@ class _AdminReviewDialogState extends ConsumerState<_AdminReviewDialog> {
           children: [
             Text('${expense.employeeName} — ${expense.projectName}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             const SizedBox(height: 4),
-            Text('Amount: ${CurrencyFormatter.format(expense.amount)} (${expense.categoryName})', style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
+            Text('Amount: ${CurrencyFormatter.format(expense.amount)} (${expense.categoryName})', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.getPrimary(context))),
             const Divider(height: 18),
             const Text('Reason:', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
             Text(expense.justificationReason ?? 'No reason provided', style: const TextStyle(fontSize: 13)),

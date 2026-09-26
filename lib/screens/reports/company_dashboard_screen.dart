@@ -101,7 +101,7 @@ class CompanyDashboardScreen extends ConsumerWidget {
                   label: 'Total Expenses',
                   value: CurrencyFormatter.format(totalCompanyCost, compact: true),
                   icon: Icons.credit_card_rounded,
-                  iconColor: AppColors.primary,
+                  iconColor: AppColors.getPrimary(context),
                   iconBgColor: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
                 ),
                 StatCard(
@@ -126,7 +126,7 @@ class CompanyDashboardScreen extends ConsumerWidget {
                 color: AppColors.getSurface(context),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.getBorder(context)),
-                boxShadow: AppColors.cardShadow,
+                boxShadow: isDark ? [] : AppColors.cardShadow,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

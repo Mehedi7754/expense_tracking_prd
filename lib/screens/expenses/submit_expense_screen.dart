@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/currency_formatter.dart';
@@ -31,8 +32,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
   bool _hasReceipt = true; // PRD Section 10: Receipt available Yes/No
   String? _receiptFileName;
+  String? _receiptPath;
   bool _isSubmitting = false;
-  bool _isOcrScanning = false;
 
   // Category A: Equipment
   final _equipTypeController = TextEditingController();
@@ -108,26 +109,71 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     return _currentAmount > limit;
   }
 
-  // PRD Section 19: Simulated Receipt OCR scanner
-  Future<void> _simulateOcrScan() async {
-    setState(() => _isOcrScanning = true);
-    await Future.delayed(const Duration(milliseconds: 900));
-    if (!mounted) return;
-
-    setState(() {
-      _isOcrScanning = false;
-      _hasReceipt = true;
-      _receiptFileName = 'receipt_scanned_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      _amountController.text = '4500';
-      _noteController.text = 'Verified via AI Receipt OCR: Green Line Paribahan field transport ticket.';
-      if (_selectedCategory == 'transportation') {
-        _transportType = TransportationType.bus;
-        _fromController.text = 'Dhaka (Sayedabad)';
-        _toController.text = 'Sylhet (Kadamtali)';
+  Future<void> _pickReceipt(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+      if (image != null) {
+        setState(() {
+          _receiptPath = image.path;
+          _receiptFileName = image.name.isNotEmpty ? image.name : image.path.split(RegExp(r'[/\\]')).last;
+        });
+        if (mounted) {
+          NotificationBanner.showSuccess(
+            context,
+            source == ImageSource.camera
+                ? 'Receipt photo captured from Camera'
+                : 'Receipt image selected from Gallery',
+          );
+        }
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        NotificationBanner.showError(
+          context,
+          'Could not access ${source == ImageSource.camera ? "camera" : "gallery"}: $e',
+        );
+      }
+    }
+  }
 
-    NotificationBanner.showSuccess(context, 'Receipt OCR: Auto-extracted Amount ৳4,500 & Details');
+  Future<void> _pickDocumentOrMedia() async {
+    try {
+      final picker = ImagePicker();
+      final XFile? file = await picker.pickMedia();
+      if (file != null) {
+        setState(() {
+          _receiptPath = file.path;
+          _receiptFileName = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
+        });
+        if (mounted) {
+          NotificationBanner.showSuccess(context, 'Receipt file attached: $_receiptFileName');
+        }
+      }
+    } catch (_) {
+      try {
+        final picker = ImagePicker();
+        final XFile? file = await picker.pickImage(source: ImageSource.gallery);
+        if (file != null) {
+          setState(() {
+            _receiptPath = file.path;
+            _receiptFileName = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
+          });
+          if (mounted) {
+            NotificationBanner.showSuccess(context, 'Receipt file attached: $_receiptFileName');
+          }
+        }
+      } catch (err) {
+        if (mounted) {
+          NotificationBanner.showError(context, 'Could not open file manager: $err');
+        }
+      }
+    }
   }
 
   Future<void> _handleSubmit() async {
@@ -208,7 +254,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           note: _noteController.text.trim(),
           date: _selectedDate,
           hasReceipt: _hasReceipt,
-          receiptPhotoUrl: _receiptFileName,
+          receiptPhotoUrl: _receiptPath ?? _receiptFileName,
           equipmentDetails: equipDetails,
           transportationDetails: transDetails,
           foodDetails: foodDetails,
@@ -263,6 +309,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     final user = ref.watch(authProvider).currentUser;
+    // Watch projectProvider for state reactivity across updates
+    ref.watch(projectProvider);
     // PRD Section 1: Member should only see assigned projects in dropdown
     final assignedProjects = ref.read(projectProvider.notifier).getProjectsForUser(user);
 
@@ -274,17 +322,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
         title: const Text('Add Expense (PFIS)', style: TextStyle(fontWeight: FontWeight.w800)),
-        actions: [
-          // OCR Scanner trigger (PRD Section 19)
-          TextButton.icon(
-            onPressed: _isOcrScanning ? null : _simulateOcrScan,
-            icon: _isOcrScanning
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.document_scanner_rounded, size: 18),
-            label: const Text('AI OCR', style: TextStyle(fontWeight: FontWeight.w700)),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -300,7 +337,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               value: _selectedProject,
               decoration: InputDecoration(
                 labelText: 'Select Assigned Project *',
-                prefixIcon: const Icon(Icons.folder_shared_rounded, color: AppColors.primary),
+                prefixIcon: Icon(Icons.folder_shared_rounded, color: AppColors.getPrimary(context)),
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurface : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -314,7 +351,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 1.8),
+                  borderSide: BorderSide(color: AppColors.getPrimary(context), width: 1.8),
                 ),
               ),
               items: assignedProjects.map((p) {
@@ -369,7 +406,10 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 children: [
                   Text(
                     '${_getCategoryDisplayName(_selectedCategory)} Details',
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.primary),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.getPrimary(context),
+                    ),
                   ),
                   const Divider(height: 20),
                   if (_selectedCategory == 'equipment') _buildEquipmentForm(),
@@ -388,11 +428,11 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             TextFormField(
               controller: _amountController,
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primary),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : AppColors.textPrimary),
               decoration: InputDecoration(
                 labelText: 'Direct Expense Amount (৳) *',
                 prefixText: '৳ ',
-                prefixStyle: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primary),
+                prefixStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.getPrimary(context)),
                 hintText: 'e.g. 4500',
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurface : Colors.white,
@@ -407,7 +447,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                  borderSide: BorderSide(color: AppColors.getPrimary(context), width: 2),
                 ),
               ),
               onChanged: (_) => setState(() {}),
@@ -601,10 +641,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                       runSpacing: 8,
                       children: [
                         OutlinedButton.icon(
-                          onPressed: () {
-                            setState(() => _receiptFileName = 'camera_capture_${DateTime.now().millisecondsSinceEpoch}.jpg');
-                            NotificationBanner.showSuccess(context, 'Receipt photo captured from Camera');
-                          },
+                          onPressed: () => _pickReceipt(ImageSource.camera),
                           icon: const Icon(Icons.camera_alt_outlined, size: 16),
                           label: const Text('Camera', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                           style: OutlinedButton.styleFrom(
@@ -615,10 +652,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                           ),
                         ),
                         OutlinedButton.icon(
-                          onPressed: () {
-                            setState(() => _receiptFileName = 'gallery_receipt_${DateTime.now().millisecondsSinceEpoch}.png');
-                            NotificationBanner.showSuccess(context, 'Receipt image selected from Gallery');
-                          },
+                          onPressed: () => _pickReceipt(ImageSource.gallery),
                           icon: const Icon(Icons.photo_library_outlined, size: 16),
                           label: const Text('Gallery', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                           style: OutlinedButton.styleFrom(
@@ -629,10 +663,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                           ),
                         ),
                         OutlinedButton.icon(
-                          onPressed: () {
-                            setState(() => _receiptFileName = 'receipt_doc_${DateTime.now().millisecondsSinceEpoch}.pdf');
-                            NotificationBanner.showSuccess(context, 'Receipt PDF loaded from File Manager');
-                          },
+                          onPressed: _pickDocumentOrMedia,
                           icon: const Icon(Icons.folder_open_outlined, size: 16),
                           label: const Text('File Manager', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                           style: OutlinedButton.styleFrom(
@@ -679,7 +710,10 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                               color: Colors.grey,
-                              onPressed: () => setState(() => _receiptFileName = null),
+                              onPressed: () => setState(() {
+                                _receiptFileName = null;
+                                _receiptPath = null;
+                              }),
                             ),
                           ],
                         ),
@@ -720,6 +754,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
   Widget _buildCategoryChip(String id, String label, IconData icon, bool isDark) {
     final isSelected = _selectedCategory == id;
+    final primaryColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
     return GestureDetector(
       onTap: () => setState(() => _selectedCategory = id),
       child: AnimatedContainer(
@@ -727,12 +762,12 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: isSelected
-              ? AppColors.primary
+              ? primaryColor
               : (isDark ? AppColors.darkSurface : Colors.white),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? AppColors.primary
+                ? primaryColor
                 : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
             width: isSelected ? 1.5 : 1.0,
           ),
@@ -821,9 +856,10 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       children: [
         DropdownButtonFormField<TransportationType>(
           value: _transportType,
+          isExpanded: true,
           decoration: const InputDecoration(labelText: 'Transportation Type'),
           items: TransportationType.values.map((t) {
-            return DropdownMenuItem(value: t, child: Text(t.displayName));
+            return DropdownMenuItem(value: t, child: Text(t.displayName, overflow: TextOverflow.ellipsis));
           }).toList(),
           onChanged: (v) => setState(() => _transportType = v!),
         ),
@@ -910,9 +946,10 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             Expanded(
               child: DropdownButtonFormField<String>(
                 value: _mealType,
+                isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Meal Type'),
                 items: ['Breakfast', 'Lunch', 'Dinner', 'Refreshments / Tea'].map((m) {
-                  return DropdownMenuItem(value: m, child: Text(m));
+                  return DropdownMenuItem(value: m, child: Text(m, overflow: TextOverflow.ellipsis));
                 }).toList(),
                 onChanged: (v) => setState(() => _mealType = v!),
               ),
@@ -993,6 +1030,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   Widget _buildOfficeForm() {
     return DropdownButtonFormField<String>(
       value: _officeSubCategory,
+      isExpanded: true,
       decoration: const InputDecoration(labelText: 'Office Cost Category'),
       items: [
         'Printing',
@@ -1003,7 +1041,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
         'Meeting expenses',
         'Temporary office',
         'Other',
-      ].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+      ].map((s) => DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))).toList(),
       onChanged: (v) => setState(() => _officeSubCategory = v!),
     );
   }

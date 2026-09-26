@@ -590,9 +590,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2),
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFFCA5A5)),
+              border: Border.all(color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5)),
             ),
             child: Row(
               children: [
@@ -609,18 +609,18 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Receipt Compliance Alert (>50%)',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF991B1B),
+                          color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '৳${CurrencyFormatter.format(unreceiptedAmount, compact: true)} lacks receipts. Please submit justification.',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF7F1D1D)),
+                        style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFFECACA) : const Color(0xFF7F1D1D)),
                       ),
                     ],
                   ),
@@ -753,14 +753,18 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFBFDBFE)),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.visibility_outlined, color: Color(0xFF2563EB), size: 20),
-              SizedBox(width: 10),
+              const Icon(Icons.visibility_outlined, color: Color(0xFF2563EB), size: 20),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Viewer Mode: Read-only access to permitted audit data.',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                  ),
                 ),
               ),
             ],
@@ -1059,7 +1063,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                           child: Text(
                             _getUserInitials(u.name),
                             style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.black87,
+                              color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                               fontWeight: FontWeight.w800,
                               fontSize: 13,
                             ),

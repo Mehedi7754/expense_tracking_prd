@@ -67,22 +67,6 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
               : 'My Projects (${permittedProjects.length})',
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
         ),
-        actions: [
-          if (canCreateProject)
-            IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4F46E5).withAlpha(20),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.add_rounded, color: Color(0xFF4F46E5), size: 20),
-              ),
-              tooltip: 'New Project',
-              onPressed: () => context.push(RoutePaths.addProject),
-            ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -188,7 +172,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                                           crossAxisCount: 2,
                                           crossAxisSpacing: 10,
                                           mainAxisSpacing: 10,
-                                          mainAxisExtent: 74,
+                                          mainAxisExtent: 96,
                                         ),
                                         delegate: SliverChildBuilderDelegate(
                                           (ctx, i) {

@@ -64,8 +64,8 @@ class _CompanyHubScreenState extends ConsumerState<CompanyHubScreen>
           isScrollable: false,
           labelPadding: EdgeInsets.zero,
           indicatorWeight: 3,
-          indicatorColor: isDark ? AppColors.darkPrimary : AppColors.primary,
-          labelColor: isDark ? AppColors.darkPrimary : AppColors.primary,
+          indicatorColor: AppColors.getPrimary(context),
+          labelColor: AppColors.getPrimary(context),
           unselectedLabelColor: isDark ? AppColors.darkTextMuted : AppColors.textMuted,
           tabs: const [
             Tab(

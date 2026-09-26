@@ -51,7 +51,7 @@ class SettingsScreen extends ConsumerWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.currency_exchange_rounded, size: 20, color: AppColors.primary),
+                      Icon(Icons.currency_exchange_rounded, size: 20, color: AppColors.getPrimary(context)),
                       const SizedBox(width: 10),
                       Text('Preferred Display Currency', style: AppTextStyles.labelMedium),
                     ],
@@ -105,7 +105,7 @@ class SettingsScreen extends ConsumerWidget {
                       children: [
                         const Text('Default Office Benefit Rate:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         Text('${(settings.defaultOfficeBenefitRate * 100).toInt()}%',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.getPrimary(context))),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -175,7 +175,7 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(width: 8),
                     Text('৳ ${settings.dailyFoodAllowance.toInt()}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.getPrimary(context))),
                   ],
                 ),
               ),

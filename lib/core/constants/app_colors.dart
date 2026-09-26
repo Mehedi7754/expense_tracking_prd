@@ -206,6 +206,13 @@ class AppColors {
   static Color getTextMuted(BuildContext context) =>
       isDark(context) ? darkTextMuted : textMuted;
 
+  // Consistent Brand Primary Accent (Modern Royal Indigo)
+  static const Color brandPrimary = Color(0xFF4F46E5);
+  static const Color brandPrimaryDark = Color(0xFF818CF8);
+
+  static Color getPrimary(BuildContext context) =>
+      isDark(context) ? brandPrimaryDark : brandPrimary;
+
   // Subtle Shadow
   static List<BoxShadow> get cardShadow => [
         const BoxShadow(

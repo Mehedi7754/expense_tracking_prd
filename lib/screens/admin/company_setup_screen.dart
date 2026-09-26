@@ -98,16 +98,16 @@ class _CompanySetupScreenState extends ConsumerState<CompanySetupScreen> {
                         width: 88,
                         height: 88,
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: AppColors.getSurface(context),
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppColors.border, width: 1.5),
-                          boxShadow: AppColors.cardShadow,
+                          border: Border.all(color: AppColors.getBorder(context), width: 1.5),
+                          boxShadow: (Theme.of(context).brightness == Brightness.dark) ? [] : AppColors.cardShadow,
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Icon(
                             Icons.business_rounded,
                             size: 44,
-                            color: AppColors.primary,
+                            color: AppColors.getPrimary(context),
                           ),
                         ),
                       ),

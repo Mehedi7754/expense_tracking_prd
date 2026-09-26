@@ -25,14 +25,22 @@ class DateRangePickerWidget extends StatelessWidget {
             end: now,
           ),
       builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: AppColors.textWhite,
-              surface: AppColors.surface,
-              onSurface: AppColors.textPrimary,
-            ),
+            colorScheme: isDark
+                ? const ColorScheme.dark(
+                    primary: Color(0xFF4F46E5),
+                    onPrimary: Colors.white,
+                    surface: Color(0xFF1E293B),
+                    onSurface: Colors.white,
+                  )
+                : const ColorScheme.light(
+                    primary: Color(0xFF4F46E5),
+                    onPrimary: Colors.white,
+                    surface: Colors.white,
+                    onSurface: Color(0xFF0F172A),
+                  ),
           ),
           child: child!,
         );
@@ -77,9 +85,9 @@ class DateRangePickerWidget extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.getSurface(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.getBorder(context)),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -90,17 +98,20 @@ class DateRangePickerWidget extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.date_range_rounded, size: 18, color: AppColors.primary),
+                  Icon(Icons.date_range_rounded, size: 18, color: AppColors.getPrimary(context)),
                   const SizedBox(width: 8),
                   Text(
                     rangeText,
-                    style: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w600),
+                    style: AppTextStyles.labelMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.getTextPrimary(context),
+                    ),
                   ),
                 ],
               ),
               if (selectedRange != null)
                 IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 16),
+                  icon: Icon(Icons.close_rounded, size: 16, color: AppColors.getTextMuted(context)),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   onPressed: () => onRangeSelected(null),
@@ -160,14 +171,14 @@ class _PresetChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isCustom ? AppColors.surfaceSubtle : AppColors.background,
+          color: isCustom ? AppColors.getSurfaceSubtle(context) : AppColors.getBackground(context),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.border, width: 1),
+          border: Border.all(color: AppColors.getBorder(context), width: 1),
         ),
         child: Text(
           label,
           style: AppTextStyles.labelSmall.copyWith(
-            color: isCustom ? AppColors.primary : AppColors.textSecondary,
+            color: isCustom ? AppColors.getPrimary(context) : AppColors.getTextSecondary(context),
             fontWeight: isCustom ? FontWeight.w600 : FontWeight.w500,
           ),
         ),

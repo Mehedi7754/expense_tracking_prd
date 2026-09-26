@@ -72,7 +72,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
                   color: AppColors.getSurface(context),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: AppColors.getBorder(context)),
-                  boxShadow: AppColors.cardShadow,
+                  boxShadow: isDark ? [] : AppColors.cardShadow,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,7 +81,10 @@ class ExpenseDetailScreen extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       CurrencyFormatter.format(expense.amount, currency: expense.currency),
-                      style: AppTextStyles.currencyLarge.copyWith(fontSize: 32),
+                      style: AppTextStyles.currencyLarge.copyWith(
+                        fontSize: 32,
+                        color: AppColors.getTextPrimary(context),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Divider(),
@@ -172,7 +175,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
                   color: AppColors.getSurface(context),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.getBorder(context)),
-                  boxShadow: AppColors.cardShadow,
+                  boxShadow: isDark ? [] : AppColors.cardShadow,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

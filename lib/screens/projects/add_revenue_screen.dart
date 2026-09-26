@@ -125,7 +125,12 @@ class _AddRevenueScreenState extends ConsumerState<AddRevenueScreen> {
                 TextFormField(
                   controller: _amountController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  style: AppTextStyles.currencyLarge.copyWith(fontSize: 22, color: AppColors.emeraldDark),
+                  style: AppTextStyles.currencyLarge.copyWith(
+                    fontSize: 22,
+                    color: (Theme.of(context).brightness == Brightness.dark)
+                        ? AppColors.emeraldAccent
+                        : AppColors.emeraldDark,
+                  ),
                   decoration: const InputDecoration(
                     labelText: 'Revenue Amount (\$)*',
                     prefixText: '\$ ',

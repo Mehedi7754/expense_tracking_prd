@@ -69,8 +69,8 @@ class CategoryManagementScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'admin_add_category_fab',
         onPressed: () => _showAddEditDialog(context, ref),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textWhite,
+        backgroundColor: AppColors.getPrimary(context),
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Category'),
       ),
@@ -82,15 +82,18 @@ class CategoryManagementScreen extends ConsumerWidget {
             itemCount: categories.length,
             itemBuilder: (ctx, i) {
               final cat = categories[i];
+              final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: cat.isActive ? AppColors.surface : AppColors.surfaceSubtle.withValues(alpha: 0.6),
+                  color: cat.isActive
+                      ? AppColors.getSurface(context)
+                      : (isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle).withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: AppColors.cardShadow,
+                  border: Border.all(color: AppColors.getBorder(context)),
+                  boxShadow: isDark ? [] : AppColors.cardShadow,
                 ),
                 child: Row(
                   children: [
@@ -98,10 +101,10 @@ class CategoryManagementScreen extends ConsumerWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: cat.isActive ? AppColors.surfaceSubtle : AppColors.borderSubtle,
+                        color: isDark ? AppColors.getPrimary(context).withValues(alpha: 0.16) : const Color(0xFFEEF2FF),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(_getIcon(cat.iconName), color: AppColors.primary, size: 20),
+                      child: Icon(_getIcon(cat.iconName), color: AppColors.getPrimary(context), size: 20),
                     ),
                     const SizedBox(width: 14),
                     Expanded(

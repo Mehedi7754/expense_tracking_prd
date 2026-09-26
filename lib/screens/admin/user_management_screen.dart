@@ -89,8 +89,8 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'admin_add_user_fab',
         onPressed: () => context.push(RoutePaths.addUser),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textWhite,
+        backgroundColor: AppColors.getPrimary(context),
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add_rounded),
         label: const Text('Add User'),
       ),
@@ -113,6 +113,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               itemCount: filtered.length,
               itemBuilder: (ctx, i) {
                 final user = filtered[i];
+                final isDark = Theme.of(ctx).brightness == Brightness.dark;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -121,7 +122,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                     color: user.isActive ? AppColors.getSurface(context) : AppColors.getSurfaceSubtle(context).withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.getBorder(context)),
-                    boxShadow: AppColors.cardShadow,
+                    boxShadow: isDark ? [] : AppColors.cardShadow,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

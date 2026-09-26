@@ -98,10 +98,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
+                color: isDark ? AppColors.getPrimary(context).withValues(alpha: 0.16) : const Color(0xFFEEF2FF),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.lock_reset_rounded, size: 28, color: AppColors.primary),
+              child: Icon(Icons.lock_reset_rounded, size: 28, color: AppColors.getPrimary(context)),
             ),
             const SizedBox(height: 18),
             Text('Reset Your Password', style: AppTextStyles.titleLarge),

@@ -80,15 +80,15 @@ class _CostEstimatorScreenState extends ConsumerState<CostEstimatorScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.primary.withAlpha(15),
+              color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.16 : 0.08),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withAlpha(50)),
+              border: Border.all(color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.3 : 0.2)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.psychology_rounded, color: AppColors.primary, size: 28),
-                SizedBox(width: 12),
-                Expanded(
+                Icon(Icons.psychology_rounded, color: AppColors.getPrimary(context), size: 28),
+                const SizedBox(width: 12),
+                const Expanded(
                   child: Text(
                     'Estimate new project costs and pricing based on historical survey benchmarks, staff requirements, and field travel intensity.',
                     style: TextStyle(fontSize: 12, height: 1.3),

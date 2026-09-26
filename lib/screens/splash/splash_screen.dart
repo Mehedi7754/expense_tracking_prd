@@ -101,12 +101,17 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                 const SizedBox(height: 24),
                 Text(
                   AppConstants.appName,
-                  style: AppTextStyles.displayMedium.copyWith(letterSpacing: -0.8),
+                  style: AppTextStyles.displayMedium.copyWith(
+                    letterSpacing: -0.8,
+                    color: AppColors.getTextPrimary(context),
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   AppConstants.appTagline,
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.getTextMuted(context),
+                  ),
                 ),
                 const SizedBox(height: 48),
                 const SizedBox(

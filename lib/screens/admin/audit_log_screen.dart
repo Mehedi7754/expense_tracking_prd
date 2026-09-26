@@ -80,10 +80,10 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.surface,
+                          color: AppColors.getSurface(context),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border),
-                          boxShadow: AppColors.cardShadow,
+                          border: Border.all(color: AppColors.getBorder(context)),
+                          boxShadow: (Theme.of(context).brightness == Brightness.dark) ? [] : AppColors.cardShadow,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,21 +108,21 @@ class _AuditLogScreenState extends ConsumerState<AuditLogScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: AppColors.surfaceSubtle,
+                                color: AppColors.getSurfaceSubtle(context),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 '${log.action} • ${log.entityType}',
                                 style: AppTextStyles.labelSmall.copyWith(
                                   fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
+                                  color: AppColors.getPrimary(context),
                                 ),
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
                               log.details,
-                              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.getTextSecondary(context)),
                             ),
                           ],
                         ),

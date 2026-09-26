@@ -120,11 +120,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         children: [
                           Text(
                             AppConstants.appName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.5,
-                              color: AppColors.primary,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                             ),
                           ),
                           const Text(
@@ -257,7 +257,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withAlpha(12),
+                              color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.16 : 0.08),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Column(
@@ -265,7 +265,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               children: [
                                 Text(
                                   _getRoleDescription(_selectedRole),
-                                  style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+                                  style: TextStyle(fontSize: 11, color: AppColors.getPrimary(context), fontWeight: FontWeight.w600),
                                 ),
                                 const SizedBox(height: 4),
                                 const Text(

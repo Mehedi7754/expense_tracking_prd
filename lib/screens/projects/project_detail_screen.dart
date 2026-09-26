@@ -104,22 +104,27 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.archive_rounded, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Close Project & Generate Summary'),
-          ],
-        ),
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.archive_rounded, color: AppColors.getPrimary(context)),
+              const SizedBox(width: 8),
+              const Text('Close Project & Generate Summary'),
+            ],
+          ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Closing this project will archive it into Historical Cost Intelligence benchmarks for future project estimation.',
-                style: TextStyle(fontSize: 13, color: Colors.black87),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                ),
               ),
               const Divider(height: 20),
               _buildSummaryRow('Contract Value:', CurrencyFormatter.format(project.grossProjectValue)),
@@ -138,7 +143,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.getPrimary(context),
+              foregroundColor: Colors.white,
+            ),
             onPressed: () {
               final summary = ProjectFinancialSummary(
                 contractValue: project.grossProjectValue,
@@ -163,9 +171,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
             child: const Text('Confirm Close'),
           ),
         ],
-      ),
-    );
-  }
+      );
+    },
+  );
+}
 
   Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
     return Padding(
@@ -210,7 +219,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(project.projectId, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            Text(project.projectId, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.getPrimary(context))),
             Text(project.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           ],
         ),
@@ -558,42 +567,46 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         }),
 
         // Office Benefit Row (PRD Section 9: 30%)
-        Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.primary.withAlpha(12),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.primary.withAlpha(40)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.corporate_fare_rounded, size: 18, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Office Benefit (${(project.officeBenefitRate * 100).toInt()}%)',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.primary),
-                  ),
-                  const Spacer(),
-                  const Text('AUTO-CALCULATED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildSubMetric('Budgeted OB', CurrencyFormatter.format(totalBudget * project.officeBenefitRate)),
-                  _buildSubMetric('Actual OB', CurrencyFormatter.format(totalActual * project.officeBenefitRate)),
-                  _buildSubMetric('Remaining', CurrencyFormatter.format((totalBudget - totalActual) * project.officeBenefitRate)),
-                  _buildSubMetric('Rate', '${(project.officeBenefitRate * 100).toInt()}%'),
-                ],
-              ),
-            ],
-          ),
-        ),
+        Builder(builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final obColor = AppColors.getPrimary(context);
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: obColor.withValues(alpha: isDark ? 0.16 : 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: obColor.withValues(alpha: isDark ? 0.3 : 0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.corporate_fare_rounded, size: 18, color: obColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Office Benefit (${(project.officeBenefitRate * 100).toInt()}%)',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: obColor),
+                    ),
+                    const Spacer(),
+                    Text('AUTO-CALCULATED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: obColor)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildSubMetric('Budgeted OB', CurrencyFormatter.format(totalBudget * project.officeBenefitRate)),
+                    _buildSubMetric('Actual OB', CurrencyFormatter.format(totalActual * project.officeBenefitRate)),
+                    _buildSubMetric('Remaining', CurrencyFormatter.format((totalBudget - totalActual) * project.officeBenefitRate)),
+                    _buildSubMetric('Rate', '${(project.officeBenefitRate * 100).toInt()}%'),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }),
       ],
     );
   }

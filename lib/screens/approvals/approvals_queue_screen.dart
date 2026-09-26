@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
@@ -22,31 +23,6 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
   bool _isBatchMode = false;
   final Set<String> _selectedExpenseIds = {};
 
-  Future<void> _handleApprove(ExpenseModel expense) async {
-    final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
-      context,
-      title: 'Approve Claim',
-      message: 'Approve ${CurrencyFormatter.format(expense.amount)} claim by ${expense.employeeName}?',
-    );
-
-    if (confirm && mounted) {
-      ref.read(expenseProvider.notifier).approveExpense(expense.id);
-      NotificationBanner.showSuccess(context, 'Claim approved for ${expense.employeeName}.');
-    }
-  }
-
-  Future<void> _handleReject(ExpenseModel expense) async {
-    final reason = await ApproveRejectDialog.showRejectDialog(
-      context,
-      title: 'Reject Claim',
-      subtitle: 'Provide a reason for ${expense.employeeName}.',
-    );
-
-    if (reason != null && mounted) {
-      ref.read(expenseProvider.notifier).rejectExpense(expense.id, reason);
-      NotificationBanner.showWarning(context, 'Claim rejected.');
-    }
-  }
 
   Future<void> _handleBatchApprove() async {
     if (_selectedExpenseIds.isEmpty) return;
@@ -321,14 +297,14 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                 }
               });
             }
-          : null,
-      borderRadius: BorderRadius.circular(18),
+          : () => context.push('/expenses/${exp.id}'),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected
                 ? const Color(0xFF10B981)
@@ -337,176 +313,108 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 25 : 8),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
+              color: Colors.black.withAlpha(isDark ? 15 : 4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            // Top Row: Squircle icon + Employee & Project + Amount
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (_isBatchMode) ...[
-                  Checkbox(
-                    value: isSelected,
-                    activeColor: const Color(0xFF10B981),
-                    onChanged: (val) {
-                      setState(() {
-                        if (val == true) {
-                          _selectedExpenseIds.add(exp.id);
-                        } else {
-                          _selectedExpenseIds.remove(exp.id);
-                        }
-                      });
-                    },
+            if (_isBatchMode) ...[
+              Checkbox(
+                value: isSelected,
+                activeColor: const Color(0xFF10B981),
+                onChanged: (val) {
+                  setState(() {
+                    if (val == true) {
+                      _selectedExpenseIds.add(exp.id);
+                    } else {
+                      _selectedExpenseIds.remove(exp.id);
+                    }
+                  });
+                },
+              ),
+              const SizedBox(width: 4),
+            ],
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: iconBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(child: Icon(icon, color: iconColor, size: 20)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    exp.employeeName,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(child: Icon(icon, color: iconColor, size: 22)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        exp.employeeName,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  CurrencyFormatter.format(exp.amount),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                const SizedBox(height: 3),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      CurrencyFormatter.format(exp.amount),
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          exp.hasReceipt ? 'Receipt' : 'No Receipt',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 4),
+                    Text(
+                      exp.hasReceipt ? 'Receipt' : 'No Receipt',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
-
-            if (exp.note.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(
-                exp.note,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-
             if (!_isBatchMode) ...[
-              const SizedBox(height: 14),
-              // Action Buttons: Approve & Reject grouped closely on wide devices
-              LayoutBuilder(
-                builder: (ctx, constraints) {
-                  final isWide = constraints.maxWidth >= 500;
-                  final rejectBtn = SizedBox(
-                    height: 38,
-                    width: isWide ? 120 : null,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _handleReject(exp),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444),
-                        side: const BorderSide(color: Color(0xFFFCA5A5)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: EdgeInsets.zero,
-                      ),
-                      icon: const Icon(Icons.close_rounded, size: 16),
-                      label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                    ),
-                  );
-
-                  final approveBtn = SizedBox(
-                    height: 38,
-                    width: isWide ? 130 : null,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _handleApprove(exp),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: EdgeInsets.zero,
-                      ),
-                      icon: const Icon(Icons.check_rounded, size: 16),
-                      label: const Text('Approve', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                    ),
-                  );
-
-                  return isWide
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            rejectBtn,
-                            const SizedBox(width: 10),
-                            approveBtn,
-                          ],
-                        )
-                      : Row(
-                          children: [
-                            Expanded(child: rejectBtn),
-                            const SizedBox(width: 10),
-                            Expanded(child: approveBtn),
-                          ],
-                        );
-                },
+              const SizedBox(width: 6),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: isDark ? AppColors.darkTextMuted : const Color(0xFFCBD5E1),
               ),
             ],
           ],

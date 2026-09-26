@@ -106,30 +106,30 @@ class ProjectCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       decoration: BoxDecoration(
         color: AppColors.getSurface(context),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.getBorder(context)),
       ),
       child: const Row(
         children: [
-          LoadingSkeleton(width: 44, height: 44, borderRadius: 13),
-          SizedBox(width: 14),
+          LoadingSkeleton(width: 56, height: 56, borderRadius: 16),
+          SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                LoadingSkeleton(width: 150, height: 15, borderRadius: 4),
+                LoadingSkeleton(width: 170, height: 16, borderRadius: 4),
                 SizedBox(height: 6),
-                LoadingSkeleton(width: 110, height: 12, borderRadius: 4),
+                LoadingSkeleton(width: 125, height: 13, borderRadius: 4),
               ],
             ),
           ),
           SizedBox(width: 12),
-          LoadingSkeleton(width: 44, height: 44, borderRadius: 22),
+          LoadingSkeleton(width: 54, height: 54, borderRadius: 27),
         ],
       ),
     );

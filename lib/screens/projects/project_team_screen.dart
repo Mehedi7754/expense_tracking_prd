@@ -68,7 +68,7 @@ class ProjectTeamScreen extends ConsumerWidget {
                 color: AppColors.getSurface(context),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.getBorder(context)),
-                boxShadow: AppColors.cardShadow,
+                boxShadow: (Theme.of(context).brightness == Brightness.dark) ? [] : AppColors.cardShadow,
               ),
               child: Row(
                 children: [

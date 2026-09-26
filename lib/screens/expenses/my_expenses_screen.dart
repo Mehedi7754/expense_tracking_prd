@@ -119,6 +119,7 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = ref.watch(authProvider).currentUser;
     final allExpenses = ref.watch(expenseProvider);
     final allProjects = ref.watch(projectProvider);
@@ -159,6 +160,9 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
               controller: _tabController,
               isScrollable: true,
               tabAlignment: TabAlignment.start,
+              indicatorColor: AppColors.getPrimary(context),
+              labelColor: AppColors.getPrimary(context),
+              unselectedLabelColor: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
               tabs: [
                 Tab(text: 'All (${myExpenses.length})'),
                 Tab(text: 'Pending ($pendingCount)'),
@@ -168,14 +172,6 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
             ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'my_expenses_fab',
-        onPressed: () => context.push(RoutePaths.submitExpense),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.textWhite,
-        elevation: 2,
-        child: const Icon(Icons.add_rounded),
       ),
       body: Column(
         children: [
@@ -245,7 +241,7 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
 
                 return RefreshIndicator(
                   onRefresh: _handleRefresh,
-                  color: AppColors.primary,
+                  color: AppColors.getPrimary(context),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 1000),

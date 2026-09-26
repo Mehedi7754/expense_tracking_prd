@@ -38,7 +38,7 @@ class NotificationsScreen extends ConsumerWidget {
       case NotificationType.commentAdded:
         return isDark ? AppColors.indigoAccent : AppColors.indigo;
       case NotificationType.general:
-        return isDark ? AppColors.darkPrimary : AppColors.primary;
+        return isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
     }
   }
 
@@ -53,7 +53,7 @@ class NotificationsScreen extends ConsumerWidget {
       case NotificationType.commentAdded:
         return isDark ? AppColors.darkIndigoLight : AppColors.indigoLight;
       case NotificationType.general:
-        return isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle;
+        return isDark ? AppColors.brandPrimary.withAlpha(40) : AppColors.brandPrimary.withAlpha(20);
     }
   }
 
@@ -169,7 +169,7 @@ class NotificationsScreen extends ConsumerWidget {
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
-                              color: isDark ? AppColors.darkPrimary : AppColors.primary,
+                              color: isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary,
                               shape: BoxShape.circle,
                             ),
                           ),

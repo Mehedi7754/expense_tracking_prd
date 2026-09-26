@@ -23,6 +23,7 @@ class TaskDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final allTasks = ref.watch(taskProvider);
     final allExpenses = ref.watch(expenseProvider);
 
@@ -76,7 +77,7 @@ class TaskDetailScreen extends ConsumerWidget {
                   color: AppColors.getSurface(context),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: AppColors.getBorder(context)),
-                  boxShadow: AppColors.cardShadow,
+                  boxShadow: isDark ? [] : AppColors.cardShadow,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
