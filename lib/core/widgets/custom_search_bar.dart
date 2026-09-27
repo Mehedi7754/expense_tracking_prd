@@ -8,12 +8,15 @@ class CustomSearchBar extends StatefulWidget {
   final VoidCallback? onClear;
   final String initialValue;
 
+  final Widget? trailing;
+
   const CustomSearchBar({
     super.key,
     this.hintText = 'Search by keyword...',
     required this.onChanged,
     this.onClear,
     this.initialValue = '',
+    this.trailing,
   });
 
   @override
@@ -46,43 +49,73 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final hasText = _controller.text.isNotEmpty;
+
     return Container(
-      height: 46,
+      width: double.infinity,
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
         color: AppColors.getSurface(context),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.getBorder(context), width: 1),
       ),
-      child: TextField(
-        controller: _controller,
-        onChanged: widget.onChanged,
-        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.getTextPrimary(context)),
-        textAlignVertical: TextAlignVertical.center,
-        decoration: InputDecoration(
-          isDense: true,
-          hintText: widget.hintText,
-          hintStyle: AppTextStyles.bodyMedium.copyWith(color: AppColors.getTextMuted(context)),
-          prefixIcon: Icon(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
             Icons.search_rounded,
             size: 20,
             color: AppColors.getTextMuted(context),
           ),
-          suffixIcon: _controller.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(Icons.clear_rounded, size: 18, color: AppColors.getTextMuted(context)),
-                  onPressed: () {
-                    _controller.clear();
-                    widget.onChanged('');
-                    widget.onClear?.call();
-                    setState(() {});
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-        ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              onChanged: (val) {
+                widget.onChanged(val);
+                setState(() {});
+              },
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.getTextPrimary(context),
+                fontSize: 13.5,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: widget.hintText,
+                hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.getTextMuted(context),
+                  fontSize: 13.5,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          if (hasText)
+            GestureDetector(
+              onTap: () {
+                _controller.clear();
+                widget.onChanged('');
+                widget.onClear?.call();
+                setState(() {});
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: AppColors.getTextMuted(context),
+                ),
+              ),
+            ),
+          if (widget.trailing != null) ...[
+            const SizedBox(width: 4),
+            widget.trailing!,
+          ],
+        ],
       ),
     );
   }

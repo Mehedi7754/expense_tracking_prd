@@ -40,6 +40,18 @@ class NotificationBanner {
     );
   }
 
+  static void showInfo(BuildContext context, String message) {
+    _showSnackBar(
+      context,
+      message: message,
+      icon: Icons.info_outline_rounded,
+      iconColor: AppColors.brandPrimary,
+      bgColor: AppColors.surface,
+      borderColor: AppColors.indigoBorder,
+      textColor: AppColors.indigoDark,
+    );
+  }
+
   static void _showSnackBar(
     BuildContext context, {
     required String message,

@@ -8,6 +8,11 @@ import 'package:expense_tracking_prd/models/project_model.dart';
 import 'package:expense_tracking_prd/models/client_model.dart';
 import 'package:expense_tracking_prd/core/widgets/project_cost_card.dart';
 import 'package:expense_tracking_prd/screens/projects/add_edit_project_screen.dart';
+import 'package:expense_tracking_prd/screens/projects/projects_list_screen.dart';
+import 'package:expense_tracking_prd/screens/approvals/approvals_queue_screen.dart';
+import 'package:expense_tracking_prd/screens/profile/profile_screen.dart';
+import 'package:expense_tracking_prd/state/auth_provider.dart';
+import 'package:expense_tracking_prd/models/user_role.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
@@ -184,5 +189,83 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Contract & Tax Setup'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ProjectsListScreen renders with single search bar and zero overflow on 360px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: ProjectsListScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Search project, ID, client...'), findsOneWidget);
+    expect(find.text('Filter'), findsOneWidget);
+    expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+  });
+
+  testWidgets('ProfileScreen renders Photo ID upload section always and no duplicate Active Photo box', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+    // User already has an avatar set
+    container.read(authProvider.notifier).updateAvatarUrl('https://example.com/avatar.jpg');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: ProfileScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    // Photo ID section must be visible and minimal
+    expect(find.text('Profile Photo & ID'), findsOneWidget);
+    expect(find.text('Camera'), findsOneWidget);
+    expect(find.text('Gallery'), findsOneWidget);
+    // Duplicate "Active Photo" box must NOT be present
+    expect(find.text('Active Photo'), findsNothing);
+    expect(find.byTooltip('Remove photo'), findsOneWidget);
+  });
+
+  testWidgets('ApprovalsQueueScreen renders with single search bar and zero overflow on 360px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: ApprovalsQueueScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Search claimant, project...'), findsOneWidget);
+    expect(find.text('Filter'), findsOneWidget);
+    expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
   });
 }

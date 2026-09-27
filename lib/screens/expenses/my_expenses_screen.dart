@@ -180,7 +180,7 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1000),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
                 child: Row(
                   children: [
                     Expanded(

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/widgets/custom_search_bar.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/project_cost_card.dart';
 import '../../models/expense_model.dart';
@@ -73,66 +74,18 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
           constraints: const BoxConstraints(maxWidth: 1000),
           child: Column(
             children: [
-              // Minimalist Search Bar (Pill shaped)
+              // Single Unified Search Bar with Integrated Filter
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: Container(
-                  height: 46,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurface : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.search_rounded, size: 20, color: Color(0xFF94A3B8)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          onChanged: (q) => setState(() => _searchQuery = q),
-                          style: const TextStyle(fontSize: 13),
-                          decoration: const InputDecoration(
-                            hintText: 'Search project, ID, client...',
-                            hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ),
-                      if (_searchQuery.isNotEmpty)
-                        GestureDetector(
-                          onTap: () => setState(() => _searchQuery = ''),
-                          child: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
-                        ),
-                    ],
-                  ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: CustomSearchBar(
+                  hintText: 'Search project, ID, client...',
+                  initialValue: _searchQuery,
+                  onChanged: (q) => setState(() => _searchQuery = q),
+                  trailing: _buildFilterButton(isDark),
                 ),
               ),
 
-              // Minimal Horizontal Filter Pills
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: Row(
-                  children: [
-                    _buildFilterPill('All', 'all', isDark),
-                    const SizedBox(width: 6),
-                    _buildFilterPill('Direct Consultancy', 'directConsultancy', isDark),
-                    const SizedBox(width: 6),
-                    _buildFilterPill('Sub-consultancy', 'subConsultancy', isDark),
-                    const SizedBox(width: 6),
-                    _buildFilterPill('Government', 'government', isDark),
-                    const SizedBox(width: 6),
-                    _buildFilterPill('Private', 'private', isDark),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
 
               // Project Cards List with Permanent Pie Chart at Top
               Expanded(
@@ -275,32 +228,39 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5).withAlpha(18),
-                      borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4F46E5).withAlpha(18),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.pie_chart_outline_rounded,
+                        color: Color(0xFF4F46E5),
+                        size: 18,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.pie_chart_outline_rounded,
-                      color: Color(0xFF4F46E5),
-                      size: 18,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        useContractValue ? 'Portfolio Allocation' : 'Cost Breakdown',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    useContractValue ? 'Portfolio Allocation' : 'Cost Breakdown',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -383,24 +343,31 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
               final double pct = displayTotal > 0 ? (e.value / displayTotal * 100) : 0;
               final shortName = e.key.length > 22 ? '${e.key.substring(0, 20)}…' : e.key;
 
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '$shortName (${pct.toStringAsFixed(0)}%)',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+              return ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        '$shortName (${pct.toStringAsFixed(0)}%)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               );
             }),
           ),
@@ -409,36 +376,102 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     );
   }
 
-  Widget _buildFilterPill(String label, String value, bool isDark) {
-    final isSelected = _selectedType == value;
+  Widget _buildFilterButton(bool isDark) {
+    final isFiltered = _selectedType != 'all';
+    final currentLabel = _filterTypeLabel(_selectedType);
 
-    return InkWell(
-      onTap: () => setState(() => _selectedType = value),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    return PopupMenuButton<String>(
+      initialValue: _selectedType,
+      tooltip: 'Filter by Assignment Type',
+      onSelected: (val) => setState(() => _selectedType = val),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      elevation: 6,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF4F46E5)
-              : (isDark ? AppColors.darkSurface : Colors.white),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF4F46E5)
-                : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
-          ),
+          color: isFiltered
+              ? const Color(0xFF4F46E5).withAlpha(isDark ? 50 : 25)
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(12),
+          border: isFiltered
+              ? Border.all(color: const Color(0xFF4F46E5).withAlpha(80), width: 1)
+              : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected
-                ? Colors.white
-                : (isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 15,
+              color: isFiltered ? const Color(0xFF4F46E5) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isFiltered ? currentLabel : 'Filter',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isFiltered ? FontWeight.w700 : FontWeight.w600,
+                color: isFiltered ? const Color(0xFF4F46E5) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
+              color: isFiltered ? const Color(0xFF4F46E5) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+            ),
+          ],
         ),
+      ),
+      itemBuilder: (ctx) => [
+        _buildPopupItem('all', 'All Projects', _selectedType == 'all', isDark),
+        _buildPopupItem('directConsultancy', 'Direct Consultancy', _selectedType == 'directConsultancy', isDark),
+        _buildPopupItem('subConsultancy', 'Sub-consultancy', _selectedType == 'subConsultancy', isDark),
+        _buildPopupItem('government', 'Government', _selectedType == 'government', isDark),
+        _buildPopupItem('private', 'Private', _selectedType == 'private', isDark),
+      ],
+    );
+  }
+
+  String _filterTypeLabel(String type) {
+    switch (type) {
+      case 'directConsultancy':
+        return 'Direct';
+      case 'subConsultancy':
+        return 'Sub-consult';
+      case 'government':
+        return 'Govt';
+      case 'private':
+        return 'Private';
+      default:
+        return 'All';
+    }
+  }
+
+  PopupMenuItem<String> _buildPopupItem(String value, String title, bool isSelected, bool isDark) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 40,
+      child: Row(
+        children: [
+          Icon(
+            isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+            size: 16,
+            color: isSelected ? const Color(0xFF4F46E5) : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected
+                  ? const Color(0xFF4F46E5)
+                  : (isDark ? Colors.white : const Color(0xFF1E293B)),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/approve_reject_dialog.dart';
+import '../../core/widgets/custom_search_bar.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
@@ -85,31 +86,9 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: Row(
-          children: [
-            Text(
-              'Approvals (${pendingExpenses.length})',
-              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
-            ),
-            if (pendingExpenses.isNotEmpty) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEF4444).withAlpha(20),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${pendingExpenses.length} Pending',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFEF4444),
-                  ),
-                ),
-              ),
-            ],
-          ],
+        title: Text(
+          'Approvals (${pendingExpenses.length})',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
         ),
         actions: [
           if (pendingExpenses.isNotEmpty)
@@ -179,59 +158,18 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
           constraints: const BoxConstraints(maxWidth: 850),
           child: Column(
             children: [
-          // Search Input
+          // Single Unified Search Bar with Integrated Filter
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, size: 18, color: Color(0xFF94A3B8)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      onChanged: (q) => setState(() => _searchQuery = q),
-                      style: const TextStyle(fontSize: 13),
-                      decoration: const InputDecoration(
-                        hintText: 'Search claimant, project...',
-                        hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: CustomSearchBar(
+              hintText: 'Search claimant, project...',
+              initialValue: _searchQuery,
+              onChanged: (q) => setState(() => _searchQuery = q),
+              trailing: _buildFilterButton(pendingExpenses.length, isDark),
             ),
           ),
 
-          // Filter Pills
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Row(
-              children: [
-                _buildFilterPill('All (${pendingExpenses.length})', 'all', isDark),
-                const SizedBox(width: 6),
-                _buildFilterPill('High Amount (>৳10k)', 'highAmount', isDark),
-                const SizedBox(width: 6),
-                _buildFilterPill('No Receipt', 'noReceipt', isDark),
-                const SizedBox(width: 6),
-                _buildFilterPill('With Receipt', 'hasReceipt', isDark),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
 
           // Minimalist Approval Cards List
           Expanded(
@@ -299,7 +237,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
     final isSelected = _selectedExpenseIds.contains(exp.id);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(22),
@@ -336,7 +274,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                 }
               : () => context.push('/expenses/${exp.id}'),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(
               children: [
                 if (_isBatchMode) ...[
@@ -357,15 +295,15 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                 ],
                 // Left squircle icon with soft tinted pastel background matching project cards
                 Container(
-                  width: 62,
-                  height: 62,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: iconBg,
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                  child: Center(child: Icon(icon, color: iconColor, size: 30)),
+                  child: Center(child: Icon(icon, color: iconColor, size: 24)),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 // Middle column: Claimant Name, Project & Relative Time, and Receipt Status
                 Expanded(
                   child: Column(
@@ -376,25 +314,25 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                         exp.employeeName,
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
-                          fontSize: 16.5,
+                          fontSize: 15.5,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                           letterSpacing: -0.3,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 4),
                       Text(
                         '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 5),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -407,12 +345,16 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          Text(
-                            exp.hasReceipt ? 'Receipt Verified' : 'No Receipt',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          Flexible(
+                            child: Text(
+                              exp.hasReceipt ? 'Receipt Verified' : 'No Receipt',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -420,7 +362,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 // Right side: Amount and Approve Button
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -463,36 +405,99 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
     );
   }
 
-  Widget _buildFilterPill(String label, String value, bool isDark) {
-    final isSelected = _activeFilter == value;
+  Widget _buildFilterButton(int totalCount, bool isDark) {
+    final isFiltered = _activeFilter != 'all';
+    final currentLabel = _filterApprovalLabel(_activeFilter);
 
-    return InkWell(
-      onTap: () => setState(() => _activeFilter = value),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    return PopupMenuButton<String>(
+      initialValue: _activeFilter,
+      tooltip: 'Filter Pending Approvals',
+      onSelected: (val) => setState(() => _activeFilter = val),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+      elevation: 6,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF4F46E5)
-              : (isDark ? AppColors.darkSurface : Colors.white),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF4F46E5)
-                : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
-          ),
+          color: isFiltered
+              ? const Color(0xFF4F46E5).withAlpha(isDark ? 50 : 25)
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(12),
+          border: isFiltered
+              ? Border.all(color: const Color(0xFF4F46E5).withAlpha(80), width: 1)
+              : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected
-                ? Colors.white
-                : (isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.tune_rounded,
+              size: 15,
+              color: isFiltered ? const Color(0xFF4F46E5) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isFiltered ? currentLabel : 'Filter',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isFiltered ? FontWeight.w700 : FontWeight.w600,
+                color: isFiltered ? const Color(0xFF4F46E5) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
+              color: isFiltered ? const Color(0xFF4F46E5) : (isDark ? Colors.white70 : const Color(0xFF64748B)),
+            ),
+          ],
         ),
+      ),
+      itemBuilder: (ctx) => [
+        _buildPopupItem('all', 'All Pending ($totalCount)', _activeFilter == 'all', isDark),
+        _buildPopupItem('highAmount', 'High Amount (>৳10k)', _activeFilter == 'highAmount', isDark),
+        _buildPopupItem('noReceipt', 'No Receipt', _activeFilter == 'noReceipt', isDark),
+        _buildPopupItem('hasReceipt', 'With Receipt', _activeFilter == 'hasReceipt', isDark),
+      ],
+    );
+  }
+
+  String _filterApprovalLabel(String filter) {
+    switch (filter) {
+      case 'highAmount':
+        return '>৳10k';
+      case 'noReceipt':
+        return 'No Rcpt';
+      case 'hasReceipt':
+        return 'Rcpt';
+      default:
+        return 'All';
+    }
+  }
+
+  PopupMenuItem<String> _buildPopupItem(String value, String title, bool isSelected, bool isDark) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 40,
+      child: Row(
+        children: [
+          Icon(
+            isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+            size: 16,
+            color: isSelected ? const Color(0xFF4F46E5) : (isDark ? Colors.white38 : const Color(0xFF94A3B8)),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected
+                  ? const Color(0xFF4F46E5)
+                  : (isDark ? Colors.white : const Color(0xFF1E293B)),
+            ),
+          ),
+        ],
       ),
     );
   }

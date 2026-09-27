@@ -256,6 +256,14 @@ class AuthNotifier extends Notifier<AuthState> {
       );
     }
   }
+
+  void updateAvatarUrl(String? url) {
+    if (state.currentUser != null) {
+      state = state.copyWith(
+        currentUser: state.currentUser!.copyWith(avatarUrl: url),
+      );
+    }
+  }
 }
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
