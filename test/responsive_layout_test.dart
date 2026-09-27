@@ -7,6 +7,8 @@ import 'package:expense_tracking_prd/models/expense_model.dart';
 import 'package:expense_tracking_prd/models/project_model.dart';
 import 'package:expense_tracking_prd/models/client_model.dart';
 import 'package:expense_tracking_prd/core/widgets/project_cost_card.dart';
+import 'package:expense_tracking_prd/screens/projects/add_edit_project_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   testWidgets('StatCard renders without overflow in tight 140x110 box', (WidgetTester tester) async {
@@ -159,5 +161,28 @@ void main() {
     expect(tester.takeException(), isNull);
     // Finds the percentage in the circular progress indicator
     expect(find.textContaining('%'), findsOneWidget);
+  });
+
+  testWidgets('AddEditProjectScreen renders with zero overflow on 360px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: AddEditProjectScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('New Project'), findsOneWidget);
+    expect(find.text('Project Overview'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -350));
+    await tester.pumpAndSettle();
+    expect(find.text('Contract & Tax Setup'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

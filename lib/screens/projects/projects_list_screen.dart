@@ -172,7 +172,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                                           crossAxisCount: 2,
                                           crossAxisSpacing: 10,
                                           mainAxisSpacing: 10,
-                                          mainAxisExtent: 96,
+                                          mainAxisExtent: 114,
                                         ),
                                         delegate: SliverChildBuilderDelegate(
                                           (ctx, i) {

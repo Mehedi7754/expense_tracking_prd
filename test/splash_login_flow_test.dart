@@ -25,10 +25,8 @@ void main() {
     expect(find.text('Sign In to Account'), findsOneWidget);
     expect(find.text('Forgot Password?'), findsOneWidget);
 
-    // Verify quick demo role switcher contains PRD roles
-    expect(find.text('Employee (Alex)'), findsOneWidget);
-    expect(find.text('Manager (Sarah)'), findsOneWidget);
-    expect(find.text('Finance (David)'), findsOneWidget);
-    expect(find.text('Admin (Eleanor)'), findsOneWidget);
+    // Verify instant role switcher was removed as requested
+    expect(find.text('Employee (Alex)'), findsNothing);
+    expect(find.text('Instant Role Switcher (1-Tap Demo)'), findsNothing);
   });
 }

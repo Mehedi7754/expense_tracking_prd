@@ -122,10 +122,10 @@ class ProjectCostCard extends StatelessWidget {
     final displayPercent = (budgetRatio * 100).round();
 
     return Container(
-      margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
           width: 1.0,
@@ -135,38 +135,38 @@ class ProjectCostCard extends StatelessWidget {
             : [
                 BoxShadow(
                   color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                  blurRadius: 12,
+                  blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
               ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
             child: Row(
               children: [
                 // 1. Left squircle icon with soft tinted pastel background
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 62,
+                  height: 62,
                   decoration: BoxDecoration(
                     color: iconBg,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Center(
                     child: Icon(
                       iconData,
-                      size: 27,
+                      size: 30,
                       color: accentColor,
                     ),
                   ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 16),
 
                 // 2. Middle Column: Project Name & Minimal Financials
                 Expanded(
@@ -177,30 +177,30 @@ class ProjectCostCard extends StatelessWidget {
                       Text(
                         project.name,
                         style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                           letterSpacing: -0.3,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 6),
                       Text.rich(
                         TextSpan(
                           children: [
                             TextSpan(
                               text: '${CurrencyFormatter.format(costIncurred, compact: true)} ',
                               style: TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-                                fontSize: 13.5,
+                                fontSize: 14,
                               ),
                             ),
                             TextSpan(
                               text: 'of ${CurrencyFormatter.format(totalBudget, compact: true)}',
                               style: TextStyle(
-                                fontWeight: FontWeight.w500,
+                                fontWeight: FontWeight.w600,
                                 color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                                 fontSize: 13,
                               ),
@@ -213,7 +213,7 @@ class ProjectCostCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
 
                 // 3. Right: Sleek Circular Progress Ring with Percentage
                 _MinimalCircularProgress(
@@ -247,20 +247,20 @@ class _MinimalCircularProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 54,
-      height: 54,
+      width: 60,
+      height: 60,
       child: CustomPaint(
         painter: _RingPainter(
           progress: progress.clamp(0.0, 1.0),
           color: color,
           trackColor: trackColor,
-          strokeWidth: 4.5,
+          strokeWidth: 5.0,
         ),
         child: Center(
           child: Text(
             label,
             style: TextStyle(
-              fontSize: label.length > 3 ? 11.5 : 13.5,
+              fontSize: label.length > 3 ? 12.0 : 14.0,
               fontWeight: FontWeight.w800,
               color: color,
               letterSpacing: -0.4,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/client_model.dart';
@@ -123,15 +124,21 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     return gross;
   }
 
-  double get _calculatedTotalBudget {
+  double get _calculatedDirectBudget {
     final eq = double.tryParse(_equipBudgetController.text.trim()) ?? 0.0;
     final tr = double.tryParse(_transportBudgetController.text.trim()) ?? 0.0;
     final fd = double.tryParse(_foodBudgetController.text.trim()) ?? 0.0;
     final ac = double.tryParse(_accommBudgetController.text.trim()) ?? 0.0;
     final of = double.tryParse(_officeBudgetController.text.trim()) ?? 0.0;
-    final direct = eq + tr + fd + ac + of;
-    final ob = direct * _officeBenefitRate;
-    return direct + ob;
+    return eq + tr + fd + ac + of;
+  }
+
+  double get _calculatedOfficeBenefit {
+    return _calculatedDirectBudget * _officeBenefitRate;
+  }
+
+  double get _calculatedTotalBudget {
+    return _calculatedDirectBudget + _calculatedOfficeBenefit;
   }
 
   Future<void> _handleSave() async {
@@ -143,7 +150,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     }
 
     setState(() => _isSaving = true);
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
 
     final gross = double.tryParse(_grossValueController.text.trim()) ?? 0.0;
@@ -156,11 +163,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       'food': double.tryParse(_foodBudgetController.text.trim()) ?? 0.0,
       'accommodation': double.tryParse(_accommBudgetController.text.trim()) ?? 0.0,
       'officecost': double.tryParse(_officeBudgetController.text.trim()) ?? 0.0,
-      'officebenefit': (double.tryParse(_equipBudgetController.text.trim()) ?? 0.0) +
-          (double.tryParse(_transportBudgetController.text.trim()) ?? 0.0) +
-          (double.tryParse(_foodBudgetController.text.trim()) ?? 0.0) +
-          (double.tryParse(_accommBudgetController.text.trim()) ?? 0.0) +
-          (double.tryParse(_officeBudgetController.text.trim()) ?? 0.0) * _officeBenefitRate,
+      'officebenefit': _calculatedOfficeBenefit,
     };
 
     final totalBudget = _calculatedTotalBudget;
@@ -204,390 +207,736 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             amountReceived: received,
             budget: totalBudget,
             categoryBudgets: categoryBudgets,
-            estimatedRemainingCost: totalBudget * 0.4, // Initial forecast estimate
+            estimatedRemainingCost: totalBudget * 0.4,
             officeBenefitRate: _officeBenefitRate,
             startDate: _startDate,
             endDate: _endDate,
             teamMemberIds: _selectedTeamMemberIds.toList(),
           );
-      NotificationBanner.showSuccess(context, 'Project created with auto-generated ID');
+      NotificationBanner.showSuccess(context, 'Project created successfully');
     }
 
     context.pop();
   }
 
+  InputDecoration _inputDeco({
+    required String label,
+    String? hint,
+    String? prefixText,
+    Widget? suffixIcon,
+    required bool isDark,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixText: prefixText,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(
+          color: Color(0xFF4F46E5),
+          width: 1.5,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (isEditing) {
       final existing = ref.watch(projectProvider).where((p) => p.id == widget.projectId).toList();
       if (existing.isNotEmpty) _initProject(existing.first);
     } else if (!_initialized) {
       _initialized = true;
-      // Default assign current user
       final current = ref.read(authProvider).currentUser;
       if (current != null) _selectedTeamMemberIds.add(current.id);
-      // Default office benefit from settings
       final settings = ref.read(settingsProvider);
       _officeBenefitRate = settings.defaultOfficeBenefitRate;
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Project' : 'Create Project (PFIS)'),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          isEditing ? 'Edit Project' : 'New Project',
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
+        ),
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
+          constraints: const BoxConstraints(maxWidth: 680),
           child: Form(
             key: _formKey,
             child: ListView(
-              padding: const EdgeInsets.all(18),
-          children: [
-            // Section 1: Basic Information
-            _buildSectionHeader(context, '1. Basic Information', Icons.info_outline_rounded),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Project Name *',
-                hintText: 'e.g. Enterprise Cloud ERP Platform',
-              ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter project name' : null,
-            ),
-            const SizedBox(height: 14),
-
-            TextFormField(
-              controller: _clientController,
-              decoration: const InputDecoration(
-                labelText: 'Client Name *',
-                hintText: 'e.g. Apex Technologies Inc.',
-              ),
-              validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter client name' : null,
-            ),
-            const SizedBox(height: 14),
-
-            Row(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                Expanded(
-                  child: DropdownButtonFormField<ClientType>(
-                    value: _clientType,
-                    decoration: const InputDecoration(labelText: 'Client Type'),
-                    items: ClientType.values.map((t) {
-                      return DropdownMenuItem(value: t, child: Text(t.displayName));
-                    }).toList(),
-                    onChanged: (v) => setState(() => _clientType = v!),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<AssignmentType>(
-                    value: _assignmentType,
-                    decoration: const InputDecoration(labelText: 'Assignment Type'),
-                    items: AssignmentType.values.map((t) {
-                      return DropdownMenuItem(value: t, child: Text(t.displayName));
-                    }).toList(),
-                    onChanged: (v) {
-                      setState(() {
-                        _assignmentType = v!;
-                        // Adjust default office benefit by assignment type
-                        if (_assignmentType == AssignmentType.government) _officeBenefitRate = 0.30;
-                        if (_assignmentType == AssignmentType.private) _officeBenefitRate = 0.25;
-                        if (_assignmentType == AssignmentType.subConsultancy) _officeBenefitRate = 0.20;
-                      });
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
+                // ==================== CARD 1: PROJECT OVERVIEW ====================
+                _buildCardContainer(
+                  isDark: isDark,
+                  icon: Icons.business_center_rounded,
+                  iconColor: const Color(0xFF4F46E5),
+                  iconBg: isDark ? const Color(0xFF312E81).withAlpha(40) : const Color(0xFFEEF2FF),
+                  title: 'Project Overview',
+                  subtitle: 'Basic specifications, client info and requirements',
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: _inputDeco(
+                        label: 'Project Name *',
+                        hint: 'e.g. Enterprise Cloud ERP Platform',
+                        isDark: isDark,
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter project name' : null,
+                    ),
+                    const SizedBox(height: 12),
 
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<ProjectStatus>(
-                    value: _status,
-                    decoration: const InputDecoration(labelText: 'Project Status'),
-                    items: ProjectStatus.values.map((s) {
-                      return DropdownMenuItem(value: s, child: Text(s.displayName));
-                    }).toList(),
-                    onChanged: (v) => setState(() => _status = v!),
-                  ),
+                    TextFormField(
+                      controller: _clientController,
+                      decoration: _inputDeco(
+                        label: 'Client Name *',
+                        hint: 'e.g. Apex Technologies Inc.',
+                        isDark: isDark,
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter client name' : null,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Client Type & Project Status in responsive row
+                    LayoutBuilder(
+                      builder: (ctx, constraints) {
+                        final isNarrow = constraints.maxWidth < 420;
+                        if (isNarrow) {
+                          return Column(
+                            children: [
+                              _buildClientTypeDropdown(isDark),
+                              const SizedBox(height: 12),
+                              _buildStatusDropdown(isDark),
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(child: _buildClientTypeDropdown(isDark)),
+                            const SizedBox(width: 12),
+                            Expanded(child: _buildStatusDropdown(isDark)),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Assignment Type (Full width to avoid text truncation/overflow)
+                    DropdownButtonFormField<AssignmentType>(
+                      value: _assignmentType,
+                      isExpanded: true,
+                      decoration: _inputDeco(label: 'Assignment Type', isDark: isDark),
+                      items: AssignmentType.values.map((t) {
+                        return DropdownMenuItem(
+                          value: t,
+                          child: Text(t.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
+                        );
+                      }).toList(),
+                      onChanged: (v) {
+                        setState(() {
+                          _assignmentType = v!;
+                          if (_assignmentType == AssignmentType.government) _officeBenefitRate = 0.30;
+                          if (_assignmentType == AssignmentType.private) _officeBenefitRate = 0.25;
+                          if (_assignmentType == AssignmentType.subConsultancy) _officeBenefitRate = 0.20;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Timeline Range Tile (Full Width, Tappable)
+                    InkWell(
+                      onTap: _pickDateRange,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InputDecorator(
+                        decoration: _inputDeco(
+                          label: 'Timeline Range',
+                          suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF4F46E5)),
+                          isDark: isDark,
+                        ),
+                        child: Text(
+                          '${DateFormatter.formatShort(_startDate)} — ${DateFormatter.formatShort(_endDate)}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Scope / Requirements
+                    TextFormField(
+                      controller: _descController,
+                      decoration: _inputDeco(
+                        label: 'Project Requirements & Scope of Work *',
+                        hint: 'Client deliverables, technical requirements and methodology',
+                        isDark: isDark,
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: InkWell(
-                    onTap: _pickDateRange,
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Timeline Range',
-                        suffixIcon: Icon(Icons.calendar_month_rounded, size: 18),
+
+                const SizedBox(height: 16),
+
+                // ==================== CARD 2: CONTRACT & FINANCIALS ====================
+                _buildCardContainer(
+                  isDark: isDark,
+                  icon: Icons.account_balance_wallet_rounded,
+                  iconColor: const Color(0xFF10B981),
+                  iconBg: isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5),
+                  title: 'Contract & Tax Setup',
+                  subtitle: 'Contract value, IT-VAT treatment and revenue projection',
+                  children: [
+                    TextFormField(
+                      controller: _grossValueController,
+                      keyboardType: TextInputType.number,
+                      decoration: _inputDeco(
+                        label: 'Gross Contract Value (৳) *',
+                        prefixText: '৳ ',
+                        hint: 'e.g. 2500000',
+                        isDark: isDark,
                       ),
-                      child: Text(
-                        '${DateFormatter.formatShort(_startDate)} - ${DateFormatter.formatShort(_endDate)}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      onChanged: (_) => setState(() {}),
+                      validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid amount' : null,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tax Status & Tax Rate in responsive layout
+                    LayoutBuilder(
+                      builder: (ctx, constraints) {
+                        final isNarrow = constraints.maxWidth < 420;
+                        if (isNarrow) {
+                          return Column(
+                            children: [
+                              _buildTaxStatusDropdown(isDark),
+                              const SizedBox(height: 12),
+                              _buildTaxRateInput(isDark),
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(flex: 3, child: _buildTaxStatusDropdown(isDark)),
+                            const SizedBox(width: 12),
+                            Expanded(flex: 2, child: _buildTaxRateInput(isDark)),
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Expected Net Revenue Preview Pill
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFC7D2FE),
+                        ),
                       ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Expected Net Revenue:',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF4338CA),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            CurrencyFormatter.format(_calculatedNetRevenue),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF4F46E5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Advance and Received
+                    LayoutBuilder(
+                      builder: (ctx, constraints) {
+                        final isNarrow = constraints.maxWidth < 420;
+                        if (isNarrow) {
+                          return Column(
+                            children: [
+                              TextFormField(
+                                controller: _advanceReceivedController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDeco(
+                                  label: 'Advance Received (৳)',
+                                  prefixText: '৳ ',
+                                  isDark: isDark,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _amountReceivedController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDeco(
+                                  label: 'Amount Received to Date (৳)',
+                                  prefixText: '৳ ',
+                                  isDark: isDark,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _advanceReceivedController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDeco(
+                                  label: 'Advance Received (৳)',
+                                  prefixText: '৳ ',
+                                  isDark: isDark,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _amountReceivedController,
+                                keyboardType: TextInputType.number,
+                                decoration: _inputDeco(
+                                  label: 'Amount Received (৳)',
+                                  prefixText: '৳ ',
+                                  isDark: isDark,
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // ==================== CARD 3: BUDGET ALLOCATION ====================
+                _buildCardContainer(
+                  isDark: isDark,
+                  icon: Icons.pie_chart_outline_rounded,
+                  iconColor: const Color(0xFFD97706),
+                  iconBg: isDark ? const Color(0xFF78350F).withAlpha(40) : const Color(0xFFFFFBEB),
+                  title: 'Budget Allocation',
+                  subtitle: 'Category expenditure & 30% automatic office benefit',
+                  children: [
+                    _buildCompactBudgetRow('Equipment', Icons.construction_rounded, _equipBudgetController, isDark),
+                    const SizedBox(height: 8),
+                    _buildCompactBudgetRow('Transportation', Icons.directions_car_rounded, _transportBudgetController, isDark),
+                    const SizedBox(height: 8),
+                    _buildCompactBudgetRow('Food & Meals', Icons.restaurant_rounded, _foodBudgetController, isDark),
+                    const SizedBox(height: 8),
+                    _buildCompactBudgetRow('Accommodation', Icons.hotel_rounded, _accommBudgetController, isDark),
+                    const SizedBox(height: 8),
+                    _buildCompactBudgetRow('Office Cost', Icons.work_outline_rounded, _officeBudgetController, isDark),
+                    const SizedBox(height: 14),
+
+                    // Office Benefit (30%) Calculation Summary Card
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Direct Budget Subtotal',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                CurrencyFormatter.format(_calculatedDirectBudget),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Office Benefit (${(_officeBenefitRate * 100).toInt()}%)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                CurrencyFormatter.format(_calculatedOfficeBenefit),
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 14),
+                          Row(
+                            children: [
+                              const Expanded(
+                                child: Text(
+                                  'Total Project Budget',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                CurrencyFormatter.format(_calculatedTotalBudget),
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF4F46E5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // ==================== CARD 4: TEAM ASSIGNMENT ====================
+                _buildCardContainer(
+                  isDark: isDark,
+                  icon: Icons.groups_rounded,
+                  iconColor: const Color(0xFF8B5CF6),
+                  iconBg: isDark ? const Color(0xFF4C1D95).withAlpha(40) : const Color(0xFFF5F3FF),
+                  title: 'Team Access',
+                  subtitle: 'Select members permitted to view & submit costs',
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: DemoUsers.all.map((u) {
+                        final isSelected = _selectedTeamMemberIds.contains(u.id);
+                        return FilterChip(
+                          avatar: CircleAvatar(
+                            radius: 10,
+                            backgroundColor: isSelected ? Colors.white : const Color(0xFF4F46E5),
+                            child: Text(
+                              u.name.substring(0, 1),
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                              ),
+                            ),
+                          ),
+                          label: Text(
+                            '${u.name} (${u.role.displayName.split(' ').first})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              color: isSelected ? Colors.white : (isDark ? Colors.white : const Color(0xFF1E293B)),
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: const Color(0xFF4F46E5),
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          checkmarkColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? const Color(0xFF4F46E5)
+                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            ),
+                          ),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedTeamMemberIds.add(u.id);
+                              } else {
+                                _selectedTeamMemberIds.remove(u.id);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // ==================== REUSABLE ACTION BUTTON ====================
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSaving ? null : _handleSave,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: _isSaving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.check_rounded, size: 18),
+                    label: Text(
+                      isEditing ? 'Save Changes' : 'Create Project',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
+                const SizedBox(height: 36),
               ],
             ),
-            const SizedBox(height: 14),
-
-            TextFormField(
-              controller: _descController,
-              decoration: const InputDecoration(
-                labelText: 'Description / Scope of Work',
-                hintText: 'Brief summary of project objectives, methodology, and deliverables',
-              ),
-              maxLines: 2,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Section 2: Financial Information (PRD Section 4)
-            _buildSectionHeader(context, '2. Financial Setup & Tax Rules', Icons.account_balance_wallet_outlined),
-            const SizedBox(height: 12),
-
-            TextFormField(
-              controller: _grossValueController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Gross Project / Contract Value (৳) *',
-                prefixText: '৳ ',
-                hintText: 'e.g. 2500000',
-              ),
-              onChanged: (_) => setState(() {}),
-              validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid amount' : null,
-            ),
-            const SizedBox(height: 14),
-
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<TaxStatus>(
-                    value: _taxStatus,
-                    decoration: const InputDecoration(labelText: 'IT-VAT / Tax Status'),
-                    items: TaxStatus.values.map((t) {
-                      return DropdownMenuItem(value: t, child: Text(t.displayName));
-                    }).toList(),
-                    onChanged: (v) => setState(() => _taxStatus = v!),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    initialValue: '${(_taxRate * 100).toInt()}%',
-                    decoration: const InputDecoration(labelText: 'Tax Rate (%)'),
-                    keyboardType: TextInputType.number,
-                    onChanged: (v) {
-                      final val = double.tryParse(v.replaceAll('%', '').trim());
-                      if (val != null) setState(() => _taxRate = val / 100);
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Calculated Net Revenue Preview
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Expected Net Revenue:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  Text(
-                    '৳ ${_calculatedNetRevenue.toStringAsFixed(0)}',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.getPrimary(context)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _advanceReceivedController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Advance Received (৳)',
-                      prefixText: '৳ ',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _amountReceivedController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Amount Received (৳)',
-                      prefixText: '৳ ',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Section 3: Project Cost Categories & Estimated Budget (PRD Section 5 & 14)
-            _buildSectionHeader(context, '3. Category Budgets & 30% Office Benefit', Icons.pie_chart_outline_rounded),
-            const SizedBox(height: 8),
-            Text(
-              'Define budgeted expenditure per category. Office Benefit is calculated automatically.',
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.darkTextSecondary),
-            ),
-            const SizedBox(height: 12),
-
-            _buildCategoryBudgetRow('Equipment Budget', _equipBudgetController),
-            const SizedBox(height: 10),
-            _buildCategoryBudgetRow('Transportation Budget', _transportBudgetController),
-            const SizedBox(height: 10),
-            _buildCategoryBudgetRow('Food Budget', _foodBudgetController),
-            const SizedBox(height: 10),
-            _buildCategoryBudgetRow('Accommodation Budget', _accommBudgetController),
-            const SizedBox(height: 10),
-            _buildCategoryBudgetRow('Office Cost Budget', _officeBudgetController),
-            const SizedBox(height: 12),
-
-            // Office Benefit Configuration & Preview (PRD Section 9)
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.16 : 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.3 : 0.2)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Office Benefit (${(_officeBenefitRate * 100).toInt()}%):',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                      ),
-                      Text(
-                        'Auto-calculated',
-                        style: TextStyle(fontSize: 11, color: AppColors.getPrimary(context), fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total Budget with Office Benefit:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                      Text(
-                        '৳ ${_calculatedTotalBudget.toStringAsFixed(0)}',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.getPrimary(context)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Section 4: Team Member Assignment (PRD Section 1)
-            _buildSectionHeader(context, '4. Assign Team Members', Icons.group_outlined),
-            const SizedBox(height: 8),
-            Text(
-              'Enforced Rule: Only assigned members can view and enter costs for this project.',
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.warning, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: DemoUsers.all.map((u) {
-                final isSelected = _selectedTeamMemberIds.contains(u.id);
-                return FilterChip(
-                  label: Text('${u.name} (${u.role.displayName})'),
-                  selected: isSelected,
-                  selectedColor: AppColors.primary.withAlpha(40),
-                  checkmarkColor: AppColors.primary,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedTeamMemberIds.add(u.id);
-                      } else {
-                        _selectedTeamMemberIds.remove(u.id);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Submit Button
-            SizedBox(
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _isSaving ? null : _handleSave,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-                icon: _isSaving
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.check_circle_rounded),
-                label: Text(
-                  isEditing ? 'Save Changes' : 'Create Project',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
-          ],
+          ),
         ),
       ),
-    ),
-  ),
-);
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
-    final theme = Theme.of(context);
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppColors.getPrimary(context)),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-      ],
     );
   }
 
-  Widget _buildCategoryBudgetRow(String label, TextEditingController controller) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-        labelText: '$label (৳)',
-        prefixText: '৳ ',
-        isDense: true,
+  // ==================== SUB-WIDGET HELPERS ====================
+
+  Widget _buildCardContainer({
+    required bool isDark,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+        ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
-      onChanged: (_) => setState(() {}),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), height: 1),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClientTypeDropdown(bool isDark) {
+    return DropdownButtonFormField<ClientType>(
+      value: _clientType,
+      isExpanded: true,
+      decoration: _inputDeco(label: 'Client Type', isDark: isDark),
+      items: ClientType.values.map((t) {
+        return DropdownMenuItem(
+          value: t,
+          child: Text(t.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
+        );
+      }).toList(),
+      onChanged: (v) => setState(() => _clientType = v!),
+    );
+  }
+
+  Widget _buildStatusDropdown(bool isDark) {
+    return DropdownButtonFormField<ProjectStatus>(
+      value: _status,
+      isExpanded: true,
+      decoration: _inputDeco(label: 'Status', isDark: isDark),
+      items: ProjectStatus.values.map((s) {
+        return DropdownMenuItem(
+          value: s,
+          child: Text(s.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
+        );
+      }).toList(),
+      onChanged: (v) => setState(() => _status = v!),
+    );
+  }
+
+  Widget _buildTaxStatusDropdown(bool isDark) {
+    return DropdownButtonFormField<TaxStatus>(
+      value: _taxStatus,
+      isExpanded: true,
+      decoration: _inputDeco(label: 'IT-VAT Treatment', isDark: isDark),
+      items: TaxStatus.values.map((t) {
+        return DropdownMenuItem(
+          value: t,
+          child: Text(t.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
+        );
+      }).toList(),
+      onChanged: (v) => setState(() => _taxStatus = v!),
+    );
+  }
+
+  Widget _buildTaxRateInput(bool isDark) {
+    return TextFormField(
+      initialValue: '${(_taxRate * 100).toInt()}%',
+      decoration: _inputDeco(label: 'Tax Rate (%)', isDark: isDark),
+      keyboardType: TextInputType.number,
+      onChanged: (v) {
+        final val = double.tryParse(v.replaceAll('%', '').trim());
+        if (val != null) setState(() => _taxRate = val / 100);
+      },
+    );
+  }
+
+  Widget _buildCompactBudgetRow(
+    String label,
+    IconData icon,
+    TextEditingController controller,
+    bool isDark,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 95,
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                hintText: '0',
+                prefixText: '৳ ',
+                prefixStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

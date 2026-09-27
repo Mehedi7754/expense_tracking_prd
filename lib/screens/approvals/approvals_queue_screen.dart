@@ -23,6 +23,18 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
   bool _isBatchMode = false;
   final Set<String> _selectedExpenseIds = {};
 
+  Future<void> _handleApprove(ExpenseModel expense) async {
+    final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
+      context,
+      title: 'Approve Claim',
+      message: 'Approve ${CurrencyFormatter.format(expense.amount)} claim by ${expense.employeeName}?',
+    );
+
+    if (confirm && mounted) {
+      ref.read(expenseProvider.notifier).approveExpense(expense.id);
+      NotificationBanner.showSuccess(context, 'Claim approved for ${expense.employeeName}.');
+    }
+  }
 
   Future<void> _handleBatchApprove() async {
     if (_selectedExpenseIds.isEmpty) return;
@@ -286,138 +298,166 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
 
     final isSelected = _selectedExpenseIds.contains(exp.id);
 
-    return InkWell(
-      onTap: _isBatchMode
-          ? () {
-              setState(() {
-                if (isSelected) {
-                  _selectedExpenseIds.remove(exp.id);
-                } else {
-                  _selectedExpenseIds.add(exp.id);
-                }
-              });
-            }
-          : () => context.push('/expenses/${exp.id}'),
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFF10B981)
-                : (isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9)),
-            width: isSelected ? 1.8 : 1.0,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 15 : 4),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isSelected
+              ? const Color(0xFF10B981)
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+          width: isSelected ? 1.8 : 1.0,
         ),
-        child: Row(
-          children: [
-            if (_isBatchMode) ...[
-              Checkbox(
-                value: isSelected,
-                activeColor: const Color(0xFF10B981),
-                onChanged: (val) {
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: _isBatchMode
+              ? () {
                   setState(() {
-                    if (val == true) {
-                      _selectedExpenseIds.add(exp.id);
-                    } else {
+                    if (isSelected) {
                       _selectedExpenseIds.remove(exp.id);
+                    } else {
+                      _selectedExpenseIds.add(exp.id);
                     }
                   });
-                },
-              ),
-              const SizedBox(width: 4),
-            ],
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(child: Icon(icon, color: iconColor, size: 20)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    exp.employeeName,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
+                }
+              : () => context.push('/expenses/${exp.id}'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            child: Row(
               children: [
-                Text(
-                  CurrencyFormatter.format(exp.amount),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.2,
+                if (_isBatchMode) ...[
+                  Checkbox(
+                    value: isSelected,
+                    activeColor: const Color(0xFF10B981),
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == true) {
+                          _selectedExpenseIds.add(exp.id);
+                        } else {
+                          _selectedExpenseIds.remove(exp.id);
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                // Left squircle icon with soft tinted pastel background matching project cards
+                Container(
+                  width: 62,
+                  height: 62,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Center(child: Icon(icon, color: iconColor, size: 30)),
+                ),
+                const SizedBox(width: 16),
+                // Middle column: Claimant Name, Project & Relative Time, and Receipt Status
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        exp.employeeName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16.5,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          letterSpacing: -0.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            exp.hasReceipt ? 'Receipt Verified' : 'No Receipt',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 3),
-                Row(
+                const SizedBox(width: 12),
+                // Right side: Amount and Approve Button
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
                     Text(
-                      exp.hasReceipt ? 'Receipt' : 'No Receipt',
+                      CurrencyFormatter.format(exp.amount),
                       style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        letterSpacing: -0.3,
                       ),
                     ),
+                    if (!_isBatchMode) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 32,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _handleApprove(exp),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF10B981),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                          label: const Text('Approve', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
             ),
-            if (!_isBatchMode) ...[
-              const SizedBox(width: 6),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: isDark ? AppColors.darkTextMuted : const Color(0xFFCBD5E1),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );

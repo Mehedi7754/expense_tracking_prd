@@ -5,7 +5,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/routing/route_paths.dart';
-import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -65,15 +64,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         height: 56,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF4F46E5), Color(0xFF7C3AED)],
+                            colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF4F46E5).withAlpha(46),
-                              blurRadius: 8,
+                              color: Colors.black.withAlpha(15),
+                              blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
                           ],
@@ -202,26 +201,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                           const SizedBox(height: 12),
 
-                          // Sign In Button
-                          Container(
+                          // Sign In Button (Reusable, Minimal, No Glow)
+                          SizedBox(
                             height: 50,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF4F46E5).withAlpha(50),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.transparent,
-                                shadowColor: Colors.transparent,
+                                backgroundColor: const Color(0xFF4F46E5),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                               onPressed: authState.isLoading ? null : _handleLogin,
@@ -267,70 +254,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 24),
-
-                  // Quick Demo Role Switcher (1-Tap Demo Switcher with Wrap to prevent compact 54px overflow)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle.withAlpha(150),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.getBorder(context), width: 1),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            const Icon(Icons.bolt_rounded, size: 16, color: AppColors.amber),
-                            Text(
-                              'Instant Role Switcher (1-Tap Demo)',
-                              style: AppTextStyles.labelSmall.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.getTextPrimary(context),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _DemoPersonaChip(
-                              label: 'Employee (Alex)',
-                              role: UserRole.projectMember,
-                              onTap: () => _selectDemoPersona(UserRole.projectMember),
-                            ),
-                            _DemoPersonaChip(
-                              label: 'Manager (Sarah)',
-                              role: UserRole.projectManager,
-                              onTap: () => _selectDemoPersona(UserRole.projectManager),
-                            ),
-                            _DemoPersonaChip(
-                              label: 'Finance (David)',
-                              role: UserRole.finance,
-                              onTap: () => _selectDemoPersona(UserRole.finance),
-                            ),
-                            _DemoPersonaChip(
-                              label: 'Admin (Eleanor)',
-                              role: UserRole.mainAdmin,
-                              onTap: () => _selectDemoPersona(UserRole.mainAdmin),
-                            ),
-                            _DemoPersonaChip(
-                              label: 'Viewer (Rahim)',
-                              role: UserRole.viewer,
-                              onTap: () => _selectDemoPersona(UserRole.viewer),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -339,63 +262,5 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-
-  void _selectDemoPersona(UserRole role) {
-    ref.read(authProvider.notifier).switchRole(role);
-    if (mounted) {
-      context.go(RoutePaths.home);
-    }
-  }
 }
 
-class _DemoPersonaChip extends StatelessWidget {
-  final String label;
-  final UserRole role;
-  final VoidCallback onTap;
-
-  const _DemoPersonaChip({
-    required this.label,
-    required this.role,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 40),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.getSurface(context),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.getBorder(context)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: role == UserRole.projectMember
-                    ? AppColors.textSecondary
-                    : role == UserRole.projectManager
-                        ? AppColors.indigo
-                        : role == UserRole.finance
-                            ? AppColors.emerald
-                            : role == UserRole.viewer
-                                ? Colors.teal
-                                : AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(label, style: AppTextStyles.labelSmall.copyWith(fontSize: 11)),
-          ],
-        ),
-      ),
-    );
-  }
-}
