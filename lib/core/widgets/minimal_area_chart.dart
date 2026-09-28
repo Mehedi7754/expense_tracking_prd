@@ -51,14 +51,19 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                widget.title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.3,
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -148,12 +153,16 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: _xLabels.map((lbl) {
-                return Text(
-                  lbl,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
-                    fontWeight: FontWeight.w500,
+                return Expanded(
+                  child: Center(
+                    child: Text(
+                      lbl,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
                 );
               }).toList(),

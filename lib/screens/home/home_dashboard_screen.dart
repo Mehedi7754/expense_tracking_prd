@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/utils/date_formatter.dart';
+import '../../core/widgets/expense_list_row.dart';
 import '../../core/widgets/minimal_area_chart.dart';
 import '../../core/widgets/project_cost_card.dart';
 import '../../core/widgets/receipt_compliance_badge.dart';
@@ -309,7 +311,16 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             borderRadius: BorderRadius.circular(22),
             child: InkWell(
               borderRadius: BorderRadius.circular(22),
-              onTap: () => context.push(RoutePaths.projectsList),
+              onTap: () => _showPortfolioFinancialDetailsModal(
+                context: context,
+                isDark: isDark,
+                projects: projects,
+                expenses: expenses,
+                totalContractValue: totalContractValue,
+                totalCostIncurred: totalCostIncurred,
+                projectedRevenue: projectedRevenue,
+                projectedProfitMargin: projectedProfitMargin,
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(22),
                 child: Column(
@@ -319,21 +330,28 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Total Portfolio Value',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w600,
+                        const Expanded(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Total Portfolio Value',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 5),
-                            Icon(Icons.arrow_forward_ios_rounded, color: Colors.white60, size: 11),
-                          ],
+                              SizedBox(width: 5),
+                              Icon(Icons.arrow_forward_ios_rounded, color: Colors.white60, size: 11),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
@@ -455,12 +473,16 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Project Portfolios',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  letterSpacing: -0.3,
+              Expanded(
+                child: Text(
+                  'Project Portfolios',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    letterSpacing: -0.3,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               InkWell(
@@ -564,7 +586,21 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             borderRadius: BorderRadius.circular(22),
             child: InkWell(
               borderRadius: BorderRadius.circular(22),
-              onTap: () => context.push(RoutePaths.projectsList),
+              onTap: () {
+                final assignedGross = assignedProjects.fold<double>(0.0, (sum, p) => sum + p.grossProjectValue);
+                final margin = assignedGross > 0 ? ((assignedGross - totalSpent) / assignedGross) * 100 : 0.0;
+                _showPortfolioFinancialDetailsModal(
+                  context: context,
+                  isDark: isDark,
+                  projects: assignedProjects,
+                  expenses: userExpenses,
+                  totalContractValue: assignedGross,
+                  totalCostIncurred: totalSpent,
+                  projectedRevenue: assignedProjects.fold<double>(0.0, (sum, p) => sum + p.expectedNetRevenue),
+                  projectedProfitMargin: margin,
+                  memberUser: user,
+                );
+              },
               child: Padding(
                 padding: const EdgeInsets.all(22),
                 child: Column(
@@ -573,14 +609,19 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'My Total Submitted Claims',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white70,
-                            fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Text(
+                            'My Total Submitted Claims',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        SizedBox(width: 8),
                         Icon(Icons.arrow_forward_ios_rounded, color: Colors.white60, size: 11),
                       ],
                     ),
@@ -694,14 +735,15 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'My Assigned Projects (${assignedProjects.length})',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  letterSpacing: -0.3,
+              Expanded(
+                child: Text(
+                  'My Assigned Projects (${assignedProjects.length})',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ),
             ],
@@ -741,12 +783,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Recent Expenses',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  letterSpacing: -0.3,
+              Expanded(
+                child: Text(
+                  'Recent Expenses',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    letterSpacing: -0.3,
+                  ),
                 ),
               ),
               InkWell(
@@ -1154,4 +1198,1313 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     }
     return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
+
+  // Portfolio Financial Details Modal Bottom Sheet
+  void _showPortfolioFinancialDetailsModal({
+    required BuildContext context,
+    required bool isDark,
+    required List<ProjectModel> projects,
+    required List<ExpenseModel> expenses,
+    required double totalContractValue,
+    required double totalCostIncurred,
+    required double projectedRevenue,
+    required double projectedProfitMargin,
+    UserModel? memberUser,
+  }) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) {
+        return _PortfolioFinancialDetailsSheet(
+          isDark: isDark,
+          projects: projects,
+          expenses: expenses,
+          totalContractValue: totalContractValue,
+          totalCostIncurred: totalCostIncurred,
+          projectedRevenue: projectedRevenue,
+          projectedProfitMargin: projectedProfitMargin,
+          memberUser: memberUser,
+        );
+      },
+    );
+  }
+}
+
+// ==============================================================================
+// 3. PORTFOLIO FINANCIAL & PERSONNEL BREAKDOWN BOTTOM SHEET
+// ==============================================================================
+
+class _PortfolioFinancialDetailsSheet extends StatefulWidget {
+  final bool isDark;
+  final List<ProjectModel> projects;
+  final List<ExpenseModel> expenses;
+  final double totalContractValue;
+  final double totalCostIncurred;
+  final double projectedRevenue;
+  final double projectedProfitMargin;
+  final UserModel? memberUser;
+
+  const _PortfolioFinancialDetailsSheet({
+    required this.isDark,
+    required this.projects,
+    required this.expenses,
+    required this.totalContractValue,
+    required this.totalCostIncurred,
+    required this.projectedRevenue,
+    required this.projectedProfitMargin,
+    this.memberUser,
+  });
+
+  @override
+  State<_PortfolioFinancialDetailsSheet> createState() => _PortfolioFinancialDetailsSheetState();
+}
+
+class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDetailsSheet> {
+  int _selectedTabIndex = 0; // 0: By Person, 1: By Category, 2: By Project, 3: All Records
+  final Set<String> _expandedPersonNames = {};
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  IconData _getCategoryIcon(String categoryName) {
+    switch (categoryName.toLowerCase()) {
+      case 'equipment':
+      case 'hardware':
+        return Icons.hardware_rounded;
+      case 'transportation':
+      case 'transport':
+      case 'travel':
+        return Icons.directions_car_rounded;
+      case 'food':
+      case 'meal':
+        return Icons.restaurant_rounded;
+      case 'accommodation':
+      case 'hotel':
+        return Icons.hotel_rounded;
+      case 'office cost':
+      case 'office':
+        return Icons.business_rounded;
+      default:
+        return Icons.receipt_long_rounded;
+    }
+  }
+
+  String _getUserInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.isDark;
+    final totalDirectSpent = widget.expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final totalUnreceipted = widget.expenses
+        .where((e) => !e.hasReceipt)
+        .fold<double>(0.0, (sum, e) => sum + e.amount);
+    final overallUnreceiptedRatio = totalDirectSpent > 0 ? (totalUnreceipted / totalDirectSpent) * 100 : 0.0;
+
+    // Group expenses by Person
+    final Map<String, List<ExpenseModel>> groupedByPerson = {};
+    for (final e in widget.expenses) {
+      groupedByPerson.putIfAbsent(e.employeeName, () => []).add(e);
+    }
+
+    final List<_PersonCostSummary> personSummaries = [];
+    for (final entry in groupedByPerson.entries) {
+      final pExpenses = entry.value;
+      final name = entry.key;
+      final pId = pExpenses.first.employeeId;
+      final totalAmt = pExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final unreceipted = pExpenses.where((e) => !e.hasReceipt).toList();
+      final unreceiptedAmt = unreceipted.fold<double>(0.0, (sum, e) => sum + e.amount);
+
+      final Map<String, double> catMap = {};
+      for (final e in pExpenses) {
+        catMap[e.categoryName] = (catMap[e.categoryName] ?? 0.0) + e.amount;
+      }
+
+      final Set<String> projNames = pExpenses.map((e) => e.projectName).toSet();
+
+      UserModel? demoUser;
+      for (final u in DemoUsers.all) {
+        if (u.id == pId || u.name.toLowerCase() == name.toLowerCase()) {
+          demoUser = u;
+          break;
+        }
+      }
+      final designation = demoUser?.designation ?? (demoUser?.role.displayName ?? 'Team Member');
+
+      personSummaries.add(_PersonCostSummary(
+        personId: pId,
+        personName: name,
+        designation: designation,
+        totalAmount: totalAmt,
+        unreceiptedAmount: unreceiptedAmt,
+        totalCount: pExpenses.length,
+        unreceiptedCount: unreceipted.length,
+        categoryAmounts: catMap,
+        projectNames: projNames,
+        expenses: pExpenses,
+      ));
+    }
+    personSummaries.sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+
+    // Group expenses by Category
+    final Map<String, List<ExpenseModel>> groupedByCat = {};
+    for (final e in widget.expenses) {
+      groupedByCat.putIfAbsent(e.categoryName, () => []).add(e);
+    }
+
+    final List<_CategoryCostSummary> categorySummaries = [];
+    for (final entry in groupedByCat.entries) {
+      final catExpenses = entry.value;
+      final totalAmt = catExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final Map<String, double> pAmounts = {};
+      for (final e in catExpenses) {
+        pAmounts[e.employeeName] = (pAmounts[e.employeeName] ?? 0.0) + e.amount;
+      }
+
+      categorySummaries.add(_CategoryCostSummary(
+        categoryName: entry.key,
+        totalAmount: totalAmt,
+        count: catExpenses.length,
+        personAmounts: pAmounts,
+      ));
+    }
+    categorySummaries.sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
+
+    // Group expenses by Project
+    final List<_ProjectCostSummary> projectSummaries = [];
+    for (final p in widget.projects) {
+      final pExp = widget.expenses.where((e) => e.projectId == p.id).toList();
+      final totalIncurred = pExp.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final Map<String, double> pAmounts = {};
+      for (final e in pExp) {
+        pAmounts[e.employeeName] = (pAmounts[e.employeeName] ?? 0.0) + e.amount;
+      }
+      projectSummaries.add(_ProjectCostSummary(
+        project: p,
+        totalIncurred: totalIncurred,
+        personAmounts: pAmounts,
+        expenseCount: pExp.length,
+      ));
+    }
+    projectSummaries.sort((a, b) => b.totalIncurred.compareTo(a.totalIncurred));
+
+    // Filtered all expenses for search
+    final query = _searchController.text.trim().toLowerCase();
+    final filteredExpenses = widget.expenses.where((e) {
+      if (query.isEmpty) return true;
+      return e.employeeName.toLowerCase().contains(query) ||
+          e.categoryName.toLowerCase().contains(query) ||
+          e.projectName.toLowerCase().contains(query) ||
+          e.note.toLowerCase().contains(query);
+    }).toList();
+
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Grab handle
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Header Row
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.analytics_rounded, color: Colors.white, size: 22),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.memberUser != null
+                              ? 'My Expense Breakdown'
+                              : 'Financial Details & Cost Audit',
+                          style: const TextStyle(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.memberUser != null
+                              ? 'Personal cost usage & submitted claims'
+                              : 'Person-wise spending, categories & project audit',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(context),
+                    tooltip: 'Close',
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // 4 Mini KPI cards
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildMiniKpi(
+                      label: 'Total Spent',
+                      value: CurrencyFormatter.format(totalDirectSpent, compact: true),
+                      color: const Color(0xFF4F46E5),
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildMiniKpi(
+                      label: 'Portfolio',
+                      value: CurrencyFormatter.format(widget.totalContractValue, compact: true),
+                      color: const Color(0xFF0284C7),
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildMiniKpi(
+                      label: 'Claimants',
+                      value: '${personSummaries.length}',
+                      color: const Color(0xFF10B981),
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildMiniKpi(
+                      label: 'No Receipt',
+                      value: '${overallUnreceiptedRatio.toStringAsFixed(0)}%',
+                      color: overallUnreceiptedRatio > 50 ? const Color(0xFFEF4444) : const Color(0xFFF59E0B),
+                      isDark: isDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            // Segmented Tabs Pill Selector
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  _buildTabPill(
+                    label: widget.memberUser != null
+                        ? '👤 My Breakdown (${personSummaries.length})'
+                        : '👥 By Person (${personSummaries.length})',
+                    index: 0,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildTabPill(
+                    label: '🏷️ Categories (${categorySummaries.length})',
+                    index: 1,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildTabPill(
+                    label: '📁 Projects (${widget.projects.length})',
+                    index: 2,
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildTabPill(
+                    label: '🧾 All Records (${widget.expenses.length})',
+                    index: 3,
+                    isDark: isDark,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+
+            // Tab Content
+            Expanded(
+              child: _buildActiveTabContent(
+                totalDirectSpent: totalDirectSpent,
+                personSummaries: personSummaries,
+                categorySummaries: categorySummaries,
+                projectSummaries: projectSummaries,
+                filteredExpenses: filteredExpenses,
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniKpi({
+    required String label,
+    required String value,
+    required Color color,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w800,
+              color: color,
+              letterSpacing: -0.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabPill({
+    required String label,
+    required int index,
+    required bool isDark,
+  }) {
+    final isSelected = _selectedTabIndex == index;
+    return InkWell(
+      onTap: () => setState(() => _selectedTabIndex = index),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF4F46E5)
+              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF4F46E5)
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+            color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF475569)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveTabContent({
+    required double totalDirectSpent,
+    required List<_PersonCostSummary> personSummaries,
+    required List<_CategoryCostSummary> categorySummaries,
+    required List<_ProjectCostSummary> projectSummaries,
+    required List<ExpenseModel> filteredExpenses,
+    required bool isDark,
+  }) {
+    switch (_selectedTabIndex) {
+      case 0:
+        return _buildPersonTab(
+          totalDirectSpent: totalDirectSpent,
+          personSummaries: personSummaries,
+          isDark: isDark,
+        );
+      case 1:
+        return _buildCategoriesTab(
+          totalDirectSpent: totalDirectSpent,
+          categorySummaries: categorySummaries,
+          isDark: isDark,
+        );
+      case 2:
+        return _buildProjectsTab(
+          projectSummaries: projectSummaries,
+          isDark: isDark,
+        );
+      case 3:
+      default:
+        return _buildRecordsTab(
+          filteredExpenses: filteredExpenses,
+          isDark: isDark,
+        );
+    }
+  }
+
+  // 1. By Person Tab: Which person which cost use
+  Widget _buildPersonTab({
+    required double totalDirectSpent,
+    required List<_PersonCostSummary> personSummaries,
+    required bool isDark,
+  }) {
+    if (personSummaries.isEmpty) {
+      return Center(
+        child: Text(
+          'No person-wise spending records found.',
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: personSummaries.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (ctx, i) {
+        final person = personSummaries[i];
+        final isExpanded = _expandedPersonNames.contains(person.personName);
+        final shareRatio = totalDirectSpent > 0 ? (person.totalAmount / totalDirectSpent) : 0.0;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              width: 1,
+            ),
+            boxShadow: isDark
+                ? []
+                : [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(8),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Avatar + Name + Total Amount
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _getUserInitials(person.personName),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          person.personName,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          person.designation,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        CurrencyFormatter.format(person.totalAmount),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF4F46E5),
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${(shareRatio * 100).toStringAsFixed(1)}% of total',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Share Progress Bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: shareRatio.clamp(0.0, 1.0),
+                  minHeight: 5,
+                  backgroundColor: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                  valueColor: const AlwaysStoppedAnimation(Color(0xFF4F46E5)),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Compliance status pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: person.unreceiptedRatio > 50
+                      ? (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2))
+                      : (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: person.unreceiptedRatio > 50
+                        ? (isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5))
+                        : (isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      person.unreceiptedRatio > 50
+                          ? Icons.warning_amber_rounded
+                          : Icons.check_circle_outline_rounded,
+                      size: 14,
+                      color: person.unreceiptedRatio > 50 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        person.unreceiptedAmount > 0
+                            ? '${CurrencyFormatter.format(person.unreceiptedAmount)} without receipt (${person.unreceiptedRatio.toStringAsFixed(0)}% of claims)'
+                            : '100% Receipts Attached & Verified',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: person.unreceiptedRatio > 50
+                              ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C))
+                              : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Which cost used chips
+              Text(
+                'Cost Usage Breakdown:',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: person.categoryAmounts.entries.map((entry) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_getCategoryIcon(entry.key), size: 12, color: const Color(0xFF4F46E5)),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '${entry.key}: ',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? Colors.white70 : const Color(0xFF334155),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          CurrencyFormatter.format(entry.value),
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF4F46E5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 10),
+
+              // Projects Assigned / Incurred
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: person.projectNames.map((proj) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withAlpha(15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.business_center_outlined, size: 11, color: Color(0xFF4F46E5)),
+                        const SizedBox(width: 4),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 240),
+                          child: Text(
+                            proj,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF4F46E5),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Expandable Claim Details Accordion
+              InkWell(
+                onTap: () {
+                  setState(() {
+                    if (isExpanded) {
+                      _expandedPersonNames.remove(person.personName);
+                    } else {
+                      _expandedPersonNames.add(person.personName);
+                    }
+                  });
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${isExpanded ? "Hide" : "View"} ${person.expenses.length} Expense Item(s)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF4F46E5),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: const Color(0xFF4F46E5),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (isExpanded) ...[
+                const SizedBox(height: 8),
+                const Divider(height: 1),
+                const SizedBox(height: 8),
+                ...person.expenses.map((e) {
+                  return InkWell(
+                    onTap: () => context.push(RoutePaths.expenseDetail(e.id)),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A).withAlpha(120) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getCategoryIcon(e.categoryName),
+                            size: 16,
+                            color: const Color(0xFF4F46E5),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  e.note.isNotEmpty ? e.note : e.categoryName,
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            CurrencyFormatter.format(e.amount),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF4F46E5),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 2. Categories Tab
+  Widget _buildCategoriesTab({
+    required double totalDirectSpent,
+    required List<_CategoryCostSummary> categorySummaries,
+    required bool isDark,
+  }) {
+    if (categorySummaries.isEmpty) {
+      return Center(
+        child: Text(
+          'No category records found.',
+          style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8)),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: categorySummaries.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (ctx, i) {
+        final cat = categorySummaries[i];
+        final shareRatio = totalDirectSpent > 0 ? (cat.totalAmount / totalDirectSpent) : 0.0;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Icon(_getCategoryIcon(cat.categoryName), size: 18, color: const Color(0xFF4F46E5)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cat.categoryName,
+                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+                        ),
+                        Text(
+                          '${cat.count} claim(s)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        CurrencyFormatter.format(cat.totalAmount),
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF4F46E5),
+                        ),
+                      ),
+                      Text(
+                        '${(shareRatio * 100).toStringAsFixed(1)}% of spend',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Claimants in this category:',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white70 : const Color(0xFF475569),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: cat.personAmounts.entries.map((entry) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.person_outline_rounded, size: 12, color: Color(0xFF4F46E5)),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '${entry.key}: ',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          CurrencyFormatter.format(entry.value),
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF4F46E5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 3. Projects Tab
+  Widget _buildProjectsTab({
+    required List<_ProjectCostSummary> projectSummaries,
+    required bool isDark,
+  }) {
+    if (projectSummaries.isEmpty) {
+      return Center(
+        child: Text(
+          'No project records found.',
+          style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8)),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: projectSummaries.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (ctx, i) {
+        final pSummary = projectSummaries[i];
+        final p = pSummary.project;
+        final pMargin = p.grossProjectValue > 0
+            ? ((p.grossProjectValue - pSummary.totalIncurred) / p.grossProjectValue) * 100
+            : 0.0;
+
+        return InkWell(
+          onTap: () => context.push(RoutePaths.projectDetail(p.id)),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            p.name,
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Client: ${p.client}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${pMargin.toStringAsFixed(1)}% Margin',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Incurred: ${CurrencyFormatter.format(pSummary.totalIncurred)}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Budget: ${CurrencyFormatter.format(p.budget, compact: true)}',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (pSummary.personAmounts.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Personnel Spenders:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: pSummary.personAmounts.entries.map((entry) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${entry.key}: ${CurrencyFormatter.format(entry.value)}',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 4. All Records Tab
+  Widget _buildRecordsTab({
+    required List<ExpenseModel> filteredExpenses,
+    required bool isDark,
+  }) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: 'Search by person, category, note...',
+              hintStyle: TextStyle(
+                fontSize: 12.5,
+                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+              ),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 16),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {});
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: filteredExpenses.isEmpty
+              ? Center(
+                  child: Text(
+                    'No expense records found matching query.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  itemCount: filteredExpenses.length,
+                  itemBuilder: (ctx, i) {
+                    final e = filteredExpenses[i];
+                    return ExpenseListRow(
+                      expense: e,
+                      showEmployeeName: true,
+                      onTap: () => context.push(RoutePaths.expenseDetail(e.id)),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PersonCostSummary {
+  final String personId;
+  final String personName;
+  final String designation;
+  final double totalAmount;
+  final double unreceiptedAmount;
+  final int totalCount;
+  final int unreceiptedCount;
+  final Map<String, double> categoryAmounts;
+  final Set<String> projectNames;
+  final List<ExpenseModel> expenses;
+
+  _PersonCostSummary({
+    required this.personId,
+    required this.personName,
+    required this.designation,
+    required this.totalAmount,
+    required this.unreceiptedAmount,
+    required this.totalCount,
+    required this.unreceiptedCount,
+    required this.categoryAmounts,
+    required this.projectNames,
+    required this.expenses,
+  });
+
+  double get unreceiptedRatio => totalAmount > 0 ? (unreceiptedAmount / totalAmount) * 100 : 0.0;
+}
+
+class _CategoryCostSummary {
+  final String categoryName;
+  final double totalAmount;
+  final int count;
+  final Map<String, double> personAmounts;
+
+  _CategoryCostSummary({
+    required this.categoryName,
+    required this.totalAmount,
+    required this.count,
+    required this.personAmounts,
+  });
+}
+
+class _ProjectCostSummary {
+  final ProjectModel project;
+  final double totalIncurred;
+  final Map<String, double> personAmounts;
+  final int expenseCount;
+
+  _ProjectCostSummary({
+    required this.project,
+    required this.totalIncurred,
+    required this.personAmounts,
+    required this.expenseCount,
+  });
 }

@@ -392,4 +392,110 @@ void main() {
     expect(find.text('Rahim Chowdhury'), findsNothing);
     expect(find.text('Viewer (Read-Only)'), findsNothing);
   });
+
+  testWidgets('Clicking Hero section container opens Portfolio Financial Details modal showing person-wise costs', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: HomeDashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    // Tap the Hero Section Container
+    final heroHeader = find.text('Total Portfolio Value');
+    expect(heroHeader, findsOneWidget);
+    await tester.tap(heroHeader);
+    await tester.pumpAndSettle();
+
+    // Verify Financial Details & Cost Audit modal is displayed
+    expect(find.text('Financial Details & Cost Audit'), findsOneWidget);
+    expect(find.text('Person-wise spending, categories & project audit'), findsOneWidget);
+
+    // Verify person-wise breakdown ("which person which cost use")
+    expect(find.text('Karim Ullah'), findsWidgets);
+    expect(find.text('Fahim Ahmed'), findsWidgets);
+    expect(find.text('Cost Usage Breakdown:'), findsWidgets);
+    expect(find.text('Equipment: '), findsWidgets);
+    expect(find.text('Transportation: '), findsWidgets);
+
+    // Scroll down to verify Sarah Jenkins as well
+    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(find.text('Sarah Jenkins'), findsWidgets);
+
+    // Verify tabs exist and switch to Categories tab
+    final categoriesTab = find.textContaining('Categories');
+    expect(categoriesTab, findsOneWidget);
+    await tester.ensureVisible(categoriesTab);
+    await tester.tap(categoriesTab);
+    await tester.pumpAndSettle();
+    expect(find.text('Claimants in this category:'), findsWidgets);
+
+    // Switch to Projects tab
+    final projectsTab = find.textContaining('📁 Projects');
+    expect(projectsTab, findsOneWidget);
+    await tester.ensureVisible(projectsTab);
+    await tester.tap(projectsTab);
+    await tester.pumpAndSettle();
+    expect(find.text('Enterprise Cloud ERP Platform'), findsWidgets);
+
+    // Switch to All Records tab
+    final recordsTab = find.textContaining('All Records');
+    expect(recordsTab, findsOneWidget);
+    await tester.ensureVisible(recordsTab);
+    await tester.tap(recordsTab);
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Clicking Member Dashboard Hero card opens personal cost breakdown with all details', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.projectMember);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: HomeDashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    // Tap Member Hero Section Container
+    final memberHero = find.text('My Total Submitted Claims');
+    expect(memberHero, findsOneWidget);
+    await tester.tap(memberHero);
+    await tester.pumpAndSettle();
+
+    // Verify modal opens with personal breakdown
+    expect(find.text('My Expense Breakdown'), findsOneWidget);
+    expect(find.text('Personal cost usage & submitted claims'), findsOneWidget);
+    expect(find.text('Fahim Ahmed'), findsWidgets);
+    expect(find.text('Equipment: '), findsWidgets);
+    expect(find.text('Transportation: '), findsWidgets);
+    expect(find.text('Food: '), findsWidgets);
+
+    expect(tester.takeException(), isNull);
+  });
 }
