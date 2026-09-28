@@ -120,9 +120,11 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           // Professional Cohesive Persona Switcher Pill
           Padding(
             padding: const EdgeInsets.only(right: 6),
-            child: InkWell(
-              onTap: () => _showPersonaSwitcherModal(context, ref, user),
-              borderRadius: BorderRadius.circular(20),
+            child: Tooltip(
+              message: 'Switch PRD Persona',
+              child: InkWell(
+                onTap: () => _showPersonaSwitcherModal(context, ref, user),
+                borderRadius: BorderRadius.circular(20),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
@@ -163,6 +165,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               ),
             ),
           ),
+        ),
           // Notification Bell
           IconButton(
             icon: Stack(
@@ -281,10 +284,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Hero Financial Card (Minimal Gradient, No Glow)
+        // Hero Financial Card (Minimal Gradient, Clickable -> Projects Portfolio)
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
@@ -302,84 +304,102 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     ),
                   ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top label + Profit trend pill
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Total Portfolio Value',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(35),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () => context.push(RoutePaths.projectsList),
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top label + Profit trend pill
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Icon(Icons.arrow_upward_rounded, color: Color(0xFF4ADE80), size: 13),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${projectedProfitMargin.toStringAsFixed(1)}% Margin',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                        const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Total Portfolio Value',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 5),
+                            Icon(Icons.arrow_forward_ios_rounded, color: Colors.white60, size: 11),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(35),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.arrow_upward_rounded, color: Color(0xFF4ADE80), size: 13),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${projectedProfitMargin.toStringAsFixed(1)}% Margin',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-              ),
 
-              const SizedBox(height: 10),
+                    const SizedBox(height: 10),
 
-              // Huge Bold Balance Number
-              Text(
-                CurrencyFormatter.format(totalContractValue, compact: true),
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
+                    // Huge Bold Balance Number
+                    Text(
+                      CurrencyFormatter.format(totalContractValue, compact: true),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // 3 Translucent Frosted Glass Mini-Pills (Image 2 style)
+                    Row(
+                      children: [
+                        _buildFrostedMiniStat(
+                          icon: Icons.payments_outlined,
+                          label: 'Incurred',
+                          value: CurrencyFormatter.format(totalCostIncurred, compact: true),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildFrostedMiniStat(
+                          icon: Icons.receipt_long_outlined,
+                          label: 'Net Revenue',
+                          value: CurrencyFormatter.format(projectedRevenue, compact: true),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildFrostedMiniStat(
+                          icon: Icons.business_center_outlined,
+                          label: 'Active',
+                          value: '${activeProjects.length} Projects',
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-
-              const SizedBox(height: 18),
-
-              // 3 Translucent Frosted Glass Mini-Pills (Image 2 style)
-              Row(
-                children: [
-                  _buildFrostedMiniStat(
-                    icon: Icons.payments_outlined,
-                    label: 'Incurred',
-                    value: CurrencyFormatter.format(totalCostIncurred, compact: true),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFrostedMiniStat(
-                    icon: Icons.receipt_long_outlined,
-                    label: 'Net Revenue',
-                    value: CurrencyFormatter.format(projectedRevenue, compact: true),
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFrostedMiniStat(
-                    icon: Icons.business_center_outlined,
-                    label: 'Active',
-                    value: '${activeProjects.length} Projects',
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
 
@@ -519,10 +539,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Personal Hero Card (Minimal Gradient, No Glow)
+        // Personal Hero Card (Minimal Gradient, Clickable -> Assigned Projects)
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
@@ -540,50 +559,67 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     ),
                   ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'My Total Submitted Claims',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(22),
+              onTap: () => context.push(RoutePaths.projectsList),
+              child: Padding(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'My Total Submitted Claims',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white60, size: 11),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      CurrencyFormatter.format(totalSpent),
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        _buildFrostedMiniStat(
+                          icon: Icons.receipt_rounded,
+                          label: 'Unreceipted',
+                          value: '${unreceiptedRatio.toStringAsFixed(0)}%',
+                        ),
+                        const SizedBox(width: 8),
+                        _buildFrostedMiniStat(
+                          icon: Icons.assignment_turned_in_outlined,
+                          label: 'Receipted',
+                          value: '${(100 - unreceiptedRatio).toStringAsFixed(0)}%',
+                        ),
+                        const SizedBox(width: 8),
+                        _buildFrostedMiniStat(
+                          icon: Icons.folder_outlined,
+                          label: 'Projects',
+                          value: '${assignedProjects.length} Assigned',
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                CurrencyFormatter.format(totalSpent),
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  _buildFrostedMiniStat(
-                    icon: Icons.receipt_rounded,
-                    label: 'Unreceipted',
-                    value: '${unreceiptedRatio.toStringAsFixed(0)}%',
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFrostedMiniStat(
-                    icon: Icons.assignment_turned_in_outlined,
-                    label: 'Receipted',
-                    value: '${(100 - unreceiptedRatio).toStringAsFixed(0)}%',
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFrostedMiniStat(
-                    icon: Icons.folder_outlined,
-                    label: 'Projects',
-                    value: '${assignedProjects.length} Assigned',
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
 
@@ -1055,7 +1091,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
-                  ...DemoUsers.all.map((u) {
+                  ...DemoUsers.all.where((u) => u.role != UserRole.viewer).map((u) {
                     final isSelected = currentUser?.id == u.id;
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

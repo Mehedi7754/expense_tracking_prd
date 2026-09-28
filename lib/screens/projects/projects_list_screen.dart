@@ -125,7 +125,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                                           crossAxisCount: 2,
                                           crossAxisSpacing: 10,
                                           mainAxisSpacing: 10,
-                                          mainAxisExtent: 114,
+                                          mainAxisExtent: 122,
                                         ),
                                         delegate: SliverChildBuilderDelegate(
                                           (ctx, i) {
@@ -341,10 +341,10 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
               final e = entries[i];
               final color = palette[i % palette.length];
               final double pct = displayTotal > 0 ? (e.value / displayTotal * 100) : 0;
-              final shortName = e.key.length > 22 ? '${e.key.substring(0, 20)}…' : e.key;
+              final projectName = e.key;
 
               return ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
+                constraints: const BoxConstraints(maxWidth: 280),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -356,8 +356,8 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        '$shortName (${pct.toStringAsFixed(0)}%)',
-                        maxLines: 1,
+                        '$projectName (${pct.toStringAsFixed(0)}%)',
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11.5,

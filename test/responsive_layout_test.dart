@@ -11,6 +11,9 @@ import 'package:expense_tracking_prd/screens/projects/add_edit_project_screen.da
 import 'package:expense_tracking_prd/screens/projects/projects_list_screen.dart';
 import 'package:expense_tracking_prd/screens/approvals/approvals_queue_screen.dart';
 import 'package:expense_tracking_prd/screens/profile/profile_screen.dart';
+import 'package:expense_tracking_prd/screens/home/home_dashboard_screen.dart';
+import 'package:expense_tracking_prd/screens/auth/login_screen.dart';
+import 'package:expense_tracking_prd/screens/auth/register_screen.dart';
 import 'package:expense_tracking_prd/state/auth_provider.dart';
 import 'package:expense_tracking_prd/models/user_role.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -267,5 +270,126 @@ void main() {
     expect(find.text('Search claimant, project...'), findsOneWidget);
     expect(find.text('Filter'), findsOneWidget);
     expect(find.byIcon(Icons.tune_rounded), findsOneWidget);
+  });
+
+  testWidgets('LoginScreen renders with minimal professional design, enlarged size, and without extra paragraphs', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: LoginScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.text('Sign In to Account'), findsOneWidget);
+    expect(find.text('Sign In to PFIS'), findsOneWidget);
+    // Verifies extra descriptive paragraph was removed
+    expect(find.textContaining('Real-time project cost monitoring'), findsNothing);
+  });
+
+  testWidgets('RegisterScreen renders with minimal professional design and without extra paragraphs', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: RegisterScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Register New User'), findsOneWidget);
+    expect(find.text('Create Account & Sign In'), findsOneWidget);
+    // Verifies extra descriptive paragraphs were removed
+    expect(find.textContaining('Select your role to access role-specific financial dashboards'), findsNothing);
+    expect(find.textContaining('Executive roles (Main Admin, Finance) require internal IT provisioning'), findsNothing);
+  });
+
+  testWidgets('ProjectCostCard configures project name with maxLines 2 for full name display', (WidgetTester tester) async {
+    final project = ProjectModel(
+      id: 'proj_test_long',
+      projectId: 'PRJ-2026-LONG',
+      name: 'Smart Infrastructure Rail Transit Modernization and Signalization Phase 2',
+      description: 'Long name test',
+      client: 'Transit Authority',
+      clientType: ClientType.government,
+      assignmentType: AssignmentType.government,
+      grossProjectValue: 5000000.0,
+      taxStatus: TaxStatus.included,
+      taxRate: 0.1,
+      expectedNetRevenue: 4500000.0,
+      advanceReceived: 1000000.0,
+      amountReceived: 2000000.0,
+      amountReceivable: 3000000.0,
+      budget: 4000000.0,
+      estimatedRemainingCost: 1000000.0,
+      officeBenefitRate: 0.15,
+      startDate: DateTime(2026, 1, 1),
+      endDate: DateTime(2026, 12, 31),
+      teamMemberIds: ['usr_01'],
+      status: ProjectStatus.ongoing,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProjectCostCard(
+            project: project,
+            projectExpenses: const [],
+            onTap: () {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final textWidget = tester.widget<Text>(find.text(project.name));
+    expect(textWidget.maxLines, equals(2));
+  });
+
+  testWidgets('Switch Test Persona modal excludes Viewer persona', (WidgetTester tester) async {
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: HomeDashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    // Tap the Persona Switcher in the AppBar
+    final personaPill = find.byTooltip('Switch PRD Persona');
+    expect(personaPill, findsOneWidget);
+    await tester.tap(personaPill);
+    await tester.pumpAndSettle();
+
+    // Verify modal header is visible
+    expect(find.text('Switch Test Persona'), findsOneWidget);
+    // Verify standard roles are present
+    expect(find.text('Eleanor Vance'), findsOneWidget);
+    expect(find.text('Sarah Jenkins'), findsOneWidget);
+    expect(find.text('Fahim Ahmed'), findsOneWidget);
+    expect(find.text('David Chen'), findsOneWidget);
+    // Verify viewer person (Rahim Chowdhury / UserRole.viewer) is removed
+    expect(find.text('Rahim Chowdhury'), findsNothing);
+    expect(find.text('Viewer (Read-Only)'), findsNothing);
   });
 }

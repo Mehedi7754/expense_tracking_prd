@@ -147,9 +147,10 @@ class ProjectCard extends StatelessWidget {
             child: Row(
               children: [
                 // 1. Left squircle icon with soft tinted pastel background
+                // 1. Left squircle icon with soft tinted pastel background
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     color: iconBg,
                     borderRadius: BorderRadius.circular(16),
@@ -157,12 +158,12 @@ class ProjectCard extends StatelessWidget {
                   child: Center(
                     child: Icon(
                       iconData,
-                      size: 27,
+                      size: 26,
                       color: accentColor,
                     ),
                   ),
                 ),
-                const SizedBox(width: 15),
+                const SizedBox(width: 14),
 
                 // 2. Middle Column: Project Name & Minimal Financials
                 Expanded(
@@ -173,12 +174,13 @@ class ProjectCard extends StatelessWidget {
                       Text(
                         project.name,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 14.5,
                           fontWeight: FontWeight.w700,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          letterSpacing: -0.3,
+                          letterSpacing: -0.2,
+                          height: 1.25,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 5),
@@ -198,7 +200,7 @@ class ProjectCard extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.w500,
                                 color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                fontSize: 13,
+                                fontSize: 12.5,
                               ),
                             ),
                           ],
@@ -243,8 +245,8 @@ class _MinimalProjectProgress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 54,
-      height: 54,
+      width: 52,
+      height: 52,
       child: CustomPaint(
         painter: _ProjectRingPainter(
           progress: progress.clamp(0.0, 1.0),
@@ -256,7 +258,7 @@ class _MinimalProjectProgress extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: label.length > 3 ? 11.5 : 13.5,
+              fontSize: label.length > 3 ? 11.0 : 13.0,
               fontWeight: FontWeight.w800,
               color: color,
               letterSpacing: -0.4,

@@ -79,9 +79,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
+              constraints: const BoxConstraints(maxWidth: 520),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -89,15 +89,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Row(
                     children: [
                       Container(
-                        width: 50,
-                        height: 50,
+                        width: 54,
+                        height: 54,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withAlpha(15),
@@ -110,46 +110,45 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           child: Icon(
                             Icons.person_add_alt_1_rounded,
                             color: Colors.white,
-                            size: 26,
+                            size: 28,
                           ),
                         ),
                       ),
                       const SizedBox(width: 14),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            AppConstants.appName,
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                              color: isDark ? Colors.white : AppColors.textPrimary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              AppConstants.appName,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.5,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const Text(
-                            'User Account Registration',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
-                          ),
-                        ],
+                            const Text(
+                              'User Account Registration',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
                   Text('Register New User', style: AppTextStyles.displayMedium),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Select your role to access role-specific financial dashboards, approvals, and metrics.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
                   const SizedBox(height: 20),
 
                   // Form Container
                   Container(
-                    padding: const EdgeInsets.all(22),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                     decoration: BoxDecoration(
                       color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(22),
                       border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
                     ),
                     child: Form(
@@ -176,9 +175,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           // Full Name
                           TextFormField(
                             controller: _nameController,
+                            style: const TextStyle(fontSize: 15),
                             decoration: const InputDecoration(
                               labelText: 'Full Name *',
-                              prefixIcon: Icon(Icons.person_outline_rounded),
+                              prefixIcon: Icon(Icons.person_outline_rounded, size: 22),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                             ),
                             validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter full name' : null,
                           ),
@@ -188,9 +189,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           TextFormField(
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
+                            style: const TextStyle(fontSize: 15),
                             decoration: const InputDecoration(
                               labelText: 'Corporate Email *',
-                              prefixIcon: Icon(Icons.mail_outline_rounded),
+                              prefixIcon: Icon(Icons.mail_outline_rounded, size: 22),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                             ),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return 'Enter email';
@@ -202,9 +205,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                           // Role Selection Label
                           Text(
-                            'Assign Role (determines dashboard & data permissions)',
+                            'Role *',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                             ),
@@ -213,7 +216,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                           // Role Selector Dropdown (Restricted: Exclude Main Admin & Finance from public registration)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                             decoration: BoxDecoration(
                               color: isDark ? AppColors.darkBackground : Colors.grey.shade50,
                               borderRadius: BorderRadius.circular(12),
@@ -232,14 +235,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                   return DropdownMenuItem<UserRole>(
                                     value: role,
                                     child: Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
                                         _buildRoleIndicatorDot(role),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            role.displayName,
-                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                                          ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          role.displayName,
+                                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
                                         ),
                                       ],
                                     ),
@@ -251,39 +253,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 6),
-
-                          // Role description pill & governance note
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.getPrimary(context).withValues(alpha: isDark ? 0.16 : 0.08),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _getRoleDescription(_selectedRole),
-                                  style: TextStyle(fontSize: 11, color: AppColors.getPrimary(context), fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  '🔒 Executive roles (Main Admin, Finance) require internal IT provisioning.',
-                                  style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic),
-                                ),
-                              ],
-                            ),
-                          ),
                           const SizedBox(height: 14),
 
                           // Department
                           TextFormField(
                             controller: _deptController,
+                            style: const TextStyle(fontSize: 15),
                             decoration: const InputDecoration(
                               labelText: 'Department',
                               hintText: 'e.g. Field Survey, Finance, IT',
-                              prefixIcon: Icon(Icons.apartment_rounded),
+                              prefixIcon: Icon(Icons.apartment_rounded, size: 22),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -292,11 +272,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           TextFormField(
                             controller: _passwordController,
                             obscureText: _obscurePassword,
+                            style: const TextStyle(fontSize: 15),
                             decoration: InputDecoration(
                               labelText: 'Password *',
-                              prefixIcon: const Icon(Icons.lock_outline_rounded),
+                              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 22),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                               suffixIcon: IconButton(
-                                icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                                icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
                                 onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                               ),
                             ),
@@ -308,11 +290,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           TextFormField(
                             controller: _confirmPasswordController,
                             obscureText: _obscureConfirm,
+                            style: const TextStyle(fontSize: 15),
                             decoration: InputDecoration(
                               labelText: 'Confirm Password *',
-                              prefixIcon: const Icon(Icons.lock_reset_rounded),
+                              prefixIcon: const Icon(Icons.lock_reset_rounded, size: 22),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                               suffixIcon: IconButton(
-                                icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                                icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
                                 onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                               ),
                             ),
@@ -321,32 +305,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 22),
 
-                          // Submit Button (Reusable, Minimal, No Glow)
+                          // Submit Button (Reusable, Minimal, No Glow, 52dp)
                           SizedBox(
-                            height: 48,
+                            height: 52,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF4F46E5),
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                               ),
                               onPressed: authState.isLoading ? null : _handleRegister,
                               child: authState.isLoading
                                   ? const SizedBox(
-                                      width: 20,
-                                      height: 20,
+                                      width: 22,
+                                      height: 22,
                                       child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                     )
-                                  : const Text(
-                                      'Create Account & Sign In',
-                                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white),
+                                  : const FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        'Create Account & Sign In',
+                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white),
+                                      ),
                                     ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
 
                           // Back to Login Link (responsive Wrap to prevent overflow)
                           Center(
@@ -416,20 +403,5 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       height: 8,
       decoration: BoxDecoration(shape: BoxShape.circle, color: dotColor),
     );
-  }
-
-  String _getRoleDescription(UserRole role) {
-    switch (role) {
-      case UserRole.mainAdmin:
-        return 'Full executive access: company financial position, all projects, revenue forecasting, user & category management.';
-      case UserRole.projectManager:
-        return 'Project-level access: manage assigned projects, cost cards, review & approve submitted expenses.';
-      case UserRole.projectMember:
-        return 'Field / staff access: submit project expenses, upload receipts, track receipt compliance (>50% warning).';
-      case UserRole.finance:
-        return 'Financial controller: approve expenses & justifications, company-wide audit, project budgets & margins.';
-      case UserRole.viewer:
-        return 'Read-only access: view permitted projects and audit reports without modification capabilities.';
-    }
   }
 }
