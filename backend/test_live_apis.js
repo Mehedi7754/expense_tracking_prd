@@ -4,7 +4,7 @@
  */
 const http = require('http');
 
-const BASE_URL = 'http://127.0.0.1:8080/api/v1';
+const BASE_URL = process.env.API_BASE || 'http://127.0.0.1:8080/api/v1';
 
 async function request(method, path, body = null, token = null) {
   const url = new URL(BASE_URL + path);
