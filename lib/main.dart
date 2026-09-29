@@ -9,13 +9,13 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
     const ProviderScope(
-      child: SpendWiseApp(),
+      child: GWProjectApp(),
     ),
   );
 }
 
-class SpendWiseApp extends ConsumerWidget {
-  const SpendWiseApp({super.key});
+class GWProjectApp extends ConsumerWidget {
+  const GWProjectApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,3 +32,6 @@ class SpendWiseApp extends ConsumerWidget {
     );
   }
 }
+
+typedef SpendWiseApp = GWProjectApp;
+

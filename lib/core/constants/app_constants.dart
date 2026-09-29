@@ -1,8 +1,8 @@
 class AppConstants {
   AppConstants._();
 
-  static const String appName = 'PFIS';
-  static const String appFullName = 'Project Financial Intelligence System';
+  static const String appName = 'GW project';
+  static const String appFullName = 'GW Project Financial Intelligence System';
   static const String appTagline = 'Project Cost & Profitability Management';
 
   // Receipt compliance thresholds (PRD Section 11, 12)

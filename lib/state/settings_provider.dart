@@ -31,7 +31,7 @@ class SettingsState {
     this.isDarkMode = false,
     this.notificationsEnabled = true,
     this.budgetAlertsEnabled = true,
-    this.companyName = 'PFIS Consultancy & Survey Ltd.',
+    this.companyName = 'GW Project Consultancy & Survey Ltd.',
     this.baseCurrency = 'BDT',
     this.companyLogoUrl,
     this.defaultOfficeBenefitRate = 0.30,

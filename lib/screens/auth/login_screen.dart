@@ -213,7 +213,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               onPressed: authState.isLoading ? null : _handleLogin,
                               child: authState.isLoading
                                   ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                  : const Text('Sign In to PFIS', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                                  : const Text('Sign In to GW project', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
                             ),
                           ),
                           const SizedBox(height: 14),

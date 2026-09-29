@@ -98,7 +98,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'PFIS Financials',
+                    'GW Project Financials',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
