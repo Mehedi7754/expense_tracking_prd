@@ -71,17 +71,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Custom Minimalist Brand Icon (Purple/Indigo Theme)
+                // Official Brand Logo (Geospatial Works)
                 Container(
-                  width: 76,
-                  height: 76,
+                  width: 88,
+                  height: 88,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(24),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withAlpha(20),
@@ -90,11 +86,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.account_balance_wallet_rounded,
-                      size: 38,
-                      color: Colors.white,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Image.asset(
+                      'assets/images/app_logo.png',
+                      width: 88,
+                      height: 88,
+                      fit: BoxFit.contain,
                     ),
                   ),
                 ),

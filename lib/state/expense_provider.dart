@@ -3,6 +3,7 @@ import '../models/comment_model.dart';
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
+import '../repositories/expense_repository.dart';
 
 class MemberReceiptSummary {
   final String memberId;
@@ -220,7 +221,31 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
   ];
 
   @override
+
+  @override
   List<ExpenseModel> build() => _initialExpenses;
+
+  Future<void> fetchExpenses({
+    String? projectId,
+    String? employeeId,
+    String? status,
+  }) async {
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      final expenses = await repo.getExpenses(
+        projectId: projectId,
+        employeeId: employeeId,
+        status: status,
+      );
+      state = expenses;
+    } catch (_) {
+      // Keep existing state on network disconnect
+    }
+  }
+
+  void setExpenses(List<ExpenseModel> expenses) {
+    state = expenses;
+  }
 
   /// PRD Section 1 & 17: Filter expenses for specific user
   List<ExpenseModel> getExpensesForUser(UserModel? user) {
@@ -271,6 +296,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     final List<MemberReceiptSummary> summaries = [];
     for (final entry in grouped.entries) {
       final list = entry.value;
+      if (list.isEmpty) continue;
       final first = list.first;
       final total = list.fold<double>(0.0, (sum, e) => sum + e.amount);
       final noReceipt = list.where((e) => !e.hasReceipt).fold<double>(0.0, (sum, e) => sum + e.amount);
@@ -294,7 +320,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
   }
 
   /// PRD Section 5, 6, 8, 9, 17: Submit Expense with auto 30% Office Benefit
-  void submitExpense({
+  Future<ExpenseModel> submitExpense({
     required String employeeId,
     required String employeeName,
     required String projectId,
@@ -316,7 +342,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     FoodDetails? foodDetails,
     AccommodationDetails? accommodationDetails,
     OfficeCostDetails? officeCostDetails,
-  }) {
+  }) async {
     final officeBenefit = amount * officeBenefitRate;
     final newExpense = ExpenseModel(
       id: 'exp_${DateTime.now().microsecondsSinceEpoch}',
@@ -346,16 +372,29 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
       officeCostDetails: officeCostDetails,
     );
 
+    // Optimistic local update
     state = [newExpense, ...state];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      final saved = await repo.createExpense(newExpense);
+      state = [
+        for (final exp in state)
+          if (exp.id == newExpense.id) saved else exp,
+      ];
+      return saved;
+    } catch (_) {
+      return newExpense;
+    }
   }
 
   /// PRD Section 13: Justification Workflow
-  void submitJustification({
+  Future<void> submitJustification({
     required String expenseId,
     required String reason,
     required String comment,
     String? attachmentUrl,
-  }) {
+  }) async {
     state = [
       for (final exp in state)
         if (exp.id == expenseId)
@@ -368,13 +407,25 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.submitJustification(
+        expenseId,
+        reason: reason,
+        comment: comment,
+        attachmentUrl: attachmentUrl,
+      );
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void approveJustification({
+  Future<void> approveJustification({
     required String expenseId,
     required String reviewerName,
     String? reviewComment,
-  }) {
+  }) async {
     state = [
       for (final exp in state)
         if (exp.id == expenseId)
@@ -387,13 +438,24 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.reviewJustification(
+        expenseId,
+        status: JustificationStatus.approved,
+        reviewComment: reviewComment,
+      );
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void rejectJustification({
+  Future<void> rejectJustification({
     required String expenseId,
     required String reviewerName,
     required String reason,
-  }) {
+  }) async {
     state = [
       for (final exp in state)
         if (exp.id == expenseId)
@@ -406,13 +468,24 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.reviewJustification(
+        expenseId,
+        status: JustificationStatus.rejected,
+        reviewComment: reason,
+      );
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void requestClarification({
+  Future<void> requestClarification({
     required String expenseId,
     required String reviewerName,
     required String note,
-  }) {
+  }) async {
     state = [
       for (final exp in state)
         if (exp.id == expenseId)
@@ -425,9 +498,20 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.reviewJustification(
+        expenseId,
+        status: JustificationStatus.clarificationRequested,
+        reviewComment: note,
+      );
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void editExpense({
+  Future<void> editExpense({
     required String id,
     required String projectId,
     required String projectName,
@@ -441,7 +525,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     required String note,
     required DateTime date,
     String? receiptPhotoUrl,
-  }) {
+  }) async {
     state = [
       for (final exp in state)
         if (exp.id == id && exp.status == ExpenseStatus.pending)
@@ -464,9 +548,17 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    final updated = state.firstWhere((e) => e.id == id);
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.updateExpense(updated);
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void approveExpense(String id) {
+  Future<void> approveExpense(String id) async {
     state = [
       for (final exp in state)
         if (exp.id == id)
@@ -474,9 +566,16 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.updateStatus(id, ExpenseStatus.approved);
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void batchApprove(List<String> ids) {
+  Future<void> batchApprove(List<String> ids) async {
     state = [
       for (final exp in state)
         if (ids.contains(exp.id))
@@ -484,9 +583,18 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      for (final id in ids) {
+        await repo.updateStatus(id, ExpenseStatus.approved);
+      }
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void batchReject(List<String> ids, String reason) {
+  Future<void> batchReject(List<String> ids, String reason) async {
     state = [
       for (final exp in state)
         if (ids.contains(exp.id))
@@ -494,9 +602,18 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      for (final id in ids) {
+        await repo.updateStatus(id, ExpenseStatus.rejected, rejectionReason: reason);
+      }
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void rejectExpense(String id, String reason) {
+  Future<void> rejectExpense(String id, String reason) async {
     state = [
       for (final exp in state)
         if (exp.id == id)
@@ -504,19 +621,26 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.updateStatus(id, ExpenseStatus.rejected, rejectionReason: reason);
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
   void withdrawExpense(String id) {
     state = state.where((exp) => !(exp.id == id && exp.status == ExpenseStatus.pending)).toList();
   }
 
-  void addComment({
+  Future<void> addComment({
     required String expenseId,
     required String text,
     required String authorId,
     required String authorName,
     required UserRole authorRole,
-  }) {
+  }) async {
     final newComment = CommentModel(
       id: 'c_${DateTime.now().microsecondsSinceEpoch}',
       expenseId: expenseId,
@@ -534,6 +658,13 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.addComment(expenseId, newComment);
+    } catch (_) {
+      // Offline fallback
+    }
   }
 }
 

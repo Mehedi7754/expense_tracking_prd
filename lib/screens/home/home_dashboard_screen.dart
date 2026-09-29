@@ -71,18 +71,23 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(15),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: Colors.white,
-                  size: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),

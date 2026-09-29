@@ -15,8 +15,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  final _emailController = TextEditingController(text: 'admin@pfis.com');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
 
@@ -63,11 +63,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         width: 58,
                         height: 58,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(
@@ -77,11 +73,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                           ],
                         ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.account_balance_wallet_rounded,
-                            color: Colors.white,
-                            size: 30,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(
+                            'assets/images/app_logo.png',
+                            width: 56,
+                            height: 56,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
@@ -158,6 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             style: const TextStyle(fontSize: 15),
                             decoration: const InputDecoration(
                               labelText: 'Email / Username',
+                              hintText: 'name@company.com',
                               prefixIcon: Icon(Icons.person_outline_rounded, size: 22),
                               contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                             ),
@@ -172,6 +171,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             style: const TextStyle(fontSize: 15),
                             decoration: InputDecoration(
                               labelText: 'Password',
+                              hintText: 'Enter password',
                               prefixIcon: const Icon(Icons.lock_outline_rounded, size: 22),
                               contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                               suffixIcon: IconButton(

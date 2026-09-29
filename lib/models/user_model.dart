@@ -50,4 +50,43 @@ class UserModel {
       assignedProjectIds: assignedProjectIds ?? this.assignedProjectIds,
     );
   }
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    List<String> parseProjectIds(dynamic raw) {
+      if (raw is List) {
+        return raw.map((e) => e.toString()).toList();
+      }
+      return const [];
+    }
+
+    final roleStr = json['role']?.toString() ?? 'project_member';
+
+    return UserModel(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? json['full_name'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      role: UserRole.fromString(roleStr),
+      department: (json['department'] ?? 'Operations').toString(),
+      designation: json['designation']?.toString(),
+      phone: json['phone']?.toString(),
+      avatarUrl: (json['avatar_url'] ?? json['avatarUrl'])?.toString(),
+      isActive: json['is_active'] ?? json['isActive'] ?? true,
+      assignedProjectIds: parseProjectIds(json['assigned_project_ids'] ?? json['assignedProjectIds']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'role': role.name,
+      'department': department,
+      if (designation != null) 'designation': designation,
+      if (phone != null) 'phone': phone,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      'is_active': isActive,
+      'assigned_project_ids': assignedProjectIds,
+    };
+  }
 }

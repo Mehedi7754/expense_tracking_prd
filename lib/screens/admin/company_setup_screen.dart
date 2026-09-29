@@ -103,11 +103,13 @@ class _CompanySetupScreenState extends ConsumerState<CompanySetupScreen> {
                           border: Border.all(color: AppColors.getBorder(context), width: 1.5),
                           boxShadow: (Theme.of(context).brightness == Brightness.dark) ? [] : AppColors.cardShadow,
                         ),
-                        child: Center(
-                          child: Icon(
-                            Icons.business_rounded,
-                            size: 44,
-                            color: AppColors.getPrimary(context),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: Image.asset(
+                            'assets/images/app_logo.png',
+                            width: 88,
+                            height: 88,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),

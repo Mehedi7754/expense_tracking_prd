@@ -218,9 +218,26 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(project.projectId, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.getPrimary(context))),
-            Text(project.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            Text(
+              project.projectId,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.getPrimary(context),
+              ),
+            ),
+            Text(
+              project.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -235,6 +252,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 16),
           tabs: const [
             Tab(text: 'Financial Overview'),
             Tab(text: 'Budget vs Actual'),
@@ -435,6 +454,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
               unreceiptedRatio: unreceiptedRatio,
             ),
           ),
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -444,22 +464,30 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                fontWeight: FontWeight.w500,
+        Expanded(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
-            ),
-            if (isEditable) ...[
-              const SizedBox(width: 4),
-              InkWell(onTap: onEdit, child: const Icon(Icons.edit, size: 13, color: Color(0xFF2563EB))),
+              if (isEditable) ...[
+                const SizedBox(width: 4),
+                InkWell(onTap: onEdit, child: const Icon(Icons.edit, size: 13, color: Color(0xFF2563EB))),
+              ],
             ],
-          ],
+          ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(
