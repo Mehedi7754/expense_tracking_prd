@@ -92,11 +92,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         width: 50,
                         height: 50,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
@@ -106,11 +102,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                           ],
                         ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.person_add_alt_1_rounded,
-                            color: Colors.white,
-                            size: 26,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.asset(
+                            'assets/images/app_logo.png',
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),

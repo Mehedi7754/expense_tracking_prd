@@ -177,12 +177,13 @@ class ProjectCostCard extends StatelessWidget {
                       Text(
                         project.name,
                         style: TextStyle(
-                          fontSize: 16.5,
+                          fontSize: 15,
                           fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                           letterSpacing: -0.3,
+                          height: 1.25,
                         ),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),

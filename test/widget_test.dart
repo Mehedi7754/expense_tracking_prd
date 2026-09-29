@@ -35,12 +35,12 @@ void main() {
     expect(auth.isAuthenticated, true);
     expect(auth.currentUser?.role, UserRole.projectMember);
 
-    // Verify projects and expenses providers are pre-seeded with Bangladesh consultancy data
+    // Verify projects and expenses providers boot clean with empty state (no hardcoded demo leaks)
     final projects = container.read(projectProvider);
-    expect(projects.isNotEmpty, true);
+    expect(projects.isEmpty, true);
 
     final expenses = container.read(expenseProvider);
-    expect(expenses.isNotEmpty, true);
+    expect(expenses.isEmpty, true);
 
     // Test role switching to Project Manager
     container.read(authProvider.notifier).switchRole(UserRole.projectManager);

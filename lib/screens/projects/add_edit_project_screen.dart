@@ -10,6 +10,8 @@ import '../../models/project_model.dart';
 import '../../state/auth_provider.dart';
 import '../../state/project_provider.dart';
 import '../../state/settings_provider.dart';
+import '../../state/user_management_provider.dart';
+import '../../models/user_model.dart';
 
 class AddEditProjectScreen extends ConsumerStatefulWidget {
   final String? projectId;
@@ -665,55 +667,75 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   title: 'Team Access',
                   subtitle: 'Select members permitted to view & submit costs',
                   children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: DemoUsers.all.map((u) {
-                        final isSelected = _selectedTeamMemberIds.contains(u.id);
-                        return FilterChip(
-                          avatar: CircleAvatar(
-                            radius: 10,
-                            backgroundColor: isSelected ? Colors.white : const Color(0xFF4F46E5),
+                    Builder(
+                      builder: (context) {
+                        final users = ref.watch(userManagementProvider);
+                        final curUser = ref.watch(authProvider).currentUser;
+                        final availableUsers = users.isNotEmpty
+                            ? users
+                            : (curUser != null ? [curUser] : const <UserModel>[]);
+
+                        if (availableUsers.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
                             child: Text(
-                              u.name.substring(0, 1),
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                              'No team members registered yet. Add team members in User Management.',
+                              style: TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          );
+                        }
+
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: availableUsers.map((u) {
+                            final isSelected = _selectedTeamMemberIds.contains(u.id);
+                            return FilterChip(
+                              avatar: CircleAvatar(
+                                radius: 10,
+                                backgroundColor: isSelected ? Colors.white : const Color(0xFF4F46E5),
+                                child: Text(
+                                  u.name.isNotEmpty ? u.name.substring(0, 1) : 'U',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          label: Text(
-                            '${u.name} (${u.role.displayName.split(' ').first})',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? Colors.white : (isDark ? Colors.white : const Color(0xFF1E293B)),
-                            ),
-                          ),
-                          selected: isSelected,
-                          selectedColor: const Color(0xFF4F46E5),
-                          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                          checkmarkColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: BorderSide(
-                              color: isSelected
-                                  ? const Color(0xFF4F46E5)
-                                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                            ),
-                          ),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _selectedTeamMemberIds.add(u.id);
-                              } else {
-                                _selectedTeamMemberIds.remove(u.id);
-                              }
-                            });
-                          },
+                              label: Text(
+                                '${u.name} (${u.role.displayName.split(' ').first})',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  color: isSelected ? Colors.white : (isDark ? Colors.white : const Color(0xFF1E293B)),
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: const Color(0xFF4F46E5),
+                              backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                              checkmarkColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? const Color(0xFF4F46E5)
+                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                ),
+                              ),
+                              onSelected: (selected) {
+                                setState(() {
+                                  if (selected) {
+                                    _selectedTeamMemberIds.add(u.id);
+                                  } else {
+                                    _selectedTeamMemberIds.remove(u.id);
+                                  }
+                                });
+                              },
+                            );
+                          }).toList(),
                         );
-                      }).toList(),
+                      },
                     ),
                   ],
                 ),

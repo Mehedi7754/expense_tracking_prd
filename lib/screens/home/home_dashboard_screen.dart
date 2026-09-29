@@ -69,18 +69,23 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(15),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.account_balance_wallet_rounded,
-                  color: Colors.white,
-                  size: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  width: 36,
+                  height: 36,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
@@ -1055,8 +1060,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
-                  ...DemoUsers.all.map((u) {
-                    final isSelected = currentUser?.id == u.id;
+                  ...UserRole.values.map((role) {
+                    final isSelected = currentUser?.role == role;
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -1069,7 +1074,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            _getUserInitials(u.name),
+                            role.displayName.substring(0, 1),
                             style: TextStyle(
                               color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
                               fontWeight: FontWeight.w800,
@@ -1079,14 +1084,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                         ),
                       ),
                       title: Text(
-                        u.name,
+                        role.displayName,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
-                        u.role.displayName,
+                        'Preview role permissions',
                         style: TextStyle(
                           fontSize: 12,
                           color: isSelected ? const Color(0xFF4F46E5) : Colors.grey,
@@ -1097,7 +1102,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                           : null,
                       onTap: () {
                         Navigator.pop(ctx);
-                        ref.read(authProvider.notifier).switchRole(u.role);
+                        ref.read(authProvider.notifier).switchRole(role);
                       },
                     );
                   }),

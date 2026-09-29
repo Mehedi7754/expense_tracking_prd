@@ -21,7 +21,7 @@ enum ClientType {
   }
 
   static ClientType fromString(String val) {
-    switch (val.toLowerCase()) {
+    switch (val.toLowerCase().replaceAll(' ', '').replaceAll('-', '').replaceAll('_', '')) {
       case 'government':
         return ClientType.government;
       case 'ngo':
@@ -78,5 +78,32 @@ class ClientModel {
       address: address ?? this.address,
       notes: notes ?? this.notes,
     );
+  }
+
+  factory ClientModel.fromJson(Map<String, dynamic> json) {
+    final typeStr = (json['client_type'] ?? json['clientType'] ?? 'private').toString();
+    return ClientModel(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      clientType: ClientType.fromString(typeStr),
+      contactPerson: (json['contact_person'] ?? json['contactPerson'] ?? '').toString(),
+      email: (json['email'] ?? '').toString(),
+      phone: (json['phone'] ?? '').toString(),
+      address: (json['address'] ?? '').toString(),
+      notes: json['notes']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'client_type': clientType.name,
+      'contact_person': contactPerson,
+      'email': email,
+      'phone': phone,
+      'address': address,
+      if (notes != null) 'notes': notes,
+    };
   }
 }
