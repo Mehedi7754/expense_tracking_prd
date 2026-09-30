@@ -19,6 +19,10 @@ class DateFormatter {
     return DateFormat('h:mm a').format(date);
   }
 
+  static String formatDateTime(DateTime date) {
+    return DateFormat('MMM d, yyyy h:mm a').format(date);
+  }
+
   static String formatRelative(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);

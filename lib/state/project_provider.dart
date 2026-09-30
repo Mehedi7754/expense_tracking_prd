@@ -36,6 +36,10 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       endDate: DateTime(2026, 11, 30),
       teamMemberIds: ['usr_emp_01', 'usr_mgr_01', 'usr_fin_01', 'usr_adm_01'], // Fahim assigned
       status: ProjectStatus.ongoing,
+      progressPercentage: 65.0,
+      progressUpdatedAt: DateTime(2026, 9, 20, 14, 30),
+      progressUpdatedByName: 'Sarah Jenkins',
+      progressUpdatedById: 'usr_mgr_01',
       revenueEntries: [
         RevenueEntry(
           id: 'rev_01',
@@ -85,6 +89,10 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       endDate: DateTime(2026, 12, 15),
       teamMemberIds: ['usr_mgr_01', 'usr_view_01'], // Sarah & Rahim assigned
       status: ProjectStatus.ongoing,
+      progressPercentage: 85.0,
+      progressUpdatedAt: DateTime(2026, 9, 25, 11, 15),
+      progressUpdatedByName: 'Sarah Jenkins',
+      progressUpdatedById: 'usr_mgr_01',
       revenueEntries: [
         RevenueEntry(
           id: 'rev_03',
@@ -126,6 +134,10 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       endDate: DateTime(2026, 9, 30),
       teamMemberIds: ['usr_mgr_01', 'usr_adm_01'],
       status: ProjectStatus.ongoing,
+      progressPercentage: 20.0,
+      progressUpdatedAt: DateTime(2026, 9, 10, 9, 0),
+      progressUpdatedByName: 'Eleanor Vance',
+      progressUpdatedById: 'usr_adm_01',
       revenueEntries: [
         RevenueEntry(
           id: 'rev_04',
@@ -167,6 +179,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       endDate: DateTime(2026, 12, 31),
       teamMemberIds: ['usr_adm_01', 'usr_fin_01'],
       status: ProjectStatus.ongoing,
+      progressPercentage: 0.0,
       revenueEntries: [
         RevenueEntry(
           id: 'rev_05',
@@ -209,6 +222,10 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       teamMemberIds: ['usr_mgr_01', 'usr_adm_01'],
       status: ProjectStatus.completed,
       isClosed: true,
+      progressPercentage: 100.0,
+      progressUpdatedAt: DateTime(2025, 12, 18, 16, 45),
+      progressUpdatedByName: 'Eleanor Vance',
+      progressUpdatedById: 'usr_adm_01',
       closingSummary: ProjectFinancialSummary(
         contractValue: 850000.0,
         taxInfo: 'IT-VAT: Included (10%)',
@@ -361,6 +378,30 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
             status: ProjectStatus.completed,
             isClosed: true,
             closingSummary: summary,
+          )
+        else
+          p,
+    ];
+  }
+
+  /// Updates the project progress (0% - 100%) and records the audit user and timestamp.
+  /// Accessible to Admin and Manager roles.
+  void updateProjectProgress({
+    required String projectId,
+    required double progressPercentage,
+    required String updatedById,
+    required String updatedByName,
+  }) {
+    final clamped = progressPercentage.clamp(0.0, 100.0);
+    final now = DateTime.now();
+    state = [
+      for (final p in state)
+        if (p.id == projectId)
+          p.copyWith(
+            progressPercentage: clamped,
+            progressUpdatedAt: now,
+            progressUpdatedById: updatedById,
+            progressUpdatedByName: updatedByName,
           )
         else
           p,

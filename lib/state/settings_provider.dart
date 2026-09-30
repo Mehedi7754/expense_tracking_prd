@@ -26,6 +26,9 @@ class SettingsState {
   final double watchProfitMargin; // 20.0%
   final double riskProfitMargin; // 10.0%
 
+  // Configurable Project Cost Tax Rates (PRD: Tax Calculation for Project Costs)
+  final List<double> availableTaxRates;
+
   const SettingsState({
     this.preferredCurrency = 'BDT',
     this.isDarkMode = false,
@@ -48,6 +51,7 @@ class SettingsState {
     this.targetProfitMargin = 35.0,
     this.watchProfitMargin = 20.0,
     this.riskProfitMargin = 10.0,
+    this.availableTaxRates = const [0.0, 5.0, 7.5, 10.0, 15.0],
   });
 
   SettingsState copyWith({
@@ -67,6 +71,7 @@ class SettingsState {
     double? targetProfitMargin,
     double? watchProfitMargin,
     double? riskProfitMargin,
+    List<double>? availableTaxRates,
   }) {
     return SettingsState(
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
@@ -85,6 +90,7 @@ class SettingsState {
       targetProfitMargin: targetProfitMargin ?? this.targetProfitMargin,
       watchProfitMargin: watchProfitMargin ?? this.watchProfitMargin,
       riskProfitMargin: riskProfitMargin ?? this.riskProfitMargin,
+      availableTaxRates: availableTaxRates ?? this.availableTaxRates,
     );
   }
 }
@@ -146,6 +152,29 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   void updateFoodAllowance(double allowance) {
     state = state.copyWith(dailyFoodAllowance: allowance);
+  }
+
+  /// Sets the complete list of available tax rates.
+  void updateTaxRates(List<double> rates) {
+    final sorted = rates.toSet().toList()..sort();
+    if (!sorted.contains(0.0)) sorted.insert(0, 0.0);
+    state = state.copyWith(availableTaxRates: sorted);
+  }
+
+  /// Adds a new tax percentage to the available rates.
+  void addTaxRate(double rate) {
+    if (rate < 0 || rate > 100) return;
+    if (!state.availableTaxRates.contains(rate)) {
+      final updated = [...state.availableTaxRates, rate]..sort();
+      state = state.copyWith(availableTaxRates: updated);
+    }
+  }
+
+  /// Removes a tax percentage (preserving 0.0% No Tax).
+  void removeTaxRate(double rate) {
+    if (rate == 0.0) return;
+    final updated = state.availableTaxRates.where((r) => r != rate).toList();
+    state = state.copyWith(availableTaxRates: updated);
   }
 }
 

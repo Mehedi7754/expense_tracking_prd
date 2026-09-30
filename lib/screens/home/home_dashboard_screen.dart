@@ -1266,6 +1266,8 @@ class _PortfolioFinancialDetailsSheet extends StatefulWidget {
 class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDetailsSheet> {
   int _selectedTabIndex = 0; // 0: By Person, 1: By Category, 2: By Project, 3: All Records
   final Set<String> _expandedPersonNames = {};
+  final Set<String> _expandedCategoryNames = {};
+  final Set<String> _expandedProjectIds = {};
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -1380,6 +1382,7 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
         totalAmount: totalAmt,
         count: catExpenses.length,
         personAmounts: pAmounts,
+        expenses: catExpenses,
       ));
     }
     categorySummaries.sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
@@ -1398,6 +1401,7 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
         totalIncurred: totalIncurred,
         personAmounts: pAmounts,
         expenseCount: pExp.length,
+        expenses: pExp,
       ));
     }
     projectSummaries.sort((a, b) => b.totalIncurred.compareTo(a.totalIncurred));
@@ -1734,253 +1738,189 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       itemCount: personSummaries.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (ctx, i) {
         final person = personSummaries[i];
         final isExpanded = _expandedPersonNames.contains(person.personName);
         final shareRatio = totalDirectSpent > 0 ? (person.totalAmount / totalDirectSpent) : 0.0;
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-              width: 1,
-            ),
-            boxShadow: isDark
-                ? []
-                : [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(8),
-                      blurRadius: 10,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Row: Avatar + Name + Total Amount
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+        return InkWell(
+          onTap: () {
+            setState(() {
+              if (isExpanded) {
+                _expandedPersonNames.remove(person.personName);
+              } else {
+                _expandedPersonNames.add(person.personName);
+              }
+            });
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isExpanded
+                    ? const Color(0xFF4F46E5).withAlpha(120)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                width: isExpanded ? 1.5 : 1,
+              ),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(6),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _getUserInitials(person.personName),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 15,
+                    ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Minimal container header row (Always visible)
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _getUserInitials(person.personName),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            person.personName,
+                            style: const TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            person.designation,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          person.personName,
+                          CurrencyFormatter.format(person.totalAmount),
                           style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF4F46E5),
+                            letterSpacing: -0.3,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          person.designation,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                          '${(shareRatio * 100).toStringAsFixed(1)}% of total',
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        CurrencyFormatter.format(person.totalAmount),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF4F46E5),
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${(shareRatio * 100).toStringAsFixed(1)}% of total',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Share Progress Bar
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: shareRatio.clamp(0.0, 1.0),
-                  minHeight: 5,
-                  backgroundColor: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
-                  valueColor: const AlwaysStoppedAnimation(Color(0xFF4F46E5)),
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // Compliance status pill
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: person.unreceiptedRatio > 50
-                      ? (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2))
-                      : (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5)),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: person.unreceiptedRatio > 50
-                        ? (isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5))
-                        : (isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0)),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      person.unreceiptedRatio > 50
-                          ? Icons.warning_amber_rounded
-                          : Icons.check_circle_outline_rounded,
-                      size: 14,
-                      color: person.unreceiptedRatio > 50 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                    ),
                     const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        person.unreceiptedAmount > 0
-                            ? '${CurrencyFormatter.format(person.unreceiptedAmount)} without receipt (${person.unreceiptedRatio.toStringAsFixed(0)}% of claims)'
-                            : '100% Receipts Attached & Verified',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: person.unreceiptedRatio > 50
-                              ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C))
-                              : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Icon(
+                      isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: isExpanded ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
                     ),
                   ],
                 ),
-              ),
 
-              const SizedBox(height: 12),
+                // Expanded Section: Only visible when clicked!
+                if (isExpanded) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
 
-              // Which cost used chips
-              Text(
-                'Cost Usage Breakdown:',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white70 : const Color(0xFF475569),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: person.categoryAmounts.entries.map((entry) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  // Share Progress Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: shareRatio.clamp(0.0, 1.0),
+                      minHeight: 5,
+                      backgroundColor: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                      valueColor: const AlwaysStoppedAnimation(Color(0xFF4F46E5)),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Compliance status pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      color: person.unreceiptedRatio > 50
+                          ? (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2))
+                          : (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5)),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: person.unreceiptedRatio > 50
+                            ? (isDark ? const Color(0xFF991B1B) : const Color(0xFFFCA5A5))
+                            : (isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0)),
+                      ),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(_getCategoryIcon(entry.key), size: 12, color: const Color(0xFF4F46E5)),
-                        const SizedBox(width: 4),
-                        Flexible(
+                        Icon(
+                          person.unreceiptedRatio > 50
+                              ? Icons.warning_amber_rounded
+                              : Icons.check_circle_outline_rounded,
+                          size: 14,
+                          color: person.unreceiptedRatio > 50 ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
                           child: Text(
-                            '${entry.key}: ',
+                            person.unreceiptedAmount > 0
+                                ? '${CurrencyFormatter.format(person.unreceiptedAmount)} without receipt (${person.unreceiptedRatio.toStringAsFixed(0)}% of claims)'
+                                : '100% Receipts Attached & Verified',
                             style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white70 : const Color(0xFF334155),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Text(
-                          CurrencyFormatter.format(entry.value),
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF4F46E5),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              const SizedBox(height: 10),
-
-              // Projects Assigned / Incurred
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: person.projectNames.map((proj) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5).withAlpha(15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.business_center_outlined, size: 11, color: Color(0xFF4F46E5)),
-                        const SizedBox(width: 4),
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 240),
-                          child: Text(
-                            proj,
-                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF4F46E5),
+                              color: person.unreceiptedRatio > 50
+                                  ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C))
+                                  : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1988,118 +1928,173 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
-              ),
+                  ),
 
-              const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
-              // Expandable Claim Details Accordion
-              InkWell(
-                onTap: () {
-                  setState(() {
-                    if (isExpanded) {
-                      _expandedPersonNames.remove(person.personName);
-                    } else {
-                      _expandedPersonNames.add(person.personName);
-                    }
-                  });
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '${isExpanded ? "Hide" : "View"} ${person.expenses.length} Expense Item(s)',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF4F46E5),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  // Which cost used chips
+                  Text(
+                    'Cost Usage Breakdown:',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: person.categoryAmounts.entries.map((entry) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_getCategoryIcon(entry.key), size: 12, color: const Color(0xFF4F46E5)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '${entry.key}: ',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              CurrencyFormatter.format(entry.value),
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Projects Assigned / Incurred
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: person.projectNames.map((proj) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4F46E5).withAlpha(15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.business_center_outlined, size: 11, color: Color(0xFF4F46E5)),
+                            const SizedBox(width: 4),
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 240),
+                              child: Text(
+                                proj,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF4F46E5),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Itemized Expenses
+                  Text(
+                    'Itemized Expenses (${person.expenses.length}):',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...person.expenses.map((e) {
+                    return InkWell(
+                      onTap: () => context.push(RoutePaths.expenseDetail(e.id)),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A).withAlpha(120) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _getCategoryIcon(e.categoryName),
+                              size: 16,
+                              color: const Color(0xFF4F46E5),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    e.note.isNotEmpty ? e.note : e.categoryName,
+                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              CurrencyFormatter.format(e.amount),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Icon(
-                        isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                        size: 18,
-                        color: const Color(0xFF4F46E5),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              if (isExpanded) ...[
-                const SizedBox(height: 8),
-                const Divider(height: 1),
-                const SizedBox(height: 8),
-                ...person.expenses.map((e) {
-                  return InkWell(
-                    onTap: () => context.push(RoutePaths.expenseDetail(e.id)),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A).withAlpha(120) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _getCategoryIcon(e.categoryName),
-                            size: 16,
-                            color: const Color(0xFF4F46E5),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  e.note.isNotEmpty ? e.note : e.categoryName,
-                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
-                                  style: TextStyle(
-                                    fontSize: 10.5,
-                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            CurrencyFormatter.format(e.amount),
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF4F46E5),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
+                    );
+                  }),
+                ],
               ],
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  // 2. Categories Tab
+  // 2. Categories Tab: Minimal container with dropdown expansion
   Widget _buildCategoriesTab({
     required double totalDirectSpent,
     required List<_CategoryCostSummary> categorySummaries,
@@ -2115,129 +2110,259 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       itemCount: categorySummaries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (ctx, i) {
         final cat = categorySummaries[i];
+        final isExpanded = _expandedCategoryNames.contains(cat.categoryName);
         final shareRatio = totalDirectSpent > 0 ? (cat.totalAmount / totalDirectSpent) : 0.0;
 
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E293B) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5).withAlpha(20),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: Icon(_getCategoryIcon(cat.categoryName), size: 18, color: const Color(0xFF4F46E5)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          cat.categoryName,
-                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
-                        ),
-                        Text(
-                          '${cat.count} claim(s)',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        CurrencyFormatter.format(cat.totalAmount),
-                        style: const TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF4F46E5),
-                        ),
-                      ),
-                      Text(
-                        '${(shareRatio * 100).toStringAsFixed(1)}% of spend',
-                        style: const TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.w600),
+        return InkWell(
+          onTap: () {
+            setState(() {
+              if (isExpanded) {
+                _expandedCategoryNames.remove(cat.categoryName);
+              } else {
+                _expandedCategoryNames.add(cat.categoryName);
+              }
+            });
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isExpanded
+                    ? const Color(0xFF4F46E5).withAlpha(120)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                width: isExpanded ? 1.5 : 1,
+              ),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(6),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
                     ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Claimants in this category:',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w700,
-                  color: isDark ? Colors.white70 : const Color(0xFF475569),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: cat.personAmounts.entries.map((entry) {
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Minimal Header (Always visible)
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4F46E5).withAlpha(20),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Icon(_getCategoryIcon(cat.categoryName), size: 20, color: const Color(0xFF4F46E5)),
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.person_outline_rounded, size: 12, color: Color(0xFF4F46E5)),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            '${entry.key}: ',
-                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            cat.categoryName,
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, letterSpacing: -0.2),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        Text(
-                          CurrencyFormatter.format(entry.value),
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF4F46E5),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${cat.count} claim${cat.count == 1 ? "" : "s"} • ${cat.personAmounts.length} claimant${cat.personAmounts.length == 1 ? "" : "s"}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          CurrencyFormatter.format(cat.totalAmount),
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF4F46E5),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${(shareRatio * 100).toStringAsFixed(1)}% of spend',
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.grey),
                         ),
                       ],
                     ),
-                  );
-                }).toList(),
-              ),
-            ],
+                    const SizedBox(width: 6),
+                    Icon(
+                      isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: isExpanded ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
+                    ),
+                  ],
+                ),
+
+                // Expanded Section
+                if (isExpanded) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+
+                  // Share Progress Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: shareRatio.clamp(0.0, 1.0),
+                      minHeight: 5,
+                      backgroundColor: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                      valueColor: const AlwaysStoppedAnimation(Color(0xFF4F46E5)),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Claimants in this category
+                  Text(
+                    'Claimants in this category:',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: cat.personAmounts.entries.map((entry) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.person_outline_rounded, size: 12, color: Color(0xFF4F46E5)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '${entry.key}: ',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(
+                              CurrencyFormatter.format(entry.value),
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Itemized category expenses
+                  Text(
+                    'Itemized Expenses (${cat.expenses.length}):',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white70 : const Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...cat.expenses.map((e) {
+                    return InkWell(
+                      onTap: () => context.push(RoutePaths.expenseDetail(e.id)),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A).withAlpha(120) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _getCategoryIcon(e.categoryName),
+                              size: 16,
+                              color: const Color(0xFF4F46E5),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    e.note.isNotEmpty ? e.note : e.projectName,
+                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${e.employeeName} • ${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              CurrencyFormatter.format(e.amount),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  // 3. Projects Tab
+  // 3. Projects Tab: Minimal container with dropdown expansion
   Widget _buildProjectsTab({
     required List<_ProjectCostSummary> projectSummaries,
     required bool isDark,
@@ -2252,42 +2377,76 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
     }
 
     return ListView.separated(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       itemCount: projectSummaries.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (ctx, i) {
         final pSummary = projectSummaries[i];
         final p = pSummary.project;
+        final isExpanded = _expandedProjectIds.contains(p.id);
         final pMargin = p.grossProjectValue > 0
             ? ((p.grossProjectValue - pSummary.totalIncurred) / p.grossProjectValue) * 100
             : 0.0;
+        final budgetRatio = p.budget > 0 ? (pSummary.totalIncurred / p.budget) : 0.0;
 
         return InkWell(
-          onTap: () => context.push(RoutePaths.projectDetail(p.id)),
+          onTap: () {
+            setState(() {
+              if (isExpanded) {
+                _expandedProjectIds.remove(p.id);
+              } else {
+                _expandedProjectIds.add(p.id);
+              }
+            });
+          },
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1E293B) : Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                color: isExpanded
+                    ? const Color(0xFF4F46E5).withAlpha(120)
+                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                width: isExpanded ? 1.5 : 1,
               ),
+              boxShadow: isDark
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(6),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Minimal Header (Always visible)
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4F46E5).withAlpha(20),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.folder_special_rounded, size: 20, color: Color(0xFF4F46E5)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             p.name,
-                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800),
-                            maxLines: 2,
+                            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, letterSpacing: -0.2),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
@@ -2297,85 +2456,222 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
                               fontSize: 11.5,
                               color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withAlpha(20),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '${pMargin.toStringAsFixed(1)}% Margin',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF10B981),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          CurrencyFormatter.format(pSummary.totalIncurred),
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF4F46E5),
+                            letterSpacing: -0.3,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: pMargin >= 0
+                                ? (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5))
+                                : (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2)),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${pMargin.toStringAsFixed(0)}% Margin',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: pMargin >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 6),
+                    Icon(
+                      isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: isExpanded ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Incurred: ${CurrencyFormatter.format(pSummary.totalIncurred)}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+
+                // Expanded Section
+                if (isExpanded) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+
+                  // Budget Utilization Progress Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: budgetRatio.clamp(0.0, 1.0),
+                      minHeight: 5,
+                      backgroundColor: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+                      valueColor: AlwaysStoppedAnimation(
+                        budgetRatio > 1.0
+                            ? const Color(0xFFEF4444)
+                            : (budgetRatio > 0.8 ? const Color(0xFFF59E0B) : const Color(0xFF4F46E5)),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Budget: ${CurrencyFormatter.format(p.budget, compact: true)}',
-                        textAlign: TextAlign.end,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Financial Key Metrics Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Incurred: ${CurrencyFormatter.format(pSummary.totalIncurred)}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Budget: ${CurrencyFormatter.format(p.budget, compact: true)}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (pSummary.personAmounts.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Personnel Spenders:',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white70 : const Color(0xFF475569),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: pSummary.personAmounts.entries.map((entry) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${entry.key}: ${CurrencyFormatter.format(entry.value)}',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
-                ),
-                if (pSummary.personAmounts.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+
+                  const SizedBox(height: 12),
+
+                  // Itemized Project Expenses
                   Text(
-                    'Personnel Spenders:',
+                    'Project Expenses (${pSummary.expenses.length}):',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white70 : const Color(0xFF475569),
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: pSummary.personAmounts.entries.map((entry) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  const SizedBox(height: 6),
+                  ...pSummary.expenses.map((e) {
+                    return InkWell(
+                      onTap: () => context.push(RoutePaths.expenseDetail(e.id)),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 6),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
+                          color: isDark ? const Color(0xFF0F172A).withAlpha(120) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(
-                          '${entry.key}: ${CurrencyFormatter.format(entry.value)}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _getCategoryIcon(e.categoryName),
+                              size: 16,
+                              color: const Color(0xFF4F46E5),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    e.note.isNotEmpty ? e.note : e.categoryName,
+                                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${e.employeeName} • ${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              CurrencyFormatter.format(e.amount),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    }).toList(),
+                      ),
+                    );
+                  }),
+
+                  const SizedBox(height: 10),
+
+                  // Button to navigate to project details
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push(RoutePaths.projectDetail(p.id)),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                      label: const Text('Open Project Overview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF4F46E5),
+                        side: const BorderSide(color: Color(0xFF4F46E5), width: 1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -2486,12 +2782,14 @@ class _CategoryCostSummary {
   final double totalAmount;
   final int count;
   final Map<String, double> personAmounts;
+  final List<ExpenseModel> expenses;
 
   _CategoryCostSummary({
     required this.categoryName,
     required this.totalAmount,
     required this.count,
     required this.personAmounts,
+    required this.expenses,
   });
 }
 
@@ -2500,11 +2798,13 @@ class _ProjectCostSummary {
   final double totalIncurred;
   final Map<String, double> personAmounts;
   final int expenseCount;
+  final List<ExpenseModel> expenses;
 
   _ProjectCostSummary({
     required this.project,
     required this.totalIncurred,
     required this.personAmounts,
     required this.expenseCount,
+    required this.expenses,
   });
 }

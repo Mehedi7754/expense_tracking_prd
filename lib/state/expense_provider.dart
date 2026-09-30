@@ -39,6 +39,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
       projectId: 'proj_01',
       projectName: 'Enterprise Cloud ERP Platform',
       amount: 40000.0,
+      baseCost: 36000.0,
+      taxRate: 10.0,
+      taxAmount: 4000.0,
       officeBenefitAmount: 12000.0, // 30%
       currency: 'BDT',
       categoryId: 'cat_equip',
@@ -293,7 +296,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     return summaries;
   }
 
-  /// PRD Section 5, 6, 8, 9, 17: Submit Expense with auto 30% Office Benefit
+  /// PRD Section 5, 6, 8, 9, 17: Submit Expense with auto 30% Office Benefit and Tax calculation
   void submitExpense({
     required String employeeId,
     required String employeeName,
@@ -302,6 +305,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     String? taskId,
     String? taskTitle,
     required double amount,
+    double? baseCost,
+    double taxRate = 0.0,
+    double? taxAmount,
     double officeBenefitRate = 0.30, // PRD Section 9: 30% auto calculated
     String currency = 'BDT',
     required String categoryId,
@@ -327,6 +333,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
       taskId: taskId,
       taskTitle: taskTitle,
       amount: amount,
+      baseCost: baseCost,
+      taxRate: taxRate,
+      taxAmount: taxAmount,
       officeBenefitAmount: officeBenefit,
       currency: currency,
       categoryId: categoryId,
@@ -434,6 +443,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     String? taskId,
     String? taskTitle,
     required double amount,
+    double? baseCost,
+    double taxRate = 0.0,
+    double? taxAmount,
     required String currency,
     required String categoryId,
     required String categoryName,
@@ -451,6 +463,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
             taskId: taskId,
             taskTitle: taskTitle,
             amount: amount,
+            baseCost: baseCost ?? (taxAmount != null && taxAmount > 0 ? (amount - taxAmount) : amount),
+            taxRate: taxRate,
+            taxAmount: taxAmount ?? (baseCost != null && taxRate > 0 ? (baseCost * (taxRate / 100.0)) : 0.0),
             officeBenefitAmount: amount * 0.30,
             currency: currency,
             categoryId: categoryId,

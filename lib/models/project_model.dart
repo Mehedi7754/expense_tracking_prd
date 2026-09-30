@@ -64,6 +64,27 @@ enum ProjectStatus {
   }
 }
 
+enum ProjectProgressStage {
+  notStarted,
+  inProgress,
+  nearCompletion,
+  completed;
+
+  String get displayName {
+    switch (this) {
+      case ProjectProgressStage.notStarted:
+        return 'Not Started';
+      case ProjectProgressStage.inProgress:
+        return 'In Progress';
+      case ProjectProgressStage.nearCompletion:
+        return 'Near Completion';
+      case ProjectProgressStage.completed:
+        return 'Completed';
+    }
+  }
+}
+
+
 enum AssignmentType {
   directConsultancy,
   subConsultancy,
@@ -189,6 +210,12 @@ class ProjectModel {
   final bool isClosed;
   final ProjectFinancialSummary? closingSummary;
 
+  // Project Progress Tracking (PRD Section & Admin/Manager controls)
+  final double progressPercentage; // 0.0 to 100.0
+  final DateTime? progressUpdatedAt;
+  final String? progressUpdatedByName;
+  final String? progressUpdatedById;
+
   const ProjectModel({
     required this.id,
     required this.projectId,
@@ -216,7 +243,20 @@ class ProjectModel {
     this.revenueEntries = const [],
     this.isClosed = false,
     this.closingSummary,
+    this.progressPercentage = 0.0,
+    this.progressUpdatedAt,
+    this.progressUpdatedByName,
+    this.progressUpdatedById,
   });
+
+  // Visual status indicators based on progress:
+  // Not Started (0%), In Progress (1%-74%), Near Completion (75%-99%), Completed (100%)
+  ProjectProgressStage get progressStage {
+    if (progressPercentage <= 0.0) return ProjectProgressStage.notStarted;
+    if (progressPercentage < 75.0) return ProjectProgressStage.inProgress;
+    if (progressPercentage < 100.0) return ProjectProgressStage.nearCompletion;
+    return ProjectProgressStage.completed;
+  }
 
   // Backward compatibility getter
   double get expectedRevenue => expectedNetRevenue;
@@ -248,6 +288,10 @@ class ProjectModel {
     List<RevenueEntry>? revenueEntries,
     bool? isClosed,
     ProjectFinancialSummary? closingSummary,
+    double? progressPercentage,
+    DateTime? progressUpdatedAt,
+    String? progressUpdatedByName,
+    String? progressUpdatedById,
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -276,6 +320,10 @@ class ProjectModel {
       revenueEntries: revenueEntries ?? this.revenueEntries,
       isClosed: isClosed ?? this.isClosed,
       closingSummary: closingSummary ?? this.closingSummary,
+      progressPercentage: progressPercentage ?? this.progressPercentage,
+      progressUpdatedAt: progressUpdatedAt ?? this.progressUpdatedAt,
+      progressUpdatedByName: progressUpdatedByName ?? this.progressUpdatedByName,
+      progressUpdatedById: progressUpdatedById ?? this.progressUpdatedById,
     );
   }
 }

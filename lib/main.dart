@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/config/app_env.dart';
 import 'core/constants/app_constants.dart';
 import 'core/constants/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'state/settings_provider.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppEnv.initialize();
   runApp(
     const ProviderScope(
       child: SpendWiseApp(),

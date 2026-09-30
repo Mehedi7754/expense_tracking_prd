@@ -7,13 +7,17 @@ import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/project_cost_card.dart';
+import '../../core/widgets/project_progress_badge.dart';
 import '../../core/widgets/receipt_compliance_badge.dart';
+import '../../core/widgets/update_progress_dialog.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
 import '../../models/user_role.dart';
+import '../../core/routing/route_paths.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
+import '../../state/user_management_provider.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   final String projectId;
@@ -212,6 +216,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
 
     final canEdit = role.canCreateProject;
     final canClose = role == UserRole.mainAdmin || role == UserRole.finance;
+    final canUpdateProgress = role.canUpdateProjectProgress;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -249,7 +254,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              _buildOverviewTab(context, project, projectExpenses),
+              _buildOverviewTab(context, project, projectExpenses, canUpdateProgress),
               _buildBudgetVsActualTab(context, project, projectExpenses),
               _buildExpensesTab(context, project, projectExpenses),
               _buildRevenueAndClosingTab(context, project, projectExpenses, canClose),
@@ -261,13 +266,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
   }
 
   // ==================== TAB 1: FINANCIAL OVERVIEW & FORECAST ====================
-  Widget _buildOverviewTab(BuildContext context, ProjectModel project, List<ExpenseModel> expenses) {
+  Widget _buildOverviewTab(
+    BuildContext context,
+    ProjectModel project,
+    List<ExpenseModel> expenses,
+    bool canUpdateProgress,
+  ) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
     final directCost = expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
-    final officeBenefit = directCost * project.officeBenefitRate;
-    final costIncurred = directCost + officeBenefit;
+    final totalTaxIncurred = expenses.fold<double>(0.0, (sum, e) => sum + e.taxAmount);
+    final costIncurred = directCost;
     final expectedRemaining = project.estimatedRemainingCost;
     final projectedFinalCost = costIncurred + expectedRemaining;
     final projectedProfit = project.grossProjectValue - projectedFinalCost;
@@ -285,6 +295,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         children: [
           // PRD Section 30 "Project Cost Card"
           ProjectCostCard(project: project, projectExpenses: expenses),
+
+          const SizedBox(height: 12),
+
+          // Project Progress Tracking Card (Admin & Manager interactive controls)
+          _buildProgressTrackingCard(context, project, canUpdateProgress),
 
           const SizedBox(height: 12),
 
@@ -312,27 +327,33 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4F46E5).withAlpha(15),
-                            borderRadius: BorderRadius.circular(8),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4F46E5).withAlpha(15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.analytics_outlined, color: Color(0xFF4F46E5), size: 18),
                           ),
-                          child: const Icon(Icons.analytics_outlined, color: Color(0xFF4F46E5), size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Financial Forecast',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Financial Forecast',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.edit_note_rounded, size: 20, color: Color(0xFF4F46E5)),
@@ -344,7 +365,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                 const SizedBox(height: 14),
                 _buildForecastItem('Contract Value', CurrencyFormatter.format(project.grossProjectValue), isDark ? Colors.white : const Color(0xFF0F172A), isDark: isDark),
                 Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 18),
-                _buildForecastItem('Cost Incurred (inc. 30% OB)', CurrencyFormatter.format(costIncurred), const Color(0xFFD97706), isDark: isDark),
+                _buildForecastItem('Cost Incurred', CurrencyFormatter.format(costIncurred), const Color(0xFFD97706), isDark: isDark),
+                if (totalTaxIncurred > 0) ...[
+                  Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 18),
+                  _buildForecastItem('Total Tax Incurred', CurrencyFormatter.format(totalTaxIncurred), const Color(0xFF6366F1), isDark: isDark),
+                ],
                 Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 18),
                 _buildForecastItem(
                   'Estimated Remaining Cost',
@@ -375,32 +400,37 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Projected Profit',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: projectedProfit >= 0
-                                  ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
-                                  : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Projected Profit',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: projectedProfit >= 0
+                                    ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
+                                    : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            CurrencyFormatter.format(projectedProfit),
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: projectedProfit >= 0
-                                  ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
-                                  : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                            const SizedBox(height: 2),
+                            Text(
+                              CurrencyFormatter.format(projectedProfit),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: projectedProfit >= 0
+                                    ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
+                                    : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
@@ -435,6 +465,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
               unreceiptedRatio: unreceiptedRatio,
             ),
           ),
+
+          const SizedBox(height: 14),
+
+          // Project Team Members Section
+          _buildProjectMembersCard(context, project),
         ],
       ),
     );
@@ -444,22 +479,29 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                fontWeight: FontWeight.w500,
+        Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            if (isEditable) ...[
-              const SizedBox(width: 4),
-              InkWell(onTap: onEdit, child: const Icon(Icons.edit, size: 13, color: Color(0xFF2563EB))),
+              if (isEditable) ...[
+                const SizedBox(width: 4),
+                InkWell(onTap: onEdit, child: const Icon(Icons.edit, size: 13, color: Color(0xFF2563EB))),
+              ],
             ],
-          ],
+          ),
         ),
+        const SizedBox(width: 8),
         Text(
           value,
           style: TextStyle(
@@ -469,6 +511,340 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           ),
         ),
       ],
+    );
+  }
+
+  // ==================== PROJECT PROGRESS TRACKING CARD ====================
+  Widget _buildProgressTrackingCard(
+    BuildContext context,
+    ProjectModel project,
+    bool canUpdateProgress,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final pct = project.progressPercentage.clamp(0.0, 100.0);
+
+    Color progressColor;
+    if (pct <= 0.0) {
+      progressColor = const Color(0xFF64748B);
+    } else if (pct < 75.0) {
+      progressColor = const Color(0xFF4F46E5);
+    } else if (pct < 100.0) {
+      progressColor = const Color(0xFFF59E0B);
+    } else {
+      progressColor = const Color(0xFF10B981);
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(8),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: progressColor.withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.speed_rounded, color: progressColor, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Project Progress',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (canUpdateProgress)
+                InkWell(
+                  onTap: () => UpdateProgressDialog.show(context, project),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withAlpha(15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF4F46E5).withAlpha(50)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.tune_rounded, size: 14, color: Color(0xFF4F46E5)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Update',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Percentage & Status Indicator Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                '${pct.toStringAsFixed(0)}%',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: progressColor,
+                  letterSpacing: -1,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: ProjectProgressBadge.fromProject(project),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: pct / 100.0,
+              minHeight: 8,
+              backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Audit record
+          Row(
+            children: [
+              Icon(
+                Icons.schedule_rounded,
+                size: 13,
+                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  project.progressUpdatedAt != null
+                      ? 'Last updated on ${DateFormatter.formatDateTime(project.progressUpdatedAt!)}'
+                      : 'Progress not yet updated (initial state 0%)',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== PROJECT TEAM MEMBERS CARD ====================
+  Widget _buildProjectMembersCard(BuildContext context, ProjectModel project) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final allUsers = ref.watch(userManagementProvider);
+    final teamMembers = allUsers.where((u) => project.teamMemberIds.contains(u.id)).toList();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(8),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF8B5CF6).withAlpha(20),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.people_alt_rounded, color: Color(0xFF8B5CF6), size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Project Members',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${teamMembers.length} assigned member${teamMembers.length == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => context.push(RoutePaths.projectTeam(project.id)),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF8B5CF6).withAlpha(15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF8B5CF6).withAlpha(50)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View Team',
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF8B5CF6)),
+                      ),
+                      SizedBox(width: 2),
+                      Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Team Member Chips / Avatars
+          if (teamMembers.isEmpty)
+            Text(
+              'No team members assigned yet.',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+              ),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: teamMembers.map((member) {
+                return InkWell(
+                  onTap: () => context.push('/profile/employee/${member.id}'),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 11,
+                          backgroundColor: const Color(0xFF8B5CF6),
+                          child: Text(
+                            member.name.isNotEmpty ? member.name[0] : 'U',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 140),
+                          child: Text(
+                            member.name,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF1E293B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B5CF6).withAlpha(20),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            member.role.displayName.split(' ').first,
+                            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF8B5CF6)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
     );
   }
 
@@ -484,9 +860,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
       {'name': 'Accommodation', 'key': 'accommodation', 'icon': Icons.hotel_rounded},
       {'name': 'Office Cost', 'key': 'officecost', 'icon': Icons.business_rounded},
     ];
-
-    double totalBudget = 0.0;
-    double totalActual = 0.0;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -508,9 +881,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
 
           final remaining = budget - actual;
           final variance = budget > 0 ? ((actual - budget) / budget) * 100 : 0.0;
-
-          totalBudget += budget;
-          totalActual += actual;
 
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -566,47 +936,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           );
         }),
 
-        // Office Benefit Row (PRD Section 9: 30%)
-        Builder(builder: (context) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          final obColor = AppColors.getPrimary(context);
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: obColor.withValues(alpha: isDark ? 0.16 : 0.08),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: obColor.withValues(alpha: isDark ? 0.3 : 0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.corporate_fare_rounded, size: 18, color: obColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Office Benefit (${(project.officeBenefitRate * 100).toInt()}%)',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: obColor),
-                    ),
-                    const Spacer(),
-                    Text('AUTO-CALCULATED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: obColor)),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSubMetric('Budgeted OB', CurrencyFormatter.format(totalBudget * project.officeBenefitRate)),
-                    _buildSubMetric('Actual OB', CurrencyFormatter.format(totalActual * project.officeBenefitRate)),
-                    _buildSubMetric('Remaining', CurrencyFormatter.format((totalBudget - totalActual) * project.officeBenefitRate)),
-                    _buildSubMetric('Rate', '${(project.officeBenefitRate * 100).toInt()}%'),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }),
+
       ],
     );
   }
@@ -715,11 +1045,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '+30% OB: ৳${exp.officeBenefitAmount.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                  ),
+                  if (exp.hasTax) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      'Inc. ${exp.taxRate.toStringAsFixed(exp.taxRate.truncateToDouble() == exp.taxRate ? 0 : 1)}% Tax',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF0284C7), fontWeight: FontWeight.w600),
+                    ),
+                  ],
                 ],
               ),
             ],

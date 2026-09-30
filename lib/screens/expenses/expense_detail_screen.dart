@@ -179,7 +179,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
 
                       // Large bold claim amount
                       Text(
-                        'Direct Claim Amount',
+                        'Total Direct Cost',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -196,78 +196,85 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         ),
                       ),
 
-                      const SizedBox(height: 18),
-
-                      // 30% Office Benefit & Total Project Cost summary box
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Office Benefit (30%)',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    CurrencyFormatter.format(expense.officeBenefitAmount),
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              height: 30,
-                              width: 1,
+                      if (expense.hasTax) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
                               color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    'Total Cost Impact',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                  const Expanded(
+                                    child: Text(
+                                      'Tax Calculation Breakdown',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    CurrencyFormatter.format(expense.totalWithBenefit),
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0284C7).withAlpha(25),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}% Tax',
+                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0284C7)),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Base Cost:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                                  Text(CurrencyFormatter.format(expense.baseCost, currency: expense.currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Tax Rate:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                                  Text('${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('Tax Amount:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                                  Text('+ ${CurrencyFormatter.format(expense.taxAmount, currency: expense.currency)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0284C7))),
+                                ],
+                              ),
+                              Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1), height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Expanded(
+                                    child: Text('Total Cost:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(CurrencyFormatter.format(expense.totalCost, currency: expense.currency), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 14),
                       Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), height: 1),
                       const SizedBox(height: 16),
 
@@ -303,14 +310,17 @@ class ExpenseDetailScreen extends ConsumerWidget {
                             color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                           ),
                           const SizedBox(width: 10),
-                          Text(
-                            'Receipt Status',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                          Expanded(
+                            child: Text(
+                              'Receipt Status',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
@@ -778,6 +788,7 @@ class _DetailRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(
           icon,
@@ -792,12 +803,15 @@ class _DetailRow extends StatelessWidget {
             color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
           ),
         ),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ],

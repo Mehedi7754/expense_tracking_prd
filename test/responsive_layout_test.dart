@@ -14,6 +14,8 @@ import 'package:expense_tracking_prd/screens/profile/profile_screen.dart';
 import 'package:expense_tracking_prd/screens/home/home_dashboard_screen.dart';
 import 'package:expense_tracking_prd/screens/auth/login_screen.dart';
 import 'package:expense_tracking_prd/screens/auth/register_screen.dart';
+import 'package:expense_tracking_prd/screens/projects/project_detail_screen.dart';
+import 'package:expense_tracking_prd/screens/expenses/expense_detail_screen.dart';
 import 'package:expense_tracking_prd/state/auth_provider.dart';
 import 'package:expense_tracking_prd/models/user_role.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -423,11 +425,14 @@ void main() {
     expect(find.text('Financial Details & Cost Audit'), findsOneWidget);
     expect(find.text('Person-wise spending, categories & project audit'), findsOneWidget);
 
-    // Verify person-wise breakdown ("which person which cost use")
+    // Verify person-wise minimal cards ("which person which cost use")
     expect(find.text('Karim Ullah'), findsWidgets);
     expect(find.text('Fahim Ahmed'), findsWidgets);
+
+    // Tap on Karim Ullah's minimal card to expand full details
+    await tester.tap(find.text('Karim Ullah').first);
+    await tester.pumpAndSettle();
     expect(find.text('Cost Usage Breakdown:'), findsWidgets);
-    expect(find.text('Equipment: '), findsWidgets);
     expect(find.text('Transportation: '), findsWidgets);
 
     // Scroll down to verify Sarah Jenkins as well
@@ -441,6 +446,10 @@ void main() {
     await tester.ensureVisible(categoriesTab);
     await tester.tap(categoriesTab);
     await tester.pumpAndSettle();
+
+    // Tap on minimal category card to expand dropdown
+    await tester.tap(find.text('Equipment').first);
+    await tester.pumpAndSettle();
     expect(find.text('Claimants in this category:'), findsWidgets);
 
     // Switch to Projects tab
@@ -450,6 +459,13 @@ void main() {
     await tester.tap(projectsTab);
     await tester.pumpAndSettle();
     expect(find.text('Enterprise Cloud ERP Platform'), findsWidgets);
+
+    // Tap on minimal project card to expand dropdown
+    final projectCard = find.text('Enterprise Cloud ERP Platform').last;
+    await tester.ensureVisible(projectCard);
+    await tester.tap(projectCard);
+    await tester.pumpAndSettle();
+    expect(find.text('Personnel Spenders:'), findsWidgets);
 
     // Switch to All Records tab
     final recordsTab = find.textContaining('All Records');
@@ -492,10 +508,63 @@ void main() {
     expect(find.text('My Expense Breakdown'), findsOneWidget);
     expect(find.text('Personal cost usage & submitted claims'), findsOneWidget);
     expect(find.text('Fahim Ahmed'), findsWidgets);
+
+    // Tap minimal card to expand full category usage details
+    await tester.tap(find.text('Fahim Ahmed').first);
+    await tester.pumpAndSettle();
+
     expect(find.text('Equipment: '), findsWidgets);
     expect(find.text('Transportation: '), findsWidgets);
     expect(find.text('Food: '), findsWidgets);
 
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('ProjectDetailScreen renders with zero overflow on 360px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: ProjectDetailScreen(projectId: 'proj_01'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Project Progress'), findsOneWidget);
+    expect(find.text('Project Members'), findsOneWidget);
+    expect(find.text('Cost Incurred'), findsOneWidget);
+  });
+
+  testWidgets('ExpenseDetailScreen renders long equipment type without overflow on 360px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: ExpenseDetailScreen(expenseId: 'exp_fahim_01'),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Equipment Details'), findsOneWidget);
+    expect(find.text('AWS Cloud Compute & GPU Cluster'), findsOneWidget);
+    expect(find.text('Tax Calculation Breakdown'), findsOneWidget);
   });
 }

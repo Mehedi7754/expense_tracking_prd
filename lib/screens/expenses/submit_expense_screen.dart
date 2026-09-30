@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/notification_banner.dart';
@@ -29,6 +28,11 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
+
+  // Tax calculation state
+  double _selectedTaxRate = 0.0;
+  bool _isCustomTax = false;
+  final _customTaxController = TextEditingController();
 
   bool _hasReceipt = true; // PRD Section 10: Receipt available Yes/No
   String? _receiptFileName;
@@ -70,6 +74,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   @override
   void dispose() {
     _amountController.dispose();
+    _customTaxController.dispose();
     _noteController.dispose();
     _equipTypeController.dispose();
     _equipQtyController.dispose();
@@ -92,13 +97,25 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     super.dispose();
   }
 
-  double get _currentAmount => double.tryParse(_amountController.text.trim()) ?? 0.0;
+  double get _enteredAmount => double.tryParse(_amountController.text.trim()) ?? 0.0;
 
-  // PRD Section 9: 30% automatic office benefit calculation
-  double get _officeBenefitAmount {
-    final rate = _selectedProject?.officeBenefitRate ?? AppConstants.defaultOfficeBenefitRate;
-    return _currentAmount * rate;
+  double get _taxRate {
+    if (_isCustomTax) {
+      return double.tryParse(_customTaxController.text.trim()) ?? 0.0;
+    }
+    return _selectedTaxRate;
   }
+
+  double get _taxAmount => _taxRate > 0 ? (_enteredAmount * (_taxRate / 100.0)) : 0.0;
+
+  // When tax is applied: 1000 entered with 5% tax -> 50 tax, 950 net cost added to project
+  double get _netCost => _taxRate > 0 ? (_enteredAmount - _taxAmount) : _enteredAmount;
+
+  double get _baseCost => _netCost;
+
+  double get _totalCost => _enteredAmount;
+
+  double get _currentAmount => _netCost;
 
   // PRD Section 6: Food allowance check
   bool get _exceedsFoodAllowance {
@@ -106,7 +123,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     final people = int.tryParse(_foodPeopleCountController.text.trim()) ?? 1;
     final settings = ref.read(settingsProvider);
     final limit = settings.dailyFoodAllowance * (people > 0 ? people : 1);
-    return _currentAmount > limit;
+    return _totalCost > limit;
   }
 
   Future<void> _pickReceipt(ImageSource source) async {
@@ -245,8 +262,11 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           employeeName: user.name,
           projectId: _selectedProject!.id,
           projectName: _selectedProject!.name,
-          amount: _currentAmount,
-          officeBenefitRate: _selectedProject!.officeBenefitRate,
+          amount: _netCost,
+          baseCost: _baseCost,
+          taxRate: _taxRate,
+          taxAmount: _taxAmount,
+          officeBenefitRate: 0.0,
           currency: 'BDT',
           categoryId: 'cat_$_selectedCategory',
           categoryName: _getCategoryDisplayName(_selectedCategory),
@@ -430,10 +450,10 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               keyboardType: TextInputType.number,
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: isDark ? Colors.white : AppColors.textPrimary),
               decoration: InputDecoration(
-                labelText: 'Direct Expense Amount (৳) *',
+                labelText: 'Base Expense Cost (৳) *',
                 prefixText: '৳ ',
                 prefixStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.getPrimary(context)),
-                hintText: 'e.g. 4500',
+                hintText: 'e.g. 4500 (before tax)',
                 filled: true,
                 fillColor: isDark ? AppColors.darkSurface : Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
@@ -484,6 +504,138 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
             const SizedBox(height: 14),
 
+            // Tax Rate Selection Card
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.percent_rounded, size: 16, color: AppColors.getPrimary(context)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Tax / VAT Rate',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_taxRate > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0284C7).withAlpha(25),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '+৳${CurrencyFormatter.format(_taxAmount).replaceAll('৳', '').trim()} Tax',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF0284C7),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...ref.watch(settingsProvider).availableTaxRates.map((rate) {
+                        final isSelected = !_isCustomTax && _selectedTaxRate == rate;
+                        return ChoiceChip(
+                          label: Text(rate == 0.0 ? '0% (No Tax)' : '${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 1)}%'),
+                          selected: isSelected,
+                          onSelected: (val) {
+                            setState(() {
+                              _isCustomTax = false;
+                              _selectedTaxRate = rate;
+                            });
+                          },
+                          selectedColor: AppColors.getPrimary(context),
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                          ),
+                          backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? AppColors.getPrimary(context)
+                                  : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                            ),
+                          ),
+                        );
+                      }),
+                      ChoiceChip(
+                        label: const Text('Custom %'),
+                        selected: _isCustomTax,
+                        onSelected: (val) {
+                          setState(() {
+                            _isCustomTax = true;
+                          });
+                        },
+                        selectedColor: AppColors.getPrimary(context),
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _isCustomTax ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                        ),
+                        backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(
+                            color: _isCustomTax
+                                ? AppColors.getPrimary(context)
+                                : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_isCustomTax) ...[
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _customTaxController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: InputDecoration(
+                        labelText: 'Custom Tax Percentage (%)',
+                        hintText: 'e.g. 8.5',
+                        suffixText: '%',
+                        isDense: true,
+                        filled: true,
+                        fillColor: isDark ? AppColors.darkBackground : Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
             Row(
               children: [
                 Expanded(
@@ -525,7 +677,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
             const SizedBox(height: 20),
 
-            // Office Benefit Auto-Calculation (Clean Minimal SaaS Style)
+            // Cost & Tax Breakdown Card
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -534,28 +686,65 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Office Benefit (${((_selectedProject?.officeBenefitRate ?? 0.30) * 100).toInt()}%):',
-                        style: TextStyle(fontSize: 13, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B), fontWeight: FontWeight.w500),
+                        'Cost Breakdown',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
                       ),
-                      Text(
-                        CurrencyFormatter.format(_officeBenefitAmount),
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-                      ),
+                      if (_taxRate > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withAlpha(20),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${_taxRate.toStringAsFixed(_taxRate.truncateToDouble() == _taxRate ? 0 : 1)}% Tax Applied',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+                          ),
+                        ),
                     ],
                   ),
-                  Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 18),
+                  const SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Total Project Cost:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      Text('Invoice Amount:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                      Text(CurrencyFormatter.format(_enteredAmount), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Tax Rate:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                      Text('${_taxRate.toStringAsFixed(_taxRate.truncateToDouble() == _taxRate ? 0 : 1)}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Tax / VAT Amount:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                      Text('+ ${CurrencyFormatter.format(_taxAmount)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _taxAmount > 0 ? const Color(0xFF0284C7) : null)),
+                    ],
+                  ),
+                  Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Expense Added to Project:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                       Text(
-                        CurrencyFormatter.format(_currentAmount + _officeBenefitAmount),
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF4F46E5)),
+                        CurrencyFormatter.format(_netCost),
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                       ),
                     ],
                   ),

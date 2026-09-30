@@ -184,8 +184,8 @@ class ExpenseListRow extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         showEmployeeName
-                            ? '${expense.projectName} • ${expense.categoryName} • ${DateFormatter.formatShort(expense.date)}'
-                            : '${expense.categoryName} • ${DateFormatter.formatShort(expense.date)}',
+                            ? '${expense.projectName} • ${expense.categoryName} • ${DateFormatter.formatShort(expense.date)}${expense.hasTax ? ' • Inc. ${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}% Tax' : ''}'
+                            : '${expense.categoryName} • ${DateFormatter.formatShort(expense.date)}${expense.hasTax ? ' • Inc. ${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}% Tax' : ''}',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,

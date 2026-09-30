@@ -196,7 +196,10 @@ class ExpenseModel {
   final String projectName;
   final String? taskId;
   final String? taskTitle;
-  final double amount; // Direct Expense Amount
+  final double amount; // Total Direct Expense Cost (Base Cost + Tax)
+  final double baseCost; // Base Cost before Tax
+  final double taxRate; // Tax percentage (e.g. 5.0, 7.5, 10.0, 15.0)
+  final double taxAmount; // Calculated Tax: baseCost * (taxRate / 100)
   final double officeBenefitAmount; // Auto-calculated 30%
   final String currency;
   final String categoryId;
@@ -236,6 +239,9 @@ class ExpenseModel {
     this.taskId,
     this.taskTitle,
     required this.amount,
+    double? baseCost,
+    this.taxRate = 0.0,
+    double? taxAmount,
     this.officeBenefitAmount = 0.0,
     this.currency = 'BDT',
     required this.categoryId,
@@ -261,7 +267,14 @@ class ExpenseModel {
     this.foodDetails,
     this.accommodationDetails,
     this.officeCostDetails,
-  });
+  })  : baseCost = baseCost ?? amount,
+        taxAmount = taxAmount ?? 0.0;
+
+  /// Explicit getter for total cost (Gross invoice total: Base Cost + Tax Amount).
+  double get totalCost => hasTax ? (baseCost + taxAmount) : amount;
+
+  /// Whether tax is applied to this expense.
+  bool get hasTax => taxRate > 0 && taxAmount > 0;
 
   double get totalWithBenefit => amount + officeBenefitAmount;
 
@@ -274,6 +287,9 @@ class ExpenseModel {
     String? taskId,
     String? taskTitle,
     double? amount,
+    double? baseCost,
+    double? taxRate,
+    double? taxAmount,
     double? officeBenefitAmount,
     String? currency,
     String? categoryId,
@@ -309,6 +325,9 @@ class ExpenseModel {
       taskId: taskId ?? this.taskId,
       taskTitle: taskTitle ?? this.taskTitle,
       amount: amount ?? this.amount,
+      baseCost: baseCost ?? this.baseCost,
+      taxRate: taxRate ?? this.taxRate,
+      taxAmount: taxAmount ?? this.taxAmount,
       officeBenefitAmount: officeBenefitAmount ?? this.officeBenefitAmount,
       currency: currency ?? this.currency,
       categoryId: categoryId ?? this.categoryId,

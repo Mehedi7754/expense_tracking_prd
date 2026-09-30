@@ -180,6 +180,70 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Project Cost Tax Configuration
+              Text('Project Cost Tax Rates Configuration', style: AppTextStyles.titleSmall),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Available Tax / VAT Rates', style: AppTextStyles.labelMedium),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Configure quick selectable tax rates for project expenses.',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton.filledTonal(
+                          icon: const Icon(Icons.add_rounded, size: 20),
+                          tooltip: 'Add Tax Rate',
+                          onPressed: () => _showAddTaxRateDialog(context, ref),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: settings.availableTaxRates.map((rate) {
+                        final isZero = rate == 0.0;
+                        return Chip(
+                          label: Text(
+                            isZero ? '0% (No Tax)' : '${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 1)}%',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          ),
+                          deleteIcon: isZero ? null : const Icon(Icons.close_rounded, size: 16),
+                          onDeleted: isZero
+                              ? null
+                              : () {
+                                  ref.read(settingsProvider.notifier).removeTaxRate(rate);
+                                  NotificationBanner.showSuccess(context, 'Removed ${rate.toStringAsFixed(1)}% tax rate.');
+                                },
+                          backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          side: BorderSide(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
             ],
 
             // Appearance Theme
@@ -238,6 +302,58 @@ class SettingsScreen extends ConsumerWidget {
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color),
         ),
       ],
+    );
+  }
+
+  void _showAddTaxRateDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Tax Rate', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter the tax/VAT percentage to make available for project expense claims:',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Tax Percentage (%)',
+                hintText: 'e.g. 12.0',
+                suffixText: '%',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final rate = double.tryParse(controller.text.trim());
+              if (rate != null && rate >= 0 && rate <= 100) {
+                ref.read(settingsProvider.notifier).addTaxRate(rate);
+                Navigator.of(dialogCtx).pop();
+                NotificationBanner.showSuccess(context, 'Added ${rate.toStringAsFixed(1)}% to available tax rates.');
+              } else {
+                NotificationBanner.showError(context, 'Enter a valid rate between 0% and 100%');
+              }
+            },
+            child: const Text('Add Rate'),
+          ),
+        ],
+      ),
     );
   }
 }

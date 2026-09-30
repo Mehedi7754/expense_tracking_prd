@@ -285,42 +285,51 @@ class ReceiptUploader extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.emerald),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Receipt Attached',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: isDark ? AppColors.emeraldAccent : AppColors.emeraldDark,
-                        fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.emerald),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Receipt Attached',
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: isDark ? AppColors.emeraldAccent : AppColors.emeraldDark,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 4),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     TextButton.icon(
-                      icon: const Icon(Icons.zoom_in_rounded, size: 16),
-                      label: const Text('View Full'),
+                      icon: const Icon(Icons.zoom_in_rounded, size: 15),
+                      label: const Text('View Full', style: TextStyle(fontSize: 11)),
                       onPressed: () => _showFullScreen(context),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     ),
                     if (!isReadOnly) ...[
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       TextButton.icon(
-                        icon: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.crimson),
+                        icon: const Icon(Icons.delete_outline_rounded, size: 15, color: AppColors.crimson),
                         label: Text(
                           'Remove',
-                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.crimson),
+                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.crimson, fontSize: 11),
                         ),
                         onPressed: () => onImageChanged(null),
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),

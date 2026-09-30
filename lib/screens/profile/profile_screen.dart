@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/config/app_env.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/widgets/notification_banner.dart';
@@ -64,7 +65,10 @@ class ProfileScreen extends ConsumerWidget {
     } catch (e) {
       if (context.mounted) {
         NotificationBanner.showInfo(context, 'Photo upload simulated with sample avatar');
-        ref.read(authProvider.notifier).updateAvatarUrl('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400');
+        final sampleAvatar = AppEnv.sampleAvatarUrl.isNotEmpty
+            ? AppEnv.sampleAvatarUrl
+            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400';
+        ref.read(authProvider.notifier).updateAvatarUrl(sampleAvatar);
       }
     }
   }

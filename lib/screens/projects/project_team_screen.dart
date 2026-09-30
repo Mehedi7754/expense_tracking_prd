@@ -85,12 +85,14 @@ class ProjectTeamScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(member.name, style: AppTextStyles.titleSmall),
+                        Text(member.name, style: AppTextStyles.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 2),
-                        Text('${member.department} • ${member.role.displayName}', style: AppTextStyles.bodySmall),
+                        Text('${member.department} • ${member.role.displayName}', style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                         Text(
                           member.email,
                           style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: AppColors.getTextMuted(context)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),

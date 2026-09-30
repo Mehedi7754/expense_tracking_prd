@@ -4,6 +4,7 @@ import '../constants/app_colors.dart';
 import '../utils/currency_formatter.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
+import 'project_progress_badge.dart';
 
 class _CardPalette {
   final Color accent;
@@ -119,8 +120,6 @@ class ProjectCostCard extends StatelessWidget {
         ? accentColor.withValues(alpha: 0.16)
         : accentColor.withValues(alpha: 0.12);
 
-    final displayPercent = (budgetRatio * 100).round();
-
     return Container(
       margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -168,7 +167,7 @@ class ProjectCostCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 14),
 
-                // 2. Middle Column: Project Name & Minimal Financials
+                // 2. Middle Column: Project Name, Status Indicator & Financials
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,7 +185,7 @@ class ProjectCostCard extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 4),
                       Text.rich(
                         TextSpan(
                           children: [
@@ -195,7 +194,7 @@ class ProjectCostCard extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.w800,
                                 color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-                                fontSize: 13.5,
+                                fontSize: 12.5,
                               ),
                             ),
                             TextSpan(
@@ -203,7 +202,7 @@ class ProjectCostCard extends StatelessWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                fontSize: 12.5,
+                                fontSize: 11.5,
                               ),
                             ),
                           ],
@@ -211,17 +210,37 @@ class ProjectCostCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      const SizedBox(height: 5),
+                      ProjectProgressBadge.fromProject(project, compact: true, showPercentage: false),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
 
-                // 3. Right: Sleek Circular Progress Ring with Percentage
-                _MinimalCircularProgress(
-                  progress: isCompleted ? 1.0 : budgetRatio,
-                  color: accentColor,
-                  trackColor: trackColor,
-                  label: isCompleted ? '100%' : '$displayPercent%',
+                // 3. Right: Sleek Circular Progress Ring with Project Progress Percentage
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _MinimalCircularProgress(
+                      progress: (isCompleted || project.progressPercentage >= 100.0)
+                          ? 1.0
+                          : (project.progressPercentage.clamp(0.0, 100.0) / 100.0),
+                      color: accentColor,
+                      trackColor: trackColor,
+                      label: (isCompleted || project.progressPercentage >= 100.0)
+                          ? '100%'
+                          : '${project.progressPercentage.clamp(0.0, 100.0).toStringAsFixed(0)}%',
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Progress',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
