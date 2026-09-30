@@ -87,6 +87,23 @@ void main() {
       expect(ApiEndpoints.auditLogs, 'https://api.spendwise.internal/api/v1/audit-logs');
     });
 
+    test('ApiEndpoints dynamically resolves custom route overrides from environment variables without hardcoding', () {
+      AppEnv.initializeForTesting({
+        'API_BASE_URL': 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1',
+        'API_ENDPOINT_HEALTH': '/health',
+        'API_ENDPOINT_AUTH_LOGIN': '/custom-auth/login',
+        'API_ENDPOINT_EXPENSES': '/financial/expenses',
+        'API_ENDPOINT_PROJECTS': '/core/projects',
+      });
+
+      expect(ApiEndpoints.health, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/health');
+      expect(ApiEndpoints.login, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/custom-auth/login');
+      expect(ApiEndpoints.expenses, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/financial/expenses');
+      expect(ApiEndpoints.expenseById('exp_999'), 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/financial/expenses/exp_999');
+      expect(ApiEndpoints.projects, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/core/projects');
+      expect(ApiEndpoints.projectById('proj_01'), 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/core/projects/proj_01');
+    });
+
     test('ApiClient redacts sensitive data and prevents credential leakage in logs', () {
       final input = {
         'username': 'eleanor.vance',
