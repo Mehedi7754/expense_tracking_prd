@@ -223,9 +223,26 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(project.projectId, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.getPrimary(context))),
-            Text(project.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+            Text(
+              project.projectId,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.getPrimary(context),
+              ),
+            ),
+            Text(
+              project.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w800,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -240,6 +257,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 16),
           tabs: const [
             Tab(text: 'Financial Overview'),
             Tab(text: 'Budget vs Actual'),
@@ -465,11 +484,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
               unreceiptedRatio: unreceiptedRatio,
             ),
           ),
-
           const SizedBox(height: 14),
 
           // Project Team Members Section
           _buildProjectMembersCard(context, project),
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -481,17 +500,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
       children: [
         Expanded(
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
                 child: Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
                     color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                     fontWeight: FontWeight.w500,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (isEditable) ...[

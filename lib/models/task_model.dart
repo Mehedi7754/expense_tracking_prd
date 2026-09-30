@@ -10,6 +10,16 @@ enum TaskStatus {
         return 'Completed';
     }
   }
+
+  static TaskStatus fromString(String val) {
+    switch (val.toLowerCase().replaceAll(' ', '').replaceAll('_', '').replaceAll('-', '')) {
+      case 'completed':
+        return TaskStatus.completed;
+      case 'inprogress':
+      default:
+        return TaskStatus.inProgress;
+    }
+  }
 }
 
 class TaskModel {
@@ -57,5 +67,38 @@ class TaskModel {
       status: status ?? this.status,
       budgetLine: budgetLine ?? this.budgetLine,
     );
+  }
+
+  factory TaskModel.fromJson(Map<String, dynamic> json) {
+    final statusStr = (json['status'] ?? 'inProgress').toString();
+    return TaskModel(
+      id: (json['id'] ?? '').toString(),
+      projectId: (json['project_id'] ?? json['projectId'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      description: (json['description'] ?? '').toString(),
+      assigneeId: (json['assignee_id'] ?? json['assigneeId'] ?? '').toString(),
+      assigneeName: (json['assignee_name'] ?? json['assigneeName'] ?? '').toString(),
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'].toString()) ?? DateTime.now()
+          : (json['dueDate'] != null
+              ? DateTime.tryParse(json['dueDate'].toString()) ?? DateTime.now()
+              : DateTime.now()),
+      status: TaskStatus.fromString(statusStr),
+      budgetLine: json['budget_line']?.toString() ?? json['budgetLine']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'project_id': projectId,
+      'title': title,
+      'description': description,
+      'assignee_id': assigneeId,
+      'assignee_name': assigneeName,
+      'due_date': dueDate.toIso8601String(),
+      'status': status.name,
+      if (budgetLine != null) 'budget_line': budgetLine,
+    };
   }
 }

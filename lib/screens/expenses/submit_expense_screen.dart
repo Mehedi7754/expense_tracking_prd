@@ -341,7 +341,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
-        title: const Text('Add Expense (PFIS)', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text('Add Expense (GW Project)', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
       body: Center(
         child: ConstrainedBox(

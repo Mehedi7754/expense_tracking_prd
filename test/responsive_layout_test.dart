@@ -291,7 +291,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Sign In to Account'), findsOneWidget);
-    expect(find.text('Sign In to PFIS'), findsOneWidget);
+    expect(find.text('Sign In to GW project'), findsOneWidget);
     // Verifies extra descriptive paragraph was removed
     expect(find.textContaining('Real-time project cost monitoring'), findsNothing);
   });

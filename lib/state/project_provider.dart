@@ -3,6 +3,7 @@ import '../models/client_model.dart';
 import '../models/project_model.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
+import '../repositories/project_repository.dart';
 
 class ProjectNotifier extends Notifier<List<ProjectModel>> {
   static final List<ProjectModel> _initialProjects = [
@@ -255,6 +256,8 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
   ];
 
   @override
+
+  @override
   List<ProjectModel> build() => _initialProjects;
 
   /// The most important rule: PRD Section 1
@@ -268,10 +271,25 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
     return state.where((p) => p.teamMemberIds.contains(user.id)).toList();
   }
 
-  void addProject({
+  Future<void> fetchProjects() async {
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      final projects = await repo.getProjects();
+      state = projects;
+    } catch (_) {
+      // Keep existing state on network disconnect
+    }
+  }
+
+  void setProjects(List<ProjectModel> projects) {
+    state = projects;
+  }
+
+  Future<ProjectModel> addProject({
     required String name,
     required String description,
     required String client,
+    String? clientId,
     ClientType clientType = ClientType.private,
     AssignmentType assignmentType = AssignmentType.directConsultancy,
     required double grossProjectValue,
@@ -286,9 +304,9 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
     required DateTime startDate,
     required DateTime endDate,
     required List<String> teamMemberIds,
-  }) {
+  }) async {
     final nextNumber = state.length + 1;
-    final generatedId = 'PRJ-2026-${nextNumber.toString().padLeft(3, '0')}';
+    final generatedId = 'PRJ-${DateTime.now().year}-${nextNumber.toString().padLeft(3, '0')}';
     final netRevenue = taxStatus == TaxStatus.included
         ? grossProjectValue * (1 - taxRate)
         : grossProjectValue;
@@ -300,6 +318,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       name: name,
       description: description,
       client: client,
+      clientId: clientId,
       clientType: clientType,
       assignmentType: assignmentType,
       grossProjectValue: grossProjectValue,
@@ -318,14 +337,36 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       teamMemberIds: teamMemberIds,
       status: ProjectStatus.ongoing,
     );
+
+    // Optimistic local update
     state = [...state, newProj];
+
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      final saved = await repo.createProject(newProj);
+      state = [
+        for (final p in state)
+          if (p.id == newProj.id) saved else p,
+      ];
+      return saved;
+    } catch (_) {
+      // Local state preserved for offline resiliency
+      return newProj;
+    }
   }
 
-  void updateProject(ProjectModel updated) {
+  Future<void> updateProject(ProjectModel updated) async {
     state = [
       for (final p in state)
         if (p.id == updated.id) updated else p,
     ];
+
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      await repo.updateProject(updated);
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
   void updateEstimatedRemainingCost(String projectId, double newRemaining) {
@@ -338,13 +379,13 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
     ];
   }
 
-  void addRevenue({
+  Future<void> addRevenue({
     required String projectId,
     required double amount,
     required DateTime date,
     required String note,
     required String createdBy,
-  }) {
+  }) async {
     final entry = RevenueEntry(
       id: 'rev_${DateTime.now().microsecondsSinceEpoch}',
       projectId: projectId,
@@ -365,12 +406,19 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
         else
           p,
     ];
+
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      await repo.addRevenue(projectId, entry);
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
-  void closeProject({
+  Future<void> closeProject({
     required String projectId,
     required ProjectFinancialSummary summary,
-  }) {
+  }) async {
     state = [
       for (final p in state)
         if (p.id == projectId)
@@ -382,6 +430,13 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
         else
           p,
     ];
+
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      await repo.closeProject(projectId, summary);
+    } catch (_) {
+      // Offline fallback
+    }
   }
 
   /// Updates the project progress (0% - 100%) and records the audit user and timestamp.

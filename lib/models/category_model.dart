@@ -28,4 +28,24 @@ class CategoryModel {
       isActive: isActive ?? this.isActive,
     );
   }
+
+  factory CategoryModel.fromJson(Map<String, dynamic> json) {
+    return CategoryModel(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      iconName: (json['icon_name'] ?? json['iconName'] ?? 'category').toString(),
+      isDefault: json['is_default'] ?? json['isDefault'] ?? false,
+      isActive: json['is_active'] ?? json['isActive'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'icon_name': iconName,
+      'is_default': isDefault,
+      'is_active': isActive,
+    };
+  }
 }

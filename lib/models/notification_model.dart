@@ -19,6 +19,22 @@ enum NotificationType {
         return 'Notification';
     }
   }
+
+  static NotificationType fromString(String val) {
+    switch (val.toLowerCase().replaceAll(' ', '').replaceAll('_', '')) {
+      case 'expenseapproved':
+        return NotificationType.expenseApproved;
+      case 'expenserejected':
+        return NotificationType.expenseRejected;
+      case 'budgetwarning':
+        return NotificationType.budgetWarning;
+      case 'commentadded':
+        return NotificationType.commentAdded;
+      case 'general':
+      default:
+        return NotificationType.general;
+    }
+  }
 }
 
 class NotificationModel {
@@ -70,5 +86,40 @@ class NotificationModel {
       isRead: isRead ?? this.isRead,
       timestamp: timestamp ?? this.timestamp,
     );
+  }
+
+  factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    final typeStr = (json['type'] ?? 'general').toString();
+    return NotificationModel(
+      id: (json['id'] ?? '').toString(),
+      userId: (json['user_id'] ?? json['userId'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      message: (json['message'] ?? '').toString(),
+      fullExplanation: (json['full_explanation'] ?? json['fullExplanation'] ?? '').toString(),
+      type: NotificationType.fromString(typeStr),
+      relatedExpenseId: json['related_expense_id']?.toString() ?? json['relatedExpenseId']?.toString(),
+      relatedProjectId: json['related_project_id']?.toString() ?? json['relatedProjectId']?.toString(),
+      isRead: json['is_read'] ?? json['isRead'] ?? false,
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
+          : (json['created_at'] != null
+              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+              : DateTime.now()),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'title': title,
+      'message': message,
+      'full_explanation': fullExplanation,
+      'type': type.name,
+      if (relatedExpenseId != null) 'related_expense_id': relatedExpenseId,
+      if (relatedProjectId != null) 'related_project_id': relatedProjectId,
+      'is_read': isRead,
+      'timestamp': timestamp.toIso8601String(),
+    };
   }
 }

@@ -49,3 +49,7 @@ app.*.map.json
 .env.*
 !.env.example
 
+# Backend
+backend/dist/
+backend/node_modules/
+backend/.env
