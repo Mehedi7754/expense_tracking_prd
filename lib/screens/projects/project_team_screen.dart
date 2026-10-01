@@ -206,8 +206,7 @@ class ProjectTeamScreen extends ConsumerWidget {
                               icon: const Icon(Icons.person_remove_outlined, size: 19, color: Color(0xFFEF4444)),
                               tooltip: 'Remove from project',
                               onPressed: () async {
-                                final updatedTeam = project.teamMemberIds.where((id) => id != member.id).toList();
-                                await ref.read(projectProvider.notifier).updateProject(project.copyWith(teamMemberIds: updatedTeam));
+                                await ref.read(projectProvider.notifier).unassignMemberFromProject(project.id, member.id);
                                 await ref.read(userManagementProvider.notifier).unassignUserFromProject(member.id, project.id);
                                 if (context.mounted) {
                                   NotificationBanner.showInfo(context, '${member.name} unassigned from ${project.name}');
@@ -482,10 +481,7 @@ class ProjectTeamScreen extends ConsumerWidget {
                                       activeColor: AppColors.getPrimary(context),
                                       onChanged: (val) async {
                                         if (val) {
-                                          final updatedTeam = [...liveProject.teamMemberIds, u.id];
-                                          await ref.read(projectProvider.notifier).updateProject(
-                                                liveProject.copyWith(teamMemberIds: updatedTeam),
-                                              );
+                                          await ref.read(projectProvider.notifier).assignMemberToProject(liveProject.id, u.id);
                                           await ref.read(userManagementProvider.notifier).assignUserToProject(u.id, liveProject.id);
                                           setModalState(() {});
                                           if (context.mounted) {
@@ -495,10 +491,7 @@ class ProjectTeamScreen extends ConsumerWidget {
                                             );
                                           }
                                         } else {
-                                          final updatedTeam = liveProject.teamMemberIds.where((id) => id != u.id).toList();
-                                          await ref.read(projectProvider.notifier).updateProject(
-                                                liveProject.copyWith(teamMemberIds: updatedTeam),
-                                              );
+                                          await ref.read(projectProvider.notifier).unassignMemberFromProject(liveProject.id, u.id);
                                           await ref.read(userManagementProvider.notifier).unassignUserFromProject(u.id, liveProject.id);
                                           setModalState(() {});
                                           if (context.mounted) {

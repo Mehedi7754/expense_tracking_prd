@@ -992,10 +992,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                           const SizedBox(width: 4),
                           InkWell(
                             onTap: () async {
-                              final updatedIds = project.teamMemberIds.where((id) => id != member.id).toList();
-                              await ref.read(projectProvider.notifier).updateProject(
-                                    project.copyWith(teamMemberIds: updatedIds),
-                                  );
+                              await ref.read(projectProvider.notifier).unassignMemberFromProject(project.id, member.id);
                               await ref.read(userManagementProvider.notifier).unassignUserFromProject(member.id, project.id);
                               if (context.mounted) {
                                 NotificationBanner.showInfo(context, '${member.name} unassigned from ${project.name}');
@@ -1708,10 +1705,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                                       activeColor: AppColors.getPrimary(context),
                                       onChanged: (val) async {
                                         if (val) {
-                                          final updatedTeam = [...liveProject.teamMemberIds, u.id];
-                                          await ref.read(projectProvider.notifier).updateProject(
-                                                liveProject.copyWith(teamMemberIds: updatedTeam),
-                                              );
+                                          await ref.read(projectProvider.notifier).assignMemberToProject(liveProject.id, u.id);
                                           await ref.read(userManagementProvider.notifier).assignUserToProject(u.id, liveProject.id);
                                           setModalState(() {});
                                           if (context.mounted) {
@@ -1721,10 +1715,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                                             );
                                           }
                                         } else {
-                                          final updatedTeam = liveProject.teamMemberIds.where((id) => id != u.id).toList();
-                                          await ref.read(projectProvider.notifier).updateProject(
-                                                liveProject.copyWith(teamMemberIds: updatedTeam),
-                                              );
+                                          await ref.read(projectProvider.notifier).unassignMemberFromProject(liveProject.id, u.id);
                                           await ref.read(userManagementProvider.notifier).unassignUserFromProject(u.id, liveProject.id);
                                           setModalState(() {});
                                           if (context.mounted) {

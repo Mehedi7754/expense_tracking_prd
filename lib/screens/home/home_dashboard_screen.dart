@@ -125,55 +125,42 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           ],
         ),
         actions: [
-          // Professional Cohesive Persona Switcher Pill
+          // Professional Secure Role Indicator Badge (Non-interactive for security)
           Padding(
             padding: const EdgeInsets.only(right: 6),
-            child: Tooltip(
-              message: 'Switch PRD Persona',
-              child: InkWell(
-                onTap: () => _showPersonaSwitcherModal(context, ref, user),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E1B4B) : const Color(0xFFEEF2FF),
                 borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E1B4B) : const Color(0xFFEEF2FF),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF4338CA) : const Color(0xFFC7D2FE),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF4338CA) : const Color(0xFFC7D2FE),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF10B981),
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFF10B981),
-                      ),
+                  const SizedBox(width: 6),
+                  Text(
+                    role.displayName,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF4F46E5),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      role.displayName.split(' ').first,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white : const Color(0xFF4F46E5),
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 15,
-                      color: isDark ? Colors.white70 : const Color(0xFF4F46E5),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-        ),
           // Notification Bell
           IconButton(
             icon: Stack(
@@ -1136,137 +1123,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         ],
       ),
     );
-  }
-
-  // Persona Switcher Bottom Sheet Modal
-  void _showPersonaSwitcherModal(BuildContext context, WidgetRef ref, UserModel? currentUser) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.75,
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.withAlpha(60),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Switch Test Persona',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Select any PRD role to preview role-specific dashboards & permissions.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 16),
-                  Builder(
-                    builder: (context) {
-                      final selectableUsers = ref.watch(userManagementProvider).where((u) => u.role != UserRole.viewer).toList();
-                      if (selectableUsers.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: Center(
-                            child: Text(
-                              'No registered team members yet.\nRegister users to manage roles.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: selectableUsers.map((u) {
-                          final isSelected = currentUser?.id == u.id;
-                          return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            leading: Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: isSelected ? const Color(0xFF4F46E5) : Colors.grey.withAlpha(30),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _getUserInitials(u.name),
-                                  style: TextStyle(
-                                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              u.name,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '${u.role.displayName} • ${u.department}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: isSelected ? const Color(0xFF4F46E5) : Colors.grey,
-                              ),
-                            ),
-                            trailing: isSelected
-                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF4F46E5))
-                                : null,
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              ref.read(authProvider.notifier).setUser(u);
-                            },
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  String _getUserInitials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 
   // Portfolio Financial Details Modal Bottom Sheet

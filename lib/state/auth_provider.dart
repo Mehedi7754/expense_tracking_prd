@@ -309,13 +309,7 @@ class AuthNotifier extends Notifier<AuthState> {
         final userNotifier = ref.read(userManagementProvider.notifier);
         await userNotifier.updateUser(updated);
       } catch (_) {}
-
-      try {
-        final repo = ref.read(authRepositoryProvider);
-        await repo.updateAvatar(url);
-      } catch (e) {
-        debugPrint('[AuthNotifier] Failed to upload avatar to backend: $e');
-      }
+      // Note: Images are maintained locally and never uploaded to backend server per specifications
     }
   }
 }

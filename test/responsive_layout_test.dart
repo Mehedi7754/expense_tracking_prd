@@ -382,22 +382,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
-    // Tap the Persona Switcher in the AppBar
+    // Verify the persona switcher dropdown is removed for security and enterprise role badge is displayed
     final personaPill = find.byTooltip('Switch PRD Persona');
-    expect(personaPill, findsOneWidget);
-    await tester.tap(personaPill);
-    await tester.pumpAndSettle();
-
-    // Verify modal header is visible
-    expect(find.text('Switch Test Persona'), findsOneWidget);
-    // Verify standard 3 roles are present
-    expect(find.text('Eleanor Vance'), findsOneWidget);
-    expect(find.text('Sarah Jenkins'), findsOneWidget);
-    expect(find.text('Fahim Ahmed'), findsOneWidget);
-    // Verify retired personas (David Chen / Finance and Rahim Chowdhury / Viewer) are removed
-    expect(find.text('David Chen'), findsNothing);
-    expect(find.text('Rahim Chowdhury'), findsNothing);
-    expect(find.text('Viewer (Read-Only)'), findsNothing);
+    expect(personaPill, findsNothing);
+    expect(find.text('Super Admin'), findsOneWidget);
   });
 
   testWidgets('Clicking Hero section container opens Portfolio Financial Details modal showing person-wise costs', (WidgetTester tester) async {

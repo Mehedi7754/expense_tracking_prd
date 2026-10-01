@@ -40,25 +40,27 @@ class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
     _progress = widget.project.progressPercentage.clamp(0.0, 100.0);
   }
 
-  void _saveProgress() {
+  Future<void> _saveProgress() async {
     final user = ref.read(authProvider).currentUser;
     if (user == null) return;
 
     setState(() => _isSaving = true);
 
-    ref.read(projectProvider.notifier).updateProjectProgress(
+    await ref.read(projectProvider.notifier).updateProjectProgress(
           projectId: widget.project.id,
           progressPercentage: _progress,
           updatedById: user.id,
           updatedByName: user.name,
         );
 
-    Navigator.of(context).pop();
+    if (mounted) {
+      Navigator.of(context).pop();
 
-    NotificationBanner.showSuccess(
-      context,
-      'Project progress updated to ${_progress.toStringAsFixed(0)}% (${widget.project.name})',
-    );
+      NotificationBanner.showSuccess(
+        context,
+        'Project progress updated to ${_progress.toStringAsFixed(0)}% (${widget.project.name})',
+      );
+    }
   }
 
   Color _getProgressColor(double pct) {

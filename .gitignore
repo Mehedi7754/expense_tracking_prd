@@ -48,8 +48,28 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+*.env
+*.env.*
+
+# Keystores, signing keys, and certificates
+*.jks
+*.keystore
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+key.properties
+local.properties
+
+# Cloud, Firebase, and Auth Secrets
+google-services.json
+GoogleService-Info.plist
 
 # Backend
 backend/dist/
 backend/node_modules/
 backend/.env
+backend/.env.*
+!backend/.env.example

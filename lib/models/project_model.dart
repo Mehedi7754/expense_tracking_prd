@@ -469,13 +469,6 @@ class ProjectModel {
   }
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
-    Map<String, double> parseCategoryBudgets(dynamic raw) {
-      if (raw is Map) {
-        return raw.map((k, v) => MapEntry(k.toString(), (v as num?)?.toDouble() ?? 0.0));
-      }
-      return const {};
-    }
-
     List<String> parseTeamMemberIds(dynamic raw) {
       if (raw is List) {
         final result = <String>{};
@@ -511,6 +504,29 @@ class ProjectModel {
     final taxStatusStr = (json['tax_status'] ?? json['taxStatus'] ?? 'included').toString();
     final statusStr = (json['status'] ?? 'ongoing').toString();
 
+    final rawCatBudgets = json['category_budgets'] ?? json['categoryBudgets'];
+    final rawCatMap = rawCatBudgets is Map ? rawCatBudgets : const {};
+    
+    final metaProgress = (rawCatMap['_meta_progress'] as num?)?.toDouble();
+    final metaProgressUpdatedAt = rawCatMap['_meta_progress_updated_at'] != null
+        ? DateTime.tryParse(rawCatMap['_meta_progress_updated_at'].toString())
+        : null;
+    final metaMembers = parseTeamMemberIds(rawCatMap['_meta_team_members']);
+    final directMembers = parseTeamMemberIds(json['team_member_ids'] ?? json['teamMemberIds']);
+    final mergedMembers = {...directMembers, ...metaMembers}.toList();
+
+    final categoryBudgetsMap = <String, double>{};
+    if (rawCatBudgets is Map) {
+      for (final entry in rawCatBudgets.entries) {
+        final k = entry.key.toString();
+        if (k.startsWith('_meta_')) continue;
+        final v = (entry.value as num?)?.toDouble();
+        if (v != null) {
+          categoryBudgetsMap[k] = v;
+        }
+      }
+    }
+
     return ProjectModel(
       id: (json['id'] ?? '').toString(),
       projectId: pCode,
@@ -528,7 +544,7 @@ class ProjectModel {
       amountReceived: (json['amount_received'] ?? json['amountReceived'] as num?)?.toDouble() ?? 0.0,
       amountReceivable: (json['amount_receivable'] ?? json['amountReceivable'] as num?)?.toDouble() ?? 0.0,
       budget: (json['budget'] as num?)?.toDouble() ?? 0.0,
-      categoryBudgets: parseCategoryBudgets(json['category_budgets'] ?? json['categoryBudgets']),
+      categoryBudgets: categoryBudgetsMap,
       estimatedRemainingCost: (json['estimated_remaining_cost'] ?? json['estimatedRemainingCost'] as num?)?.toDouble() ?? 0.0,
       officeBenefitRate: (json['office_benefit_rate'] ?? json['officeBenefitRate'] as num?)?.toDouble() ?? 0.30,
       startDate: json['start_date'] != null
@@ -537,15 +553,17 @@ class ProjectModel {
       endDate: json['end_date'] != null
           ? DateTime.tryParse(json['end_date'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      teamMemberIds: parseTeamMemberIds(json['team_member_ids'] ?? json['teamMemberIds']),
+      teamMemberIds: mergedMembers,
       status: ProjectStatus.fromString(statusStr),
       revenueEntries: parseRevenues(json['revenue_entries'] ?? json['revenueEntries']),
       isClosed: json['is_closed'] ?? json['isClosed'] ?? false,
       closingSummary: json['closing_summary'] != null
           ? ProjectFinancialSummary.fromJson(json['closing_summary'] as Map<String, dynamic>)
           : null,
-      progressPercentage: (json['progress_percentage'] ?? json['progressPercentage'] as num?)?.toDouble() ?? 0.0,
-      progressUpdatedAt: json['progress_updated_at'] != null ? DateTime.tryParse(json['progress_updated_at'].toString()) : null,
+      progressPercentage: (json['progress_percentage'] ?? json['progressPercentage'] ?? metaProgress as num?)?.toDouble() ?? 0.0,
+      progressUpdatedAt: json['progress_updated_at'] != null
+          ? DateTime.tryParse(json['progress_updated_at'].toString())
+          : metaProgressUpdatedAt,
       progressUpdatedByName: json['progress_updated_by_name']?.toString(),
       progressUpdatedById: json['progress_updated_by_id']?.toString(),
       createdById: json['created_by_id']?.toString() ?? json['createdById']?.toString() ?? json['created_by']?.toString(),
@@ -554,10 +572,10 @@ class ProjectModel {
   }
 
   Map<String, dynamic> toJson({bool forApi = false, bool isNewCreation = false}) {
-    final validTeamMembers = teamMemberIds.map((id) => demoToUuid[id] ?? id).where((id) {
-      if (!forApi) return true;
-      return RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false).hasMatch(id) || id.contains('@');
-    }).toList();
+    final validTeamMembers = teamMemberIds
+        .map((id) => demoToUuid[id] ?? id)
+        .where((id) => id.trim().isNotEmpty)
+        .toList();
 
     final isTemporaryId = id.startsWith('proj_');
     final isCollidingCode = RegExp(r'^PRJ-\d{4}-00[1-5]$').hasMatch(projectId);
@@ -589,23 +607,30 @@ class ProjectModel {
       'amount_received': amountReceived,
       'amount_receivable': amountReceivable,
       'budget': budget,
-      'category_budgets': categoryBudgets,
+      'category_budgets': {
+        ...categoryBudgets,
+        if (progressPercentage > 0) '_meta_progress': progressPercentage,
+        if (progressUpdatedAt != null) '_meta_progress_updated_at': progressUpdatedAt!.toIso8601String(),
+        if (validTeamMembers.isNotEmpty) '_meta_team_members': validTeamMembers,
+      },
       'estimated_remaining_cost': estimatedRemainingCost,
       'office_benefit_rate': officeBenefitRate,
       'start_date': startDate.toIso8601String(),
       'end_date': endDate.toIso8601String(),
       'team_member_ids': validTeamMembers,
+      'teamMemberIds': validTeamMembers,
       'status': status.toApiValue,
       'revenue_entries': revenueEntries.map((e) => e.toJson()).toList(),
       'is_closed': isClosed,
       if (closingSummary != null) 'closing_summary': closingSummary!.toJson(),
       'progress_percentage': progressPercentage,
+      'progressPercentage': progressPercentage,
       if (progressUpdatedAt != null) 'progress_updated_at': progressUpdatedAt!.toIso8601String(),
       if (progressUpdatedByName != null) 'progress_updated_by_name': progressUpdatedByName,
       if (progressUpdatedById != null) 'progress_updated_by_id': progressUpdatedById,
       if (createdById != null && createdById!.isNotEmpty) 'created_by': demoToUuid[createdById] ?? createdById,
       if (createdById != null && createdById!.isNotEmpty) 'created_by_id': demoToUuid[createdById] ?? createdById,
-      if (imageUrl != null && imageUrl!.isNotEmpty) 'image_url': imageUrl,
+      if (!forApi && imageUrl != null && imageUrl!.isNotEmpty) 'image_url': imageUrl,
     };
   }
 }

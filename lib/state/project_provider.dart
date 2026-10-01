@@ -80,14 +80,53 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
       final remoteIds = remoteProjects.map((p) => p.id).toSet();
       final remoteCodes = remoteProjects.map((p) => p.projectId).toSet();
 
+      final localMap = <String, ProjectModel>{for (final p in state) p.id: p};
+      final mergedProjects = <ProjectModel>[];
+
+      for (final remote in remoteProjects) {
+        final local = localMap[remote.id];
+        if (local != null) {
+          // Merge team members: combine so no assigned member is dropped
+          final combinedMembers = {...remote.teamMemberIds, ...local.teamMemberIds}.toList();
+          
+          double progress = remote.progressPercentage;
+          DateTime? progressUpdatedAt = remote.progressUpdatedAt;
+          String? progressUpdatedByName = remote.progressUpdatedByName;
+          String? progressUpdatedById = remote.progressUpdatedById;
+
+          if (local.progressUpdatedAt != null &&
+              (remote.progressUpdatedAt == null || local.progressUpdatedAt!.isAfter(remote.progressUpdatedAt!))) {
+            progress = local.progressPercentage;
+            progressUpdatedAt = local.progressUpdatedAt;
+            progressUpdatedByName = local.progressUpdatedByName;
+            progressUpdatedById = local.progressUpdatedById;
+          } else if (remote.progressPercentage > 0) {
+            progress = remote.progressPercentage;
+          } else if (local.progressPercentage > 0) {
+            progress = local.progressPercentage;
+          }
+
+          final merged = remote.copyWith(
+            teamMemberIds: combinedMembers,
+            progressPercentage: progress,
+            progressUpdatedAt: progressUpdatedAt,
+            progressUpdatedByName: progressUpdatedByName,
+            progressUpdatedById: progressUpdatedById,
+          );
+          mergedProjects.add(merged);
+        } else {
+          mergedProjects.add(remote);
+        }
+      }
+
       // Preserve locally created projects that have not yet reached the backend
       final localOnly = state
           .where((p) => !remoteIds.contains(p.id) && !remoteCodes.contains(p.projectId))
           .toList();
 
-      state = [...remoteProjects, ...localOnly];
+      state = [...mergedProjects, ...localOnly];
       await _persistProjects();
-      debugPrint('[ProjectNotifier] Synchronized ${remoteProjects.length} projects from backend');
+      debugPrint('[ProjectNotifier] Synchronized ${remoteProjects.length} projects from backend with progress & team persistence');
     } catch (e) {
       debugPrint('[ProjectNotifier] Backend fetch failed, using offline projects: $e');
     }
@@ -269,29 +308,101 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
     }
   }
 
-  /// Updates the project progress (0% - 100%) and records the audit user and timestamp.
-  /// Accessible to Admin and Manager roles.
-  void updateProjectProgress({
+  /// Updates the project progress (0% - 100%) and uploads to backend PostgreSQL server.
+  Future<void> updateProjectProgress({
     required String projectId,
     required double progressPercentage,
     required String updatedById,
     required String updatedByName,
-  }) {
+  }) async {
     final clamped = progressPercentage.clamp(0.0, 100.0);
     final now = DateTime.now();
+    ProjectModel? updatedProj;
+
     state = [
       for (final p in state)
         if (p.id == projectId)
-          p.copyWith(
-            progressPercentage: clamped,
-            progressUpdatedAt: now,
-            progressUpdatedById: updatedById,
-            progressUpdatedByName: updatedByName,
-          )
+          () {
+            final u = p.copyWith(
+              progressPercentage: clamped,
+              progressUpdatedAt: now,
+              progressUpdatedById: updatedById,
+              progressUpdatedByName: updatedByName,
+            );
+            updatedProj = u;
+            return u;
+          }()
         else
           p,
     ];
-    _persistProjects();
+    await _persistProjects();
+
+    if (updatedProj != null) {
+      try {
+        final repo = ref.read(projectRepositoryProvider);
+        await repo.updateProject(updatedProj!);
+        debugPrint('[ProjectNotifier] Project progress uploaded to backend successfully: $clamped%');
+      } catch (e) {
+        debugPrint('[ProjectNotifier] Error uploading project progress to backend: $e');
+      }
+    }
+  }
+
+  /// Assigns a member to project and uploads to backend PostgreSQL server.
+  Future<void> assignMemberToProject(String projectId, String memberId) async {
+    ProjectModel? updatedProj;
+    state = [
+      for (final p in state)
+        if (p.id == projectId)
+          () {
+            if (p.teamMemberIds.contains(memberId)) return p;
+            final updatedTeam = [...p.teamMemberIds, memberId];
+            final u = p.copyWith(teamMemberIds: updatedTeam);
+            updatedProj = u;
+            return u;
+          }()
+        else
+          p,
+    ];
+    await _persistProjects();
+
+    if (updatedProj != null) {
+      try {
+        final repo = ref.read(projectRepositoryProvider);
+        await repo.updateProject(updatedProj!);
+        debugPrint('[ProjectNotifier] Assigned member uploaded to backend: $memberId');
+      } catch (e) {
+        debugPrint('[ProjectNotifier] Error uploading assigned member to backend: $e');
+      }
+    }
+  }
+
+  /// Unassigns a member from project and uploads to backend PostgreSQL server.
+  Future<void> unassignMemberFromProject(String projectId, String memberId) async {
+    ProjectModel? updatedProj;
+    state = [
+      for (final p in state)
+        if (p.id == projectId)
+          () {
+            final updatedTeam = p.teamMemberIds.where((id) => id != memberId).toList();
+            final u = p.copyWith(teamMemberIds: updatedTeam);
+            updatedProj = u;
+            return u;
+          }()
+        else
+          p,
+    ];
+    await _persistProjects();
+
+    if (updatedProj != null) {
+      try {
+        final repo = ref.read(projectRepositoryProvider);
+        await repo.updateProject(updatedProj!);
+        debugPrint('[ProjectNotifier] Unassigned member uploaded to backend: $memberId');
+      } catch (e) {
+        debugPrint('[ProjectNotifier] Error uploading unassigned member to backend: $e');
+      }
+    }
   }
 }
 
