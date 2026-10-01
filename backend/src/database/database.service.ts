@@ -28,9 +28,21 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     try {
       const res = await this.pool.query('SELECT NOW() AS current_time');
       this.logger.log(`Database connected successfully: ${res.rows[0].current_time}`);
+      // Auto-migrate missing columns for image uploads
+      await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_url TEXT;');
+      await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;');
     } catch (err: any) {
       this.logger.error(`Database connection failed: ${err.message}`, err.stack);
       throw err;
+    }
+  }
+
+  async ping(): Promise<boolean> {
+    try {
+      await this.pool.query('SELECT 1');
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 

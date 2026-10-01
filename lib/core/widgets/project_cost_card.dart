@@ -1,8 +1,8 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 import '../utils/currency_formatter.dart';
+import '../utils/image_utils.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
 import 'project_progress_badge.dart';
@@ -257,26 +257,12 @@ class ProjectCostCard extends StatelessWidget {
   }
 
   Widget _buildProjectThumbnail(String path, IconData fallbackIcon, Color fallbackColor) {
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        width: 52,
-        height: 52,
-        errorBuilder: (_, __, ___) => Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor)),
-      );
-    }
-    final file = File(path);
-    if (file.existsSync()) {
-      return Image.file(
-        file,
-        fit: BoxFit.cover,
-        width: 52,
-        height: 52,
-        errorBuilder: (_, __, ___) => Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor)),
-      );
-    }
-    return Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor));
+    return AppImageHelper.buildImage(
+      path: path,
+      width: 52,
+      height: 52,
+      placeholder: () => Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor)),
+    );
   }
 }
 

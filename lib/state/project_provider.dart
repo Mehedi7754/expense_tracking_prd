@@ -17,21 +17,6 @@ bool _isTestEnvironment() {
 }
 
 class ProjectNotifier extends Notifier<List<ProjectModel>> {
-  static bool isDummyProject(ProjectModel p) {
-    const dummyIds = {'proj_01', 'proj_02', 'proj_03', 'proj_04', 'proj_05'};
-    const dummyCodes = {'PRJ-2026-001', 'PRJ-2026-002', 'PRJ-2026-003', 'PRJ-2026-004', 'PRJ-2026-005'};
-    const dummyNames = {
-      'Enterprise Cloud ERP Platform',
-      'Smart Healthcare IoT System',
-      'AI-Powered Logistics Engine',
-      'Solar Microgrid Power Hub',
-      'Financial Compliance Audit Suite',
-    };
-    return dummyIds.contains(p.id) ||
-        dummyCodes.contains(p.projectId) ||
-        dummyNames.contains(p.name);
-  }
-
   @override
   List<ProjectModel> build() {
     _loadCachedProjects();
@@ -48,16 +33,10 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
         final customProjects = decoded
             .whereType<Map<String, dynamic>>()
             .map(ProjectModel.fromJson)
-            .where((p) => !isDummyProject(p))
             .toList();
 
         state = customProjects;
-        // Purge dummy projects from local persistent storage
-        await prefs.setString(
-          _kCustomProjectsKey,
-          jsonEncode(customProjects.map((p) => p.toJson()).toList()),
-        );
-        debugPrint('[ProjectNotifier] Restored ${customProjects.length} real projects from local persistent storage');
+        debugPrint('[ProjectNotifier] Restored ${customProjects.length} projects from local storage');
       } else {
         state = const [];
       }
@@ -71,8 +50,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
     if (_isTestEnvironment()) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final realProjects = state.where((p) => !isDummyProject(p)).toList();
-      final jsonList = realProjects.map((p) => p.toJson()).toList();
+      final jsonList = state.map((p) => p.toJson()).toList();
       await prefs.setString(_kCustomProjectsKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('[ProjectNotifier] Error persisting projects: $e');
@@ -99,18 +77,17 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
     try {
       final repo = ref.read(projectRepositoryProvider);
       final remoteProjects = await repo.getProjects();
-      final validRemoteProjects = remoteProjects.where((p) => !isDummyProject(p)).toList();
-      final remoteIds = validRemoteProjects.map((p) => p.id).toSet();
-      final remoteCodes = validRemoteProjects.map((p) => p.projectId).toSet();
+      final remoteIds = remoteProjects.map((p) => p.id).toSet();
+      final remoteCodes = remoteProjects.map((p) => p.projectId).toSet();
 
-      // Preserve locally created real projects that have not yet reached the backend
+      // Preserve locally created projects that have not yet reached the backend
       final localOnly = state
-          .where((p) => !isDummyProject(p) && !remoteIds.contains(p.id) && !remoteCodes.contains(p.projectId))
+          .where((p) => !remoteIds.contains(p.id) && !remoteCodes.contains(p.projectId))
           .toList();
 
-      state = [...validRemoteProjects, ...localOnly];
+      state = [...remoteProjects, ...localOnly];
       await _persistProjects();
-      debugPrint('[ProjectNotifier] Synchronized ${validRemoteProjects.length} real projects from backend');
+      debugPrint('[ProjectNotifier] Synchronized ${remoteProjects.length} projects from backend');
     } catch (e) {
       debugPrint('[ProjectNotifier] Backend fetch failed, using offline projects: $e');
     }

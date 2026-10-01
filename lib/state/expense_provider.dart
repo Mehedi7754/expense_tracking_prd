@@ -41,31 +41,6 @@ class MemberReceiptSummary {
 }
 
 class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
-  static bool isDummyExpense(ExpenseModel e) {
-    const dummyIds = {
-      'exp_fahim_01',
-      'exp_fahim_02',
-      'exp_sarah_01',
-      'exp_sarah_02',
-      'exp_karim_01',
-      'exp_michael_01',
-      'exp_fahim_03',
-    };
-    const dummyNames = {'Fahim Ahmed', 'Sarah Jenkins', 'Karim Ullah', 'Michael Chang', 'Eleanor Vance'};
-    const dummyProjects = {
-      'proj_01', 'proj_02', 'proj_03', 'proj_04', 'proj_05',
-      'Enterprise Cloud ERP Platform',
-      'Smart Healthcare IoT System',
-      'AI-Powered Logistics Engine',
-      'Solar Microgrid Power Hub',
-      'Financial Compliance Audit Suite',
-    };
-    return dummyIds.contains(e.id) ||
-        dummyNames.contains(e.employeeName) ||
-        dummyProjects.contains(e.projectId) ||
-        dummyProjects.contains(e.projectName);
-  }
-
   @override
   List<ExpenseModel> build() {
     _loadCachedExpenses();
@@ -82,15 +57,10 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         final customExpenses = decoded
             .whereType<Map<String, dynamic>>()
             .map(ExpenseModel.fromJson)
-            .where((e) => !isDummyExpense(e))
             .toList();
 
         state = customExpenses;
-        await prefs.setString(
-          _kCustomExpensesKey,
-          jsonEncode(customExpenses.map((e) => e.toJson()).toList()),
-        );
-        debugPrint('[ExpenseNotifier] Restored ${customExpenses.length} real expenses from local cache');
+        debugPrint('[ExpenseNotifier] Restored ${customExpenses.length} expenses from local cache');
       } else {
         state = const [];
       }
@@ -104,8 +74,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     if (_isTestEnvironment()) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final realExpenses = state.where((e) => !isDummyExpense(e)).toList();
-      final jsonList = realExpenses.map((e) => e.toJson()).toList();
+      final jsonList = state.map((e) => e.toJson()).toList();
       await prefs.setString(_kCustomExpensesKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('[ExpenseNotifier] Error persisting expenses: $e');
@@ -124,13 +93,12 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         employeeId: employeeId,
         status: status,
       );
-      final validRemote = remoteExpenses.where((e) => !isDummyExpense(e)).toList();
-      if (validRemote.isNotEmpty) {
-        final remoteIds = validRemote.map((e) => e.id).toSet();
-        final localOnly = state.where((e) => !isDummyExpense(e) && !remoteIds.contains(e.id)).toList();
-        state = [...validRemote, ...localOnly];
+      if (remoteExpenses.isNotEmpty) {
+        final remoteIds = remoteExpenses.map((e) => e.id).toSet();
+        final localOnly = state.where((e) => !remoteIds.contains(e.id)).toList();
+        state = [...remoteExpenses, ...localOnly];
         await _persistExpenses();
-        debugPrint('[ExpenseNotifier] Synchronized ${validRemote.length} real expenses from backend');
+        debugPrint('[ExpenseNotifier] Synchronized ${remoteExpenses.length} expenses from backend');
       }
     } catch (e) {
       debugPrint('[ExpenseNotifier] Offline: keeping cached expenses: $e');

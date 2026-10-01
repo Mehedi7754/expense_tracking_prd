@@ -156,4 +156,74 @@ export class AuthService {
       assignedProjectIds: row.assigned_project_ids,
     };
   }
+
+  async updateProfile(userId: string, data: any) {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let idx = 1;
+
+    if (data.avatarUrl !== undefined || data.avatar_url !== undefined) {
+      fields.push(`avatar_url = $${idx++}`);
+      values.push(data.avatarUrl ?? data.avatar_url);
+    }
+    if (data.name !== undefined || data.full_name !== undefined) {
+      fields.push(`full_name = $${idx++}`);
+      values.push(data.name ?? data.full_name);
+    }
+    if (data.phone !== undefined) {
+      fields.push(`phone = $${idx++}`);
+      values.push(data.phone);
+    }
+    if (data.designation !== undefined) {
+      fields.push(`designation = $${idx++}`);
+      values.push(data.designation);
+    }
+    if (data.department !== undefined) {
+      fields.push(`department = $${idx++}`);
+      values.push(data.department);
+    }
+
+    if (!fields.length) {
+      return this.getProfile(userId);
+    }
+
+    values.push(userId);
+    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, email, full_name, role, department, designation, phone, avatar_url`;
+    const res = await this.db.query(sql, values);
+    if (!res.rows.length) {
+      throw new UnauthorizedException('User not found');
+    }
+    const r = res.rows[0];
+    return {
+      id: r.id,
+      name: r.full_name,
+      email: r.email,
+      role: r.role,
+      department: r.department,
+      designation: r.designation,
+      phone: r.phone,
+      avatarUrl: r.avatar_url,
+    };
+  }
+
+  async updateAvatar(userId: string, avatarUrl: string | null) {
+    const res = await this.db.query(
+      `UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, email, full_name, role, department, designation, phone, avatar_url`,
+      [avatarUrl, userId],
+    );
+    if (!res.rows.length) {
+      throw new UnauthorizedException('User not found');
+    }
+    const r = res.rows[0];
+    return {
+      id: r.id,
+      name: r.full_name,
+      email: r.email,
+      role: r.role,
+      department: r.department,
+      designation: r.designation,
+      phone: r.phone,
+      avatarUrl: r.avatar_url,
+    };
+  }
 }

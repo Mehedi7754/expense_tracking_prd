@@ -7,7 +7,6 @@ import 'package:expense_tracking_prd/core/widgets/minimal_area_chart.dart';
 import 'package:expense_tracking_prd/models/project_model.dart';
 import 'package:expense_tracking_prd/models/user_model.dart';
 import 'package:expense_tracking_prd/models/user_role.dart';
-import 'package:expense_tracking_prd/state/auth_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -117,7 +116,13 @@ void main() {
       expect(prefs.getString('gw_session_auth_token'), isNull);
 
       // Save a session manually
-      const user = DemoUsers.projectManager;
+      const user = UserModel(
+        id: 'test_usr_pm_01',
+        name: 'Sarah Jenkins',
+        email: 'manager@pfis.com',
+        role: UserRole.projectManager,
+        department: 'Project Management & Field Ops',
+      );
       await prefs.setString('gw_session_user_data', jsonEncode(user.toJson()));
       await prefs.setString('gw_session_auth_token', 'mock_jwt_token_12345');
 

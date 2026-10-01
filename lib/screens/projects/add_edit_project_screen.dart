@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/utils/image_utils.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/client_model.dart';
 import '../../models/project_model.dart';
@@ -1464,22 +1465,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   }
 
   Widget _buildImagePreview(String path) {
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildFallbackBanner(),
-      );
-    }
-    final file = File(path);
-    if (file.existsSync()) {
-      return Image.file(
-        file,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildFallbackBanner(),
-      );
-    }
-    return _buildFallbackBanner();
+    return AppImageHelper.buildImage(
+      path: path,
+      placeholder: () => _buildFallbackBanner(),
+    );
   }
 
   Widget _buildFallbackBanner() {
@@ -1511,9 +1500,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         imageQuality: 85,
       );
       if (picked != null) {
-        setState(() => _imageUrl = picked.path);
+        final base64Uri = await AppImageHelper.fileToBase64DataUri(File(picked.path));
+        setState(() => _imageUrl = base64Uri);
         if (mounted) {
-          NotificationBanner.showSuccess(context, 'Project image selected');
+          NotificationBanner.showSuccess(context, 'Project image selected and prepared for upload');
         }
       }
     } catch (e) {

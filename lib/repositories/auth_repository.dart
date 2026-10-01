@@ -107,6 +107,35 @@ class AuthRepository {
 
     throw const FormatException('Invalid profile update response structure');
   }
+
+  Future<UserModel?> updateAvatar(String? avatarUrl) async {
+    try {
+      final response = await _client.put(
+        '/auth/avatar',
+        body: {'avatarUrl': avatarUrl},
+      );
+      if (response is Map<String, dynamic>) {
+        final userData = response['user'] is Map<String, dynamic>
+            ? response['user'] as Map<String, dynamic>
+            : response;
+        return UserModel.fromJson(userData);
+      }
+    } catch (_) {
+      try {
+        final response = await _client.patch(
+          ApiEndpoints.updateProfile,
+          body: {'avatar_url': avatarUrl},
+        );
+        if (response is Map<String, dynamic>) {
+          final userData = response['user'] is Map<String, dynamic>
+              ? response['user'] as Map<String, dynamic>
+              : response;
+          return UserModel.fromJson(userData);
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

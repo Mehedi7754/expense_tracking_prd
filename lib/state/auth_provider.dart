@@ -198,11 +198,9 @@ class AuthNotifier extends Notifier<AuthState> {
 
       final authUser = user;
       final currentUsers = ref.read(userManagementProvider);
-      if (!UserManagementNotifier.isDummyUser(authUser)) {
-        final existingIndex = currentUsers.indexWhere((u) => u.id == authUser.id || u.email == authUser.email);
-        if (existingIndex == -1) {
-          ref.read(userManagementProvider.notifier).setUsers([...currentUsers, authUser]);
-        }
+      final existingIndex = currentUsers.indexWhere((u) => u.id == authUser.id || u.email == authUser.email);
+      if (existingIndex == -1) {
+        ref.read(userManagementProvider.notifier).setUsers([...currentUsers, authUser]);
       }
 
       await _persistSession(authUser, token);
@@ -248,19 +246,22 @@ class AuthNotifier extends Notifier<AuthState> {
 
   void switchRole(UserRole role) {
     UserModel targetUser;
-    switch (role) {
-      case UserRole.mainAdmin:
-        targetUser = DemoUsers.mainAdmin;
-        break;
-      case UserRole.projectManager:
-        targetUser = DemoUsers.projectManager;
-        break;
-      case UserRole.projectMember:
-      default:
-        targetUser = DemoUsers.projectMember;
-        break;
+    final matching = kAuthenticDatabaseUsers.where((u) => u.role == role).toList();
+    if (matching.isNotEmpty) {
+      targetUser = matching.first;
+    } else {
+      final current = state.currentUser;
+      targetUser = current != null
+          ? current.copyWith(role: role)
+          : UserModel(
+              id: 'role_${role.name}',
+              name: role.displayName,
+              email: '${role.name}@pfis.com',
+              role: role,
+              department: 'Operations',
+            );
     }
-    _persistSession(targetUser, 'demo_token_${targetUser.id}');
+    _persistSession(targetUser, 'session_token_${targetUser.id}');
     state = state.copyWith(currentUser: targetUser, isAuthenticated: true, clearError: true);
     _authenticateWithBackend(targetUser.email, 'password123');
   }
@@ -298,54 +299,25 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  void updateAvatarUrl(String? url) {
+  Future<void> updateAvatarUrl(String? url) async {
     if (state.currentUser != null) {
       final updated = state.currentUser!.copyWith(avatarUrl: url);
       state = state.copyWith(currentUser: updated);
-      _persistSession(updated, ref.read(apiClientProvider).authToken);
+      await _persistSession(updated, ref.read(apiClientProvider).authToken);
+
+      try {
+        final userNotifier = ref.read(userManagementProvider.notifier);
+        await userNotifier.updateUser(updated);
+      } catch (_) {}
+
+      try {
+        final repo = ref.read(authRepositoryProvider);
+        await repo.updateAvatar(url);
+      } catch (e) {
+        debugPrint('[AuthNotifier] Failed to upload avatar to backend: $e');
+      }
     }
   }
-}
-
-class DemoUsers {
-  static const UserModel mainAdmin = UserModel(
-    id: 'usr_adm_01',
-    name: 'Eleanor Vance',
-    email: 'admin@pfis.com',
-    role: UserRole.mainAdmin,
-    department: 'Corporate Governance',
-    designation: 'Managing Director / Super Admin',
-    phone: '+880 1711-000001',
-    assignedProjectIds: ['proj_01', 'proj_02', 'proj_03', 'proj_04', 'proj_05'],
-  );
-
-  static const UserModel projectManager = UserModel(
-    id: 'usr_mgr_01',
-    name: 'Sarah Jenkins',
-    email: 'manager@pfis.com',
-    role: UserRole.projectManager,
-    department: 'Project Management & Field Ops',
-    designation: 'Senior Project Manager',
-    phone: '+880 1711-000002',
-    assignedProjectIds: ['proj_01', 'proj_02'],
-  );
-
-  static const UserModel projectMember = UserModel(
-    id: 'usr_emp_01',
-    name: 'Fahim Ahmed',
-    email: 'fahim@pfis.com',
-    role: UserRole.projectMember,
-    department: 'Field Survey & Operations',
-    designation: 'Field Team Lead',
-    phone: '+880 1812-345678',
-    assignedProjectIds: ['proj_01'],
-  );
-
-  static const List<UserModel> all = [
-    mainAdmin,
-    projectManager,
-    projectMember,
-  ];
 }
 
 final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);

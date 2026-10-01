@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
+import '../../core/utils/image_utils.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/user_model.dart';
 import '../../state/auth_provider.dart';
@@ -58,9 +59,10 @@ class ProfileScreen extends ConsumerWidget {
         imageQuality: 85,
       );
       if (pickedFile != null) {
-        ref.read(authProvider.notifier).updateAvatarUrl(pickedFile.path);
+        final base64Uri = await AppImageHelper.fileToBase64DataUri(File(pickedFile.path));
+        await ref.read(authProvider.notifier).updateAvatarUrl(base64Uri);
         if (context.mounted) {
-          NotificationBanner.showSuccess(context, 'Profile photo updated successfully');
+          NotificationBanner.showSuccess(context, 'Profile photo updated and saved to server');
         }
       }
     } catch (e) {
@@ -536,28 +538,12 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildAvatarContent(String? avatarUrl, String name) {
-    if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
-        return Image.network(
-          avatarUrl,
-          width: 84,
-          height: 84,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildInitialsFallback(name),
-        );
-      }
-      final file = File(avatarUrl);
-      if (file.existsSync()) {
-        return Image.file(
-          file,
-          width: 84,
-          height: 84,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildInitialsFallback(name),
-        );
-      }
-    }
-    return _buildInitialsFallback(name);
+    return AppImageHelper.buildImage(
+      path: avatarUrl,
+      width: 84,
+      height: 84,
+      placeholder: () => _buildInitialsFallback(name),
+    );
   }
 
   Widget _buildInitialsFallback(String name) {

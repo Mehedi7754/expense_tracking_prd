@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/utils/image_utils.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/project_cost_card.dart';
@@ -1337,35 +1338,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
   }
 
   Widget _buildProjectBannerImage(String path) {
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          color: const Color(0xFF312E81),
-          child: const Center(
-            child: Icon(Icons.business_center_rounded, size: 40, color: Colors.white70),
-          ),
+    return AppImageHelper.buildImage(
+      path: path,
+      placeholder: () => Container(
+        color: const Color(0xFF312E81),
+        child: const Center(
+          child: Icon(Icons.business_center_rounded, size: 40, color: Colors.white70),
         ),
-      );
-    }
-    final file = File(path);
-    if (file.existsSync()) {
-      return Image.file(
-        file,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-          color: const Color(0xFF312E81),
-          child: const Center(
-            child: Icon(Icons.business_center_rounded, size: 40, color: Colors.white70),
-          ),
-        ),
-      );
-    }
-    return Container(
-      color: const Color(0xFF312E81),
-      child: const Center(
-        child: Icon(Icons.business_center_rounded, size: 40, color: Colors.white70),
       ),
     );
   }
@@ -1381,10 +1360,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         imageQuality: 85,
       );
       if (picked != null) {
-        final updated = project.copyWith(imageUrl: picked.path);
+        final base64Uri = await AppImageHelper.fileToBase64DataUri(File(picked.path));
+        final updated = project.copyWith(imageUrl: base64Uri);
         await ref.read(projectProvider.notifier).updateProject(updated);
         if (context.mounted) {
-          NotificationBanner.showSuccess(context, 'Project image uploaded successfully');
+          NotificationBanner.showSuccess(context, 'Project image uploaded and saved to server');
         }
       }
     } catch (e) {

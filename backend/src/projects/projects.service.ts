@@ -39,6 +39,7 @@ export class ProjectsService {
       closingSummary: p.closing_summary,
       createdById: p.created_by,
       teamMemberIds: memberIds,
+      imageUrl: p.image_url || null,
       revenueEntries: revenues.map((r) => ({
         id: r.id,
         projectId: r.project_id,
@@ -182,19 +183,21 @@ export class ProjectsService {
         clientId = null;
       }
 
+      const imageUrl = data.imageUrl || data.image_url || null;
+
       const projRes = await client.query(
         `INSERT INTO projects (
           project_code, name, description, client_name, client_id, client_type, assignment_type,
           gross_project_value, tax_status, tax_rate, expected_net_revenue,
           advance_received, amount_received, amount_receivable, budget,
           category_budgets, estimated_remaining_cost, office_benefit_rate,
-          start_date, end_date, status, created_by
+          start_date, end_date, status, created_by, image_url
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7,
           $8, $9, $10, $11,
           $12, $13, $14, $15,
           $16, $17, $18,
-          $19, $20, $21, $22
+          $19, $20, $21, $22, $23
         ) RETURNING *`,
         [
           projectCode,
@@ -219,6 +222,7 @@ export class ProjectsService {
           data.endDate || data.end_date || new Date().toISOString().split('T')[0],
           data.status || 'ongoing',
           validCreatedBy,
+          imageUrl,
         ],
       );
 
@@ -288,6 +292,10 @@ export class ProjectsService {
     if (data.categoryBudgets !== undefined || data.category_budgets !== undefined) {
       fields.push(`category_budgets = $${idx++}`);
       values.push(JSON.stringify(data.categoryBudgets ?? data.category_budgets));
+    }
+    if (data.imageUrl !== undefined || data.image_url !== undefined) {
+      fields.push(`image_url = $${idx++}`);
+      values.push(data.imageUrl ?? data.image_url);
     }
 
     if (data.teamMemberIds !== undefined || data.team_member_ids !== undefined) {

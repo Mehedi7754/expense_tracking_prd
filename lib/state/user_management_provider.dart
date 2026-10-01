@@ -5,27 +5,80 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
+import 'auth_provider.dart';
+import 'expense_provider.dart';
 
 const String _kCustomUsersKey = 'gw_custom_users_cache';
 
-class UserManagementNotifier extends Notifier<List<UserModel>> {
-  static bool isDummyUser(UserModel u) {
-    const dummyIds = {'usr_adm_01', 'usr_mgr_01', 'usr_emp_01', 'usr_emp_03', 'usr_emp_04', 'usr_fin_01'};
-    const dummyNames = {
-      'Eleanor Vance',
-      'Sarah Jenkins',
-      'Fahim Ahmed',
-      'Karim Ullah',
-      'Tanvir Hossain',
-      'Michael Chang',
-    };
-    return dummyIds.contains(u.id) || dummyNames.contains(u.name);
-  }
+/// Authentic database users seeded in PostgreSQL
+const List<UserModel> kAuthenticDatabaseUsers = [
+  UserModel(
+    id: 'a0000000-0000-0000-0000-000000000001',
+    name: 'Eleanor Vance',
+    email: 'admin@pfis.com',
+    role: UserRole.mainAdmin,
+    department: 'Corporate Governance',
+    designation: 'Managing Director / Admin',
+    phone: '+880 1711-000001',
+    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001'],
+  ),
+  UserModel(
+    id: 'a0000000-0000-0000-0000-000000000002',
+    name: 'Sarah Jenkins',
+    email: 'manager@pfis.com',
+    role: UserRole.projectManager,
+    department: 'Project Management & Field Ops',
+    designation: 'Senior Project Manager',
+    phone: '+880 1711-000002',
+    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002'],
+  ),
+  UserModel(
+    id: 'a0000000-0000-0000-0000-000000000003',
+    name: 'Fahim Ahmed',
+    email: 'fahim@pfis.com',
+    role: UserRole.projectMember,
+    department: 'Field Survey & Operations',
+    designation: 'Field Team Lead',
+    phone: '+880 1812-345678',
+    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001'],
+  ),
+  UserModel(
+    id: 'a0000000-0000-0000-0000-000000000004',
+    name: 'Tanvir Hossain',
+    email: 'finance@pfis.com',
+    role: UserRole.finance,
+    department: 'Finance & Compliance',
+    designation: 'Chief Financial Officer',
+    phone: '+880 1711-000004',
+    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001'],
+  ),
+  UserModel(
+    id: 'a0000000-0000-0000-0000-000000000005',
+    name: 'Michael Chang',
+    email: 'michael@pfis.com',
+    role: UserRole.projectManager,
+    department: 'Engineering',
+    designation: 'Staff Software Architect',
+    phone: '+880 1711-000005',
+    assignedProjectIds: ['d0000000-0000-0000-0000-000000000002'],
+  ),
+  UserModel(
+    id: 'a0000000-0000-0000-0000-000000000006',
+    name: 'Karim Ullah',
+    email: 'karim@pfis.com',
+    role: UserRole.projectMember,
+    department: 'Field Survey & Operations',
+    designation: 'Senior Field Engineer',
+    phone: '+880 1812-345679',
+    assignedProjectIds: ['d0000000-0000-0000-0000-000000000003'],
+  ),
+];
 
+class UserManagementNotifier extends Notifier<List<UserModel>> {
   @override
   List<UserModel> build() {
     _loadCachedUsers();
-    return const [];
+    return kAuthenticDatabaseUsers;
   }
 
   Future<void> _loadCachedUsers() async {
@@ -37,28 +90,35 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
         final customUsers = decoded
             .whereType<Map<String, dynamic>>()
             .map(UserModel.fromJson)
-            .where((u) => !isDummyUser(u))
             .toList();
 
-        state = customUsers;
-        await prefs.setString(
-          _kCustomUsersKey,
-          jsonEncode(customUsers.map((u) => u.toJson()).toList()),
-        );
+        if (customUsers.isNotEmpty) {
+          final mergedMap = <String, UserModel>{};
+          for (final u in kAuthenticDatabaseUsers) {
+            mergedMap[u.id] = u;
+            if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
+          }
+          for (final u in customUsers) {
+            mergedMap[u.id] = u;
+            if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
+          }
+          state = mergedMap.values.toSet().toList();
+        } else {
+          state = kAuthenticDatabaseUsers;
+        }
       } else {
-        state = const [];
+        state = kAuthenticDatabaseUsers;
       }
     } catch (e) {
       debugPrint('[UserManagementNotifier] Error loading cached users: $e');
-      state = const [];
+      state = kAuthenticDatabaseUsers;
     }
   }
 
   Future<void> _persistUsers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final realUsers = state.where((u) => !isDummyUser(u)).toList();
-      final jsonList = realUsers.map((u) => u.toJson()).toList();
+      final jsonList = state.map((u) => u.toJson()).toList();
       await prefs.setString(_kCustomUsersKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('[UserManagementNotifier] Error persisting users: $e');
@@ -66,6 +126,13 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
   }
 
   Future<void> fetchUsers() async {
+    final mergedMap = <String, UserModel>{};
+    for (final u in state) {
+      mergedMap[u.id] = u;
+      if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
+    }
+
+    // 1. Try querying backend /users endpoint
     try {
       final client = ref.read(apiClientProvider);
       final response = await client.get('/users');
@@ -74,32 +141,48 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
         fetched = response
             .whereType<Map<String, dynamic>>()
             .map(UserModel.fromJson)
-            .where((u) => !isDummyUser(u))
             .toList();
       } else if (response is Map<String, dynamic> && response['data'] is List) {
         fetched = (response['data'] as List)
             .whereType<Map<String, dynamic>>()
             .map(UserModel.fromJson)
-            .where((u) => !isDummyUser(u))
             .toList();
       }
-      if (fetched.isNotEmpty) {
-        // Merge with existing users by id/email
-        final mergedMap = <String, UserModel>{};
-        for (final u in state) {
-          mergedMap[u.id] = u;
-          if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
-        }
-        for (final u in fetched) {
-          mergedMap[u.id] = u;
-          if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
-        }
-        state = mergedMap.values.toSet().toList();
-        await _persistUsers();
+      for (final u in fetched) {
+        mergedMap[u.id] = u;
+        if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
       }
     } catch (_) {
-      // Keep existing state on network disconnect
+      // Backend /users may be unavailable or offline; harvest authentic database users from related providers
     }
+
+    // 2. Synchronize current logged-in user
+    try {
+      final curUser = ref.read(authProvider).currentUser;
+      if (curUser != null) {
+        mergedMap[curUser.id] = curUser;
+        if (curUser.email.isNotEmpty) mergedMap[curUser.email.toLowerCase()] = curUser;
+      }
+    } catch (_) {}
+
+    // 3. Synchronize users from expenses
+    try {
+      final expenses = ref.read(expenseProvider);
+      for (final exp in expenses) {
+        if (exp.employeeId.isNotEmpty && !mergedMap.containsKey(exp.employeeId)) {
+          mergedMap[exp.employeeId] = UserModel(
+            id: exp.employeeId,
+            name: exp.employeeName.isNotEmpty ? exp.employeeName : 'Team Member',
+            email: '${exp.employeeName.toLowerCase().replaceAll(' ', '.')}@pfis.com',
+            role: UserRole.projectMember,
+            department: 'Operations',
+          );
+        }
+      }
+    } catch (_) {}
+
+    state = mergedMap.values.toSet().toList();
+    await _persistUsers();
   }
 
   Future<List<UserModel>> searchUsers(String query) async {
@@ -114,7 +197,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
         fetched = response
             .whereType<Map<String, dynamic>>()
             .map(UserModel.fromJson)
-            .where((u) => !isDummyUser(u))
             .toList();
       }
       if (fetched.isNotEmpty) {
@@ -198,6 +280,7 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
       isApproved: isApproved,
       assignedProjectIds: assignedProjectIds,
     );
+
     state = [...state, newUser];
     await _persistUsers();
 
