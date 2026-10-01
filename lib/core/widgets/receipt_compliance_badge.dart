@@ -18,24 +18,24 @@ class ReceiptComplianceBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     Color statusColor;
     String statusText;
-    String symbol;
+    IconData statusIcon;
 
     if (unreceiptedRatio >= 75.0) {
       statusColor = const Color(0xFF991B1B); // Dark Red
       statusText = 'CRITICAL RISK';
-      symbol = '🔴';
+      statusIcon = Icons.error_outline_rounded;
     } else if (unreceiptedRatio >= 50.0) {
       statusColor = AppColors.error;
       statusText = 'HIGH RISK';
-      symbol = '🔴';
+      statusIcon = Icons.warning_amber_rounded;
     } else if (unreceiptedRatio >= 30.0) {
       statusColor = AppColors.warning;
       statusText = 'WARNING';
-      symbol = '🟡';
+      statusIcon = Icons.info_outline_rounded;
     } else {
       statusColor = AppColors.success;
       statusText = 'COMPLIANT';
-      symbol = '🟢';
+      statusIcon = Icons.check_circle_rounded;
     }
 
     if (isCompact) {
@@ -49,7 +49,7 @@ class ReceiptComplianceBadge extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(symbol, style: const TextStyle(fontSize: 10)),
+            Icon(statusIcon, size: 12, color: statusColor),
             const SizedBox(width: 4),
             Text(
               '${unreceiptedRatio.toStringAsFixed(0)}% No-Receipt',
@@ -94,8 +94,10 @@ class ReceiptComplianceBadge extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    Icon(statusIcon, size: 14, color: statusColor),
+                    const SizedBox(width: 5),
                     Text(
-                      '$symbol $statusText',
+                      statusText,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,

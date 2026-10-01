@@ -6,6 +6,11 @@ export class ProjectsService {
   constructor(private readonly db: DatabaseService) {}
 
   private mapProjectRow(p: any, revenues: any[] = [], members: any[] = []) {
+    const memberIds = (members || []).map((m) => m.user_id || m);
+    if (p.created_by && !memberIds.includes(p.created_by)) {
+      memberIds.push(p.created_by);
+    }
+
     return {
       id: p.id,
       projectId: p.project_code,
@@ -32,7 +37,8 @@ export class ProjectsService {
       isClosed: Boolean(p.is_closed),
       closedAt: p.closed_at,
       closingSummary: p.closing_summary,
-      teamMemberIds: members.map((m) => m.user_id || m),
+      createdById: p.created_by,
+      teamMemberIds: memberIds,
       revenueEntries: revenues.map((r) => ({
         id: r.id,
         projectId: r.project_id,
@@ -70,7 +76,7 @@ export class ProjectsService {
 
     const params: any[] = [];
     if (!isAdminOrFinance) {
-      queryText += ` WHERE EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $1) `;
+      queryText += ` WHERE (p.created_by = $1 OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $1)) `;
       params.push(user.id);
     }
 
@@ -116,7 +122,33 @@ export class ProjectsService {
     return this.db.transaction(async (client) => {
       const gross = Number(data.grossProjectValue || data.gross_project_value || 0);
       const taxRate = Number(data.taxRate || data.tax_rate || 0.1);
-      const taxStatus = data.taxStatus || data.tax_status || 'included';
+
+      // Normalize assignment_type to snake_case enum
+      const rawAssignment = (data.assignment_type || data.assignmentType || 'direct_consultancy').toString();
+      let assignmentType = 'direct_consultancy';
+      const cleanAssignment = rawAssignment.toLowerCase().replace(/[\s\-_]/g, '');
+      if (cleanAssignment.includes('subconsultancy')) {
+        assignmentType = 'sub_consultancy';
+      } else if (cleanAssignment.includes('government')) {
+        assignmentType = 'government';
+      } else if (cleanAssignment.includes('private')) {
+        assignmentType = 'private';
+      } else {
+        assignmentType = 'direct_consultancy';
+      }
+
+      // Normalize tax_status to snake_case enum
+      const rawTax = (data.tax_status || data.taxStatus || 'included').toString();
+      let taxStatus = 'included';
+      const cleanTax = rawTax.toLowerCase().replace(/[\s\-_]/g, '');
+      if (cleanTax.includes('excluded')) {
+        taxStatus = 'excluded';
+      } else if (cleanTax.includes('notapplicable') || cleanTax === 'na') {
+        taxStatus = 'not_applicable';
+      } else {
+        taxStatus = 'included';
+      }
+
       const netRevenue = taxStatus === 'included' ? gross * (1 - taxRate) : gross;
       const budget = Number(data.budget || gross * 0.85);
       const advanceReceived = Number(data.advanceReceived || data.advance_received || 0);
@@ -129,6 +161,25 @@ export class ProjectsService {
         const countRes = await client.query('SELECT count(*) FROM projects');
         const num = parseInt(countRes.rows[0].count, 10) + 1;
         projectCode = `PRJ-${new Date().getFullYear()}-${num.toString().padStart(3, '0')}`;
+      }
+
+      const demoUserMap: Record<string, string> = {
+        'usr_adm_01': 'a0000000-0000-0000-0000-000000000001',
+        'usr_mgr_01': 'a0000000-0000-0000-0000-000000000002',
+        'usr_emp_01': 'a0000000-0000-0000-0000-000000000003',
+        'usr_fin_01': 'a0000000-0000-0000-0000-000000000004',
+        'usr_view_01': 'a0000000-0000-0000-0000-000000000005',
+      };
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      let validCreatedBy = demoUserMap[createdById] || createdById;
+      if (!uuidRegex.test(validCreatedBy)) {
+        validCreatedBy = 'a0000000-0000-0000-0000-000000000001';
+      }
+
+      let clientId = data.clientId || data.client_id || null;
+      if (clientId && !uuidRegex.test(clientId)) {
+        clientId = null;
       }
 
       const projRes = await client.query(
@@ -150,9 +201,9 @@ export class ProjectsService {
           data.name,
           data.description || '',
           data.client || data.client_name || 'Client',
-          data.clientId || data.client_id || null,
+          clientId,
           data.clientType || data.client_type || 'private',
-          data.assignmentType || data.assignment_type || 'direct_consultancy',
+          assignmentType,
           gross,
           taxStatus,
           taxRate,
@@ -167,24 +218,45 @@ export class ProjectsService {
           data.startDate || data.start_date || new Date().toISOString().split('T')[0],
           data.endDate || data.end_date || new Date().toISOString().split('T')[0],
           data.status || 'ongoing',
-          createdById,
+          validCreatedBy,
         ],
       );
 
       const created = projRes.rows[0];
 
-      // Insert team members
-      const teamMembers: string[] = data.teamMemberIds || data.team_member_ids || [];
-      for (const memberId of teamMembers) {
-        await client.query(
-          `INSERT INTO project_members (project_id, user_id, role_in_project)
-           VALUES ($1, $2, 'Member')
-           ON CONFLICT DO NOTHING`,
-          [created.id, memberId],
-        );
+      // Insert team members safely
+      const rawMembers: string[] = data.teamMemberIds || data.team_member_ids || [];
+      const teamMembers = [...rawMembers];
+      // Ensure the project creator is always added as a project member
+      if (uuidRegex.test(validCreatedBy) && !teamMembers.some((m) => (demoUserMap[m] || m) === validCreatedBy)) {
+        teamMembers.unshift(validCreatedBy);
       }
 
-      return this.mapProjectRow(created, [], teamMembers);
+      const insertedMembers: string[] = [];
+      for (const rawMember of teamMembers) {
+        let memberId = demoUserMap[rawMember] || rawMember;
+        if (typeof memberId === 'string' && memberId.includes('@')) {
+          const uRes = await client.query('SELECT id FROM users WHERE email = $1', [memberId.trim().toLowerCase()]);
+          if (uRes.rows.length) {
+            memberId = uRes.rows[0].id;
+          }
+        }
+        if (uuidRegex.test(memberId)) {
+          try {
+            await client.query(
+              `INSERT INTO project_members (project_id, user_id, role_in_project)
+               VALUES ($1, $2, $3)
+               ON CONFLICT DO NOTHING`,
+              [created.id, memberId, memberId === validCreatedBy ? 'Owner' : 'Member'],
+            );
+            insertedMembers.push(memberId);
+          } catch (_) {
+            // Ignore non-existent user FK failures
+          }
+        }
+      }
+
+      return this.mapProjectRow(created, [], insertedMembers);
     });
   }
 
@@ -216,6 +288,37 @@ export class ProjectsService {
     if (data.categoryBudgets !== undefined || data.category_budgets !== undefined) {
       fields.push(`category_budgets = $${idx++}`);
       values.push(JSON.stringify(data.categoryBudgets ?? data.category_budgets));
+    }
+
+    if (data.teamMemberIds !== undefined || data.team_member_ids !== undefined) {
+      const rawMembers: string[] = data.teamMemberIds || data.team_member_ids || [];
+      const demoUserMap: Record<string, string> = {
+        'usr_adm_01': 'a0000000-0000-0000-0000-000000000001',
+        'usr_mgr_01': 'a0000000-0000-0000-0000-000000000002',
+        'usr_emp_01': 'a0000000-0000-0000-0000-000000000003',
+        'usr_fin_01': 'a0000000-0000-0000-0000-000000000004',
+        'usr_view_01': 'a0000000-0000-0000-0000-000000000005',
+      };
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      for (const rawMember of rawMembers) {
+        let memberId = demoUserMap[rawMember] || rawMember;
+        if (typeof memberId === 'string' && memberId.includes('@')) {
+          const uRes = await this.db.query('SELECT id FROM users WHERE email = $1', [memberId.trim().toLowerCase()]);
+          if (uRes.rows.length) {
+            memberId = uRes.rows[0].id;
+          }
+        }
+        if (uuidRegex.test(memberId)) {
+          try {
+            await this.db.query(
+              `INSERT INTO project_members (project_id, user_id, role_in_project)
+               VALUES ($1, $2, 'Member')
+               ON CONFLICT DO NOTHING`,
+              [id, memberId],
+            );
+          } catch (_) {}
+        }
+      }
     }
 
     if (fields.length === 0) {

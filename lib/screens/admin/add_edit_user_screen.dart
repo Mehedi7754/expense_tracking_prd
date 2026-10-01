@@ -146,7 +146,7 @@ class _AddEditUserScreenState extends ConsumerState<AddEditUserScreen> {
                 DropdownButtonFormField<UserRole>(
                   value: _selectedRole,
                   decoration: const InputDecoration(labelText: 'App Role & Permission Tier *'),
-                  items: UserRole.values.map((r) {
+                  items: UserRole.activeRoles.map((r) {
                     return DropdownMenuItem<UserRole>(
                       value: r,
                       child: Text(r.displayName),

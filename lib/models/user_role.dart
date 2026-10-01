@@ -5,10 +5,23 @@ enum UserRole {
   finance,
   viewer;
 
+  /// The only active roles in the app per requirement: Super Admin, Project Manager, Project Member
+  static const List<UserRole> activeRoles = [
+    UserRole.mainAdmin,
+    UserRole.projectManager,
+    UserRole.projectMember,
+  ];
+
+  /// Roles permitted during registration: Project Member and Project Manager only
+  static const List<UserRole> registrationRoles = [
+    UserRole.projectMember,
+    UserRole.projectManager,
+  ];
+
   String get displayName {
     switch (this) {
       case UserRole.mainAdmin:
-        return 'Main Admin';
+        return 'Super Admin';
       case UserRole.projectManager:
         return 'Project Manager';
       case UserRole.projectMember:
@@ -22,14 +35,19 @@ enum UserRole {
 
   bool get canViewAllProjects => this == UserRole.mainAdmin || this == UserRole.finance;
   bool get canCreateProject =>
-      this == UserRole.mainAdmin || this == UserRole.projectManager || this == UserRole.finance;
+      this == UserRole.mainAdmin || this == UserRole.projectManager;
   bool get canUpdateProjectProgress =>
       this == UserRole.mainAdmin || this == UserRole.projectManager;
-  bool get canManageUsers => this == UserRole.mainAdmin;
+  bool get canManageUsers =>
+      this == UserRole.mainAdmin || this == UserRole.projectManager;
+  bool get canApproveMembers =>
+      this == UserRole.mainAdmin ||
+      this == UserRole.projectManager ||
+      this == UserRole.projectMember;
   bool get canApproveExpenses =>
-      this == UserRole.mainAdmin || this == UserRole.projectManager || this == UserRole.finance;
+      this == UserRole.mainAdmin || this == UserRole.projectManager;
   bool get canApproveJustifications =>
-      this == UserRole.mainAdmin || this == UserRole.finance;
+      this == UserRole.mainAdmin || this == UserRole.projectManager;
   bool get canEnterExpenses =>
       this == UserRole.projectMember ||
       this == UserRole.projectManager ||
@@ -38,6 +56,7 @@ enum UserRole {
 
   static UserRole fromString(String role) {
     switch (role.toLowerCase().replaceAll(' ', '').replaceAll('/', '').replaceAll('_', '')) {
+      case 'superadmin':
       case 'mainadmin':
       case 'admin':
       case 'administrator':

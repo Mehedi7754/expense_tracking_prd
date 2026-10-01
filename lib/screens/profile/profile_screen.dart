@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../core/config/app_env.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/widgets/notification_banner.dart';
@@ -35,10 +34,12 @@ class ProfileScreen extends ConsumerWidget {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ref.read(authProvider.notifier).logout();
-              context.go(RoutePaths.login);
+              await ref.read(authProvider.notifier).logout();
+              if (context.mounted) {
+                context.go(RoutePaths.login);
+              }
             },
             child: const Text('Sign Out'),
           ),
@@ -64,11 +65,7 @@ class ProfileScreen extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        NotificationBanner.showInfo(context, 'Photo upload simulated with sample avatar');
-        final sampleAvatar = AppEnv.sampleAvatarUrl.isNotEmpty
-            ? AppEnv.sampleAvatarUrl
-            : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400';
-        ref.read(authProvider.notifier).updateAvatarUrl(sampleAvatar);
+        NotificationBanner.showError(context, 'Could not access photo: $e');
       }
     }
   }
@@ -185,7 +182,7 @@ class ProfileScreen extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (user == null) {
-      return const Scaffold(body: Center(child: Text('Not signed in')));
+      return const Scaffold(body: SizedBox.shrink());
     }
 
     return Scaffold(

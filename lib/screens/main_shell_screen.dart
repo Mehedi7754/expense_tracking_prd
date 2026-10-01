@@ -8,6 +8,7 @@ import '../models/user_role.dart';
 import '../state/auth_provider.dart';
 import '../state/expense_provider.dart';
 import '../state/notification_provider.dart';
+import '../state/project_provider.dart';
 import 'approvals/approvals_queue_screen.dart';
 import 'expenses/my_expenses_screen.dart';
 import 'expenses/receipt_compliance_screen.dart';
@@ -28,10 +29,28 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   UserRole? _lastRole;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(projectProvider.notifier).fetchProjects();
+      ref.read(expenseProvider.notifier).fetchExpenses();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.currentUser;
-    final role = user?.role ?? UserRole.projectMember;
+
+    if (user == null || !authState.isAuthenticated) {
+      return const Scaffold(
+        body: Center(
+          child: SizedBox.shrink(),
+        ),
+      );
+    }
+
+    final role = user.role;
 
     // Reset tab to 0 if the role was switched
     if (_lastRole != role) {
@@ -44,7 +63,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
     final notifications = ref.watch(notificationProvider);
     final unreadNotifsCount = notifications.where((n) {
-      if (user == null) return false;
       return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
     }).length;
 

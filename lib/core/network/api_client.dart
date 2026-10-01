@@ -37,17 +37,18 @@ class ApiClient {
     http.Client? httpClient,
     Duration? timeout,
   })  : baseUrl = baseUrl ??
-            (AppEnv.isInitialized && AppEnv.apiBaseUrl.isNotEmpty
+            (AppEnv.apiBaseUrl.isNotEmpty
                 ? AppEnv.apiBaseUrl
-                : const String.fromEnvironment(
-                    'API_BASE_URL',
-                    defaultValue: 'http://localhost:8080/api/v1',
-                  )),
+                : AppEnv.defaultApiBaseUrl),
         _httpClient = httpClient ?? http.Client(),
         timeout = timeout ??
             Duration(
               seconds: AppEnv.isInitialized ? AppEnv.timeoutSeconds : 15,
             );
+
+  String? _effectiveBaseUrl;
+
+  String get effectiveBaseUrl => _effectiveBaseUrl ?? baseUrl;
 
   String? get authToken => _authToken;
 
@@ -69,6 +70,12 @@ class ApiClient {
       'X-Client-Environment': AppEnv.isInitialized ? AppEnv.environment : 'development',
     };
 
+    // Forward the Coolify virtual host header so both domain and direct-IP requests route accurately
+    final targetHost = Uri.tryParse(effectiveBaseUrl)?.host ?? '';
+    if (targetHost == '163.227.239.97' || targetHost.contains('sslip.io')) {
+      headers['Host'] = 'xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io';
+    }
+
     if (_authToken != null && _authToken!.isNotEmpty) {
       headers['Authorization'] = 'Bearer $_authToken';
     }
@@ -84,13 +91,13 @@ class ApiClient {
   Map<String, String> buildHeaders({Map<String, String>? extraHeaders}) =>
       _buildHeaders(extraHeaders);
 
-  Uri _buildUri(String endpoint, [Map<String, dynamic>? queryParams]) {
+  Uri _buildUri(String targetBaseUrl, String endpoint, [Map<String, dynamic>? queryParams]) {
     final Uri uri;
     if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
       uri = Uri.parse(endpoint);
     } else {
       final cleanEndpoint = endpoint.startsWith('/') ? endpoint : '/$endpoint';
-      final fullUrl = '$baseUrl$cleanEndpoint';
+      final fullUrl = '$targetBaseUrl$cleanEndpoint';
       uri = Uri.parse(fullUrl);
     }
 
@@ -111,8 +118,8 @@ class ApiClient {
     Map<String, String>? headers,
   }) async {
     return _send(
-      () => _httpClient.get(
-        _buildUri(endpoint, queryParams),
+      (activeUrl) => _httpClient.get(
+        _buildUri(activeUrl, endpoint, queryParams),
         headers: _buildHeaders(headers),
       ),
     );
@@ -125,8 +132,8 @@ class ApiClient {
     Map<String, String>? headers,
   }) async {
     return _send(
-      () => _httpClient.post(
-        _buildUri(endpoint, queryParams),
+      (activeUrl) => _httpClient.post(
+        _buildUri(activeUrl, endpoint, queryParams),
         headers: _buildHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
       ),
@@ -140,8 +147,8 @@ class ApiClient {
     Map<String, String>? headers,
   }) async {
     return _send(
-      () => _httpClient.put(
-        _buildUri(endpoint, queryParams),
+      (activeUrl) => _httpClient.put(
+        _buildUri(activeUrl, endpoint, queryParams),
         headers: _buildHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
       ),
@@ -155,8 +162,8 @@ class ApiClient {
     Map<String, String>? headers,
   }) async {
     return _send(
-      () => _httpClient.patch(
-        _buildUri(endpoint, queryParams),
+      (activeUrl) => _httpClient.patch(
+        _buildUri(activeUrl, endpoint, queryParams),
         headers: _buildHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
       ),
@@ -169,20 +176,42 @@ class ApiClient {
     Map<String, String>? headers,
   }) async {
     return _send(
-      () => _httpClient.delete(
-        _buildUri(endpoint, queryParams),
+      (activeUrl) => _httpClient.delete(
+        _buildUri(activeUrl, endpoint, queryParams),
         headers: _buildHeaders(headers),
       ),
     );
   }
 
-  Future<dynamic> _send(Future<http.Response> Function() requestFn) async {
+  Future<dynamic> _send(Future<http.Response> Function(String activeUrl) requestFn) async {
     try {
-      final response = await requestFn().timeout(timeout);
+      final response = await requestFn(effectiveBaseUrl).timeout(timeout);
       return _processResponse(response);
     } on SocketException catch (e) {
+      if (effectiveBaseUrl.contains('sslip.io') && !effectiveBaseUrl.contains('163.227.239.97')) {
+        debugPrint('[ApiClient] DNS failure on sslip.io ($e). Retrying via direct IP: http://163.227.239.97/api/v1');
+        _effectiveBaseUrl = 'http://163.227.239.97/api/v1';
+        try {
+          final fallbackResponse = await requestFn(_effectiveBaseUrl!).timeout(timeout);
+          debugPrint('[ApiClient] Direct IP failover succeeded.');
+          return _processResponse(fallbackResponse);
+        } catch (_) {
+          // Fall through to throw original exception
+        }
+      }
       throw NetworkException('Network error: ${e.message}');
     } on http.ClientException catch (e) {
+      if (effectiveBaseUrl.contains('sslip.io') && !effectiveBaseUrl.contains('163.227.239.97')) {
+        debugPrint('[ApiClient] Client error on sslip.io ($e). Retrying via direct IP: http://163.227.239.97/api/v1');
+        _effectiveBaseUrl = 'http://163.227.239.97/api/v1';
+        try {
+          final fallbackResponse = await requestFn(_effectiveBaseUrl!).timeout(timeout);
+          debugPrint('[ApiClient] Direct IP failover succeeded.');
+          return _processResponse(fallbackResponse);
+        } catch (_) {
+          // Fall through to throw original exception
+        }
+      }
       throw NetworkException('Connection error: ${e.message}');
     } on TimeoutException {
       throw const ApiTimeoutException();

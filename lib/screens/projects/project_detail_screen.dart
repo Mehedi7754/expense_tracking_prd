@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
@@ -246,12 +248,23 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           ],
         ),
         actions: [
-          if (canEdit)
+          if (canEdit) ...[
+            IconButton(
+              icon: const Icon(Icons.add_photo_alternate_outlined),
+              tooltip: 'Upload Project Image',
+              onPressed: () => _showImageSourcePicker(context, project),
+            ),
+            IconButton(
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              tooltip: 'Assign Project Members',
+              onPressed: () => _showAssignMembersModal(context, project),
+            ),
             IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Edit Project Setup',
               onPressed: () => context.push('/projects/edit/${project.id}'),
             ),
+          ],
           const SizedBox(width: 8),
         ],
         bottom: TabBar(
@@ -273,7 +286,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           child: TabBarView(
             controller: _tabController,
             children: [
-              _buildOverviewTab(context, project, projectExpenses, canUpdateProgress),
+              _buildOverviewTab(context, project, projectExpenses, canUpdateProgress, canEdit),
               _buildBudgetVsActualTab(context, project, projectExpenses),
               _buildExpensesTab(context, project, projectExpenses),
               _buildRevenueAndClosingTab(context, project, projectExpenses, canClose),
@@ -290,6 +303,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
     ProjectModel project,
     List<ExpenseModel> expenses,
     bool canUpdateProgress,
+    bool canEdit,
   ) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -312,6 +326,118 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Project Cover Image or Upload Prompt for Admin & PM
+          if (project.imageUrl != null && project.imageUrl!.isNotEmpty) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              height: 160,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: isDark ? [] : AppColors.cardShadow,
+              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: _buildProjectBannerImage(project.imageUrl!),
+                  ),
+                  if (canEdit)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: InkWell(
+                        onTap: () => _showImageSourcePicker(context, project),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withAlpha(160),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white30),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.camera_alt_outlined, color: Colors.white, size: 14),
+                              SizedBox(width: 5),
+                              Text(
+                                'Change Image',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+          ] else if (canEdit) ...[
+            InkWell(
+              onTap: () => _showImageSourcePicker(context, project),
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: AppColors.getPrimary(context).withAlpha(80),
+                    width: 1.2,
+                  ),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.getPrimary(context).withAlpha(20),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.add_photo_alternate_outlined,
+                          color: AppColors.getPrimary(context),
+                          size: 19,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Upload Project Cover Image',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Add site photos or blueprints (Super Admin & Project Manager)',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+
           // PRD Section 30 "Project Cost Card"
           ProjectCostCard(project: project, projectExpenses: expenses),
 
@@ -487,7 +613,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
           const SizedBox(height: 14),
 
           // Project Team Members Section
-          _buildProjectMembersCard(context, project),
+          _buildProjectMembersCard(context, project, canEdit),
           const SizedBox(height: 32),
         ],
       ),
@@ -544,14 +670,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
     final pct = project.progressPercentage.clamp(0.0, 100.0);
 
     Color progressColor;
-    if (pct <= 0.0) {
-      progressColor = const Color(0xFF64748B);
+    if (pct <= 25.0) {
+      progressColor = const Color(0xFFEF4444); // Red: 0 to 25%
     } else if (pct < 75.0) {
-      progressColor = const Color(0xFF4F46E5);
+      progressColor = const Color(0xFFF59E0B); // Amber/Orange: 26 to 74%
     } else if (pct < 100.0) {
-      progressColor = const Color(0xFFF59E0B);
+      progressColor = const Color(0xFF3B82F6); // Blue: 75 to 99%
     } else {
-      progressColor = const Color(0xFF10B981);
+      progressColor = const Color(0xFF10B981); // Emerald Green: 100%
     }
 
     return Container(
@@ -698,7 +824,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
   }
 
   // ==================== PROJECT TEAM MEMBERS CARD ====================
-  Widget _buildProjectMembersCard(BuildContext context, ProjectModel project) {
+  Widget _buildProjectMembersCard(BuildContext context, ProjectModel project, bool canEdit) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allUsers = ref.watch(userManagementProvider);
     final teamMembers = allUsers.where((u) => project.teamMemberIds.contains(u.id)).toList();
@@ -724,71 +850,58 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withAlpha(20),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.people_alt_rounded, color: Color(0xFF8B5CF6), size: 18),
+              ),
+              const SizedBox(width: 10),
               Expanded(
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF8B5CF6).withAlpha(20),
-                        borderRadius: BorderRadius.circular(8),
+                    Text(
+                      'Project Members',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
-                      child: const Icon(Icons.people_alt_rounded, color: Color(0xFF8B5CF6), size: 18),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Project Members',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            '${teamMembers.length} assigned member${teamMembers.length == 1 ? '' : 's'}',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
+                    Text(
+                      '${teamMembers.length} assigned member${teamMembers.length == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => context.push(RoutePaths.projectTeam(project.id)),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8B5CF6).withAlpha(15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF8B5CF6).withAlpha(50)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'View Team',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF8B5CF6)),
-                      ),
-                      SizedBox(width: 2),
-                      Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF8B5CF6)),
-                    ],
-                  ),
+              const SizedBox(width: 6),
+              if (canEdit) ...[
+                IconButton(
+                  tooltip: 'Assign Members',
+                  icon: Icon(Icons.person_add_alt_1_rounded, size: 20, color: AppColors.getPrimary(context)),
+                  onPressed: () => _showAssignMembersModal(context, project),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
+                const SizedBox(width: 4),
+              ],
+              IconButton(
+                tooltip: 'View Team',
+                icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF8B5CF6)),
+                onPressed: () => context.push(RoutePaths.projectTeam(project.id)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
@@ -796,33 +909,50 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
 
           // Team Member Chips / Avatars
           if (teamMembers.isEmpty)
-            Text(
-              'No team members assigned yet.',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No team members assigned yet. Admin and Project Manager can assign members to work on this project.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                  ),
+                ),
+                if (canEdit) ...[
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.getPrimary(context),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 15),
+                    label: const Text('Assign Project Members', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    onPressed: () => _showAssignMembersModal(context, project),
+                  ),
+                ],
+              ],
             )
-          else
+          else ...[
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: teamMembers.map((member) {
-                return InkWell(
-                  onTap: () => context.push('/profile/employee/${member.id}'),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                      ),
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                         CircleAvatar(
                           radius: 11,
                           backgroundColor: const Color(0xFF8B5CF6),
@@ -833,7 +963,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                         ),
                         const SizedBox(width: 6),
                         ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 140),
+                          constraints: const BoxConstraints(maxWidth: 130),
                           child: Text(
                             member.name,
                             style: TextStyle(
@@ -857,12 +987,46 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
                             style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFF8B5CF6)),
                           ),
                         ),
+                        if (canEdit) ...[
+                          const SizedBox(width: 4),
+                          InkWell(
+                            onTap: () async {
+                              final updatedIds = project.teamMemberIds.where((id) => id != member.id).toList();
+                              await ref.read(projectProvider.notifier).updateProject(
+                                    project.copyWith(teamMemberIds: updatedIds),
+                                  );
+                              await ref.read(userManagementProvider.notifier).unassignUserFromProject(member.id, project.id);
+                              if (context.mounted) {
+                                NotificationBanner.showInfo(context, '${member.name} unassigned from ${project.name}');
+                              }
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(2),
+                              child: Icon(Icons.close_rounded, size: 14, color: Color(0xFF94A3B8)),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
             ),
+            if (canEdit) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.getPrimary(context),
+                  side: BorderSide(color: AppColors.getPrimary(context).withAlpha(60)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  visualDensity: VisualDensity.compact,
+                ),
+                icon: const Icon(Icons.person_add_alt_1_rounded, size: 14),
+                label: const Text('Manage & Assign Members', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                onPressed: () => _showAssignMembersModal(context, project),
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -1171,4 +1335,441 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
       ],
     );
   }
+
+  Widget _buildProjectBannerImage(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: const Color(0xFF312E81),
+          child: const Center(
+            child: Icon(Icons.business_center_rounded, size: 40, color: Colors.white70),
+          ),
+        ),
+      );
+    }
+    final file = File(path);
+    if (file.existsSync()) {
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          color: const Color(0xFF312E81),
+          child: const Center(
+            child: Icon(Icons.business_center_rounded, size: 40, color: Colors.white70),
+          ),
+        ),
+      );
+    }
+    return Container(
+      color: const Color(0xFF312E81),
+      child: const Center(
+        child: Icon(Icons.business_center_rounded, size: 40, color: Colors.white70),
+      ),
+    );
+  }
+
+  // ==================== REQUIREMENT 1: PROJECT IMAGE UPLOAD ====================
+  Future<void> _pickAndApplyImage(BuildContext context, ProjectModel project, ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1000,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        final updated = project.copyWith(imageUrl: picked.path);
+        await ref.read(projectProvider.notifier).updateProject(updated);
+        if (context.mounted) {
+          NotificationBanner.showSuccess(context, 'Project image uploaded successfully');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        NotificationBanner.showError(context, 'Failed to upload project image: $e');
+      }
+    }
+  }
+
+  void _showImageSourcePicker(BuildContext context, ProjectModel project) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Upload Project Image',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: -0.3),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Select a cover photo or banner for ${project.name}',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5).withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF4F46E5)),
+              ),
+              title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              subtitle: const Text('Capture site or blueprints directly', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndApplyImage(context, project, ImageSource.camera);
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0EA5E9).withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.photo_library_outlined, color: Color(0xFF0EA5E9)),
+              ),
+              title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              subtitle: const Text('Select photo from local device library', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndApplyImage(context, project, ImageSource.gallery);
+              },
+            ),
+            if (project.imageUrl != null && project.imageUrl!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.red.withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                ),
+                title: const Text('Remove Image', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.red)),
+                subtitle: const Text('Clear current project banner', style: TextStyle(fontSize: 11)),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final updated = project.copyWith(clearImageUrl: true);
+                  await ref.read(projectProvider.notifier).updateProject(updated);
+                  if (context.mounted) {
+                    NotificationBanner.showInfo(context, 'Project image removed');
+                  }
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==================== REQUIREMENT 2: ASSIGN PROJECT MEMBERS ====================
+  void _showAssignMembersModal(BuildContext context, ProjectModel project) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    String searchQuery = '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Consumer(
+          builder: (modalCtx, ref, _) {
+            return StatefulBuilder(
+              builder: (modalContext, setModalState) {
+                final allUsers = ref.watch(userManagementProvider);
+                final currentProjects = ref.watch(projectProvider);
+                final liveProject = currentProjects.firstWhere(
+                  (p) => p.id == project.id,
+                  orElse: () => project,
+                );
+                final assignedIds = liveProject.teamMemberIds.toSet();
+
+            final filteredUsers = allUsers.where((u) {
+              if (searchQuery.isEmpty) return true;
+              final q = searchQuery.toLowerCase();
+              return u.name.toLowerCase().contains(q) ||
+                  u.email.toLowerCase().contains(q) ||
+                  u.department.toLowerCase().contains(q) ||
+                  (u.designation?.toLowerCase().contains(q) ?? false);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.82,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Assign Project Members',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${assignedIds.length} members assigned to ${liveProject.name}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Search Field
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+                    child: TextField(
+                      onChanged: (val) {
+                        setModalState(() => searchQuery = val.trim());
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search members by name, email, department...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Member list
+                  Expanded(
+                    child: filteredUsers.isEmpty
+                        ? Center(
+                            child: Text(
+                              'No registered members found.',
+                              style: TextStyle(
+                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            itemCount: filteredUsers.length,
+                            separatorBuilder: (_, __) => Divider(
+                              height: 1,
+                              color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9),
+                            ),
+                            itemBuilder: (itemCtx, i) {
+                              final u = filteredUsers[i];
+                              final isAssigned = assignedIds.contains(u.id);
+
+                              return ListTile(
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                leading: CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: isAssigned
+                                      ? AppColors.getPrimary(context)
+                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                  child: Text(
+                                    u.name.isNotEmpty ? u.name[0].toUpperCase() : 'U',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: isAssigned ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                                    ),
+                                  ),
+                                ),
+                                title: Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        u.name,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: u.isApproved
+                                            ? const Color(0xFF10B981).withAlpha(20)
+                                            : const Color(0xFFF59E0B).withAlpha(20),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        u.isApproved ? 'Approved' : 'Pending',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: u.isApproved ? const Color(0xFF10B981) : const Color(0xFFD97706),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '${u.department} • ${u.role.displayName}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    Text(
+                                      u.email,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (!u.isApproved) ...[
+                                      TextButton(
+                                        style: TextButton.styleFrom(
+                                          visualDensity: VisualDensity.compact,
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        ),
+                                        onPressed: () async {
+                                          await ref.read(userManagementProvider.notifier).approveUser(u.id);
+                                          setModalState(() {});
+                                          if (context.mounted) {
+                                            NotificationBanner.showSuccess(context, '${u.name} approved');
+                                          }
+                                        },
+                                        child: const Text('Approve', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                                      ),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Switch.adaptive(
+                                      value: isAssigned,
+                                      activeColor: AppColors.getPrimary(context),
+                                      onChanged: (val) async {
+                                        if (val) {
+                                          final updatedTeam = [...liveProject.teamMemberIds, u.id];
+                                          await ref.read(projectProvider.notifier).updateProject(
+                                                liveProject.copyWith(teamMemberIds: updatedTeam),
+                                              );
+                                          await ref.read(userManagementProvider.notifier).assignUserToProject(u.id, liveProject.id);
+                                          setModalState(() {});
+                                          if (context.mounted) {
+                                            NotificationBanner.showSuccess(
+                                              context,
+                                              '${u.name} assigned to ${liveProject.name}. They can now work on this project.',
+                                            );
+                                          }
+                                        } else {
+                                          final updatedTeam = liveProject.teamMemberIds.where((id) => id != u.id).toList();
+                                          await ref.read(projectProvider.notifier).updateProject(
+                                                liveProject.copyWith(teamMemberIds: updatedTeam),
+                                              );
+                                          await ref.read(userManagementProvider.notifier).unassignUserFromProject(u.id, liveProject.id);
+                                          setModalState(() {});
+                                          if (context.mounted) {
+                                            NotificationBanner.showInfo(
+                                              context,
+                                              '${u.name} unassigned from ${liveProject.name}',
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  },
+);
+}
 }

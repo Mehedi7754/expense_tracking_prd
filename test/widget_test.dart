@@ -11,6 +11,7 @@ import 'package:expense_tracking_prd/state/auth_provider.dart';
 import 'package:expense_tracking_prd/state/expense_provider.dart';
 import 'package:expense_tracking_prd/state/project_provider.dart';
 import 'package:expense_tracking_prd/state/settings_provider.dart';
+import 'test_fixtures.dart';
 
 void main() {
   testWidgets('App smoke test initializes and settles properly', (WidgetTester tester) async {
@@ -41,28 +42,30 @@ void main() {
     expect(auth.isAuthenticated, true);
     expect(auth.currentUser?.role, UserRole.projectMember);
 
-    // Verify projects and expenses providers are pre-seeded with Bangladesh consultancy data
+    // Verify projects and expenses providers are clean and unseeded in production
     final projects = container.read(projectProvider);
-    expect(projects.isNotEmpty, true);
+    expect(projects.isEmpty, true);
 
     final expenses = container.read(expenseProvider);
-    expect(expenses.isNotEmpty, true);
+    expect(expenses.isEmpty, true);
+
+    // Test seeding with test fixtures
+    container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
+    container.read(expenseProvider.notifier).setExpenses(TestFixtures.testExpenses);
+    expect(container.read(projectProvider).isNotEmpty, true);
+    expect(container.read(expenseProvider).isNotEmpty, true);
 
     // Test role switching to Project Manager
     container.read(authProvider.notifier).switchRole(UserRole.projectManager);
     expect(container.read(authProvider).currentUser?.role, UserRole.projectManager);
 
-    // Test role switching to Finance
-    container.read(authProvider.notifier).switchRole(UserRole.finance);
-    expect(container.read(authProvider).currentUser?.role, UserRole.finance);
+    // Test role switching to Project Member
+    container.read(authProvider.notifier).switchRole(UserRole.projectMember);
+    expect(container.read(authProvider).currentUser?.role, UserRole.projectMember);
 
-    // Test role switching to Main Admin
+    // Test role switching to Super Admin
     container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
     expect(container.read(authProvider).currentUser?.role, UserRole.mainAdmin);
-
-    // Test role switching to Viewer
-    container.read(authProvider.notifier).switchRole(UserRole.viewer);
-    expect(container.read(authProvider).currentUser?.role, UserRole.viewer);
   });
 
   group('Environment Security & Configuration Tests', () {
@@ -137,6 +140,7 @@ void main() {
 
     test('ProjectProgressStage maps correctly according to progress percentage thresholds', () {
       final container = ProviderContainer();
+      container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
       final base = container.read(projectProvider).first;
 
       final pNotStarted = base.copyWith(progressPercentage: 0.0);
@@ -164,6 +168,7 @@ void main() {
 
     test('ProjectNotifier updateProjectProgress updates percentage and audit metadata', () {
       final container = ProviderContainer();
+      container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
       final projectsBefore = container.read(projectProvider);
       final targetProject = projectsBefore.first;
 

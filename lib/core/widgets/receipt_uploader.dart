@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_text_styles.dart';
+import 'notification_banner.dart';
 
 class ReceiptUploader extends StatelessWidget {
   final String? imagePath;
@@ -30,7 +31,9 @@ class ReceiptUploader extends StatelessWidget {
         onImageChanged(pickedFile.path);
       }
     } catch (e) {
-      onImageChanged('sample_receipt_invoice.jpg');
+      if (context.mounted) {
+        NotificationBanner.showError(context, 'Could not load receipt: $e');
+      }
     }
   }
 
@@ -91,23 +94,6 @@ class ReceiptUploader extends StatelessWidget {
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage(context, ImageSource.gallery);
-                },
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.auto_awesome_rounded, color: AppColors.emerald),
-                ),
-                title: Text('Attach Sample Verified Receipt', style: AppTextStyles.labelLarge),
-                subtitle: Text('Quick test fixture for reviewer approval evaluation', style: AppTextStyles.bodySmall),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onImageChanged('sample_receipt_invoice.jpg');
                 },
               ),
             ],
@@ -363,9 +349,12 @@ class ReceiptUploader extends StatelessWidget {
             children: [
               Icon(Icons.image_not_supported_outlined, size: 18, color: AppColors.getTextMuted(context)),
               const SizedBox(width: 8),
-              Text(
-                'No receipt attached to this claim',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextMuted(context)),
+              Flexible(
+                child: Text(
+                  'No receipt attached to this claim',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextMuted(context)),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

@@ -10,6 +10,7 @@ class UserModel {
   final String? phone;
   final String? avatarUrl;
   final bool isActive;
+  final bool isApproved;
   final List<String> assignedProjectIds;
 
   const UserModel({
@@ -22,6 +23,7 @@ class UserModel {
     this.phone,
     this.avatarUrl,
     this.isActive = true,
+    this.isApproved = true,
     this.assignedProjectIds = const [],
   });
 
@@ -35,6 +37,7 @@ class UserModel {
     String? phone,
     String? avatarUrl,
     bool? isActive,
+    bool? isApproved,
     List<String>? assignedProjectIds,
   }) {
     return UserModel(
@@ -47,6 +50,7 @@ class UserModel {
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isActive: isActive ?? this.isActive,
+      isApproved: isApproved ?? this.isApproved,
       assignedProjectIds: assignedProjectIds ?? this.assignedProjectIds,
     );
   }
@@ -71,6 +75,7 @@ class UserModel {
       phone: json['phone']?.toString(),
       avatarUrl: (json['avatar_url'] ?? json['avatarUrl'])?.toString(),
       isActive: json['is_active'] ?? json['isActive'] ?? true,
+      isApproved: json['is_approved'] ?? json['isApproved'] ?? true,
       assignedProjectIds: parseProjectIds(json['assigned_project_ids'] ?? json['assignedProjectIds']),
     );
   }
@@ -86,6 +91,7 @@ class UserModel {
       if (phone != null) 'phone': phone,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
       'is_active': isActive,
+      'is_approved': isApproved,
       'assigned_project_ids': assignedProjectIds,
     };
   }

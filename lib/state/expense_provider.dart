@@ -1,9 +1,20 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/comment_model.dart';
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/expense_repository.dart';
+
+const String _kCustomExpensesKey = 'gw_custom_expenses_cache';
+
+bool _isTestEnvironment() {
+  if (kIsWeb) return false;
+  return Platform.environment.containsKey('FLUTTER_TEST');
+}
 
 class MemberReceiptSummary {
   final String memberId;
@@ -30,203 +41,76 @@ class MemberReceiptSummary {
 }
 
 class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
-  // Initial expenses reflecting PRD Section 11 & 12 scenarios
-  static final List<ExpenseModel> _initialExpenses = [
-    // Fahim's expenses on Project 01 (Total: ৳100K, No Receipt: ৳60K = 60% 🔴)
-    ExpenseModel(
-      id: 'exp_fahim_01',
-      employeeId: 'usr_emp_01',
-      employeeName: 'Fahim Ahmed',
-      projectId: 'proj_01',
-      projectName: 'Enterprise Cloud ERP Platform',
-      amount: 40000.0,
-      baseCost: 36000.0,
-      taxRate: 10.0,
-      taxAmount: 4000.0,
-      officeBenefitAmount: 12000.0, // 30%
-      currency: 'BDT',
-      categoryId: 'cat_equip',
-      categoryName: 'Equipment',
-      categoryIcon: 'hardware',
-      note: 'AWS GPU cluster and dedicated staging server infrastructure.',
-      date: DateTime(2026, 9, 5),
-      hasReceipt: true,
-      receiptPhotoUrl: 'sample_receipt_invoice.jpg',
-      status: ExpenseStatus.approved,
-      createdAt: DateTime(2026, 9, 5, 11, 30),
-      equipmentDetails: const EquipmentDetails(
-        equipmentType: 'AWS Cloud Compute & GPU Cluster',
-        isRental: true,
-        quantity: 4,
-        rentalAmount: 40000.0,
-        rentalPeriod: '1 Month',
-      ),
-    ),
-    ExpenseModel(
-      id: 'exp_fahim_02',
-      employeeId: 'usr_emp_01',
-      employeeName: 'Fahim Ahmed',
-      projectId: 'proj_01',
-      projectName: 'Enterprise Cloud ERP Platform',
-      amount: 35000.0,
-      officeBenefitAmount: 10500.0, // 30%
-      currency: 'BDT',
-      categoryId: 'cat_trans',
-      categoryName: 'Transportation',
-      categoryIcon: 'transport',
-      note: 'Client onsite technical sprint planning & team commute.',
-      date: DateTime(2026, 9, 12),
-      hasReceipt: false, // 🔴 No Receipt
-      status: ExpenseStatus.pending,
-      justificationStatus: JustificationStatus.required,
-      createdAt: DateTime(2026, 9, 12, 18, 45),
-      transportationDetails: const TransportationDetails(
-        transportationType: TransportationType.cng,
-        fromLocation: 'Tech HQ',
-        toLocation: 'Client Corporate Tower',
-        distanceKm: 45.0,
-        fuelCost: 20000.0,
-        otherTransportCost: 15000.0,
-      ),
-    ),
-    ExpenseModel(
-      id: 'exp_fahim_03',
-      employeeId: 'usr_emp_01',
-      employeeName: 'Fahim Ahmed',
-      projectId: 'proj_01',
-      projectName: 'Enterprise Cloud ERP Platform',
-      amount: 25000.0,
-      officeBenefitAmount: 7500.0, // 30%
-      currency: 'BDT',
-      categoryId: 'cat_food',
-      categoryName: 'Food',
-      categoryIcon: 'meal',
-      note: 'Dev team sprint release milestone dinner & refreshments.',
-      date: DateTime(2026, 9, 14),
-      hasReceipt: false, // 🔴 No Receipt
-      status: ExpenseStatus.pending,
-      justificationStatus: JustificationStatus.required,
-      createdAt: DateTime(2026, 9, 14, 21, 15),
-      foodDetails: const FoodDetails(
-        location: 'Tech Hub Cafeteria',
-        attendees: 'Fahim, 7 Fullstack Engineers',
-        numberOfPeople: 8,
-        mealType: 'Sprint Dinner',
-        exceedsFoodAllowance: false,
-      ),
-    ),
-
-    // Project 02: Sarah & Rahim (Total: ৳80K, No Receipt: ৳20K = 25% 🟢)
-    ExpenseModel(
-      id: 'exp_04',
-      employeeId: 'usr_mgr_01',
-      employeeName: 'Sarah Jenkins',
-      projectId: 'proj_02',
-      projectName: 'Fintech Mobile Banking App (iOS & Android)',
-      amount: 60000.0,
-      officeBenefitAmount: 12000.0, // 20%
-      currency: 'BDT',
-      categoryId: 'cat_accomm',
-      categoryName: 'Accommodation',
-      categoryIcon: 'hotel',
-      note: 'Client onsite technical architecture workshop and team accommodation.',
-      date: DateTime(2026, 9, 10),
-      hasReceipt: true,
-      receiptPhotoUrl: 'sample_receipt_invoice.jpg',
-      status: ExpenseStatus.approved,
-      createdAt: DateTime(2026, 9, 10, 14, 00),
-      accommodationDetails: const AccommodationDetails(
-        hotelName: 'Tech Residency Suites',
-        location: 'Gulshan-2, Dhaka',
-        guests: 'Sarah, 3 Lead Engineers',
-        numberOfNights: 4,
-        ratePerNight: 15000.0,
-      ),
-    ),
-    ExpenseModel(
-      id: 'exp_05',
-      employeeId: 'usr_mgr_01',
-      employeeName: 'Sarah Jenkins',
-      projectId: 'proj_02',
-      projectName: 'Fintech Mobile Banking App (iOS & Android)',
-      amount: 20000.0,
-      officeBenefitAmount: 4000.0, // 20%
-      currency: 'BDT',
-      categoryId: 'cat_trans',
-      categoryName: 'Transportation',
-      categoryIcon: 'transport',
-      note: 'Emergency ride-hail transport for night deployment engineering team.',
-      date: DateTime(2026, 9, 13),
-      hasReceipt: false, // 25% ratio overall on Project 02
-      status: ExpenseStatus.approved,
-      justificationStatus: JustificationStatus.approved,
-      justificationReason: 'Late night server deployment transport',
-      justificationComment: 'Emergency transport after core banking integration release.',
-      justificationReviewedBy: 'David Chen',
-      justificationReviewedAt: DateTime(2026, 9, 14, 10, 00),
-      createdAt: DateTime(2026, 9, 13, 23, 30),
-      transportationDetails: const TransportationDetails(
-        transportationType: TransportationType.cng,
-        fromLocation: 'Server Center',
-        toLocation: 'Engineer Residencies',
-        distanceKm: 28.0,
-      ),
-    ),
-
-    // Project 03: Karim (Total: ৳120K, No Receipt: ৳70K = 58.3% 🔴 Review)
-    ExpenseModel(
-      id: 'exp_06',
-      employeeId: 'usr_emp_03',
-      employeeName: 'Karim Ullah',
-      projectId: 'proj_03',
-      projectName: 'AI-Powered Telehealth Diagnostic Portal',
-      amount: 50000.0,
-      officeBenefitAmount: 15000.0, // 30%
-      currency: 'BDT',
-      categoryId: 'cat_office',
-      categoryName: 'Office Cost',
-      categoryIcon: 'office',
-      note: 'HIPAA compliance security certification & dev team tooling licenses.',
-      date: DateTime(2026, 8, 25),
-      hasReceipt: true,
-      receiptPhotoUrl: 'sample_receipt_invoice.jpg',
-      status: ExpenseStatus.approved,
-      createdAt: DateTime(2026, 8, 25, 16, 00),
-      officeCostDetails: const OfficeCostDetails(subCategory: 'Software Licenses'),
-    ),
-    ExpenseModel(
-      id: 'exp_07',
-      employeeId: 'usr_emp_03',
-      employeeName: 'Karim Ullah',
-      projectId: 'proj_03',
-      projectName: 'AI-Powered Telehealth Diagnostic Portal',
-      amount: 70000.0,
-      officeBenefitAmount: 21000.0, // 30%
-      currency: 'BDT',
-      categoryId: 'cat_trans',
-      categoryName: 'Transportation',
-      categoryIcon: 'transport',
-      note: 'Hospital partner integration site visits and doctor onboarding travel.',
-      date: DateTime(2026, 9, 8),
-      hasReceipt: false, // 🔴 No Receipt
-      status: ExpenseStatus.pending,
-      justificationStatus: JustificationStatus.submitted,
-      justificationReason: 'Local transport receipts unavailable from ride drivers',
-      justificationComment: 'Multiple hospital visits across 10 days for doctor app pilot.',
-      createdAt: DateTime(2026, 9, 8, 19, 00),
-      transportationDetails: const TransportationDetails(
-        transportationType: TransportationType.local,
-        fromLocation: 'BioHealth Lab',
-        toLocation: 'Partner Hospitals',
-        distanceKm: 140.0,
-      ),
-    ),
-  ];
+  static bool isDummyExpense(ExpenseModel e) {
+    const dummyIds = {
+      'exp_fahim_01',
+      'exp_fahim_02',
+      'exp_sarah_01',
+      'exp_sarah_02',
+      'exp_karim_01',
+      'exp_michael_01',
+      'exp_fahim_03',
+    };
+    const dummyNames = {'Fahim Ahmed', 'Sarah Jenkins', 'Karim Ullah', 'Michael Chang', 'Eleanor Vance'};
+    const dummyProjects = {
+      'proj_01', 'proj_02', 'proj_03', 'proj_04', 'proj_05',
+      'Enterprise Cloud ERP Platform',
+      'Smart Healthcare IoT System',
+      'AI-Powered Logistics Engine',
+      'Solar Microgrid Power Hub',
+      'Financial Compliance Audit Suite',
+    };
+    return dummyIds.contains(e.id) ||
+        dummyNames.contains(e.employeeName) ||
+        dummyProjects.contains(e.projectId) ||
+        dummyProjects.contains(e.projectName);
+  }
 
   @override
+  List<ExpenseModel> build() {
+    _loadCachedExpenses();
+    return const [];
+  }
 
-  @override
-  List<ExpenseModel> build() => _initialExpenses;
+  Future<void> _loadCachedExpenses() async {
+    if (_isTestEnvironment()) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_kCustomExpensesKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(jsonStr);
+        final customExpenses = decoded
+            .whereType<Map<String, dynamic>>()
+            .map(ExpenseModel.fromJson)
+            .where((e) => !isDummyExpense(e))
+            .toList();
+
+        state = customExpenses;
+        await prefs.setString(
+          _kCustomExpensesKey,
+          jsonEncode(customExpenses.map((e) => e.toJson()).toList()),
+        );
+        debugPrint('[ExpenseNotifier] Restored ${customExpenses.length} real expenses from local cache');
+      } else {
+        state = const [];
+      }
+    } catch (e) {
+      debugPrint('[ExpenseNotifier] Error loading cached expenses: $e');
+      state = const [];
+    }
+  }
+
+  Future<void> _persistExpenses() async {
+    if (_isTestEnvironment()) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final realExpenses = state.where((e) => !isDummyExpense(e)).toList();
+      final jsonList = realExpenses.map((e) => e.toJson()).toList();
+      await prefs.setString(_kCustomExpensesKey, jsonEncode(jsonList));
+    } catch (e) {
+      debugPrint('[ExpenseNotifier] Error persisting expenses: $e');
+    }
+  }
 
   Future<void> fetchExpenses({
     String? projectId,
@@ -235,19 +119,27 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
   }) async {
     try {
       final repo = ref.read(expenseRepositoryProvider);
-      final expenses = await repo.getExpenses(
+      final remoteExpenses = await repo.getExpenses(
         projectId: projectId,
         employeeId: employeeId,
         status: status,
       );
-      state = expenses;
-    } catch (_) {
-      // Keep existing state on network disconnect
+      final validRemote = remoteExpenses.where((e) => !isDummyExpense(e)).toList();
+      if (validRemote.isNotEmpty) {
+        final remoteIds = validRemote.map((e) => e.id).toSet();
+        final localOnly = state.where((e) => !isDummyExpense(e) && !remoteIds.contains(e.id)).toList();
+        state = [...validRemote, ...localOnly];
+        await _persistExpenses();
+        debugPrint('[ExpenseNotifier] Synchronized ${validRemote.length} real expenses from backend');
+      }
+    } catch (e) {
+      debugPrint('[ExpenseNotifier] Offline: keeping cached expenses: $e');
     }
   }
 
   void setExpenses(List<ExpenseModel> expenses) {
     state = expenses;
+    _persistExpenses();
   }
 
   /// PRD Section 1 & 17: Filter expenses for specific user
@@ -381,8 +273,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
       officeCostDetails: officeCostDetails,
     );
 
-    // Optimistic local update
+    // Optimistic local update & instant persistence so it's NEVER lost on restart
     state = [newExpense, ...state];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -391,8 +284,10 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         for (final exp in state)
           if (exp.id == newExpense.id) saved else exp,
       ];
+      await _persistExpenses();
       return saved;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[ExpenseNotifier] Error submitting expense to backend: $e. Retained in local storage.');
       return newExpense;
     }
   }
@@ -416,6 +311,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -447,6 +343,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -477,6 +374,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -507,6 +405,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -563,6 +462,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     final updated = state.firstWhere((e) => e.id == id);
     try {
@@ -581,6 +481,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -598,6 +499,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -617,6 +519,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -636,6 +539,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -647,6 +551,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
 
   void withdrawExpense(String id) {
     state = state.where((exp) => !(exp.id == id && exp.status == ExpenseStatus.pending)).toList();
+    _persistExpenses();
   }
 
   Future<void> addComment({
@@ -673,6 +578,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         else
           exp,
     ];
+    await _persistExpenses();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);

@@ -71,8 +71,12 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   // Category E: Office Cost
   String _officeSubCategory = 'Printing';
 
+  // Category F: Other Custom Category Name
+  final _otherCategoryNameController = TextEditingController();
+
   @override
   void dispose() {
+    _otherCategoryNameController.dispose();
     _amountController.dispose();
     _customTaxController.dispose();
     _noteController.dispose();
@@ -257,7 +261,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       officeDetails = OfficeCostDetails(subCategory: _officeSubCategory);
     }
 
-    ref.read(expenseProvider.notifier).submitExpense(
+    final created = await ref.read(expenseProvider.notifier).submitExpense(
           employeeId: user.id,
           employeeName: user.name,
           projectId: _selectedProject!.id,
@@ -282,11 +286,21 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           officeCostDetails: officeDetails,
         );
 
-    NotificationBanner.showSuccess(
-      context,
-      _hasReceipt ? 'Expense submitted successfully' : 'Expense submitted (Flagged: No Receipt)',
-    );
-    context.pop();
+    if (mounted) {
+      final isUploadedToServer = !created.id.startsWith('exp_');
+      if (isUploadedToServer) {
+        NotificationBanner.showSuccess(
+          context,
+          _hasReceipt ? 'Expense submitted and uploaded to server!' : 'Expense submitted & uploaded (Flagged: No Receipt)',
+        );
+      } else {
+        NotificationBanner.showWarning(
+          context,
+          'Saved locally (Server unreachable: Check network / phone). Will sync when connected.',
+        );
+      }
+      context.pop();
+    }
   }
 
   String _getCategoryDisplayName(String cat) {
@@ -302,7 +316,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       case 'office':
         return 'Office Cost';
       default:
-        return 'Other';
+        final customName = _otherCategoryNameController.text.trim();
+        return customName.isNotEmpty ? customName : 'Other';
     }
   }
 
@@ -1236,9 +1251,29 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   }
 
   Widget _buildOtherForm() {
-    return const Text(
-      'Enter general expense information below. Provide detailed description in the purpose field.',
-      style: TextStyle(fontSize: 12, color: Colors.grey),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _otherCategoryNameController,
+          decoration: const InputDecoration(
+            labelText: 'Custom Category Name *',
+            hintText: 'e.g. Legal & Professional, Stationery, Cloud Hosting',
+            prefixIcon: Icon(Icons.edit_note_rounded),
+          ),
+          validator: (v) {
+            if (_selectedCategory == 'other' && (v == null || v.trim().isEmpty)) {
+              return 'Please enter the expense category name';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Provide specific category details or purpose in the description field below.',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
+      ],
     );
   }
 }

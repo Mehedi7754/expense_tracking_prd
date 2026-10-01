@@ -139,13 +139,13 @@ class SettingsScreen extends ConsumerWidget {
                       style: TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                     const SizedBox(height: 12),
-                    _buildThresholdItem('🟢 Normal Threshold', 'Below 30%', AppColors.success),
+                    _buildThresholdItem(Icons.check_circle_rounded, 'Normal Threshold', 'Below 30%', AppColors.success),
                     const Divider(height: 16),
-                    _buildThresholdItem('🟡 Warning Threshold', '30% – 50%', AppColors.warning),
+                    _buildThresholdItem(Icons.info_outline_rounded, 'Warning Threshold', '30% – 50%', AppColors.warning),
                     const Divider(height: 16),
-                    _buildThresholdItem('🔴 Red Flag / High Risk Threshold', 'Above 50% (Justification Required)', AppColors.error),
+                    _buildThresholdItem(Icons.warning_amber_rounded, 'Red Flag / High Risk Threshold', 'Above 50% (Justification Required)', AppColors.error),
                     const Divider(height: 16),
-                    _buildThresholdItem('🔴 Critical Risk Threshold', 'Above 75%', const Color(0xFF991B1B)),
+                    _buildThresholdItem(Icons.error_outline_rounded, 'Critical Risk Threshold', 'Above 75%', const Color(0xFF991B1B)),
                   ],
                 ),
               ),
@@ -286,9 +286,11 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildThresholdItem(String label, String value, Color color) {
+  Widget _buildThresholdItem(IconData icon, String label, String value, Color color) {
     return Row(
       children: [
+        Icon(icon, size: 15, color: color),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             label,

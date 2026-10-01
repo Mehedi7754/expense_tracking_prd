@@ -57,15 +57,22 @@ class ProjectProgressBadge extends StatelessWidget {
   }
 
   Color _getColor(BuildContext context) {
+    if (percentage != null) {
+      final p = percentage!.clamp(0.0, 100.0);
+      if (p <= 25.0) return const Color(0xFFEF4444); // Red: 0 to 25%
+      if (p < 75.0) return const Color(0xFFF59E0B); // Amber/Orange: 26 to 74%
+      if (p < 100.0) return const Color(0xFF3B82F6); // Blue: 75 to 99%
+      return const Color(0xFF10B981); // Emerald Green: 100%
+    }
     switch (stage) {
       case ProjectProgressStage.notStarted:
-        return const Color(0xFF64748B); // Slate
+        return const Color(0xFFEF4444); // Red: 0 to 25%
       case ProjectProgressStage.inProgress:
-        return const Color(0xFF4F46E5); // Indigo
+        return const Color(0xFFF59E0B); // Amber / Orange: 26 to 74%
       case ProjectProgressStage.nearCompletion:
-        return const Color(0xFFF59E0B); // Amber / Orange
+        return const Color(0xFF3B82F6); // Blue: 75 to 99%
       case ProjectProgressStage.completed:
-        return const Color(0xFF10B981); // Emerald
+        return const Color(0xFF10B981); // Emerald: 100%
     }
   }
 

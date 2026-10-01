@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
@@ -149,7 +150,7 @@ class ProjectCostCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
             child: Row(
               children: [
-                // 1. Left squircle icon with soft tinted pastel background
+                // 1. Left squircle icon or project image with soft tinted pastel background
                 Container(
                   width: 52,
                   height: 52,
@@ -157,12 +158,17 @@ class ProjectCostCard extends StatelessWidget {
                     color: iconBg,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Center(
-                    child: Icon(
-                      iconData,
-                      size: 26,
-                      color: accentColor,
-                    ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: (project.imageUrl != null && project.imageUrl!.isNotEmpty)
+                        ? _buildProjectThumbnail(project.imageUrl!, iconData, accentColor)
+                        : Center(
+                            child: Icon(
+                              iconData,
+                              size: 26,
+                              color: accentColor,
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -248,6 +254,29 @@ class ProjectCostCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildProjectThumbnail(String path, IconData fallbackIcon, Color fallbackColor) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        width: 52,
+        height: 52,
+        errorBuilder: (_, __, ___) => Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor)),
+      );
+    }
+    final file = File(path);
+    if (file.existsSync()) {
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        width: 52,
+        height: 52,
+        errorBuilder: (_, __, ___) => Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor)),
+      );
+    }
+    return Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor));
   }
 }
 

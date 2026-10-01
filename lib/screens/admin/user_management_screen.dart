@@ -9,6 +9,7 @@ import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/role_badge.dart';
 import '../../models/user_model.dart';
 import '../../models/user_role.dart';
+import '../../state/auth_provider.dart';
 import '../../state/user_management_provider.dart';
 
 class UserManagementScreen extends ConsumerStatefulWidget {
@@ -33,7 +34,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
         title: Text('Change Role: ${user.name}', style: AppTextStyles.titleMedium),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: UserRole.values.map((role) {
+          children: UserRole.activeRoles.map((role) {
             final isCurrent = user.role == role;
             return ListTile(
               title: Text(role.displayName, style: AppTextStyles.labelMedium),
@@ -58,6 +59,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = ref.watch(authProvider).currentUser;
     final allUsers = ref.watch(userManagementProvider);
 
     final filtered = allUsers.where((u) {
@@ -160,6 +162,43 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                                       ),
                                       const SizedBox(width: 8),
                                       RoleBadge(role: user.role, compact: true),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                        decoration: BoxDecoration(
+                                          color: user.isApproved
+                                              ? AppColors.emerald.withAlpha(20)
+                                              : AppColors.amber.withAlpha(25),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: user.isApproved
+                                                ? AppColors.emerald.withAlpha(70)
+                                                : AppColors.amber.withAlpha(90),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              user.isApproved
+                                                  ? Icons.verified_user_rounded
+                                                  : Icons.pending_actions_rounded,
+                                              size: 11,
+                                              color: user.isApproved ? AppColors.emeraldDark : AppColors.amberDark,
+                                            ),
+                                            const SizedBox(width: 3),
+                                            Text(
+                                              user.isApproved ? 'Approved' : 'Pending',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
+                                                color: user.isApproved ? AppColors.emeraldDark : AppColors.amberDark,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 2),
@@ -182,6 +221,33 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                           ],
                         ),
                       ),
+                      if (!user.isApproved && (currentUser?.role.canApproveMembers ?? true)) ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.emerald,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
+                            ),
+                            icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                            label: const Text(
+                              'Approve Member',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                            ),
+                            onPressed: () {
+                              ref.read(userManagementProvider.notifier).approveUser(user.id);
+                              NotificationBanner.showSuccess(
+                                context,
+                                '${user.name} has been approved as an active team member.',
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       const Divider(),
                       const SizedBox(height: 6),

@@ -77,15 +77,14 @@ class AppEnv {
 
   /// The Base URL for all backend REST API requests.
   ///
-  /// Strictly loaded from `.env`. No fallback host is hardcoded.
+  static const String defaultApiBaseUrl =
+      'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1';
+
+  /// The Base URL for all backend REST API requests.
   static String get apiBaseUrl {
     final url = dotenv.isInitialized ? dotenv.env['API_BASE_URL']?.trim() : null;
     if (url == null || url.isEmpty) {
-      if (kDebugMode && !kIsWeb) {
-        // Return empty or throw in debug when explicitly expected
-        return '';
-      }
-      return '';
+      return defaultApiBaseUrl;
     }
     return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
   }

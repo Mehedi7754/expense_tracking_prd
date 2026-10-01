@@ -17,8 +17,12 @@ import 'package:expense_tracking_prd/screens/auth/register_screen.dart';
 import 'package:expense_tracking_prd/screens/projects/project_detail_screen.dart';
 import 'package:expense_tracking_prd/screens/expenses/expense_detail_screen.dart';
 import 'package:expense_tracking_prd/state/auth_provider.dart';
+import 'package:expense_tracking_prd/state/user_management_provider.dart';
+import 'package:expense_tracking_prd/state/project_provider.dart';
+import 'package:expense_tracking_prd/state/expense_provider.dart';
 import 'package:expense_tracking_prd/models/user_role.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'test_fixtures.dart';
 
 void main() {
   testWidgets('StatCard renders without overflow in tight 140x110 box', (WidgetTester tester) async {
@@ -190,7 +194,7 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('New Project'), findsOneWidget);
     expect(find.text('Project Overview'), findsOneWidget);
-    await tester.drag(find.byType(ListView), const Offset(0, -350));
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
     await tester.pumpAndSettle();
     expect(find.text('Contract & Tax Setup'), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -364,6 +368,7 @@ void main() {
   testWidgets('Switch Test Persona modal excludes Viewer persona', (WidgetTester tester) async {
     final container = ProviderContainer();
     container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+    container.read(userManagementProvider.notifier).setUsers(TestFixtures.testUsers);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -385,12 +390,12 @@ void main() {
 
     // Verify modal header is visible
     expect(find.text('Switch Test Persona'), findsOneWidget);
-    // Verify standard roles are present
+    // Verify standard 3 roles are present
     expect(find.text('Eleanor Vance'), findsOneWidget);
     expect(find.text('Sarah Jenkins'), findsOneWidget);
     expect(find.text('Fahim Ahmed'), findsOneWidget);
-    expect(find.text('David Chen'), findsOneWidget);
-    // Verify viewer person (Rahim Chowdhury / UserRole.viewer) is removed
+    // Verify retired personas (David Chen / Finance and Rahim Chowdhury / Viewer) are removed
+    expect(find.text('David Chen'), findsNothing);
     expect(find.text('Rahim Chowdhury'), findsNothing);
     expect(find.text('Viewer (Read-Only)'), findsNothing);
   });
@@ -402,6 +407,9 @@ void main() {
 
     final container = ProviderContainer();
     container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+    container.read(userManagementProvider.notifier).setUsers(TestFixtures.testUsers);
+    container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
+    container.read(expenseProvider.notifier).setExpenses(TestFixtures.testExpenses);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -453,7 +461,7 @@ void main() {
     expect(find.text('Claimants in this category:'), findsWidgets);
 
     // Switch to Projects tab
-    final projectsTab = find.textContaining('📁 Projects');
+    final projectsTab = find.textContaining('Projects (');
     expect(projectsTab, findsOneWidget);
     await tester.ensureVisible(projectsTab);
     await tester.tap(projectsTab);
@@ -485,6 +493,9 @@ void main() {
 
     final container = ProviderContainer();
     container.read(authProvider.notifier).switchRole(UserRole.projectMember);
+    container.read(userManagementProvider.notifier).setUsers(TestFixtures.testUsers);
+    container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
+    container.read(expenseProvider.notifier).setExpenses(TestFixtures.testExpenses);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -527,6 +538,8 @@ void main() {
 
     final container = ProviderContainer();
     container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+    container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
+    container.read(expenseProvider.notifier).setExpenses(TestFixtures.testExpenses);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -551,6 +564,8 @@ void main() {
 
     final container = ProviderContainer();
     container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+    container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
+    container.read(expenseProvider.notifier).setExpenses(TestFixtures.testExpenses);
 
     await tester.pumpWidget(
       UncontrolledProviderScope(

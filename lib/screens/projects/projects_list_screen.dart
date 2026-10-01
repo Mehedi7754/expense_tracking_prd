@@ -26,6 +26,14 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   String _selectedType = 'all'; // all, directConsultancy, subConsultancy, government, private
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(projectProvider.notifier).fetchProjects();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -41,7 +49,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
         ? <ProjectModel>[]
         : (role?.canViewAllProjects == true
             ? allProjects
-            : allProjects.where((p) => p.teamMemberIds.contains(user.id)).toList());
+            : allProjects.where((p) => p.hasMember(user.id)).toList());
 
     final filteredProjects = permittedProjects.where((p) {
       if (_searchQuery.isNotEmpty) {
@@ -90,28 +98,42 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
               // Project Cards List with Permanent Pie Chart at Top
               Expanded(
                 child: filteredProjects.isEmpty
-                    ? EmptyStateWidget(
-                        icon: Icons.folder_open_rounded,
-                        title: 'No Projects Found',
-                        message: _searchQuery.isNotEmpty
-                            ? 'No projects matching your search criteria.'
-                            : 'No projects available in this category.',
-                        actionLabel: canCreateProject ? 'Create Project' : null,
-                        onAction: canCreateProject ? () => context.push(RoutePaths.addProject) : null,
+                    ? RefreshIndicator(
+                        onRefresh: () => ref.read(projectProvider.notifier).fetchProjects(),
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            SizedBox(
+                              height: 400,
+                              child: EmptyStateWidget(
+                                icon: Icons.folder_open_rounded,
+                                title: 'No Projects Found',
+                                message: _searchQuery.isNotEmpty
+                                    ? 'No projects matching your search criteria.'
+                                    : 'No projects available in this category.',
+                                actionLabel: canCreateProject ? 'Create Project' : null,
+                                onAction: canCreateProject ? () => context.push(RoutePaths.addProject) : null,
+                              ),
+                            ),
+                          ],
+                        ),
                       )
                     : Builder(
                         builder: (ctx) {
                           final isTablet = MediaQuery.sizeOf(ctx).width >= 768;
-                          return CustomScrollView(
-                            slivers: [
-                              SliverToBoxAdapter(
-                                child: _buildProjectPieChartCard(
-                                  context,
-                                  filteredProjects,
-                                  allExpenses,
-                                  isDark,
+                          return RefreshIndicator(
+                            onRefresh: () => ref.read(projectProvider.notifier).fetchProjects(),
+                            child: CustomScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              slivers: [
+                                SliverToBoxAdapter(
+                                  child: _buildProjectPieChartCard(
+                                    context,
+                                    filteredProjects,
+                                    allExpenses,
+                                    isDark,
+                                  ),
                                 ),
-                              ),
                               SliverPadding(
                                 padding: EdgeInsets.only(
                                   bottom: 24,
@@ -157,8 +179,9 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                                       ),
                               ),
                             ],
-                          );
-                        },
+                          ),
+                        );
+                      },
                       ),
               ),
             ],

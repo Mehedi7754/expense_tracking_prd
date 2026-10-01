@@ -62,10 +62,10 @@ class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
   }
 
   Color _getProgressColor(double pct) {
-    if (pct <= 0.0) return const Color(0xFF64748B);
-    if (pct < 75.0) return const Color(0xFF4F46E5);
-    if (pct < 100.0) return const Color(0xFFF59E0B);
-    return const Color(0xFF10B981);
+    if (pct <= 25.0) return const Color(0xFFEF4444); // Red: 0 to 25%
+    if (pct < 75.0) return const Color(0xFFF59E0B); // Amber / Orange: 26 to 74%
+    if (pct < 100.0) return const Color(0xFF3B82F6); // Blue: 75 to 99%
+    return const Color(0xFF10B981); // Emerald Green: 100%
   }
 
   @override

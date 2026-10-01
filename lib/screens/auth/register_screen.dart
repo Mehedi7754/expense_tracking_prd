@@ -225,11 +225,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                                 value: _selectedRole,
                                 isExpanded: true,
                                 icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                                items: const [
-                                  UserRole.projectMember,
-                                  UserRole.projectManager,
-                                  UserRole.viewer,
-                                ].map((role) {
+                                items: UserRole.registrationRoles.map((role) {
                                   return DropdownMenuItem<UserRole>(
                                     value: role,
                                     child: Row(

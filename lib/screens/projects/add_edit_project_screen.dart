@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
@@ -12,6 +14,7 @@ import '../../state/project_provider.dart';
 import '../../state/settings_provider.dart';
 import '../../state/user_management_provider.dart';
 import '../../models/user_model.dart';
+import '../../models/user_role.dart';
 
 class AddEditProjectScreen extends ConsumerStatefulWidget {
   final String? projectId;
@@ -52,10 +55,29 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now().add(const Duration(days: 180));
   final Set<String> _selectedTeamMemberIds = {};
+  final _memberSearchController = TextEditingController();
+  String _memberSearchQuery = '';
+  String? _imageUrl;
   bool _initialized = false;
   bool _isSaving = false;
 
   bool get isEditing => widget.projectId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(userManagementProvider.notifier).fetchUsers();
+      if (!isEditing) {
+        final currentUser = ref.read(authProvider).currentUser;
+        if (currentUser != null && mounted) {
+          setState(() {
+            _selectedTeamMemberIds.add(currentUser.id);
+          });
+        }
+      }
+    });
+  }
 
   void _initProject(ProjectModel project) {
     if (_initialized) return;
@@ -70,6 +92,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     _taxStatus = project.taxStatus;
     _taxRate = project.taxRate;
     _officeBenefitRate = project.officeBenefitRate;
+    _imageUrl = project.imageUrl;
 
     _grossValueController.text = project.grossProjectValue.toStringAsFixed(0);
     _advanceReceivedController.text = project.advanceReceived.toStringAsFixed(0);
@@ -88,6 +111,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
 
   @override
   void dispose() {
+    _memberSearchController.dispose();
     _nameController.dispose();
     _descController.dispose();
     _clientController.dispose();
@@ -192,11 +216,20 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         startDate: _startDate,
         endDate: _endDate,
         teamMemberIds: _selectedTeamMemberIds.toList(),
+        imageUrl: _imageUrl,
       );
-      ref.read(projectProvider.notifier).updateProject(updated);
-      NotificationBanner.showSuccess(context, 'Project updated successfully');
+      await ref.read(projectProvider.notifier).updateProject(updated);
+      if (mounted) {
+        NotificationBanner.showSuccess(context, 'Project updated successfully');
+      }
     } else {
-      ref.read(projectProvider.notifier).addProject(
+      final currentUser = ref.read(authProvider).currentUser;
+      final members = {
+        ..._selectedTeamMemberIds,
+        if (currentUser != null && currentUser.id.isNotEmpty) currentUser.id,
+      }.toList();
+
+      final created = await ref.read(projectProvider.notifier).addProject(
             name: _nameController.text.trim(),
             description: _descController.text.trim(),
             client: _clientController.text.trim(),
@@ -213,12 +246,24 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             officeBenefitRate: _officeBenefitRate,
             startDate: _startDate,
             endDate: _endDate,
-            teamMemberIds: _selectedTeamMemberIds.toList(),
+            teamMemberIds: members,
+            createdById: currentUser?.id,
+            imageUrl: _imageUrl,
           );
-      NotificationBanner.showSuccess(context, 'Project created successfully');
+      if (mounted) {
+        final isUploadedToServer = !created.id.startsWith('proj_');
+        if (isUploadedToServer) {
+          NotificationBanner.showSuccess(context, 'Project created and uploaded to backend server!');
+        } else {
+          NotificationBanner.showWarning(context, 'Saved locally (Server unreachable: Check internet / phone settings).');
+        }
+      }
     }
 
-    context.pop();
+    if (mounted) {
+      setState(() => _isSaving = false);
+      context.pop();
+    }
   }
 
   InputDecoration _inputDeco({
@@ -296,6 +341,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
+                // ==================== PROJECT COVER IMAGE UPLOAD ====================
+                _buildProjectImageSection(isDark),
+                const SizedBox(height: 16),
+
                 // ==================== CARD 1: PROJECT OVERVIEW ====================
                 _buildCardContainer(
                   isDark: isDark,
@@ -309,7 +358,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       controller: _nameController,
                       decoration: _inputDeco(
                         label: 'Project Name *',
-                        hint: 'e.g. Enterprise Cloud ERP Platform',
+                        hint: 'Enter official project title',
                         isDark: isDark,
                       ),
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter project name' : null,
@@ -320,7 +369,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       controller: _clientController,
                       decoration: _inputDeco(
                         label: 'Client Name *',
-                        hint: 'e.g. Apex Technologies Inc.',
+                        hint: 'Enter client or organization name',
                         isDark: isDark,
                       ),
                       validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter client name' : null,
@@ -665,75 +714,363 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   iconColor: const Color(0xFF8B5CF6),
                   iconBg: isDark ? const Color(0xFF4C1D95).withAlpha(40) : const Color(0xFFF5F3FF),
                   title: 'Team Access',
-                  subtitle: 'Select members permitted to view & submit costs',
+                  subtitle: 'Search & assign members permitted to view & submit costs',
                   children: [
                     Builder(
                       builder: (context) {
-                        final users = ref.watch(userManagementProvider);
+                        final allUsers = ref.watch(userManagementProvider);
                         final curUser = ref.watch(authProvider).currentUser;
-                        final availableUsers = users.isNotEmpty
-                            ? users
-                            : (curUser != null ? [curUser] : const <UserModel>[]);
 
-                        if (availableUsers.isEmpty) {
-                          return const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8),
-                            child: Text(
-                              'No team members registered yet. Add team members in User Management.',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          );
+                        // Ensure current user is in user lookup pool if available
+                        final Map<String, UserModel> userMap = {};
+                        for (final u in allUsers) {
+                          userMap[u.id] = u;
+                          if (u.email.isNotEmpty) userMap[u.email.toLowerCase()] = u;
+                        }
+                        if (curUser != null) {
+                          userMap[curUser.id] = curUser;
+                          if (curUser.email.isNotEmpty) userMap[curUser.email.toLowerCase()] = curUser;
                         }
 
-                        return Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: availableUsers.map((u) {
-                            final isSelected = _selectedTeamMemberIds.contains(u.id);
-                            return FilterChip(
-                              avatar: CircleAvatar(
-                                radius: 10,
-                                backgroundColor: isSelected ? Colors.white : const Color(0xFF4F46E5),
-                                child: Text(
-                                  u.name.isNotEmpty ? u.name.substring(0, 1) : 'U',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: isSelected ? const Color(0xFF4F46E5) : Colors.white,
+                        final selectedUsers = _selectedTeamMemberIds.map((id) {
+                          return userMap[id] ?? UserModel(
+                            id: id,
+                            name: id.contains('@') ? id.split('@').first : id,
+                            email: id.contains('@') ? id : '',
+                            role: UserRole.projectMember,
+                            department: 'Operations',
+                          );
+                        }).toList();
+
+                        // Filter candidates based on search
+                        final query = _memberSearchQuery.trim().toLowerCase();
+                        final candidatePool = userMap.values.toSet().toList();
+                        final filteredCandidates = query.isEmpty
+                            ? candidatePool
+                            : candidatePool.where((u) {
+                                return u.name.toLowerCase().contains(query) ||
+                                    u.email.toLowerCase().contains(query) ||
+                                    u.department.toLowerCase().contains(query);
+                              }).toList();
+
+                        final isQueryEmail = query.contains('@') && query.contains('.');
+                        final hasExactEmailMatch = candidatePool.any((u) => u.email.toLowerCase() == query);
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 1. Search Bar
+                            TextFormField(
+                              controller: _memberSearchController,
+                              style: const TextStyle(fontSize: 14),
+                              onChanged: (val) {
+                                setState(() {
+                                  _memberSearchQuery = val;
+                                });
+                                if (val.trim().length >= 2) {
+                                  ref.read(userManagementProvider.notifier).searchUsers(val.trim());
+                                }
+                              },
+                              decoration: InputDecoration(
+                                hintText: 'Search member by name or Gmail...',
+                                hintStyle: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                                ),
+                                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                                suffixIcon: _memberSearchQuery.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear_rounded, size: 18),
+                                        onPressed: () {
+                                          _memberSearchController.clear();
+                                          setState(() => _memberSearchQuery = '');
+                                        },
+                                      )
+                                    : null,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                filled: true,
+                                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                                   ),
                                 ),
-                              ),
-                              label: Text(
-                                '${u.name} (${u.role.displayName.split(' ').first})',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                  color: isSelected ? Colors.white : (isDark ? Colors.white : const Color(0xFF1E293B)),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
                                 ),
                               ),
-                              selected: isSelected,
-                              selectedColor: const Color(0xFF4F46E5),
-                              backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                              checkmarkColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                                side: BorderSide(
-                                  color: isSelected
-                                      ? const Color(0xFF4F46E5)
-                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            ),
+
+                            // 2. Direct Add by Email Option if unlisted
+                            if (_memberSearchQuery.isNotEmpty && !hasExactEmailMatch) ...[
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4F46E5).withAlpha(isDark ? 30 : 15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: const Color(0xFF4F46E5).withAlpha(80)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF4F46E5), size: 20),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            isQueryEmail ? 'Assign member with Gmail:' : 'Search or invite by email:',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
+                                          ),
+                                          Text(
+                                            _memberSearchQuery,
+                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final added = await ref.read(userManagementProvider.notifier).findOrAddMemberByEmail(
+                                              _memberSearchQuery,
+                                            );
+                                        if (added != null && mounted) {
+                                          setState(() {
+                                            _selectedTeamMemberIds.add(added.id);
+                                            _memberSearchController.clear();
+                                            _memberSearchQuery = '';
+                                          });
+                                          NotificationBanner.showSuccess(
+                                            this.context,
+                                            'Added and assigned ${added.name.isNotEmpty ? added.name : added.email} to project',
+                                          );
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF4F46E5),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      ),
+                                      icon: const Icon(Icons.add_rounded, size: 16),
+                                      label: const Text('Assign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              onSelected: (selected) {
-                                setState(() {
-                                  if (selected) {
-                                    _selectedTeamMemberIds.add(u.id);
-                                  } else {
-                                    _selectedTeamMemberIds.remove(u.id);
-                                  }
-                                });
-                              },
-                            );
-                          }).toList(),
+                            ],
+
+                            // 3. Assigned Members Chips
+                            if (selectedUsers.isNotEmpty) ...[
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Assigned Team (${selectedUsers.length})',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _selectedTeamMemberIds.clear();
+                                        if (curUser != null) _selectedTeamMemberIds.add(curUser.id);
+                                      });
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                    child: const Text('Reset', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: selectedUsers.map((u) {
+                                  final isCurrentUser = curUser != null && curUser.id == u.id;
+                                  return Chip(
+                                    avatar: CircleAvatar(
+                                      radius: 11,
+                                      backgroundColor: const Color(0xFF4F46E5),
+                                      child: Text(
+                                        u.name.isNotEmpty ? u.name.substring(0, 1).toUpperCase() : 'U',
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                                      ),
+                                    ),
+                                    label: Text(
+                                      '${u.name.isNotEmpty ? u.name : u.email}${isCurrentUser ? ' (You)' : ''}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                      ),
+                                    ),
+                                    deleteIcon: isCurrentUser ? null : const Icon(Icons.close_rounded, size: 16),
+                                    onDeleted: isCurrentUser
+                                        ? null
+                                        : () {
+                                            setState(() {
+                                              _selectedTeamMemberIds.remove(u.id);
+                                            });
+                                          },
+                                    backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      side: BorderSide(
+                                        color: isDark ? const Color(0xFF334155) : const Color(0xFFC7D2FE),
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+
+                            const SizedBox(height: 14),
+
+                            // 4. Available Candidates Selector List
+                            Text(
+                              _memberSearchQuery.isEmpty ? 'Available Members' : 'Search Results (${filteredCandidates.length})',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            if (filteredCandidates.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Center(
+                                  child: Text(
+                                    'No registered members match "$_memberSearchQuery".\nUse "Assign member by email" above to assign them.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: filteredCandidates.length > 8 ? 8 : filteredCandidates.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                                itemBuilder: (context, index) {
+                                  final u = filteredCandidates[index];
+                                  final isAssigned = _selectedTeamMemberIds.contains(u.id);
+
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isAssigned
+                                          ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF))
+                                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: isAssigned
+                                            ? const Color(0xFF4F46E5)
+                                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: isAssigned ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
+                                          child: Text(
+                                            u.name.isNotEmpty ? u.name.substring(0, 1).toUpperCase() : 'U',
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Flexible(
+                                                    child: Text(
+                                                      u.name.isNotEmpty ? u.name : u.email,
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      u.role.displayName.split(' ').first,
+                                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              if (u.email.isNotEmpty)
+                                                Text(
+                                                  u.email,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          icon: Icon(
+                                            isAssigned ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
+                                            color: isAssigned ? const Color(0xFF10B981) : const Color(0xFF4F46E5),
+                                            size: 24,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              if (isAssigned) {
+                                                _selectedTeamMemberIds.remove(u.id);
+                                              } else {
+                                                _selectedTeamMemberIds.add(u.id);
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
                         );
                       },
                     ),
@@ -961,4 +1298,331 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       ),
     );
   }
+
+  Widget _buildProjectImageSection(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: Colors.black.withAlpha(5),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF312E81).withAlpha(40) : const Color(0xFFEEF2FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.add_photo_alternate_rounded, color: Color(0xFF4F46E5), size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Project Cover Image',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Add a project banner for visual identification',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_imageUrl != null && _imageUrl!.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Color(0xFFEF4444)),
+                  tooltip: 'Remove project image',
+                  onPressed: () {
+                    setState(() => _imageUrl = null);
+                    NotificationBanner.showInfo(context, 'Project image removed');
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_imageUrl != null && _imageUrl!.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: double.infinity,
+                height: 150,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildImagePreview(_imageUrl!),
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black.withAlpha(160),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: const Icon(Icons.camera_alt_outlined, size: 14),
+                        label: const Text('Change Image', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        onPressed: _showImageSourcePicker,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            InkWell(
+              onTap: _showImageSourcePicker,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A).withAlpha(100) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    style: BorderStyle.solid,
+                    width: 1.2,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.cloud_upload_outlined,
+                        size: 24,
+                        color: Color(0xFF4F46E5),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Upload Project Image',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Camera or Gallery • JPG, PNG supported',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        elevation: 0,
+                      ),
+                      icon: const Icon(Icons.add_a_photo_outlined, size: 15),
+                      label: const Text('Select Image', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      onPressed: _showImageSourcePicker,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImagePreview(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackBanner(),
+      );
+    }
+    final file = File(path);
+    if (file.existsSync()) {
+      return Image.file(
+        file,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackBanner(),
+      );
+    }
+    return _buildFallbackBanner();
+  }
+
+  Widget _buildFallbackBanner() {
+    return Container(
+      color: const Color(0xFF312E81),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.business_center_rounded, size: 36, color: Colors.white70),
+            SizedBox(height: 6),
+            Text(
+              'Project Cover Image',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickProjectImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (picked != null) {
+        setState(() => _imageUrl = picked.path);
+        if (mounted) {
+          NotificationBanner.showSuccess(context, 'Project image selected');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationBanner.showError(context, 'Could not access image: $e');
+      }
+    }
+  }
+
+  void _showImageSourcePicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurface : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Upload Project Image',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: -0.3),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Select a cover photo or banner for this project',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5).withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF4F46E5)),
+              ),
+              title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              subtitle: const Text('Capture project site or blueprint', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickProjectImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.photo_library_outlined, color: Color(0xFF0284C7)),
+              ),
+              title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              subtitle: const Text('Select photo from local device', style: TextStyle(fontSize: 11)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickProjectImage(ImageSource.gallery);
+              },
+            ),
+            if (_imageUrl != null && _imageUrl!.isNotEmpty) ...[
+              ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444).withAlpha(20),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                ),
+                title: const Text(
+                  'Remove Cover Image',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFFEF4444)),
+                ),
+                subtitle: const Text('Revert back to project initial banner', style: TextStyle(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() => _imageUrl = null);
+                  NotificationBanner.showInfo(context, 'Cover image removed');
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
+

@@ -67,6 +67,23 @@ enum ProjectStatus {
     }
   }
 
+  String get toApiValue {
+    switch (this) {
+      case ProjectStatus.proposal:
+        return 'proposal';
+      case ProjectStatus.approved:
+        return 'approved';
+      case ProjectStatus.ongoing:
+        return 'ongoing';
+      case ProjectStatus.completed:
+        return 'completed';
+      case ProjectStatus.suspended:
+        return 'suspended';
+      case ProjectStatus.cancelled:
+        return 'cancelled';
+    }
+  }
+
   static ProjectStatus fromString(String val) {
     switch (val.toLowerCase().replaceAll(' ', '').replaceAll('-', '').replaceAll('_', '')) {
       case 'proposal':
@@ -128,6 +145,19 @@ enum AssignmentType {
     }
   }
 
+  String get toApiValue {
+    switch (this) {
+      case AssignmentType.directConsultancy:
+        return 'direct_consultancy';
+      case AssignmentType.subConsultancy:
+        return 'sub_consultancy';
+      case AssignmentType.government:
+        return 'government';
+      case AssignmentType.private:
+        return 'private';
+    }
+  }
+
   static AssignmentType fromString(String val) {
     switch (val.toLowerCase().replaceAll(' ', '').replaceAll('-', '').replaceAll('_', '')) {
       case 'subconsultancy':
@@ -157,6 +187,17 @@ enum TaxStatus {
         return 'IT-VAT: Excluded';
       case TaxStatus.notApplicable:
         return 'IT-VAT: Not Applicable';
+    }
+  }
+
+  String get toApiValue {
+    switch (this) {
+      case TaxStatus.included:
+        return 'included';
+      case TaxStatus.excluded:
+        return 'excluded';
+      case TaxStatus.notApplicable:
+        return 'not_applicable';
     }
   }
 
@@ -277,6 +318,8 @@ class ProjectModel {
   final DateTime? progressUpdatedAt;
   final String? progressUpdatedByName;
   final String? progressUpdatedById;
+  final String? createdById;
+  final String? imageUrl; // Project Cover Image / Banner
 
   const ProjectModel({
     required this.id,
@@ -309,6 +352,8 @@ class ProjectModel {
     this.progressUpdatedAt,
     this.progressUpdatedByName,
     this.progressUpdatedById,
+    this.createdById,
+    this.imageUrl,
   });
 
   // Visual status indicators based on progress:
@@ -354,6 +399,9 @@ class ProjectModel {
     DateTime? progressUpdatedAt,
     String? progressUpdatedByName,
     String? progressUpdatedById,
+    String? createdById,
+    String? imageUrl,
+    bool clearImageUrl = false,
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -386,7 +434,38 @@ class ProjectModel {
       progressUpdatedAt: progressUpdatedAt ?? this.progressUpdatedAt,
       progressUpdatedByName: progressUpdatedByName ?? this.progressUpdatedByName,
       progressUpdatedById: progressUpdatedById ?? this.progressUpdatedById,
+      createdById: createdById ?? this.createdById,
+      imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
     );
+  }
+
+  static const Map<String, String> demoToUuid = {
+    'usr_adm_01': 'a0000000-0000-0000-0000-000000000001',
+    'usr_mgr_01': 'a0000000-0000-0000-0000-000000000002',
+    'usr_emp_01': 'a0000000-0000-0000-0000-000000000003',
+    'usr_fin_01': 'a0000000-0000-0000-0000-000000000004',
+    'usr_view_01': 'a0000000-0000-0000-0000-000000000005',
+  };
+
+  static const Map<String, String> uuidToDemo = {
+    'a0000000-0000-0000-0000-000000000001': 'usr_adm_01',
+    'a0000000-0000-0000-0000-000000000002': 'usr_mgr_01',
+    'a0000000-0000-0000-0000-000000000003': 'usr_emp_01',
+    'a0000000-0000-0000-0000-000000000004': 'usr_fin_01',
+    'a0000000-0000-0000-0000-000000000005': 'usr_view_01',
+  };
+
+  bool hasMember(String userId) {
+    if (createdById != null &&
+        (createdById == userId ||
+            demoToUuid[userId] == createdById ||
+            uuidToDemo[userId] == createdById)) {
+      return true;
+    }
+    if (teamMemberIds.contains(userId)) return true;
+    final mapped = demoToUuid[userId] ?? uuidToDemo[userId];
+    if (mapped != null && teamMemberIds.contains(mapped)) return true;
+    return false;
   }
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {
@@ -399,7 +478,17 @@ class ProjectModel {
 
     List<String> parseTeamMemberIds(dynamic raw) {
       if (raw is List) {
-        return raw.map((e) => e.toString()).toList();
+        final result = <String>{};
+        for (final item in raw) {
+          final s = item.toString();
+          result.add(s);
+          if (uuidToDemo.containsKey(s)) {
+            result.add(uuidToDemo[s]!);
+          } else if (demoToUuid.containsKey(s)) {
+            result.add(demoToUuid[s]!);
+          }
+        }
+        return result.toList();
       }
       return const [];
     }
@@ -455,23 +544,45 @@ class ProjectModel {
       closingSummary: json['closing_summary'] != null
           ? ProjectFinancialSummary.fromJson(json['closing_summary'] as Map<String, dynamic>)
           : null,
+      progressPercentage: (json['progress_percentage'] ?? json['progressPercentage'] as num?)?.toDouble() ?? 0.0,
+      progressUpdatedAt: json['progress_updated_at'] != null ? DateTime.tryParse(json['progress_updated_at'].toString()) : null,
+      progressUpdatedByName: json['progress_updated_by_name']?.toString(),
+      progressUpdatedById: json['progress_updated_by_id']?.toString(),
+      createdById: json['created_by_id']?.toString() ?? json['createdById']?.toString() ?? json['created_by']?.toString(),
+      imageUrl: (json['image_url'] ?? json['imageUrl'])?.toString(),
     );
   }
 
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toJson({bool forApi = false, bool isNewCreation = false}) {
+    final validTeamMembers = teamMemberIds.map((id) => demoToUuid[id] ?? id).where((id) {
+      if (!forApi) return true;
+      return RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false).hasMatch(id) || id.contains('@');
+    }).toList();
+
+    final isTemporaryId = id.startsWith('proj_');
+    final isCollidingCode = RegExp(r'^PRJ-\d{4}-00[1-5]$').hasMatch(projectId);
+
     return {
-      'id': id,
-      'project_id': projectId,
-      'project_code': projectId,
+      if (!forApi)
+        'id': id
+      else if (!isTemporaryId && !isNewCreation && RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false).hasMatch(id))
+        'id': id,
+      if (!forApi) ...{
+        'project_id': projectId,
+        'project_code': projectId,
+      } else if (!isTemporaryId && !isCollidingCode && !isNewCreation) ...{
+        'project_id': projectId,
+        'project_code': projectId,
+      },
       'name': name,
       'description': description,
       'client': client,
       'client_name': client,
-      if (clientId != null) 'client_id': clientId,
+      if (clientId != null && clientId!.isNotEmpty && RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false).hasMatch(clientId!)) 'client_id': clientId,
       'client_type': clientType.name,
-      'assignment_type': assignmentType.name,
+      'assignment_type': assignmentType.toApiValue,
       'gross_project_value': grossProjectValue,
-      'tax_status': taxStatus.name,
+      'tax_status': taxStatus.toApiValue,
       'tax_rate': taxRate,
       'expected_net_revenue': expectedNetRevenue,
       'advance_received': advanceReceived,
@@ -483,11 +594,18 @@ class ProjectModel {
       'office_benefit_rate': officeBenefitRate,
       'start_date': startDate.toIso8601String(),
       'end_date': endDate.toIso8601String(),
-      'team_member_ids': teamMemberIds,
-      'status': status.name,
+      'team_member_ids': validTeamMembers,
+      'status': status.toApiValue,
       'revenue_entries': revenueEntries.map((e) => e.toJson()).toList(),
       'is_closed': isClosed,
       if (closingSummary != null) 'closing_summary': closingSummary!.toJson(),
+      'progress_percentage': progressPercentage,
+      if (progressUpdatedAt != null) 'progress_updated_at': progressUpdatedAt!.toIso8601String(),
+      if (progressUpdatedByName != null) 'progress_updated_by_name': progressUpdatedByName,
+      if (progressUpdatedById != null) 'progress_updated_by_id': progressUpdatedById,
+      if (createdById != null && createdById!.isNotEmpty) 'created_by': demoToUuid[createdById] ?? createdById,
+      if (createdById != null && createdById!.isNotEmpty) 'created_by_id': demoToUuid[createdById] ?? createdById,
+      if (imageUrl != null && imageUrl!.isNotEmpty) 'image_url': imageUrl,
     };
   }
 }

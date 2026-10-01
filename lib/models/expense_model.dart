@@ -334,7 +334,7 @@ class ExpenseModel {
   final String categoryIcon;
   final String note;
   final DateTime date;
-  final bool hasReceipt; // 🟢 Receipt Available vs 🔴 No Receipt
+  final bool hasReceipt; // Receipt Available vs No Receipt
   final String? receiptPhotoUrl;
   final ExpenseStatus status;
   final String? rejectionReason;

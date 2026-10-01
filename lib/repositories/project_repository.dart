@@ -37,7 +37,7 @@ class ProjectRepository {
   Future<ProjectModel> createProject(ProjectModel project) async {
     final response = await _client.post(
       ApiEndpoints.projects,
-      body: project.toJson(),
+      body: project.toJson(forApi: true, isNewCreation: true),
     );
 
     final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
@@ -49,7 +49,7 @@ class ProjectRepository {
   Future<ProjectModel> updateProject(ProjectModel project) async {
     final response = await _client.put(
       ApiEndpoints.projectById(project.id),
-      body: project.toJson(),
+      body: project.toJson(forApi: true),
     );
 
     final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>

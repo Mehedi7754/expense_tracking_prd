@@ -10,6 +10,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { HealthModule } from './health/health.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { HealthModule } from './health/health.module';
     }),
     DatabaseModule,
     AuthModule,
+    UsersModule,
     ProjectsModule,
     ExpensesModule,
     CategoriesModule,

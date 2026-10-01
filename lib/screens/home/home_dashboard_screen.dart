@@ -17,6 +17,7 @@ import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/notification_provider.dart';
 import '../../state/project_provider.dart';
+import '../../state/user_management_provider.dart';
 
 class HomeDashboardScreen extends ConsumerStatefulWidget {
   const HomeDashboardScreen({super.key});
@@ -44,7 +45,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         ? <ProjectModel>[]
         : (role.canViewAllProjects
             ? allProjects
-            : allProjects.where((p) => p.teamMemberIds.contains(user.id)).toList());
+            : allProjects.where((p) => p.hasMember(user.id)).toList());
     final visibleProjectIds = visibleProjects.map((p) => p.id).toSet();
     final visibleExpenses = user == null
         ? <ExpenseModel>[]
@@ -216,10 +217,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Main Body according to Role
-                  if (role == UserRole.projectMember)
-                    _buildMemberDashboard(context, ref, user!, visibleProjects, visibleExpenses)
+                  if (user == null)
+                    const SizedBox.shrink()
+                  else if (role == UserRole.projectMember)
+                    _buildMemberDashboard(context, ref, user, visibleProjects, visibleExpenses)
                   else if (role == UserRole.viewer)
-                    _buildViewerDashboard(context, ref, user!, visibleProjects, visibleExpenses)
+                    _buildViewerDashboard(context, ref, user, visibleProjects, visibleExpenses)
                   else
                     _buildCompanyDashboard(context, ref, allProjects, allExpenses),
                 ],
@@ -519,7 +522,46 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         const SizedBox(height: 6),
 
         // Minimal Project Cost Cards List
-        if (filteredProjects.isEmpty)
+        if (projects.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.folder_open_rounded, size: 40, color: AppColors.getPrimary(context).withAlpha(150)),
+                    const SizedBox(height: 10),
+                    const Text('No Projects Yet', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Create your first project to start tracking budgets, revenues, and team expenses.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 14),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.getPrimary(context),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Add Project', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      onPressed: () => context.push(RoutePaths.addProject),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+        else if (filteredProjects.isEmpty)
           Padding(
             padding: const EdgeInsets.all(32),
             child: Center(
@@ -1140,52 +1182,75 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
-                  ...DemoUsers.all.where((u) => u.role != UserRole.viewer).map((u) {
-                    final isSelected = currentUser?.id == u.id;
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      leading: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFF4F46E5) : Colors.grey.withAlpha(30),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            _getUserInitials(u.name),
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
+                  Builder(
+                    builder: (context) {
+                      final selectableUsers = ref.watch(userManagementProvider).where((u) => u.role != UserRole.viewer).toList();
+                      if (selectableUsers.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text(
+                              'No registered team members yet.\nRegister users to manage roles.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                      title: Text(
-                        u.name,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        ),
-                      ),
-                      subtitle: Text(
-                        u.role.displayName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isSelected ? const Color(0xFF4F46E5) : Colors.grey,
-                        ),
-                      ),
-                      trailing: isSelected
-                          ? const Icon(Icons.check_circle_rounded, color: Color(0xFF4F46E5))
-                          : null,
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        ref.read(authProvider.notifier).switchRole(u.role);
-                      },
-                    );
-                  }),
+                        );
+                      }
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: selectableUsers.map((u) {
+                          final isSelected = currentUser?.id == u.id;
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            leading: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFF4F46E5) : Colors.grey.withAlpha(30),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  _getUserInitials(u.name),
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : Colors.black87),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              u.name,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${u.role.displayName} • ${u.department}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isSelected ? const Color(0xFF4F46E5) : Colors.grey,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded, color: Color(0xFF4F46E5))
+                                : null,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              ref.read(authProvider.notifier).setUser(u);
+                            },
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
                   const SizedBox(height: 8),
                 ],
               ),
@@ -1243,7 +1308,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
 // 3. PORTFOLIO FINANCIAL & PERSONNEL BREAKDOWN BOTTOM SHEET
 // ==============================================================================
 
-class _PortfolioFinancialDetailsSheet extends StatefulWidget {
+class _PortfolioFinancialDetailsSheet extends ConsumerStatefulWidget {
   final bool isDark;
   final List<ProjectModel> projects;
   final List<ExpenseModel> expenses;
@@ -1265,10 +1330,10 @@ class _PortfolioFinancialDetailsSheet extends StatefulWidget {
   });
 
   @override
-  State<_PortfolioFinancialDetailsSheet> createState() => _PortfolioFinancialDetailsSheetState();
+  ConsumerState<_PortfolioFinancialDetailsSheet> createState() => _PortfolioFinancialDetailsSheetState();
 }
 
-class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDetailsSheet> {
+class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinancialDetailsSheet> {
   int _selectedTabIndex = 0; // 0: By Person, 1: By Category, 2: By Project, 3: All Records
   final Set<String> _expandedPersonNames = {};
   final Set<String> _expandedCategoryNames = {};
@@ -1315,6 +1380,7 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
+    final allUsers = ref.watch(userManagementProvider);
     final totalDirectSpent = widget.expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     final totalUnreceipted = widget.expenses
         .where((e) => !e.hasReceipt)
@@ -1343,14 +1409,14 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
 
       final Set<String> projNames = pExpenses.map((e) => e.projectName).toSet();
 
-      UserModel? demoUser;
-      for (final u in DemoUsers.all) {
+      UserModel? matchedUser;
+      for (final u in allUsers) {
         if (u.id == pId || u.name.toLowerCase() == name.toLowerCase()) {
-          demoUser = u;
+          matchedUser = u;
           break;
         }
       }
-      final designation = demoUser?.designation ?? (demoUser?.role.displayName ?? 'Team Member');
+      final designation = matchedUser?.designation ?? (matchedUser?.role.displayName ?? 'Team Member');
 
       personSummaries.add(_PersonCostSummary(
         personId: pId,
@@ -1560,27 +1626,31 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
               child: Row(
                 children: [
                   _buildTabPill(
+                    icon: widget.memberUser != null ? Icons.person_outline_rounded : Icons.people_outline_rounded,
                     label: widget.memberUser != null
-                        ? '👤 My Breakdown (${personSummaries.length})'
-                        : '👥 By Person (${personSummaries.length})',
+                        ? 'My Breakdown (${personSummaries.length})'
+                        : 'By Person (${personSummaries.length})',
                     index: 0,
                     isDark: isDark,
                   ),
                   const SizedBox(width: 8),
                   _buildTabPill(
-                    label: '🏷️ Categories (${categorySummaries.length})',
+                    icon: Icons.category_outlined,
+                    label: 'Categories (${categorySummaries.length})',
                     index: 1,
                     isDark: isDark,
                   ),
                   const SizedBox(width: 8),
                   _buildTabPill(
-                    label: '📁 Projects (${widget.projects.length})',
+                    icon: Icons.folder_outlined,
+                    label: 'Projects (${widget.projects.length})',
                     index: 2,
                     isDark: isDark,
                   ),
                   const SizedBox(width: 8),
                   _buildTabPill(
-                    label: '🧾 All Records (${widget.expenses.length})',
+                    icon: Icons.receipt_long_outlined,
+                    label: 'All Records (${widget.expenses.length})',
                     index: 3,
                     isDark: isDark,
                   ),
@@ -1655,6 +1725,7 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
   }
 
   Widget _buildTabPill({
+    required IconData icon,
     required String label,
     required int index,
     required bool isDark,
@@ -1677,15 +1748,73 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
                 : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12.5,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-            color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF475569)),
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF475569)),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF475569)),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _buildExpenseReceiptSubtitle({
+    String? prefix,
+    required DateTime date,
+    required bool hasReceipt,
+    required bool isDark,
+  }) {
+    final textColor = isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B);
+    final statusColor = hasReceipt ? AppColors.emerald : AppColors.crimson;
+    final prefixText = (prefix != null && prefix.isNotEmpty) ? '$prefix • ' : '';
+    final dateText = '${DateFormatter.formatShort(date)} • ';
+
+    return Text.rich(
+      TextSpan(
+        children: [
+          if (prefixText.isNotEmpty)
+            TextSpan(
+              text: prefixText,
+              style: TextStyle(fontSize: 10.5, color: textColor),
+            ),
+          TextSpan(
+            text: dateText,
+            style: TextStyle(fontSize: 10.5, color: textColor),
+          ),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Icon(
+              hasReceipt ? Icons.check_circle_rounded : Icons.cancel_outlined,
+              size: 11,
+              color: statusColor,
+            ),
+          ),
+          const WidgetSpan(child: SizedBox(width: 3)),
+          TextSpan(
+            text: hasReceipt ? 'Receipt' : 'No Receipt',
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
+              color: statusColor,
+            ),
+          ),
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -2066,12 +2195,10 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(
-                                    '${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                    ),
+                                  _buildExpenseReceiptSubtitle(
+                                    date: e.date,
+                                    hasReceipt: e.hasReceipt,
+                                    isDark: isDark,
                                   ),
                                 ],
                               ),
@@ -2332,14 +2459,11 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(
-                                    '${e.employeeName} • ${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  _buildExpenseReceiptSubtitle(
+                                    prefix: e.employeeName,
+                                    date: e.date,
+                                    hasReceipt: e.hasReceipt,
+                                    isDark: isDark,
                                   ),
                                 ],
                               ),
@@ -2634,14 +2758,11 @@ class _PortfolioFinancialDetailsSheetState extends State<_PortfolioFinancialDeta
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
-                                  Text(
-                                    '${e.employeeName} • ${DateFormatter.formatShort(e.date)} • ${e.hasReceipt ? "🟢 Receipt" : "🔴 No Receipt"}',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  _buildExpenseReceiptSubtitle(
+                                    prefix: e.employeeName,
+                                    date: e.date,
+                                    hasReceipt: e.hasReceipt,
+                                    isDark: isDark,
                                   ),
                                 ],
                               ),

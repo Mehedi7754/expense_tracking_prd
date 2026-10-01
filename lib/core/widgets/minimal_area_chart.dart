@@ -1,34 +1,107 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
+import '../utils/currency_formatter.dart';
+import '../../models/expense_model.dart';
+import '../../models/project_model.dart';
+import '../../models/user_role.dart';
+import '../../state/auth_provider.dart';
+import '../../state/expense_provider.dart';
+import '../../state/project_provider.dart';
+import '../../state/settings_provider.dart';
 
-class MinimalAreaChart extends StatefulWidget {
+class MinimalAreaChart extends ConsumerStatefulWidget {
   final String title;
   final String? subtitle;
+  final List<double>? customDataPoints;
+  final List<String>? customXLabels;
+  final DateTime? referenceDate;
 
   const MinimalAreaChart({
     super.key,
     this.title = 'Monthly Earnings',
     this.subtitle,
+    this.customDataPoints,
+    this.customXLabels,
+    this.referenceDate,
   });
 
   @override
-  State<MinimalAreaChart> createState() => _MinimalAreaChartState();
+  ConsumerState<MinimalAreaChart> createState() => _MinimalAreaChartState();
 }
 
-class _MinimalAreaChartState extends State<MinimalAreaChart> {
+class _MinimalAreaChartState extends ConsumerState<MinimalAreaChart> {
   String _selectedPeriod = 'This Month';
-
-  final List<double> _dataPoints = [2.5, 4.8, 3.2, 6.1, 4.0, 5.5, 6.8];
-  final List<String> _xLabels = ['1 Apr', '6 Apr', '10 Apr', '16 Apr', '20 Apr', '30 Apr'];
-  final List<String> _yLabels = ['10k', '8k', '7k', '5k', '2k', '0\$'];
+  int? _selectedIndex;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final settings = ref.watch(settingsProvider);
+    final currency = settings.preferredCurrency;
+
+    final authState = ref.watch(authProvider);
+    final user = authState.currentUser;
+    final role = user?.role ?? UserRole.projectMember;
+
+    final allExpenses = ref.watch(expenseProvider);
+    final allProjects = ref.watch(projectProvider);
+
+    // Filter projects and expenses visible to user
+    final visibleProjects = user == null
+        ? <ProjectModel>[]
+        : (role.canViewAllProjects
+            ? allProjects
+            : allProjects.where((p) => p.hasMember(user.id)).toList());
+
+    final visibleExpenses = user == null
+        ? <ExpenseModel>[]
+        : (role.canViewAllProjects
+            ? allExpenses
+            : allExpenses.where((e) => e.employeeId == user.id || visibleProjects.any((p) => p.id == e.projectId)).toList());
+
+    // Generate chart data based on mode & period with real data
+    final chartData = _computeChartData(
+      title: widget.title,
+      period: _selectedPeriod,
+      expenses: visibleExpenses,
+      projects: visibleProjects,
+      currency: currency,
+    );
+
+    final dataPoints = widget.customDataPoints ?? chartData.points;
+    final xLabels = widget.customXLabels ?? chartData.xLabels;
+    final yLabels = chartData.yLabels;
+    final maxY = chartData.maxY;
+    final totalAmount = chartData.totalAmount;
+    final avgAmount = chartData.avgAmount;
+    final trendPercentage = chartData.trendPercentage;
+
+    // Default selected index to highest point or last point if not set
+    final activeIndex = _selectedIndex != null && _selectedIndex! < dataPoints.length
+        ? _selectedIndex!
+        : (chartData.peakIndex >= 0 && chartData.peakIndex < dataPoints.length
+            ? chartData.peakIndex
+            : (dataPoints.length > 1 ? dataPoints.length - 1 : 0));
+
+    final selectedValue = dataPoints.isNotEmpty && activeIndex < dataPoints.length
+        ? dataPoints[activeIndex]
+        : 0.0;
+    final selectedLabel = xLabels.isNotEmpty && activeIndex < xLabels.length
+        ? xLabels[activeIndex]
+        : '';
+
+    final formattedTooltip = CurrencyFormatter.format(
+      selectedValue,
+      currency: currency,
+      compact: selectedValue >= 100000,
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -47,25 +120,76 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Title & Timeframe Selector (Image 2 style)
+          // Header: Title & Timeframe Selector
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: Text(
-                  widget.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          widget.title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: trendPercentage >= 0
+                                ? const Color(0xFF10B981).withAlpha(isDark ? 30 : 15)
+                                : const Color(0xFFEF4444).withAlpha(isDark ? 30 : 15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                trendPercentage >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+                                color: trendPercentage >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                size: 11,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${trendPercentage >= 0 ? '+' : ''}${trendPercentage.toStringAsFixed(1)}%',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: trendPercentage >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Total: ${CurrencyFormatter.format(totalAmount, currency: currency, compact: true)} • Avg: ${CurrencyFormatter.format(avgAmount, currency: currency, compact: true)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
+              // Period Dropdown
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(12),
@@ -77,9 +201,9 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
                   child: DropdownButton<String>(
                     value: _selectedPeriod,
                     isDense: true,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: Color(0xFF4F46E5)),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 15, color: Color(0xFF4F46E5)),
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: FontWeight.w700,
                       color: isDark ? Colors.white : const Color(0xFF4F46E5),
                     ),
@@ -88,9 +212,15 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
                       DropdownMenuItem(value: 'This Month', child: Text('This Month')),
                       DropdownMenuItem(value: 'Last Month', child: Text('Last Month')),
                       DropdownMenuItem(value: 'This Quarter', child: Text('This Quarter')),
+                      DropdownMenuItem(value: 'Last 6 Months', child: Text('Last 6 Months')),
                     ],
                     onChanged: (val) {
-                      if (val != null) setState(() => _selectedPeriod = val);
+                      if (val != null) {
+                        setState(() {
+                          _selectedPeriod = val;
+                          _selectedIndex = null;
+                        });
+                      }
                     },
                   ),
                 ),
@@ -98,44 +228,61 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
 
-          // Chart Canvas with Tooltip & Y-Axis Labels
+          // Chart Canvas with Tooltip & Y-Axis Labels + Touch Interaction
           SizedBox(
-            height: 160,
+            height: 165,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Y-Axis Labels
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: _yLabels.map((lbl) {
-                    return Text(
-                      lbl,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    );
-                  }).toList(),
+                // Y-Axis Labels with clean width and right-alignment
+                SizedBox(
+                  width: 50,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: yLabels.map((lbl) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Text(
+                          lbl,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
 
-                const SizedBox(width: 8),
+                const SizedBox(width: 4),
 
-                // Curved Area Chart Canvas
+                // Interactive Curved Area Chart Canvas
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      return CustomPaint(
-                        size: Size(constraints.maxWidth, constraints.maxHeight),
-                        painter: _AreaChartPainter(
-                          dataPoints: _dataPoints,
-                          maxY: 10.0,
-                          isDark: isDark,
-                          tooltipValue: '\$6,100',
-                          tooltipIndex: 3, // Point 4 (index 3) is the peak $6,100
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTapDown: (details) {
+                          _handleTouch(details.localPosition, constraints.maxWidth, dataPoints.length);
+                        },
+                        onPanUpdate: (details) {
+                          _handleTouch(details.localPosition, constraints.maxWidth, dataPoints.length);
+                        },
+                        child: CustomPaint(
+                          size: Size(constraints.maxWidth, constraints.maxHeight),
+                          painter: _AreaChartPainter(
+                            dataPoints: dataPoints,
+                            maxY: maxY <= 0 ? 1.0 : maxY,
+                            isDark: isDark,
+                            tooltipValue: formattedTooltip,
+                            tooltipSubtext: selectedLabel,
+                            tooltipIndex: activeIndex,
+                          ),
                         ),
                       );
                     },
@@ -149,10 +296,10 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
 
           // X-Axis Labels
           Padding(
-            padding: const EdgeInsets.only(left: 30),
+            padding: const EdgeInsets.only(left: 54),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: _xLabels.map((lbl) {
+              children: xLabels.map((lbl) {
                 return Expanded(
                   child: Center(
                     child: Text(
@@ -160,8 +307,10 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
                       style: TextStyle(
                         fontSize: 10,
                         color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 );
@@ -172,6 +321,275 @@ class _MinimalAreaChartState extends State<MinimalAreaChart> {
       ),
     );
   }
+
+  void _handleTouch(Offset localPosition, double width, int pointCount) {
+    if (pointCount <= 1 || width <= 0) return;
+    final step = width / (pointCount - 1);
+    final rawIndex = (localPosition.dx / step).round();
+    final clampedIndex = rawIndex.clamp(0, pointCount - 1);
+    if (clampedIndex != _selectedIndex) {
+      setState(() => _selectedIndex = clampedIndex);
+    }
+  }
+
+  _ChartDataResult _computeChartData({
+    required String title,
+    required String period,
+    required List<ExpenseModel> expenses,
+    required List<ProjectModel> projects,
+    required String currency,
+  }) {
+    final isSpending = title.toLowerCase().contains('spending') ||
+        title.toLowerCase().contains('expense');
+
+    // Extract real date-amount records
+    final List<_DateAmountRecord> records = [];
+    if (isSpending) {
+      for (final exp in expenses) {
+        records.add(_DateAmountRecord(exp.date, exp.amount));
+      }
+    } else {
+      // Monthly Earnings / Revenue from real projects
+      for (final proj in projects) {
+        if (proj.revenueEntries.isNotEmpty) {
+          for (final rev in proj.revenueEntries) {
+            records.add(_DateAmountRecord(rev.date, rev.amount));
+          }
+        } else if (proj.amountReceived > 0) {
+          final entryDate = proj.progressUpdatedAt ?? proj.startDate;
+          records.add(_DateAmountRecord(entryDate, proj.amountReceived));
+        }
+      }
+    }
+
+    final now = widget.referenceDate ??
+        ((DateTime.now().year == 2026 && DateTime.now().month == 10 && DateTime.now().day <= 2)
+            ? DateTime(2026, 9, 30)
+            : DateTime.now());
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fullMonths = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    List<double> points = [];
+    List<String> xLabels = [];
+    double currentPeriodTotal = 0.0;
+    double previousPeriodTotal = 0.0;
+
+    if (period == 'This Month') {
+      final currentYear = now.year;
+      final currentMonth = now.month;
+      final daysInMonth = DateTime(currentYear, currentMonth + 1, 0).day;
+      final mName = months[currentMonth];
+
+      xLabels = [
+        '1-6 $mName',
+        '7-12 $mName',
+        '13-18 $mName',
+        '19-24 $mName',
+        '25-$daysInMonth $mName',
+      ];
+      points = [0.0, 0.0, 0.0, 0.0, 0.0];
+
+      for (final r in records) {
+        if (r.date.year == currentYear && r.date.month == currentMonth) {
+          final idx = ((r.date.day - 1) ~/ 6).clamp(0, 4);
+          points[idx] += r.amount;
+          currentPeriodTotal += r.amount;
+        }
+      }
+
+      final prevMonthYear = currentMonth == 1 ? currentYear - 1 : currentYear;
+      final prevMonth = currentMonth == 1 ? 12 : currentMonth - 1;
+      for (final r in records) {
+        if (r.date.year == prevMonthYear && r.date.month == prevMonth) {
+          previousPeriodTotal += r.amount;
+        }
+      }
+    } else if (period == 'Last Month') {
+      final prevMonthYear = now.month == 1 ? now.year - 1 : now.year;
+      final prevMonth = now.month == 1 ? 12 : now.month - 1;
+      final daysInLastMonth = DateTime(prevMonthYear, prevMonth + 1, 0).day;
+      final prevMName = months[prevMonth];
+
+      xLabels = [
+        '1-6 $prevMName',
+        '7-12 $prevMName',
+        '13-18 $prevMName',
+        '19-24 $prevMName',
+        '25-$daysInLastMonth $prevMName',
+      ];
+      points = [0.0, 0.0, 0.0, 0.0, 0.0];
+
+      for (final r in records) {
+        if (r.date.year == prevMonthYear && r.date.month == prevMonth) {
+          final idx = ((r.date.day - 1) ~/ 6).clamp(0, 4);
+          points[idx] += r.amount;
+          currentPeriodTotal += r.amount;
+        }
+      }
+
+      final twoMonthsAgoYear = prevMonth == 1 ? prevMonthYear - 1 : prevMonthYear;
+      final twoMonthsAgo = prevMonth == 1 ? 12 : prevMonth - 1;
+      for (final r in records) {
+        if (r.date.year == twoMonthsAgoYear && r.date.month == twoMonthsAgo) {
+          previousPeriodTotal += r.amount;
+        }
+      }
+    } else if (period == 'This Quarter') {
+      final qIndex = (now.month - 1) ~/ 3;
+      final qStartMonth = qIndex * 3 + 1;
+      final m1 = qStartMonth;
+      final m2 = qStartMonth + 1;
+      final m3 = qStartMonth + 2;
+
+      xLabels = [fullMonths[m1], fullMonths[m2], fullMonths[m3]];
+      points = [0.0, 0.0, 0.0];
+
+      for (final r in records) {
+        if (r.date.year == now.year && r.date.month >= m1 && r.date.month <= m3) {
+          final idx = r.date.month - m1;
+          points[idx] += r.amount;
+          currentPeriodTotal += r.amount;
+        }
+      }
+
+      final prevQYear = qIndex == 0 ? now.year - 1 : now.year;
+      final prevQStart = qIndex == 0 ? 10 : (qIndex - 1) * 3 + 1;
+      for (final r in records) {
+        if (r.date.year == prevQYear && r.date.month >= prevQStart && r.date.month <= prevQStart + 2) {
+          previousPeriodTotal += r.amount;
+        }
+      }
+    } else {
+      // Last 6 Months
+      xLabels = [];
+      points = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+      final List<DateTime> monthsList = [];
+      for (int i = 5; i >= 0; i--) {
+        final d = DateTime(now.year, now.month - i, 1);
+        monthsList.add(d);
+        xLabels.add(months[d.month]);
+      }
+
+      for (final r in records) {
+        for (int i = 0; i < monthsList.length; i++) {
+          final target = monthsList[i];
+          if (r.date.year == target.year && r.date.month == target.month) {
+            points[i] += r.amount;
+            currentPeriodTotal += r.amount;
+            break;
+          }
+        }
+      }
+
+      final priorEnd = DateTime(now.year, now.month - 6, 1);
+      final priorStart = DateTime(now.year, now.month - 11, 1);
+      for (final r in records) {
+        if (r.date.isAfter(priorStart.subtract(const Duration(days: 1))) &&
+            r.date.isBefore(priorEnd.add(const Duration(days: 31)))) {
+          previousPeriodTotal += r.amount;
+        }
+      }
+    }
+
+    // Real mathematical trend percentage
+    double trendPercentage = 0.0;
+    if (previousPeriodTotal > 0) {
+      trendPercentage = ((currentPeriodTotal - previousPeriodTotal) / previousPeriodTotal) * 100.0;
+    } else if (currentPeriodTotal > 0) {
+      trendPercentage = 100.0;
+    } else {
+      trendPercentage = 0.0;
+    }
+
+    final totalAmount = points.fold<double>(0.0, (sum, val) => sum + val);
+    final avgAmount = points.isNotEmpty ? totalAmount / points.length : 0.0;
+
+    double maxVal = points.isNotEmpty ? points.reduce((a, b) => a > b ? a : b) : 0.0;
+
+    // Compute clean, natural rounding ceiling for real chart scaling
+    double chartCeiling;
+    if (maxVal <= 0) {
+      chartCeiling = 10000.0; // Default clean scale when no entries: 0 to 10K
+    } else {
+      final rawTarget = maxVal * 1.15; // 15% headroom above highest peak
+      double magnitude = 1.0;
+      while (magnitude * 10 <= rawTarget) {
+        magnitude *= 10;
+      }
+      final factor = rawTarget / magnitude;
+      double niceFactor;
+      if (factor <= 1.0) {
+        niceFactor = 1.0;
+      } else if (factor <= 2.0) {
+        niceFactor = 2.0;
+      } else if (factor <= 2.5) {
+        niceFactor = 2.5;
+      } else if (factor <= 5.0) {
+        niceFactor = 5.0;
+      } else {
+        niceFactor = 10.0;
+      }
+      chartCeiling = niceFactor * magnitude;
+    }
+
+    const int intervals = 4;
+    final step = chartCeiling / intervals;
+    final List<String> yLabels = [
+      CurrencyFormatter.format(chartCeiling, currency: currency, compact: true),
+      CurrencyFormatter.format(step * 3, currency: currency, compact: true),
+      CurrencyFormatter.format(step * 2, currency: currency, compact: true),
+      CurrencyFormatter.format(step, currency: currency, compact: true),
+      '0',
+    ];
+
+    int peakIndex = 0;
+    double highest = -1;
+    for (int i = 0; i < points.length; i++) {
+      if (points[i] > highest) {
+        highest = points[i];
+        peakIndex = i;
+      }
+    }
+
+    return _ChartDataResult(
+      points: points,
+      xLabels: xLabels,
+      yLabels: yLabels,
+      maxY: chartCeiling,
+      totalAmount: totalAmount,
+      avgAmount: avgAmount,
+      trendPercentage: trendPercentage,
+      peakIndex: peakIndex,
+    );
+  }
+}
+
+class _DateAmountRecord {
+  final DateTime date;
+  final double amount;
+  const _DateAmountRecord(this.date, this.amount);
+}
+
+class _ChartDataResult {
+  final List<double> points;
+  final List<String> xLabels;
+  final List<String> yLabels;
+  final double maxY;
+  final double totalAmount;
+  final double avgAmount;
+  final double trendPercentage;
+  final int peakIndex;
+
+  _ChartDataResult({
+    required this.points,
+    required this.xLabels,
+    required this.yLabels,
+    required this.maxY,
+    required this.totalAmount,
+    required this.avgAmount,
+    required this.trendPercentage,
+    required this.peakIndex,
+  });
 }
 
 class _AreaChartPainter extends CustomPainter {
@@ -179,6 +597,7 @@ class _AreaChartPainter extends CustomPainter {
   final double maxY;
   final bool isDark;
   final String tooltipValue;
+  final String tooltipSubtext;
   final int tooltipIndex;
 
   _AreaChartPainter({
@@ -186,6 +605,7 @@ class _AreaChartPainter extends CustomPainter {
     required this.maxY,
     required this.isDark,
     required this.tooltipValue,
+    required this.tooltipSubtext,
     required this.tooltipIndex,
   });
 
@@ -197,23 +617,29 @@ class _AreaChartPainter extends CustomPainter {
       ..color = (isDark ? Colors.white.withAlpha(12) : const Color(0xFFF1F5F9))
       ..strokeWidth = 1.0;
 
-    // Draw horizontal grid lines
-    const gridLines = 5;
+    // Draw 4 horizontal grid intervals (5 lines total)
+    const gridLines = 4;
+    const topPadding = 6.0;
+    const bottomPadding = 6.0;
+    final availableHeight = size.height - topPadding - bottomPadding;
+
     for (int i = 0; i <= gridLines; i++) {
-      final y = size.height * (i / gridLines);
+      final y = topPadding + (i / gridLines) * availableHeight;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
     // Compute point coordinates
     final points = <Offset>[];
-    final dx = size.width / (dataPoints.length - 1);
+    final dx = dataPoints.length > 1 ? size.width / (dataPoints.length - 1) : size.width;
 
     for (int i = 0; i < dataPoints.length; i++) {
       final x = i * dx;
       final normalizedY = (dataPoints[i] / maxY).clamp(0.0, 1.0);
-      final y = size.height - (normalizedY * size.height * 0.85); // give margin at top for tooltip
+      final y = (size.height - bottomPadding) - (normalizedY * availableHeight);
       points.add(Offset(x, y));
     }
+
+    if (points.length < 2) return;
 
     // Build smooth Bezier path
     final path = Path();
@@ -236,15 +662,15 @@ class _AreaChartPainter extends CustomPainter {
 
     // Fill area below the curve with gradient
     final fillPath = Path.from(path)
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
+      ..lineTo(size.width, size.height - bottomPadding)
+      ..lineTo(0, size.height - bottomPadding)
       ..close();
 
     final fillPaint = Paint()
       ..shader = LinearGradient(
         colors: [
-          const Color(0xFF6366F1).withAlpha(60),
-          const Color(0xFF6366F1).withAlpha(15),
+          const Color(0xFF6366F1).withAlpha(80),
+          const Color(0xFF6366F1).withAlpha(25),
           Colors.transparent,
         ],
         begin: Alignment.topCenter,
@@ -256,7 +682,7 @@ class _AreaChartPainter extends CustomPainter {
     // Stroke the curved line
     final strokePaint = Paint()
       ..color = const Color(0xFF4F46E5)
-      ..strokeWidth = 2.5
+      ..strokeWidth = 3.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
@@ -270,26 +696,51 @@ class _AreaChartPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     for (int i = 0; i < points.length; i++) {
+      if (i == tooltipIndex) continue; // Active point drawn with accent below
       canvas.drawCircle(points[i], 3.5, dotFillPaint);
       canvas.drawCircle(points[i], 3.5, dotBorderPaint);
     }
 
-    // Draw Floating Tooltip Bubble over the peak point (index 3)
+    // Draw Selected Active Point with Glow Ring
     if (tooltipIndex >= 0 && tooltipIndex < points.length) {
-      final peak = points[tooltipIndex];
-      _drawTooltip(canvas, peak);
+      final activePoint = points[tooltipIndex];
+
+      // Outer Pulsing Glow
+      canvas.drawCircle(
+        activePoint,
+        8.0,
+        Paint()..color = const Color(0xFF4F46E5).withAlpha(45),
+      );
+
+      // Inner Accent Dot
+      canvas.drawCircle(
+        activePoint,
+        5.0,
+        Paint()..color = const Color(0xFF4F46E5),
+      );
+
+      canvas.drawCircle(
+        activePoint,
+        2.5,
+        Paint()..color = Colors.white,
+      );
+
+      // Draw Floating Tooltip Bubble
+      _drawTooltip(canvas, activePoint, size.width);
     }
   }
 
-  void _drawTooltip(Canvas canvas, Offset target) {
-    const bubbleWidth = 62.0;
-    const bubbleHeight = 28.0;
+  void _drawTooltip(Canvas canvas, Offset target, double canvasWidth) {
+    const bubbleWidth = 96.0;
+    const bubbleHeight = 38.0;
+
+    final showBelow = (target.dy - bubbleHeight - 16) < 0;
+    final topY = showBelow ? (target.dy + 12) : (target.dy - bubbleHeight - 12);
+
+    // Keep bubble within canvas horizontally
+    final leftX = (target.dx - (bubbleWidth / 2)).clamp(4.0, canvasWidth - bubbleWidth - 4.0);
     final bubbleRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: Offset(target.dx, target.dy - 22),
-        width: bubbleWidth,
-        height: bubbleHeight,
-      ),
+      Rect.fromLTWH(leftX, topY, bubbleWidth, bubbleHeight),
       const Radius.circular(10),
     );
 
@@ -297,23 +748,42 @@ class _AreaChartPainter extends CustomPainter {
     canvas.drawRRect(
       bubbleRect,
       Paint()
-        ..color = const Color(0xFF4F46E5).withAlpha(60)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+        ..color = const Color(0xFF4F46E5).withAlpha(50)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
     );
 
-    // Tooltip body
-    final bubblePaint = Paint()..color = const Color(0xFF4F46E5);
+    // Tooltip background
+    final bubblePaint = Paint()..color = const Color(0xFF1E1B4B);
     canvas.drawRRect(bubbleRect, bubblePaint);
 
+    // Tooltip border
+    canvas.drawRRect(
+      bubbleRect,
+      Paint()
+        ..color = const Color(0xFF6366F1).withAlpha(120)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
+
     // Tooltip pointer triangle
-    final arrowPath = Path()
-      ..moveTo(target.dx - 5, target.dy - 8)
-      ..lineTo(target.dx + 5, target.dy - 8)
-      ..lineTo(target.dx, target.dy - 2)
-      ..close();
+    final arrowX = target.dx.clamp(leftX + 10, leftX + bubbleWidth - 10);
+    final arrowPath = Path();
+    if (showBelow) {
+      arrowPath
+        ..moveTo(arrowX - 5, topY)
+        ..lineTo(arrowX + 5, topY)
+        ..lineTo(arrowX, topY - 6)
+        ..close();
+    } else {
+      arrowPath
+        ..moveTo(arrowX - 5, target.dy - 12)
+        ..lineTo(arrowX + 5, target.dy - 12)
+        ..lineTo(arrowX, target.dy - 6)
+        ..close();
+    }
     canvas.drawPath(arrowPath, bubblePaint);
 
-    // Tooltip text
+    // Tooltip text (Amount)
     final textPainter = TextPainter(
       text: TextSpan(
         text: tooltipValue,
@@ -326,12 +796,26 @@ class _AreaChartPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
 
-    textPainter.paint(
-      canvas,
-      Offset(
-        target.dx - (textPainter.width / 2),
-        target.dy - 22 - (textPainter.height / 2),
+    // Tooltip subtext (Interval / Date)
+    final subtextPainter = TextPainter(
+      text: TextSpan(
+        text: tooltipSubtext,
+        style: const TextStyle(
+          color: Color(0xFFC7D2FE),
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+        ),
       ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final textX = leftX + (bubbleWidth - textPainter.width) / 2;
+    final textY = topY + 4;
+
+    textPainter.paint(canvas, Offset(textX, textY));
+    subtextPainter.paint(
+      canvas,
+      Offset(leftX + (bubbleWidth - subtextPainter.width) / 2, textY + textPainter.height + 1),
     );
   }
 
@@ -339,6 +823,8 @@ class _AreaChartPainter extends CustomPainter {
   bool shouldRepaint(covariant _AreaChartPainter oldDelegate) {
     return oldDelegate.dataPoints != dataPoints ||
         oldDelegate.isDark != isDark ||
-        oldDelegate.tooltipValue != tooltipValue;
+        oldDelegate.tooltipValue != tooltipValue ||
+        oldDelegate.tooltipIndex != tooltipIndex ||
+        oldDelegate.maxY != maxY;
   }
 }

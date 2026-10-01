@@ -6,7 +6,6 @@ import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/receipt_compliance_badge.dart';
 import '../../models/expense_model.dart';
-import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 
@@ -52,7 +51,10 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).currentUser;
-    final role = user?.role ?? UserRole.projectMember;
+    if (user == null) {
+      return const Scaffold(body: SizedBox.shrink());
+    }
+    final role = user.role;
     final allExpenses = ref.watch(expenseProvider);
 
     final isAdminOrFinance = role.canApproveJustifications;
@@ -82,7 +84,7 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
                     _buildAdminPendingJustifications(context, allExpenses),
                   ],
                 )
-              : _buildMemberComplianceView(context, user!, allExpenses),
+              : _buildMemberComplianceView(context, user, allExpenses),
         ),
       ),
     );
@@ -258,13 +260,24 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
                           color: (s.isExceedingThreshold ? AppColors.error : AppColors.success).withAlpha(20),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          s.isExceedingThreshold ? '🔴 Review' : '🟢 Compliant',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              s.isExceedingThreshold ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+                              size: 13,
+                              color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              s.isExceedingThreshold ? 'Review' : 'Compliant',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
