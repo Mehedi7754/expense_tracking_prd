@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   private mapProjectRow(p: any, revenues: any[] = [], members: any[] = []) {
     const memberIds = (members || []).map((m) => m.user_id || m);
@@ -161,7 +165,8 @@ export class ProjectsService {
       if (!projectCode) {
         const countRes = await client.query('SELECT count(*) FROM projects');
         const num = parseInt(countRes.rows[0].count, 10) + 1;
-        projectCode = `PRJ-${new Date().getFullYear()}-${num.toString().padStart(3, '0')}`;
+        const rand = Math.floor(100 + Math.random() * 900);
+        projectCode = `PRJ-${new Date().getFullYear()}-${num.toString().padStart(3, '0')}-${rand}`;
       }
 
       const demoUserMap: Record<string, string> = {
@@ -260,7 +265,20 @@ export class ProjectsService {
         }
       }
 
-      return this.mapProjectRow(created, [], insertedMembers);
+      const mapped = this.mapProjectRow(created, [], insertedMembers);
+      try {
+        await this.auditLogsService.log(
+          {
+            action: 'PROJECT_CREATED',
+            entityType: 'Project',
+            entityId: created.id,
+            details: { name: created.name, code: created.project_code, gross: created.gross_project_value },
+          },
+          { id: validCreatedBy },
+        );
+      } catch (_) {}
+
+      return mapped;
     });
   }
 
@@ -340,24 +358,58 @@ export class ProjectsService {
       throw new NotFoundException(`Project not found: ${id}`);
     }
 
-    return this.findOne(id);
+    const updated = await this.findOne(id);
+    try {
+      await this.auditLogsService.log({
+        action: 'PROJECT_UPDATED',
+        entityType: 'Project',
+        entityId: id,
+        details: data,
+      });
+    } catch (_) {}
+
+    return updated;
   }
 
   async addRevenue(projectId: string, revenueData: any, createdById: string) {
-    const res = await this.db.query(
-      `INSERT INTO project_revenues (project_id, amount, date, note, created_by)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [
-        projectId,
-        Number(revenueData.amount),
-        revenueData.date || new Date().toISOString().split('T')[0],
-        revenueData.note || '',
-        createdById,
-      ],
-    );
+    const amount = Number(revenueData.amount || 0);
+    return this.db.transaction(async (client) => {
+      const res = await client.query(
+        `INSERT INTO project_revenues (project_id, amount, date, note, created_by)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [
+          projectId,
+          amount,
+          revenueData.date || new Date().toISOString().split('T')[0],
+          revenueData.note || '',
+          createdById,
+        ],
+      );
 
-    return res.rows[0];
+      // Recalculate amount_received and amount_receivable on the project
+      await client.query(
+        `UPDATE projects
+         SET amount_received = amount_received + $1,
+             amount_receivable = GREATEST(0, gross_project_value - (amount_received + $1))
+         WHERE id = $2`,
+        [amount, projectId],
+      );
+
+      try {
+        await this.auditLogsService.log(
+          {
+            action: 'PROJECT_REVENUE_ADDED',
+            entityType: 'Project',
+            entityId: projectId,
+            details: { amount, note: revenueData.note },
+          },
+          { id: createdById },
+        );
+      } catch (_) {}
+
+      return res.rows[0];
+    });
   }
 
   async closeProject(projectId: string, summary: any) {
@@ -372,6 +424,15 @@ export class ProjectsService {
     if (!res.rows.length) {
       throw new NotFoundException(`Project not found: ${projectId}`);
     }
+
+    try {
+      await this.auditLogsService.log({
+        action: 'PROJECT_CLOSED',
+        entityType: 'Project',
+        entityId: projectId,
+        details: summary || {},
+      });
+    } catch (_) {}
 
     return this.findOne(projectId);
   }

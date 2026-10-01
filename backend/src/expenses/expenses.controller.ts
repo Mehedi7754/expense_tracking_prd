@@ -12,8 +12,10 @@ import {
 } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('expenses')
 export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
@@ -43,11 +45,13 @@ export class ExpensesController {
     return this.expensesService.update(id, body);
   }
 
+  @Roles('main_admin', 'project_manager')
   @Delete(':id')
   async deleteExpense(@Param('id') id: string) {
     return this.expensesService.delete(id);
   }
 
+  @Roles('main_admin', 'project_manager')
   @Post(':id/approve')
   async approveExpense(
     @Param('id') id: string,
@@ -57,6 +61,7 @@ export class ExpensesController {
     return this.expensesService.approve(id, req.user.id, note);
   }
 
+  @Roles('main_admin', 'project_manager')
   @Post(':id/reject')
   async rejectExpense(
     @Param('id') id: string,
@@ -75,3 +80,4 @@ export class ExpensesController {
     return this.expensesService.addComment(id, req.user.id, comment);
   }
 }
+

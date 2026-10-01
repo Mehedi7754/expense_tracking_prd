@@ -80,13 +80,4 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       client.release();
     }
   }
-
-  async ping(): Promise<boolean> {
-    try {
-      await this.pool.query('SELECT 1');
-      return true;
-    } catch {
-      return false;
-    }
-  }
 }

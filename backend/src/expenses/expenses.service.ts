@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ExpensesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly auditLogsService: AuditLogsService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private mapExpenseRow(e: any, comments: any[] = []) {
     const details = typeof e.category_details === 'string' ? JSON.parse(e.category_details) : e.category_details || {};
@@ -166,7 +172,26 @@ export class ExpensesService {
   }
 
   async create(data: any, user: any) {
-    const employeeId = data.employeeId || data.employee_id || user.id;
+    const isAdmin = user?.role === 'main_admin';
+    const employeeId = (isAdmin && (data.employeeId || data.employee_id)) ? (data.employeeId || data.employee_id) : user.id;
+    const initialStatus = (isAdmin && data.status) ? data.status : 'pending';
+
+    let categoryId = data.categoryId || data.category_id;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!categoryId || !uuidRegex.test(categoryId)) {
+      const cleanSlug = (categoryId || '').toString().replace(/^cat_/, '');
+      const catRes = await this.db.query(
+        'SELECT id FROM categories WHERE slug ILIKE $1 OR name ILIKE $1 OR slug ILIKE $2 OR name ILIKE $2 LIMIT 1',
+        [categoryId || '', cleanSlug],
+      );
+      if (catRes.rows.length) {
+        categoryId = catRes.rows[0].id;
+      } else {
+        const firstCat = await this.db.query('SELECT id FROM categories LIMIT 1');
+        if (firstCat.rows.length) categoryId = firstCat.rows[0].id;
+      }
+    }
+
     const categoryDetails = data.categoryDetails || data.category_details || {};
     if (data.equipmentDetails) Object.assign(categoryDetails, { equipment_name: data.equipmentDetails.equipmentName, serial_number: data.equipmentDetails.serialNumber });
     if (data.transportationDetails) Object.assign(categoryDetails, { transportation_type: data.transportationDetails.transportationType, from_location: data.transportationDetails.fromLocation, to_location: data.transportationDetails.toLocation });
@@ -195,12 +220,12 @@ export class ExpensesService {
         data.taskId || data.task_id || null,
         Number(data.amount),
         data.currency || 'BDT',
-        data.categoryId || data.category_id,
+        categoryId,
         data.note || '',
         data.date || new Date().toISOString().split('T')[0],
         hasReceipt,
         data.receiptPhotoUrl || data.receipt_photo_url || null,
-        data.status || 'pending',
+        initialStatus,
         justificationStatus,
         data.justificationReason || data.justification_reason || null,
         data.justificationComment || data.justification_comment || null,
@@ -208,7 +233,23 @@ export class ExpensesService {
       ],
     );
 
-    return this.findOne(res.rows[0].id);
+    const created = await this.findOne(res.rows[0].id);
+
+    try {
+      await this.auditLogsService.log(
+        {
+          action: 'EXPENSE_SUBMITTED',
+          entityType: 'Expense',
+          entityId: created.id,
+          details: { amount: created.amount, category: created.categoryName, projectId: created.projectId },
+        },
+        user,
+      );
+    } catch (e) {
+      console.error('Failed to log audit for expense create:', e);
+    }
+
+    return created;
   }
 
   async update(id: string, data: any) {
@@ -243,14 +284,30 @@ export class ExpensesService {
   }
 
   async delete(id: string) {
+    const exp = await this.findOne(id);
     const res = await this.db.query('DELETE FROM expenses WHERE id = $1 RETURNING id', [id]);
     if (!res.rows.length) {
       throw new NotFoundException(`Expense not found: ${id}`);
+    }
+    try {
+      await this.auditLogsService.log({
+        action: 'EXPENSE_DELETED',
+        entityType: 'Expense',
+        entityId: id,
+        details: { amount: exp.amount, projectId: exp.projectId },
+      });
+    } catch (e) {
+      console.error('Failed to log audit for expense delete:', e);
     }
     return { success: true, id };
   }
 
   async approve(id: string, reviewerId: string, note?: string) {
+    const exp = await this.findOne(id);
+    if (exp.employeeId === reviewerId) {
+      throw new ForbiddenException('Anti-fraud rule: You cannot approve your own expense report');
+    }
+
     await this.db.query(
       `UPDATE expenses
        SET status = 'approved',
@@ -262,10 +319,38 @@ export class ExpensesService {
       [reviewerId, note || 'Approved by reviewer', id],
     );
 
+    try {
+      const reviewerRes = await this.db.query('SELECT full_name, role FROM users WHERE id = $1', [reviewerId]);
+      const reviewer = reviewerRes.rows[0] || { full_name: 'Reviewer', role: 'project_manager' };
+
+      await this.auditLogsService.log({
+        userId: reviewerId,
+        userName: reviewer.full_name,
+        userRole: reviewer.role,
+        action: 'EXPENSE_APPROVED',
+        entityType: 'Expense',
+        entityId: id,
+        details: { note: note || '', amount: exp.amount },
+      });
+
+      await this.notificationsService.create({
+        userId: exp.employeeId,
+        title: 'Expense Approved',
+        message: `Your expense report for ${exp.categoryName} (${exp.amount} ${exp.currency}) has been approved.`,
+        type: 'expense_approved',
+        relatedProjectId: exp.projectId,
+        relatedExpenseId: id,
+      });
+    } catch (e) {
+      console.error('Failed to process audit/notification for expense approve:', e);
+    }
+
     return this.findOne(id);
   }
 
   async reject(id: string, reviewerId: string, reason: string) {
+    const exp = await this.findOne(id);
+
     await this.db.query(
       `UPDATE expenses
        SET status = 'rejected',
@@ -276,6 +361,32 @@ export class ExpensesService {
        WHERE id = $3`,
       [reason || 'Rejected by reviewer', reviewerId, id],
     );
+
+    try {
+      const reviewerRes = await this.db.query('SELECT full_name, role FROM users WHERE id = $1', [reviewerId]);
+      const reviewer = reviewerRes.rows[0] || { full_name: 'Reviewer', role: 'project_manager' };
+
+      await this.auditLogsService.log({
+        userId: reviewerId,
+        userName: reviewer.full_name,
+        userRole: reviewer.role,
+        action: 'EXPENSE_REJECTED',
+        entityType: 'Expense',
+        entityId: id,
+        details: { reason, amount: exp.amount },
+      });
+
+      await this.notificationsService.create({
+        userId: exp.employeeId,
+        title: 'Expense Rejected',
+        message: `Your expense report for ${exp.categoryName} (${exp.amount} ${exp.currency}) was rejected. Reason: ${reason || 'None specified'}`,
+        type: 'expense_rejected',
+        relatedProjectId: exp.projectId,
+        relatedExpenseId: id,
+      });
+    } catch (e) {
+      console.error('Failed to process audit/notification for expense reject:', e);
+    }
 
     return this.findOne(id);
   }

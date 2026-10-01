@@ -37,4 +37,12 @@ export class AuthController {
     const url = body.avatarUrl || body.avatar_url || null;
     return this.authService.updateAvatar(req.user.id, url);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  async changePassword(@Body() body: { currentPassword?: string; current_password?: string; newPassword?: string; new_password?: string }, @Request() req: any) {
+    const currentPass = body.currentPassword || body.current_password || '';
+    const newPass = body.newPassword || body.new_password || '';
+    return this.authService.changePassword(req.user.id, currentPass, newPass);
+  }
 }

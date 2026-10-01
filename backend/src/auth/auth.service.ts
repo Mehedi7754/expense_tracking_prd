@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { DatabaseService } from '../database/database.service';
@@ -87,7 +87,14 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const roleEnum = this.mapRole(dto.role);
+    // Security fix: Public registration cannot create main_admin or finance accounts
+    let roleEnum = 'project_member';
+    if (dto.role) {
+      const mapped = this.mapRole(dto.role);
+      if (mapped === 'project_manager' || mapped === 'project_member') {
+        roleEnum = mapped;
+      }
+    }
     const passwordHash = await bcrypt.hash(dto.password, 10);
 
     const insertRes = await this.db.query(
@@ -225,5 +232,19 @@ export class AuthService {
       phone: r.phone,
       avatarUrl: r.avatar_url,
     };
+  }
+
+  async changePassword(userId: string, currentPass: string, newPass: string) {
+    const res = await this.db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    if (!res.rows.length) {
+      throw new UnauthorizedException('User not found');
+    }
+    const isMatch = await bcrypt.compare(currentPass, res.rows[0].password_hash);
+    if (!isMatch) {
+      throw new BadRequestException('Current password does not match');
+    }
+    const newHash = await bcrypt.hash(newPass, 10);
+    await this.db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
+    return { success: true, message: 'Password updated successfully' };
   }
 }
