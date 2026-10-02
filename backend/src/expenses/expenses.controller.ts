@@ -31,8 +31,8 @@ export class ExpensesController {
   }
 
   @Get(':id')
-  async getExpense(@Param('id') id: string) {
-    return this.expensesService.findOne(id);
+  async getExpense(@Param('id') id: string, @Request() req: any) {
+    return this.expensesService.findOne(id, req.user);
   }
 
   @Post()
@@ -41,14 +41,14 @@ export class ExpensesController {
   }
 
   @Put(':id')
-  async updateExpense(@Param('id') id: string, @Body() body: any) {
-    return this.expensesService.update(id, body);
+  async updateExpense(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    return this.expensesService.update(id, body, req.user);
   }
 
   @Roles('main_admin', 'project_manager')
   @Delete(':id')
-  async deleteExpense(@Param('id') id: string) {
-    return this.expensesService.delete(id);
+  async deleteExpense(@Param('id') id: string, @Request() req: any) {
+    return this.expensesService.delete(id, req.user);
   }
 
   @Roles('main_admin', 'project_manager')

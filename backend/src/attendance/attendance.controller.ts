@@ -1,20 +1,32 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Request, HttpCode, HttpStatus, Param } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  UseGuards,
+  Request,
+  HttpCode,
+  HttpStatus,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { AttendanceService } from './attendance.service';
 import { CheckInDto } from './dto/check-in.dto';
 
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
-  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @Post('check-in')
   async checkIn(@Body() dto: CheckInDto, @Request() req: any) {
     return this.attendanceService.checkIn(req.user.id, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
   async getAttendanceRecords(
     @Query('userId') userId: string,
@@ -35,7 +47,6 @@ export class AttendanceController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('summary')
   async getSummary(
     @Query('userId') userId: string,
@@ -43,20 +54,30 @@ export class AttendanceController {
     @Query('year') year: string,
     @Request() req: any,
   ) {
-    const targetUserId = userId || req.user.id;
+    const isManagerOrAdmin =
+      req.user.role === 'main_admin' ||
+      req.user.role === 'project_manager' ||
+      req.user.role === 'finance_manager' ||
+      req.user.role === 'finance';
+
+    if (!isManagerOrAdmin && userId && userId !== req.user.id) {
+      throw new ForbiddenException('You can only view your own attendance summary');
+    }
+
+    const targetUserId = isManagerOrAdmin && userId ? userId : req.user.id;
     const targetMonth = month ? parseInt(month, 10) : new Date().getMonth() + 1;
     const targetYear = year ? parseInt(year, 10) : new Date().getFullYear();
 
     return this.attendanceService.getAttendanceSummary(targetUserId, targetMonth, targetYear);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Roles('main_admin', 'project_manager', 'finance_manager', 'finance')
   @Get('daily-overview')
   async getDailyOverview(@Query('date') date: string) {
     return this.attendanceService.getDailyOverview(date);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Roles('main_admin', 'project_manager')
   @Post('confirm-absence')
   async confirmAbsence(
     @Body() body: { userId: string; date: string; notes?: string },

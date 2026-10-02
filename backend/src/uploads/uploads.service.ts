@@ -111,15 +111,16 @@ export class UploadsService {
    * Deletes a previously uploaded file.
    */
   async deleteFile(category: UploadCategory, filename: string): Promise<boolean> {
-    const filePath = path.join(this.uploadsRoot, category, filename);
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(this.uploadsRoot, category, safeFilename);
     try {
       if (fs.existsSync(filePath)) {
         await fs.promises.unlink(filePath);
-        this.logger.log(`Deleted upload: ${category}/${filename}`);
+        this.logger.log(`Deleted upload: ${category}/${safeFilename}`);
         return true;
       }
     } catch (e) {
-      this.logger.warn(`Failed to delete upload ${category}/${filename}: ${e}`);
+      this.logger.warn(`Failed to delete upload ${category}/${safeFilename}: ${e}`);
     }
     return false;
   }

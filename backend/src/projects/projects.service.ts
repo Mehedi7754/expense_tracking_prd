@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
@@ -91,7 +91,7 @@ export class ProjectsService {
     return res.rows.map((row) => this.mapProjectRow(row, row.revenues, row.team_members));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: any) {
     const res = await this.db.query(
       `SELECT p.*,
         COALESCE(
@@ -120,7 +120,17 @@ export class ProjectsService {
     }
 
     const row = res.rows[0];
-    return this.mapProjectRow(row, row.revenues, row.team_members);
+    const project = this.mapProjectRow(row, row.revenues, row.team_members);
+
+    if (user && user.role !== 'main_admin' && user.role !== 'finance_manager' && user.role !== 'finance') {
+      const isCreator = row.created_by === user.id;
+      const isMember = (project.teamMemberIds || []).includes(user.id) || (user.assignedProjectIds || []).includes(project.id);
+      if (!isCreator && !isMember) {
+        throw new ForbiddenException('You do not have permission to view this project');
+      }
+    }
+
+    return project;
   }
 
   async create(data: any, createdById: string) {
@@ -282,7 +292,17 @@ export class ProjectsService {
     });
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, user?: any) {
+    const existing = await this.findOne(id, user);
+
+    const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'finance_manager' || user?.role === 'finance';
+    if (user && !isAdminOrFinance) {
+      const isAssigned = (existing.teamMemberIds || []).includes(user.id) || (user.assignedProjectIds || []).includes(existing.id);
+      if (!isAssigned) {
+        throw new ForbiddenException('You do not have permission to update this project');
+      }
+    }
+
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;

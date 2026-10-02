@@ -508,7 +508,7 @@ export class SalaryService {
       'SELECT id, status FROM salary_calculations WHERE user_id = $1 AND month = $2 AND year = $3',
       [userId, month, year],
     );
-    const isConfirmed = calcRes.rows.length > 0 && calcRes.rows[0].status === 'confirmed';
+    const isConfirmed = Boolean(calcRes?.rows?.length && calcRes.rows[0]?.status === 'confirmed');
 
     return {
       userId,

@@ -140,7 +140,7 @@ export class ExpensesService {
     return res.rows.map((r) => this.mapExpenseRow(r, r.comments));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: any) {
     const sql = `
       SELECT e.*,
         u.full_name AS employee_name,
@@ -169,7 +169,17 @@ export class ExpensesService {
       throw new NotFoundException(`Expense not found: ${id}`);
     }
 
-    return this.mapExpenseRow(res.rows[0], res.rows[0].comments);
+    const expense = this.mapExpenseRow(res.rows[0], res.rows[0].comments);
+
+    if (user && user.role !== 'main_admin' && user.role !== 'finance_manager' && user.role !== 'finance') {
+      const isOwner = expense.employeeId === user.id;
+      const isAssigned = (user.assignedProjectIds || []).includes(expense.projectId);
+      if (!isOwner && !isAssigned) {
+        throw new ForbiddenException('You do not have permission to view this expense report');
+      }
+    }
+
+    return expense;
   }
 
   async create(data: any, user: any) {
@@ -270,7 +280,26 @@ export class ExpensesService {
     return created;
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, user?: any) {
+    const existing = await this.findOne(id, user);
+
+    const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'finance_manager' || user?.role === 'finance';
+    const isProjectManager = user?.role === 'project_manager';
+
+    if (user && !isAdminOrFinance && !isProjectManager) {
+      if (existing.employeeId !== user.id) {
+        throw new ForbiddenException('You can only edit your own expense reports');
+      }
+      if (existing.status !== 'pending' && existing.status !== 'draft') {
+        throw new ForbiddenException('Cannot edit an expense that has already been approved or rejected');
+      }
+      delete data.status;
+    }
+
+    if (!isAdminOrFinance && data.status === 'approved' && existing.employeeId === user?.id) {
+      throw new ForbiddenException('Anti-fraud rule: You cannot approve your own expense report');
+    }
+
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -293,16 +322,25 @@ export class ExpensesService {
     }
 
     if (fields.length === 0) {
-      return this.findOne(id);
+      return this.findOne(id, user);
     }
 
     values.push(id);
     await this.db.query(`UPDATE expenses SET ${fields.join(', ')} WHERE id = $${idx}`, values);
-    return this.findOne(id);
+    return this.findOne(id, user);
   }
 
-  async delete(id: string) {
-    const exp = await this.findOne(id);
+  async delete(id: string, user?: any) {
+    const exp = await this.findOne(id, user);
+    const isAdmin = user?.role === 'main_admin';
+    if (!isAdmin) {
+      const isAssignedManager = (user?.assignedProjectIds || []).includes(exp.projectId);
+      const isOwner = exp.employeeId === user?.id && (exp.status === 'pending' || exp.status === 'draft');
+      if (!isAssignedManager && !isOwner) {
+        throw new ForbiddenException('You do not have permission to delete this expense');
+      }
+    }
+
     const res = await this.db.query('DELETE FROM expenses WHERE id = $1 RETURNING id', [id]);
     if (!res.rows.length) {
       throw new NotFoundException(`Expense not found: ${id}`);

@@ -24,8 +24,8 @@ export class ProjectsController {
   }
 
   @Get(':id')
-  async getProject(@Param('id') id: string) {
-    return this.projectsService.findOne(id);
+  async getProject(@Param('id') id: string, @Request() req: any) {
+    return this.projectsService.findOne(id, req.user);
   }
 
   @Roles('main_admin', 'project_manager')
@@ -36,8 +36,8 @@ export class ProjectsController {
 
   @Roles('main_admin', 'project_manager')
   @Put(':id')
-  async updateProject(@Param('id') id: string, @Body() body: any) {
-    return this.projectsService.update(id, body);
+  async updateProject(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    return this.projectsService.update(id, body, req.user);
   }
 
   @Roles('main_admin', 'project_manager')
