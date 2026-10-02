@@ -51,6 +51,16 @@ export class ProjectsController {
   }
 
   @Roles('main_admin', 'project_manager')
+  @Post(':id/revenues')
+  async addRevenues(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    return this.projectsService.addRevenue(id, body, req.user.id);
+  }
+
+  @Roles('main_admin', 'project_manager')
   @Post(':id/close')
   async closeProject(@Param('id') id: string, @Body() body: any) {
     return this.projectsService.closeProject(id, body);

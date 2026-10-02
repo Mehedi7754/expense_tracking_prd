@@ -26,6 +26,9 @@ RUN npm ci --quiet --omit=dev && npm cache clean --force
 
 COPY --from=builder /usr/src/app/dist ./dist
 
+RUN mkdir -p /usr/src/app/uploads/receipts /usr/src/app/uploads/avatars /usr/src/app/uploads/projects \
+    && chown -R node:node /usr/src/app
+
 USER node
 
 EXPOSE 8080

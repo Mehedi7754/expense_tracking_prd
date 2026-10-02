@@ -183,9 +183,20 @@ export class ExpensesService {
       const cleanSlug = (categoryId || '').toString().replace(/^cat_/, '');
       const rawName = data.categoryName || data.category_name || (categoryId ? categoryId.toString().replace(/^cat_/, '') : 'General');
       const formatted = rawName.charAt(0).toUpperCase() + rawName.slice(1);
+
+      let mappedName = rawName;
+      const lowerSlug = cleanSlug.toLowerCase();
+      if (lowerSlug.includes('meal') || lowerSlug.includes('food') || lowerSlug.includes('dining')) mappedName = 'Food';
+      else if (lowerSlug.includes('lodg') || lowerSlug.includes('hotel') || lowerSlug.includes('accommodat')) mappedName = 'Accommodation';
+      else if (lowerSlug.includes('hard') || lowerSlug.includes('equip') || lowerSlug.includes('device')) mappedName = 'Equipment';
+      else if (lowerSlug.includes('transp') || lowerSlug.includes('taxi')) mappedName = 'Transportation';
+      else if (lowerSlug.includes('soft') || lowerSlug.includes('tool')) mappedName = 'Software & Tools';
+      else if (lowerSlug.includes('office') || lowerSlug.includes('suppl')) mappedName = 'Office Cost';
+      else if (lowerSlug.includes('travel') || lowerSlug.includes('flight')) mappedName = 'Travel & Flights';
+
       const catRes = await this.db.query(
-        'SELECT id FROM categories WHERE slug ILIKE $1 OR name ILIKE $1 OR slug ILIKE $2 OR name ILIKE $2 OR LOWER(name) = LOWER($3) LIMIT 1',
-        [categoryId || '', cleanSlug, rawName],
+        'SELECT id FROM categories WHERE name ILIKE $1 OR name ILIKE $2 OR LOWER(name) = LOWER($3) OR LOWER(name) = LOWER($4) LIMIT 1',
+        [`%${categoryId || ''}%`, `%${cleanSlug}%`, rawName, mappedName],
       );
       if (catRes.rows.length) {
         categoryId = catRes.rows[0].id;
@@ -419,5 +430,51 @@ export class ExpensesService {
       comment: res.rows[0].comment_text,
       createdAt: res.rows[0].created_at,
     };
+  }
+
+  async submitJustification(id: string, userId: string, data: any) {
+    const res = await this.db.query(
+      `UPDATE expenses
+       SET justification_status = 'submitted',
+           justification_reason = $1,
+           justification_comment = $2,
+           justification_attachment_url = $3,
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [
+        data.justificationReason || data.justification_reason || '',
+        data.justificationComment || data.justification_comment || null,
+        data.justificationAttachmentUrl || data.justification_attachment_url || null,
+        id,
+      ],
+    );
+    if (!res.rows.length) {
+      throw new NotFoundException(`Expense ${id} not found`);
+    }
+    return this.findOne(id);
+  }
+
+  async reviewJustification(id: string, reviewerId: string, data: any) {
+    const res = await this.db.query(
+      `UPDATE expenses
+       SET justification_status = $1,
+           justification_review_comment = $2,
+           justification_reviewed_by = $3,
+           justification_reviewed_at = NOW(),
+           updated_at = NOW()
+       WHERE id = $4
+       RETURNING *`,
+      [
+        data.status || 'approved',
+        data.comment || data.justificationReviewComment || null,
+        reviewerId,
+        id,
+      ],
+    );
+    if (!res.rows.length) {
+      throw new NotFoundException(`Expense ${id} not found`);
+    }
+    return this.findOne(id);
   }
 }

@@ -1,8 +1,21 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -19,5 +32,40 @@ export class UsersController {
       return user ? [user] : [];
     }
     return this.usersService.findAll(q);
+  }
+
+  @Get(':id')
+  async getUser(@Param('id') id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  @Roles('main_admin')
+  @Post()
+  async createUser(@Body() body: any) {
+    return this.usersService.create(body);
+  }
+
+  @Roles('main_admin')
+  @Put(':id')
+  async updateUser(@Param('id') id: string, @Body() body: any) {
+    return this.usersService.update(id, body);
+  }
+
+  @Roles('main_admin')
+  @Patch(':id/role')
+  async updateRole(@Param('id') id: string, @Body('role') role: string) {
+    return this.usersService.updateRole(id, role);
+  }
+
+  @Roles('main_admin')
+  @Patch(':id/status')
+  async updateStatus(@Param('id') id: string, @Body('isActive') isActive: boolean) {
+    return this.usersService.updateStatus(id, isActive);
+  }
+
+  @Roles('main_admin')
+  @Delete(':id')
+  async deleteUser(@Param('id') id: string) {
+    return this.usersService.delete(id);
   }
 }

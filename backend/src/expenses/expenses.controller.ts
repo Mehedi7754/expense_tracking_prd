@@ -79,5 +79,24 @@ export class ExpensesController {
   ) {
     return this.expensesService.addComment(id, req.user.id, comment);
   }
+
+  @Post(':id/justification')
+  async submitJustification(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    return this.expensesService.submitJustification(id, req.user.id, body);
+  }
+
+  @Roles('main_admin', 'project_manager')
+  @Post(':id/justification/review')
+  async reviewJustification(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    return this.expensesService.reviewJustification(id, req.user.id, body);
+  }
 }
 

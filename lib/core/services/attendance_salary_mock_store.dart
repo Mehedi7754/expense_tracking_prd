@@ -543,6 +543,7 @@ class AttendanceSalaryMockStore {
       final dateStr = DateFormat('yyyy-MM-dd').format(dateObj);
       final dayOfWeek = DateFormat('EEEE').format(dateObj);
       final isFuture = dateObj.isAfter(DateTime(now.year, now.month, now.day));
+      final isToday = dateObj.year == now.year && dateObj.month == now.month && dateObj.day == now.day;
 
       // Weekend in Bangladesh: Friday & Saturday
       final isWeekend = dateObj.weekday == DateTime.friday || dateObj.weekday == DateTime.saturday;
@@ -594,8 +595,10 @@ class AttendanceSalaryMockStore {
       } else if (hasMorning || hasAfternoon) {
         status = 'half_day';
         presentWeight = 0.5;
-        deductionUnits = 0.5; // Half-day absence cut
-        halfDaysCount++;
+        deductionUnits = isToday ? 0.0 : 0.5; // Do not penalize current in-progress day!
+        if (!isToday) halfDaysCount++;
+      } else if (isToday) {
+        status = 'upcoming'; // Scheduled workday currently in progress
       } else if (isConfirmedAbsent) {
         status = 'confirmed_absent';
         deductionUnits = 1.0; // Confirmed absent cut

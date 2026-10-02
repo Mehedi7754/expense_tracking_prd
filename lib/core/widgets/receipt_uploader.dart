@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../repositories/file_upload_repository.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_text_styles.dart';
+import '../config/app_env.dart';
 import 'notification_banner.dart';
 
 /// Receipt uploader widget that picks an image and uploads it to the backend.
@@ -240,7 +241,7 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
 
   String _resolveBaseUrl(WidgetRef ref) {
     // Use the API base URL without the /api/v1 suffix for static files
-    return '';
+    return AppEnv.apiBaseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
   }
 
   Widget _buildPlaceholder(BuildContext context, bool isDark, bool isExpanded) {

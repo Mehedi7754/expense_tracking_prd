@@ -378,6 +378,7 @@ export class SalaryService {
       }
 
       const isFuture = dateStr > todayIso;
+      const isToday = dateStr === todayIso;
 
       const dayAtt = attMap[dateStr] || {};
       const morningRecord = dayAtt.morning;
@@ -417,12 +418,16 @@ export class SalaryService {
       } else if (morningAttended || afternoonAttended) {
         status = 'half_day';
         presentWeight = 0.5;
-        deductionUnits = 0.5;
-        halfDays += 1;
-        notes = morningAttended ? 'Morning session only (Half Day)' : 'Afternoon session only (Half Day)';
-      } else if (isFuture) {
+        deductionUnits = isToday ? 0.0 : 0.5;
+        if (!isToday) {
+          halfDays += 1;
+        }
+        notes = morningAttended
+          ? (isToday ? 'Morning session attended (afternoon in progress)' : 'Morning session only (Half Day)')
+          : (isToday ? 'Afternoon session attended' : 'Afternoon session only (Half Day)');
+      } else if (isFuture || isToday) {
         status = 'upcoming';
-        notes = 'Scheduled working day (Upcoming)';
+        notes = isToday ? 'Current workday (in progress)' : 'Scheduled working day (Upcoming)';
       } else {
         // Scheduled working day in the past with no punch
         const isExplicitlyConfirmedAbsent =

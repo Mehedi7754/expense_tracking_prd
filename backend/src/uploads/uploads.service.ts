@@ -32,10 +32,14 @@ export class UploadsService {
   private ensureDirectories(): void {
     const categories: UploadCategory[] = ['receipts', 'avatars', 'projects'];
     for (const cat of categories) {
-      const dir = path.join(this.uploadsRoot, cat);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        this.logger.log(`Created uploads directory: ${dir}`);
+      try {
+        const dir = path.join(this.uploadsRoot, cat);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+          this.logger.log(`Created uploads directory: ${dir}`);
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not create uploads directory for ${cat}: ${err.message}`);
       }
     }
   }
