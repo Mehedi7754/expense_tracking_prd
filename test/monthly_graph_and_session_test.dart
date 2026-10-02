@@ -41,11 +41,12 @@ void main() {
 
     testWidgets('MinimalAreaChart allows switching period to Last Month and This Quarter', (WidgetTester tester) async {
       await tester.pumpWidget(
-        const ProviderScope(
+        ProviderScope(
           child: MaterialApp(
             home: Scaffold(
               body: MinimalAreaChart(
                 title: 'Monthly Spending',
+                referenceDate: DateTime(2026, 9, 30),
               ),
             ),
           ),

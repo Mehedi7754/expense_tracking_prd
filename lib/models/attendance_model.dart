@@ -159,6 +159,9 @@ class EmployeeDailyAttendance {
   bool get isHalfDay => status == 'half_day';
   bool get isMissing => status == 'missing';
   bool get isConfirmedAbsent => status == 'confirmed_absent';
+  bool get isWeekend => status == 'weekend';
+  bool get isHoliday => status == 'holiday';
+  bool get isNonWorkingDay => status == 'weekend' || status == 'holiday';
 
   factory EmployeeDailyAttendance.fromJson(Map<String, dynamic> json) {
     return EmployeeDailyAttendance(
@@ -193,6 +196,11 @@ class DailyAttendanceOverview {
     required this.missingCount,
     required this.employees,
   });
+
+  bool get isWeekend {
+    final parsed = DateTime.tryParse(date);
+    return parsed != null && (parsed.weekday == DateTime.friday || parsed.weekday == DateTime.saturday);
+  }
 
   factory DailyAttendanceOverview.fromJson(Map<String, dynamic> json) {
     final list = json['employees'] as List<dynamic>? ?? [];

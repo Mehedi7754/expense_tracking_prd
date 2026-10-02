@@ -27,6 +27,16 @@ class ReceiptUploader extends ConsumerStatefulWidget {
     this.entityId,
   });
 
+  /// Resolves an image path or URL into a fully-qualified HTTP/HTTPS URL.
+  /// If the path is relative (e.g. `/uploads/expenses/...`), it prepends the backend base host.
+  static String resolveImageUrl(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    final baseUrl = AppEnv.apiBaseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+    return path.startsWith('/') ? '$baseUrl$path' : '$baseUrl/$path';
+  }
+
   @override
   ConsumerState<ReceiptUploader> createState() => _ReceiptUploaderState();
 }
@@ -223,10 +233,7 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
     }
 
     if (isServerUrl) {
-      final baseUrl = _resolveBaseUrl(ref);
-      final finalUrl = path.startsWith('http')
-          ? path
-          : (path.startsWith('/') ? '$baseUrl$path' : '$baseUrl/$path');
+      final finalUrl = ReceiptUploader.resolveImageUrl(path);
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Image.network(
@@ -241,11 +248,6 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
 
     // Fallback: styled placeholder for sample/unavailable receipts
     return _buildPlaceholder(context, isDark, isExpanded);
-  }
-
-  String _resolveBaseUrl(WidgetRef ref) {
-    // Use the API base URL without the /api/v1 suffix for static files
-    return AppEnv.apiBaseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
   }
 
   Widget _buildPlaceholder(BuildContext context, bool isDark, bool isExpanded) {
