@@ -56,7 +56,10 @@ export class ProjectsService {
   }
 
   async findAll(user: any) {
-    const isAdminOrFinance = user.role === 'main_admin' || user.role === 'finance';
+    const isAdminOrFinance =
+      user.role === 'main_admin' ||
+      user.role === 'finance' ||
+      user.role === 'finance_manager';
     
     let queryText = `
       SELECT p.*,

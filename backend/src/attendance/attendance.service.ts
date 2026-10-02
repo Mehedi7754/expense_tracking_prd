@@ -116,9 +116,15 @@ export class AttendanceService {
   }): Promise<AttendanceRecord[]> {
     const { userId, date, month, year, sessionType, currentUserRole, currentUserId } = params;
 
-    const isPrivileged = ['main_admin', 'admin', 'project_manager', 'manager', 'finance'].includes(
-      currentUserRole.toLowerCase().replace(/_/g, ''),
-    );
+    const normalizedRole = (currentUserRole || '').toLowerCase().replace(/_/g, '');
+    const isPrivileged = [
+      'mainadmin',
+      'admin',
+      'projectmanager',
+      'manager',
+      'financemanager',
+      'finance',
+    ].includes(normalizedRole);
 
     const conditions: string[] = [];
     const values: any[] = [];
@@ -249,6 +255,18 @@ export class AttendanceService {
       }
     }
 
+    // Query holidays covering targetDate
+    const holidayRes = await this.db.query(
+      `SELECT name FROM holidays WHERE date = $1 LIMIT 1`,
+      [targetDate],
+    );
+    const holidayName = holidayRes.rows.length ? holidayRes.rows[0].name : null;
+
+    // Check weekend (Friday = 5, Saturday = 6 in regional calendar)
+    const targetDateObj = new Date(targetDate + 'T00:00:00Z');
+    const dayOfWeek = targetDateObj.getUTCDay();
+    const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+
     const employees = usersRes.rows.map((user) => {
       const userAtt = attMap[user.id] || {};
       let status = 'missing';
@@ -256,6 +274,10 @@ export class AttendanceService {
         status = 'present';
       } else if (userAtt.morning || userAtt.afternoon) {
         status = 'half_day';
+      } else if (holidayName) {
+        status = 'holiday';
+      } else if (isWeekend) {
+        status = 'weekend';
       }
 
       return {
@@ -279,6 +301,8 @@ export class AttendanceService {
 
     return {
       date: targetDate,
+      isWeekend,
+      holidayName,
       totalEmployees: employees.length,
       presentCount,
       halfDayCount,

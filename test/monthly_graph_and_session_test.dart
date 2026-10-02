@@ -65,11 +65,15 @@ void main() {
       await tester.tap(find.text('This Quarter').last);
       await tester.pumpAndSettle();
 
-      // Verify period updated and quarter labels render
+      // Verify period updated and quarter labels render dynamically for current quarter
       expect(find.text('This Quarter'), findsOneWidget);
-      expect(find.text('July'), findsOneWidget);
-      expect(find.text('August'), findsOneWidget);
-      expect(find.text('September'), findsOneWidget);
+      const fullMonths = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      final now = DateTime.now();
+      final qIndex = (now.month - 1) ~/ 3;
+      final qStartMonth = qIndex * 3 + 1;
+      expect(find.text(fullMonths[qStartMonth]), findsOneWidget);
+      expect(find.text(fullMonths[qStartMonth + 1]), findsOneWidget);
+      expect(find.text(fullMonths[qStartMonth + 2]), findsOneWidget);
     });
 
     testWidgets('MinimalAreaChart supports interactive touch / dragging to scrub points', (WidgetTester tester) async {

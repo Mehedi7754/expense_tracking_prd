@@ -14,7 +14,7 @@ export class CategoriesController {
     return this.categoriesService.findAll();
   }
 
-  @Roles('main_admin', 'finance_manager')
+  @Roles('main_admin', 'finance_manager', 'finance')
   @Post()
   async createCategory(@Body() body: any) {
     return this.categoriesService.create(body);

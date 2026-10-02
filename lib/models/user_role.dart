@@ -46,8 +46,7 @@ enum UserRole {
       this == UserRole.mainAdmin || this == UserRole.projectManager;
   bool get canApproveMembers =>
       this == UserRole.mainAdmin ||
-      this == UserRole.projectManager ||
-      this == UserRole.projectMember;
+      this == UserRole.projectManager;
   bool get canApproveExpenses =>
       this == UserRole.mainAdmin || this == UserRole.projectManager;
   bool get canApproveJustifications =>
