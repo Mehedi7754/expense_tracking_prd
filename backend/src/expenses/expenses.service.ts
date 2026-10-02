@@ -112,8 +112,9 @@ export class ExpensesService {
 
     // PRD Access control: regular member only sees their own expenses unless project manager/admin/finance
     if (user.role === 'project_member') {
-      sql += ` AND (e.employee_id = $${idx++} OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.project_id AND pm.user_id = '${user.id}' AND pm.role_in_project ILIKE '%Manager%'))`;
+      sql += ` AND (e.employee_id = $${idx} OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.project_id AND pm.user_id = $${idx} AND pm.role_in_project ILIKE '%Manager%'))`;
       params.push(user.id);
+      idx++;
     } else if (user.role === 'project_manager') {
       sql += ` AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.project_id AND pm.user_id = $${idx++})`;
       params.push(user.id);
@@ -180,15 +181,20 @@ export class ExpensesService {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!categoryId || !uuidRegex.test(categoryId)) {
       const cleanSlug = (categoryId || '').toString().replace(/^cat_/, '');
+      const rawName = data.categoryName || data.category_name || (categoryId ? categoryId.toString().replace(/^cat_/, '') : 'General');
+      const formatted = rawName.charAt(0).toUpperCase() + rawName.slice(1);
       const catRes = await this.db.query(
-        'SELECT id FROM categories WHERE slug ILIKE $1 OR name ILIKE $1 OR slug ILIKE $2 OR name ILIKE $2 LIMIT 1',
-        [categoryId || '', cleanSlug],
+        'SELECT id FROM categories WHERE slug ILIKE $1 OR name ILIKE $1 OR slug ILIKE $2 OR name ILIKE $2 OR LOWER(name) = LOWER($3) LIMIT 1',
+        [categoryId || '', cleanSlug, rawName],
       );
       if (catRes.rows.length) {
         categoryId = catRes.rows[0].id;
       } else {
-        const firstCat = await this.db.query('SELECT id FROM categories LIMIT 1');
-        if (firstCat.rows.length) categoryId = firstCat.rows[0].id;
+        const newCat = await this.db.query(
+          'INSERT INTO categories (name, icon_name, is_default) VALUES ($1, $2, TRUE) RETURNING id',
+          [formatted, data.categoryIcon || 'category'],
+        );
+        categoryId = newCat.rows[0]?.id;
       }
     }
 

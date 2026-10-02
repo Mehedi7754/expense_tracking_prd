@@ -62,7 +62,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     if (_initialized) return;
     _initialized = true;
 
-    final initialTotal = expense.amount;
+    final initialTotal = expense.totalCost;
     _amountController.text = initialTotal.toStringAsFixed(initialTotal.truncateToDouble() == initialTotal ? 0 : 2);
     _noteController.text = expense.note;
     _selectedCurrency = expense.currency;

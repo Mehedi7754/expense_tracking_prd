@@ -11,6 +11,15 @@ enum TaskStatus {
     }
   }
 
+  String get dbValue {
+    switch (this) {
+      case TaskStatus.inProgress:
+        return 'in_progress';
+      case TaskStatus.completed:
+        return 'completed';
+    }
+  }
+
   static TaskStatus fromString(String val) {
     switch (val.toLowerCase().replaceAll(' ', '').replaceAll('_', '').replaceAll('-', '')) {
       case 'completed':
@@ -97,8 +106,18 @@ class TaskModel {
       'assignee_id': assigneeId,
       'assignee_name': assigneeName,
       'due_date': dueDate.toIso8601String(),
-      'status': status.name,
+      'status': status.dbValue,
       if (budgetLine != null) 'budget_line': budgetLine,
     };
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TaskModel &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

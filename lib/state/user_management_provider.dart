@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
+import '../core/utils/fetch_cache_mixin.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import 'auth_provider.dart';
@@ -74,7 +75,7 @@ const List<UserModel> kAuthenticDatabaseUsers = [
   ),
 ];
 
-class UserManagementNotifier extends Notifier<List<UserModel>> {
+class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMixin {
   @override
   List<UserModel> build() {
     _loadCachedUsers();
@@ -95,14 +96,12 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
         if (customUsers.isNotEmpty) {
           final mergedMap = <String, UserModel>{};
           for (final u in kAuthenticDatabaseUsers) {
-            mergedMap[u.id] = u;
-            if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
+            _addOrUpdateUser(mergedMap, u);
           }
           for (final u in customUsers) {
-            mergedMap[u.id] = u;
-            if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
+            _addOrUpdateUser(mergedMap, u);
           }
-          state = mergedMap.values.toSet().toList();
+          state = mergedMap.values.toList();
         } else {
           state = kAuthenticDatabaseUsers;
         }
@@ -125,64 +124,92 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
     }
   }
 
-  Future<void> fetchUsers() async {
-    final mergedMap = <String, UserModel>{};
-    for (final u in state) {
-      mergedMap[u.id] = u;
-      if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
+  static void _addOrUpdateUser(Map<String, UserModel> map, UserModel user) {
+    if (user.email.isNotEmpty) {
+      final existingKey = map.keys.cast<String?>().firstWhere(
+        (k) => map[k]!.email.trim().toLowerCase() == user.email.trim().toLowerCase(),
+        orElse: () => null,
+      );
+      if (existingKey != null) {
+        final finalKey = user.id.isNotEmpty ? user.id : existingKey;
+        map.remove(existingKey);
+        map[finalKey] = user;
+        return;
+      }
     }
+    final key = user.id.isNotEmpty ? user.id : user.email.trim().toLowerCase();
+    map[key] = user;
+  }
 
-    // 1. Try querying backend /users endpoint
-    try {
-      final client = ref.read(apiClientProvider);
-      final response = await client.get('/users');
-      List<UserModel> fetched = [];
-      if (response is List) {
-        fetched = response
-            .whereType<Map<String, dynamic>>()
-            .map(UserModel.fromJson)
-            .toList();
-      } else if (response is Map<String, dynamic> && response['data'] is List) {
-        fetched = (response['data'] as List)
-            .whereType<Map<String, dynamic>>()
-            .map(UserModel.fromJson)
-            .toList();
-      }
-      for (final u in fetched) {
-        mergedMap[u.id] = u;
-        if (u.email.isNotEmpty) mergedMap[u.email.toLowerCase()] = u;
-      }
-    } catch (_) {
-      // Backend /users may be unavailable or offline; harvest authentic database users from related providers
-    }
+  /// Fetches users from backend with cache check.
+  /// Set [force] to `true` for pull-to-refresh or post-mutation sync.
+  Future<void> fetchUsers({bool force = false}) async {
+    if (!shouldFetch(force: force, hasData: state.isNotEmpty)) return;
 
-    // 2. Synchronize current logged-in user
+    markFetchStarted();
     try {
-      final curUser = ref.read(authProvider).currentUser;
-      if (curUser != null) {
-        mergedMap[curUser.id] = curUser;
-        if (curUser.email.isNotEmpty) mergedMap[curUser.email.toLowerCase()] = curUser;
+      final mergedMap = <String, UserModel>{};
+      for (final u in state) {
+        _addOrUpdateUser(mergedMap, u);
       }
-    } catch (_) {}
 
-    // 3. Synchronize users from expenses
-    try {
-      final expenses = ref.read(expenseProvider);
-      for (final exp in expenses) {
-        if (exp.employeeId.isNotEmpty && !mergedMap.containsKey(exp.employeeId)) {
-          mergedMap[exp.employeeId] = UserModel(
-            id: exp.employeeId,
-            name: exp.employeeName.isNotEmpty ? exp.employeeName : 'Team Member',
-            email: '${exp.employeeName.toLowerCase().replaceAll(' ', '.')}@pfis.com',
-            role: UserRole.projectMember,
-            department: 'Operations',
-          );
+      // 1. Try querying backend /users endpoint
+      try {
+        final client = ref.read(apiClientProvider);
+        final response = await client.get('/users');
+        List<UserModel> fetched = [];
+        if (response is List) {
+          fetched = response
+              .whereType<Map<String, dynamic>>()
+              .map(UserModel.fromJson)
+              .toList();
+        } else if (response is Map<String, dynamic> && response['data'] is List) {
+          fetched = (response['data'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(UserModel.fromJson)
+              .toList();
         }
+        for (final u in fetched) {
+          _addOrUpdateUser(mergedMap, u);
+        }
+      } catch (_) {
+        // Backend /users may be unavailable or offline; harvest authentic database users from related providers
       }
-    } catch (_) {}
 
-    state = mergedMap.values.toSet().toList();
-    await _persistUsers();
+      // 2. Synchronize current logged-in user
+      try {
+        final curUser = ref.read(authProvider).currentUser;
+        if (curUser != null) {
+          _addOrUpdateUser(mergedMap, curUser);
+        }
+      } catch (_) {}
+
+      // 3. Synchronize users from expenses
+      try {
+        final expenses = ref.read(expenseProvider);
+        for (final exp in expenses) {
+          if (exp.employeeId.isNotEmpty) {
+            _addOrUpdateUser(
+              mergedMap,
+              UserModel(
+                id: exp.employeeId,
+                name: exp.employeeName.isNotEmpty ? exp.employeeName : 'Team Member',
+                email: '${exp.employeeName.toLowerCase().replaceAll(' ', '.')}@pfis.com',
+                role: UserRole.projectMember,
+                department: 'Operations',
+              ),
+            );
+          }
+        }
+      } catch (_) {}
+
+      state = mergedMap.values.toList();
+      await _persistUsers();
+      markFetchCompleted();
+    } catch (e) {
+      markFetchFailed();
+      debugPrint('[UserManagementNotifier] Error fetching users: $e');
+    }
   }
 
   Future<List<UserModel>> searchUsers(String query) async {
@@ -191,7 +218,10 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
 
     try {
       final client = ref.read(apiClientProvider);
-      final response = await client.get('/users/search?q=${Uri.encodeComponent(clean)}');
+      final response = await client.get(
+        '/users/search',
+        queryParams: {'q': clean},
+      );
       List<UserModel> fetched = [];
       if (response is List) {
         fetched = response
@@ -351,7 +381,9 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
   }
 
   Future<void> toggleActive(String userId) async {
-    final user = state.firstWhere((u) => u.id == userId);
+    final idx = state.indexWhere((u) => u.id == userId);
+    if (idx == -1) return;
+    final user = state[idx];
     final updated = user.copyWith(isActive: !user.isActive);
 
     state = [
@@ -369,7 +401,9 @@ class UserManagementNotifier extends Notifier<List<UserModel>> {
   }
 
   Future<void> approveUser(String userId) async {
-    final user = state.firstWhere((u) => u.id == userId);
+    final idx = state.indexWhere((u) => u.id == userId);
+    if (idx == -1) return;
+    final user = state[idx];
     final updated = user.copyWith(isApproved: true, isActive: true);
 
     state = [

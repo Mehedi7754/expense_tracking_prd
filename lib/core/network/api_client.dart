@@ -32,6 +32,10 @@ class ApiClient {
 
   String? _authToken;
 
+  /// Global callback invoked on 401 Unauthorized responses.
+  /// Set by AuthNotifier to trigger logout & redirect to login.
+  static void Function()? onUnauthorized;
+
   ApiClient({
     String? baseUrl,
     http.Client? httpClient,
@@ -251,6 +255,10 @@ class ApiClient {
       case 400:
         throw ValidationException(errorMessage, statusCode: 400);
       case 401:
+        // Bug 10: Trigger global session-expiry handler before throwing
+        if (ApiClient.onUnauthorized != null) {
+          ApiClient.onUnauthorized!();
+        }
         throw UnauthorizedException(errorMessage);
       case 403:
         throw ForbiddenException(errorMessage);

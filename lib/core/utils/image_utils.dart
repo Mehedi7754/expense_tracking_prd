@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../config/app_env.dart';
 
 class AppImageHelper {
   /// Converts an image file or bytes to a base64 Data URI string.
@@ -46,7 +47,7 @@ class AppImageHelper {
       }
     }
 
-    // 2. HTTP/HTTPS Network URL
+    // 2. HTTP/HTTPS Network URL or Relative Backend URL
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return Image.network(
         trimmed,
@@ -55,6 +56,19 @@ class AppImageHelper {
         height: height,
         errorBuilder: (_, __, ___) => placeholder(),
       );
+    }
+
+    if (trimmed.startsWith('/uploads/') || (trimmed.startsWith('/') && !trimmed.contains('/data/user/'))) {
+      final resolved = AppEnv.resolveUrl(trimmed);
+      if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+        return Image.network(
+          resolved,
+          fit: fit,
+          width: width,
+          height: height,
+          errorBuilder: (_, __, ___) => placeholder(),
+        );
+      }
     }
 
     // 3. Local File

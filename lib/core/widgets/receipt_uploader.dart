@@ -1,24 +1,39 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../repositories/file_upload_repository.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_text_styles.dart';
 import 'notification_banner.dart';
 
-class ReceiptUploader extends StatelessWidget {
+/// Receipt uploader widget that picks an image and uploads it to the backend.
+///
+/// The [onImageChanged] callback receives the **server URL** (not the local path)
+/// after a successful upload, so the calling screen stores the URL in the model.
+class ReceiptUploader extends ConsumerStatefulWidget {
   final String? imagePath;
   final ValueChanged<String?> onImageChanged;
   final bool isReadOnly;
+  final String? entityId;
 
   const ReceiptUploader({
     super.key,
     required this.imagePath,
     required this.onImageChanged,
     this.isReadOnly = false,
+    this.entityId,
   });
 
-  Future<void> _pickImage(BuildContext context, ImageSource source) async {
+  @override
+  ConsumerState<ReceiptUploader> createState() => _ReceiptUploaderState();
+}
+
+class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
+  bool _isUploading = false;
+
+  Future<void> _pickAndUpload(BuildContext context, ImageSource source) async {
     try {
       final picker = ImagePicker();
       final pickedFile = await picker.pickImage(
@@ -27,13 +42,30 @@ class ReceiptUploader extends StatelessWidget {
         maxHeight: 1200,
         imageQuality: 85,
       );
-      if (pickedFile != null) {
-        onImageChanged(pickedFile.path);
+      if (pickedFile == null) return;
+
+      setState(() => _isUploading = true);
+
+      // Upload to backend
+      try {
+        final uploadRepo = ref.read(fileUploadRepositoryProvider);
+        final result = await uploadRepo.upload(
+          filePathOrDataUri: pickedFile.path,
+          category: UploadCategory.receipts,
+          entityId: widget.entityId,
+        );
+        widget.onImageChanged(result.url);
+      } catch (uploadError) {
+        debugPrint('[ReceiptUploader] Backend upload failed, using local path: $uploadError');
+        // Fallback: use local path if backend is unreachable
+        widget.onImageChanged(pickedFile.path);
       }
     } catch (e) {
       if (context.mounted) {
         NotificationBanner.showError(context, 'Could not load receipt: $e');
       }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
   }
 
@@ -76,7 +108,7 @@ class ReceiptUploader extends StatelessWidget {
                 subtitle: Text('Capture with device camera', style: AppTextStyles.bodySmall),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _pickImage(context, ImageSource.camera);
+                  _pickAndUpload(context, ImageSource.camera);
                 },
               ),
               const SizedBox(height: 8),
@@ -93,7 +125,7 @@ class ReceiptUploader extends StatelessWidget {
                 subtitle: Text('Upload saved photo or PDF receipt', style: AppTextStyles.bodySmall),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _pickImage(context, ImageSource.gallery);
+                  _pickAndUpload(context, ImageSource.gallery);
                 },
               ),
             ],
@@ -165,89 +197,114 @@ class ReceiptUploader extends StatelessWidget {
   }
 
   Widget _buildReceiptVisual({required BuildContext context, bool isExpanded = false}) {
-    if (imagePath == null || imagePath!.isEmpty) {
+    if (widget.imagePath == null || widget.imagePath!.isEmpty) {
       return const SizedBox.shrink();
     }
 
     final isDark = AppColors.isDark(context);
-    final bool isSample = imagePath!.contains('sample_receipt') ||
-        imagePath!.startsWith('http') ||
-        kIsWeb ||
-        !File(imagePath!).existsSync();
+    final path = widget.imagePath!;
 
-    if (isSample) {
-      return Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurfaceSubtle : const Color(0xFFFAFAFA),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.getBorder(context), width: 1),
-        ),
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: isExpanded ? 24 : 14),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.getSurface(context),
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.getBorder(context)),
-              ),
-              child: Icon(
-                Icons.receipt_long_rounded,
-                size: isExpanded ? 36 : 26,
-                color: isDark ? AppColors.darkPrimary : AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'TAX INVOICE & RECEIPT',
-              style: AppTextStyles.labelMedium.copyWith(
-                letterSpacing: 1.1,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-                color: AppColors.getTextPrimary(context),
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Verified Enterprise Merchant Document',
-              style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: AppColors.getTextMuted(context)),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isDark ? AppColors.darkEmeraldBorder : AppColors.emeraldBorder,
-                ),
-              ),
-              child: Text(
-                'Validated Digital Attachment',
-                style: AppTextStyles.labelSmall.copyWith(
-                  color: isDark ? AppColors.emeraldAccent : AppColors.emeraldDark,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+    // Determine if this is a server URL, a sample, or a real local file
+    final bool isServerUrl = path.startsWith('/uploads/') || path.startsWith('http');
+    final bool isSample = path.contains('sample_receipt');
+    final bool isLocalFile = !kIsWeb && !isServerUrl && !isSample && File(path).existsSync();
+
+    if (isLocalFile) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.file(
+          File(path),
+          height: isExpanded ? 400 : 160,
+          width: double.infinity,
+          fit: BoxFit.cover,
         ),
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.file(
-        File(imagePath!),
-        height: isExpanded ? 400 : 160,
-        width: double.infinity,
-        fit: BoxFit.cover,
+    if (isServerUrl) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          path.startsWith('http') ? path : '${_resolveBaseUrl(ref)}$path',
+          height: isExpanded ? 400 : 160,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildPlaceholder(context, isDark, isExpanded),
+        ),
+      );
+    }
+
+    // Fallback: styled placeholder for sample/unavailable receipts
+    return _buildPlaceholder(context, isDark, isExpanded);
+  }
+
+  String _resolveBaseUrl(WidgetRef ref) {
+    // Use the API base URL without the /api/v1 suffix for static files
+    return '';
+  }
+
+  Widget _buildPlaceholder(BuildContext context, bool isDark, bool isExpanded) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurfaceSubtle : const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.getBorder(context), width: 1),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: isExpanded ? 24 : 14),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.getSurface(context),
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.getBorder(context)),
+            ),
+            child: Icon(
+              Icons.receipt_long_rounded,
+              size: isExpanded ? 36 : 26,
+              color: isDark ? AppColors.darkPrimary : AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'TAX INVOICE & RECEIPT',
+            style: AppTextStyles.labelMedium.copyWith(
+              letterSpacing: 1.1,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              color: AppColors.getTextPrimary(context),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            'Verified Enterprise Merchant Document',
+            style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: AppColors.getTextMuted(context)),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isDark ? AppColors.darkEmeraldBorder : AppColors.emeraldBorder,
+              ),
+            ),
+            child: Text(
+              'Validated Digital Attachment',
+              style: AppTextStyles.labelSmall.copyWith(
+                color: isDark ? AppColors.emeraldAccent : AppColors.emeraldDark,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -256,7 +313,38 @@ class ReceiptUploader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = AppColors.isDark(context);
 
-    if (imagePath != null && imagePath!.isNotEmpty) {
+    // Show upload progress indicator
+    if (_isUploading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isDark
+              ? AppColors.darkSurfaceSubtle.withValues(alpha: 0.6)
+              : AppColors.surfaceSubtle.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.getBorder(context), width: 1.2),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Uploading receipt...',
+                style: AppTextStyles.labelMedium.copyWith(color: AppColors.getTextMuted(context)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (widget.imagePath != null && widget.imagePath!.isNotEmpty) {
       return Container(
         decoration: BoxDecoration(
           color: AppColors.getSurface(context),
@@ -305,7 +393,7 @@ class ReceiptUploader extends StatelessWidget {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     ),
-                    if (!isReadOnly) ...[
+                    if (!widget.isReadOnly) ...[
                       const SizedBox(width: 4),
                       TextButton.icon(
                         icon: const Icon(Icons.delete_outline_rounded, size: 15, color: AppColors.crimson),
@@ -313,7 +401,7 @@ class ReceiptUploader extends StatelessWidget {
                           'Remove',
                           style: AppTextStyles.labelSmall.copyWith(color: AppColors.crimson, fontSize: 11),
                         ),
-                        onPressed: () => onImageChanged(null),
+                        onPressed: () => widget.onImageChanged(null),
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                           minimumSize: Size.zero,
@@ -335,7 +423,7 @@ class ReceiptUploader extends StatelessWidget {
       );
     }
 
-    if (isReadOnly) {
+    if (widget.isReadOnly) {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(

@@ -1,5 +1,19 @@
 import 'client_model.dart';
 
+double _asDouble(dynamic val, [double fallback = 0.0]) {
+  if (val == null) return fallback;
+  if (val is num) return val.toDouble();
+  if (val is String) return double.tryParse(val) ?? fallback;
+  return fallback;
+}
+
+int _asInt(dynamic val, [int fallback = 0]) {
+  if (val == null) return fallback;
+  if (val is num) return val.toInt();
+  if (val is String) return int.tryParse(val) ?? fallback;
+  return fallback;
+}
+
 class RevenueEntry {
   final String id;
   final String projectId;
@@ -21,7 +35,7 @@ class RevenueEntry {
     return RevenueEntry(
       id: (json['id'] ?? '').toString(),
       projectId: (json['project_id'] ?? json['projectId'] ?? '').toString(),
-      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      amount: _asDouble(json['amount']),
       date: json['date'] != null
           ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -248,18 +262,18 @@ class ProjectFinancialSummary {
 
   factory ProjectFinancialSummary.fromJson(Map<String, dynamic> json) {
     return ProjectFinancialSummary(
-      contractValue: (json['contract_value'] ?? json['contractValue'] as num?)?.toDouble() ?? 0.0,
+      contractValue: _asDouble(json['contract_value'] ?? json['contractValue']),
       taxInfo: (json['tax_info'] ?? json['taxInfo'] ?? '').toString(),
-      totalRevenue: (json['total_revenue'] ?? json['totalRevenue'] as num?)?.toDouble() ?? 0.0,
-      directExpenditure: (json['direct_expenditure'] ?? json['directExpenditure'] as num?)?.toDouble() ?? 0.0,
-      officeBenefit: (json['office_benefit'] ?? json['officeBenefit'] as num?)?.toDouble() ?? 0.0,
-      netProjectCost: (json['net_project_cost'] ?? json['netProjectCost'] as num?)?.toDouble() ?? 0.0,
-      profit: (json['profit'] as num?)?.toDouble() ?? 0.0,
-      profitMargin: (json['profit_margin'] ?? json['profitMargin'] as num?)?.toDouble() ?? 0.0,
-      totalReceivable: (json['total_receivable'] ?? json['totalReceivable'] as num?)?.toDouble() ?? 0.0,
-      receiptComplianceRate: (json['receipt_compliance_rate'] ?? json['receiptComplianceRate'] as num?)?.toDouble() ?? 0.0,
-      teamMembersCount: (json['team_members_count'] ?? json['teamMembersCount'] as num?)?.toInt() ?? 0,
-      budgetVariance: (json['budget_variance'] ?? json['budgetVariance'] as num?)?.toDouble() ?? 0.0,
+      totalRevenue: _asDouble(json['total_revenue'] ?? json['totalRevenue']),
+      directExpenditure: _asDouble(json['direct_expenditure'] ?? json['directExpenditure']),
+      officeBenefit: _asDouble(json['office_benefit'] ?? json['officeBenefit']),
+      netProjectCost: _asDouble(json['net_project_cost'] ?? json['netProjectCost']),
+      profit: _asDouble(json['profit']),
+      profitMargin: _asDouble(json['profit_margin'] ?? json['profitMargin']),
+      totalReceivable: _asDouble(json['total_receivable'] ?? json['totalReceivable']),
+      receiptComplianceRate: _asDouble(json['receipt_compliance_rate'] ?? json['receiptComplianceRate']),
+      teamMembersCount: _asInt(json['team_members_count'] ?? json['teamMembersCount']),
+      budgetVariance: _asDouble(json['budget_variance'] ?? json['budgetVariance']),
       closedAt: json['closed_at'] != null
           ? DateTime.tryParse(json['closed_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -507,7 +521,7 @@ class ProjectModel {
     final rawCatBudgets = json['category_budgets'] ?? json['categoryBudgets'];
     final rawCatMap = rawCatBudgets is Map ? rawCatBudgets : const {};
     
-    final metaProgress = (rawCatMap['_meta_progress'] as num?)?.toDouble();
+    final metaProgress = _asDouble(rawCatMap['_meta_progress']);
     final metaProgressUpdatedAt = rawCatMap['_meta_progress_updated_at'] != null
         ? DateTime.tryParse(rawCatMap['_meta_progress_updated_at'].toString())
         : null;
@@ -520,9 +534,8 @@ class ProjectModel {
       for (final entry in rawCatBudgets.entries) {
         final k = entry.key.toString();
         if (k.startsWith('_meta_')) continue;
-        final v = (entry.value as num?)?.toDouble();
-        if (v != null) {
-          categoryBudgetsMap[k] = v;
+        if (entry.value != null) {
+          categoryBudgetsMap[k] = _asDouble(entry.value);
         }
       }
     }
@@ -536,17 +549,17 @@ class ProjectModel {
       clientId: json['client_id']?.toString() ?? json['clientId']?.toString(),
       clientType: ClientType.fromString(clientTypeStr),
       assignmentType: AssignmentType.fromString(assignmentTypeStr),
-      grossProjectValue: (json['gross_project_value'] ?? json['grossProjectValue'] as num?)?.toDouble() ?? 0.0,
+      grossProjectValue: _asDouble(json['gross_project_value'] ?? json['grossProjectValue']),
       taxStatus: TaxStatus.fromString(taxStatusStr),
-      taxRate: (json['tax_rate'] ?? json['taxRate'] as num?)?.toDouble() ?? 0.10,
-      expectedNetRevenue: (json['expected_net_revenue'] ?? json['expectedNetRevenue'] as num?)?.toDouble() ?? 0.0,
-      advanceReceived: (json['advance_received'] ?? json['advanceReceived'] as num?)?.toDouble() ?? 0.0,
-      amountReceived: (json['amount_received'] ?? json['amountReceived'] as num?)?.toDouble() ?? 0.0,
-      amountReceivable: (json['amount_receivable'] ?? json['amountReceivable'] as num?)?.toDouble() ?? 0.0,
-      budget: (json['budget'] as num?)?.toDouble() ?? 0.0,
+      taxRate: _asDouble(json['tax_rate'] ?? json['taxRate'], 0.10),
+      expectedNetRevenue: _asDouble(json['expected_net_revenue'] ?? json['expectedNetRevenue']),
+      advanceReceived: _asDouble(json['advance_received'] ?? json['advanceReceived']),
+      amountReceived: _asDouble(json['amount_received'] ?? json['amountReceived']),
+      amountReceivable: _asDouble(json['amount_receivable'] ?? json['amountReceivable']),
+      budget: _asDouble(json['budget']),
       categoryBudgets: categoryBudgetsMap,
-      estimatedRemainingCost: (json['estimated_remaining_cost'] ?? json['estimatedRemainingCost'] as num?)?.toDouble() ?? 0.0,
-      officeBenefitRate: (json['office_benefit_rate'] ?? json['officeBenefitRate'] as num?)?.toDouble() ?? 0.30,
+      estimatedRemainingCost: _asDouble(json['estimated_remaining_cost'] ?? json['estimatedRemainingCost']),
+      officeBenefitRate: _asDouble(json['office_benefit_rate'] ?? json['officeBenefitRate'], 0.30),
       startDate: json['start_date'] != null
           ? DateTime.tryParse(json['start_date'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -560,7 +573,7 @@ class ProjectModel {
       closingSummary: json['closing_summary'] != null
           ? ProjectFinancialSummary.fromJson(json['closing_summary'] as Map<String, dynamic>)
           : null,
-      progressPercentage: (json['progress_percentage'] ?? json['progressPercentage'] ?? metaProgress as num?)?.toDouble() ?? 0.0,
+      progressPercentage: _asDouble(json['progress_percentage'] ?? json['progressPercentage'] ?? metaProgress),
       progressUpdatedAt: json['progress_updated_at'] != null
           ? DateTime.tryParse(json['progress_updated_at'].toString())
           : metaProgressUpdatedAt,
@@ -633,4 +646,14 @@ class ProjectModel {
       if (!forApi && imageUrl != null && imageUrl!.isNotEmpty) 'image_url': imageUrl,
     };
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProjectModel &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

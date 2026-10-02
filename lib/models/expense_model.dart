@@ -398,7 +398,15 @@ class ExpenseModel {
         taxAmount = taxAmount ?? 0.0;
 
   /// Explicit getter for total cost (Gross invoice total: Base Cost + Tax Amount).
-  double get totalCost => hasTax ? (baseCost + taxAmount) : amount;
+  double get totalCost {
+    if (hasTax) return baseCost + taxAmount;
+    if (taxRate > 0) {
+      if (taxAmount > 0) return baseCost + taxAmount;
+      if (taxRate < 100) return amount / (1 - (taxRate / 100.0));
+      return baseCost * (1 + (taxRate / 100.0));
+    }
+    return amount;
+  }
 
   /// Whether tax is applied to this expense.
   bool get hasTax => taxRate > 0 && taxAmount > 0;
@@ -494,6 +502,13 @@ class ExpenseModel {
       return const [];
     }
 
+    double parseDouble(dynamic val, [double fallback = 0.0]) {
+      if (val == null) return fallback;
+      if (val is num) return val.toDouble();
+      if (val is String) return double.tryParse(val) ?? fallback;
+      return fallback;
+    }
+
     final statusStr = (json['status'] ?? 'pending').toString();
     final justStatusStr = (json['justification_status'] ?? json['justificationStatus'] ?? 'none').toString();
 
@@ -516,8 +531,15 @@ class ExpenseModel {
       projectName: (json['project_name'] ?? json['projectName'] ?? '').toString(),
       taskId: json['task_id']?.toString() ?? json['taskId']?.toString(),
       taskTitle: json['task_title']?.toString() ?? json['taskTitle']?.toString(),
-      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
-      officeBenefitAmount: (json['office_benefit_amount'] ?? json['officeBenefitAmount'] as num?)?.toDouble() ?? 0.0,
+      amount: parseDouble(json['amount']),
+      baseCost: (json['base_cost'] != null || json['baseCost'] != null)
+          ? parseDouble(json['base_cost'] ?? json['baseCost'])
+          : null,
+      taxRate: parseDouble(json['tax_rate'] ?? json['taxRate']),
+      taxAmount: (json['tax_amount'] != null || json['taxAmount'] != null)
+          ? parseDouble(json['tax_amount'] ?? json['taxAmount'])
+          : null,
+      officeBenefitAmount: parseDouble(json['office_benefit_amount'] ?? json['officeBenefitAmount']),
       currency: (json['currency'] ?? 'BDT').toString(),
       categoryId: (json['category_id'] ?? json['categoryId'] ?? '').toString(),
       categoryName: (json['category_name'] ?? json['categoryName'] ?? '').toString(),
@@ -561,6 +583,9 @@ class ExpenseModel {
       if (taskId != null) 'task_id': taskId,
       if (taskTitle != null) 'task_title': taskTitle,
       'amount': amount,
+      'base_cost': baseCost,
+      'tax_rate': taxRate,
+      'tax_amount': taxAmount,
       'office_benefit_amount': officeBenefitAmount,
       'currency': currency,
       'category_id': categoryId,
@@ -588,4 +613,12 @@ class ExpenseModel {
       if (officeCostDetails != null) 'office_cost_details': officeCostDetails!.toJson(),
     };
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ExpenseModel && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
 }

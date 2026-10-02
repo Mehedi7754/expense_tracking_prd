@@ -106,6 +106,24 @@ class AppEnv {
     return dotenv.env['SAMPLE_AVATAR_URL']?.trim() ?? '';
   }
 
+  /// Returns the server origin (protocol + host + port), without /api/v1 path.
+  static String get serverOrigin {
+    final base = apiBaseUrl;
+    final uri = Uri.tryParse(base);
+    if (uri != null && uri.hasScheme && uri.hasAuthority) {
+      return '${uri.scheme}://${uri.authority}';
+    }
+    return '';
+  }
+
+  /// Resolves a potentially relative URL (e.g. `/uploads/receipts/...`) to a full absolute URL.
+  static String resolveUrl(String url) {
+    if (url.startsWith('/uploads/') || (url.startsWith('/') && !url.startsWith('//'))) {
+      return '$serverOrigin$url';
+    }
+    return url;
+  }
+
   /// Internal helper to read an endpoint route with fallback.
   static String _getEnv(String key, String fallback) {
     if (!dotenv.isInitialized) return fallback;
@@ -152,4 +170,16 @@ class AppEnv {
 
   static String get endpointCostEstimator => _getEnv('API_ENDPOINT_COST_ESTIMATOR', '/admin/cost-estimator/historical');
   static String get endpointBenchmarks => _getEnv('API_ENDPOINT_BENCHMARKS', '/estimator/benchmarks');
+
+  // Attendance & Geo-Location Tracking
+  static String get endpointAttendance => _getEnv('API_ENDPOINT_ATTENDANCE', '/attendance');
+  static String get endpointAttendanceCheckIn => _getEnv('API_ENDPOINT_ATTENDANCE_CHECK_IN', '/attendance/check-in');
+  static String get endpointAttendanceSummary => _getEnv('API_ENDPOINT_ATTENDANCE_SUMMARY', '/attendance/summary');
+  static String get endpointAttendanceOverview => _getEnv('API_ENDPOINT_ATTENDANCE_OVERVIEW', '/attendance/daily-overview');
+
+  // Salary & Attendance Deductions
+  static String get endpointSalary => _getEnv('API_ENDPOINT_SALARY', '/salary');
+  static String get endpointSalaryReport => _getEnv('API_ENDPOINT_SALARY_REPORT', '/salary/report');
+  static String get endpointHolidays => _getEnv('API_ENDPOINT_HOLIDAYS', '/salary/holidays');
+  static String get endpointLeaves => _getEnv('API_ENDPOINT_LEAVES', '/salary/leaves');
 }

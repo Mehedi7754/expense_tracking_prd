@@ -40,8 +40,11 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('change-password')
-  async changePassword(@Body() body: { currentPassword?: string; current_password?: string; newPassword?: string; new_password?: string }, @Request() req: any) {
-    const currentPass = body.currentPassword || body.current_password || '';
+  async changePassword(
+    @Body() body: { currentPassword?: string; current_password?: string; oldPassword?: string; newPassword?: string; new_password?: string },
+    @Request() req: any,
+  ) {
+    const currentPass = body.currentPassword || body.current_password || body.oldPassword || '';
     const newPass = body.newPassword || body.new_password || '';
     return this.authService.changePassword(req.user.id, currentPass, newPass);
   }

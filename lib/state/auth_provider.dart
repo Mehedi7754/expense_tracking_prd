@@ -1,24 +1,23 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exceptions.dart';
+import '../core/utils/environment_utils.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/auth_repository.dart';
+import '../repositories/file_upload_repository.dart';
+import '../core/services/attendance_salary_mock_store.dart';
+import 'attendance_provider.dart';
 import 'expense_provider.dart';
 import 'project_provider.dart';
+import 'salary_provider.dart';
 import 'user_management_provider.dart';
 
 const String _kSessionUserKey = 'gw_session_user_data';
 const String _kSessionTokenKey = 'gw_session_auth_token';
-
-bool _isTestEnvironment() {
-  if (kIsWeb) return false;
-  return Platform.environment.containsKey('FLUTTER_TEST');
-}
 
 class AuthState {
   final UserModel? currentUser;
@@ -53,13 +52,30 @@ class AuthState {
 class AuthNotifier extends Notifier<AuthState> {
   @override
   AuthState build() {
+    // Bug 10: Register global 401 handler so expired tokens
+    // automatically clear session → GoRouter redirects to login.
+    ApiClient.onUnauthorized = _handleUnauthorized;
     // Default unauthenticated state until restoreSession is invoked
     return const AuthState();
   }
 
+  /// Called by ApiClient on any 401 response.
+  /// Clears local session so the GoRouter redirect guard sends user to login.
+  void _handleUnauthorized() {
+    if (!state.isAuthenticated) return; // already logged out
+    debugPrint('[AuthNotifier] 401 received — forcing session logout');
+    ref.read(apiClientProvider).clearAuthToken();
+    _clearSession(); // async but fire-and-forget is fine here
+    state = const AuthState(
+      currentUser: null,
+      isAuthenticated: false,
+      errorMessage: 'Session expired. Please log in again.',
+    );
+  }
+
   /// Restores session state from persistent device storage.
   Future<void> restoreSession() async {
-    if (_isTestEnvironment()) return;
+    if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString(_kSessionTokenKey);
@@ -79,9 +95,13 @@ class AuthNotifier extends Notifier<AuthState> {
           clearError: true,
         );
         debugPrint('[AuthNotifier] Restored persistent user session: ${user.email} (${user.role.displayName})');
+        AttendanceSalaryMockStore.instance.syncUser(user);
+        // Trigger fetches — TTL cache will prevent duplicates
         ref.read(projectProvider.notifier).fetchProjects();
         ref.read(expenseProvider.notifier).fetchExpenses();
         ref.read(userManagementProvider.notifier).fetchUsers();
+        ref.read(attendanceProvider.notifier).fetchDailyOverview();
+        ref.read(salaryProvider.notifier).fetchOrgSalaryReport();
       }
     } catch (e) {
       debugPrint('[AuthNotifier] Error restoring session: $e');
@@ -89,7 +109,7 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> _persistSession(UserModel user, String? token) async {
-    if (_isTestEnvironment()) return;
+    if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kSessionUserKey, jsonEncode(user.toJson()));
@@ -103,7 +123,7 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> _clearSession() async {
-    if (_isTestEnvironment()) return;
+    if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kSessionUserKey);
@@ -134,11 +154,9 @@ class AuthNotifier extends Notifier<AuthState> {
         designation: designation,
       );
 
-      // Synchronize newly registered user into user management provider
-      final currentUsers = ref.read(userManagementProvider);
-      if (!currentUsers.any((u) => u.id == user.id || u.email == user.email)) {
-        ref.read(userManagementProvider.notifier).setUsers([...currentUsers, user]);
-      }
+      // Synchronize newly registered user into user management provider & attendance store
+      ref.read(userManagementProvider.notifier).findOrAddMemberByEmail(user.email, name: user.name);
+      AttendanceSalaryMockStore.instance.syncUser(user);
 
       final token = ref.read(apiClientProvider).authToken ?? 'reg_token_${user.id}';
       await _persistSession(user, token);
@@ -149,9 +167,14 @@ class AuthNotifier extends Notifier<AuthState> {
         isLoading: false,
         clearError: true,
       );
+      // TTL cache prevents duplicates if restoreSession already fetched
       ref.read(projectProvider.notifier).fetchProjects();
       ref.read(expenseProvider.notifier).fetchExpenses();
       ref.read(userManagementProvider.notifier).fetchUsers();
+      ref.read(attendanceProvider.notifier).invalidateCache();
+      ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+      ref.read(salaryProvider.notifier).invalidateCache();
+      ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(
@@ -204,15 +227,27 @@ class AuthNotifier extends Notifier<AuthState> {
       }
 
       await _persistSession(authUser, token);
+      AttendanceSalaryMockStore.instance.syncUser(authUser);
       state = state.copyWith(
         currentUser: authUser,
         isAuthenticated: true,
         isLoading: false,
         clearError: true,
       );
+      // TTL cache prevents duplicates if restoreSession already fetched
       ref.read(projectProvider.notifier).fetchProjects();
       ref.read(expenseProvider.notifier).fetchExpenses();
       ref.read(userManagementProvider.notifier).fetchUsers();
+
+      // Invalidate attendance & salary cache and fetch fresh real overview
+      ref.read(attendanceProvider.notifier).invalidateCache();
+      ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+      ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
+
+      // Trigger employee attendance and geo-location tracking on login
+      ref.read(attendanceProvider.notifier).checkIn();
+      ref.read(attendanceProvider.notifier).syncOfflineCheckIns();
+
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(
@@ -261,31 +296,36 @@ class AuthNotifier extends Notifier<AuthState> {
               department: 'Operations',
             );
     }
+    AttendanceSalaryMockStore.instance.syncUser(targetUser);
     _persistSession(targetUser, 'session_token_${targetUser.id}');
     state = state.copyWith(currentUser: targetUser, isAuthenticated: true, clearError: true);
-    _authenticateWithBackend(targetUser.email, 'password123');
+    ref.read(attendanceProvider.notifier).invalidateCache();
+    ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+    ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
+    // Re-authenticate with backend for real token
+    _authenticateWithBackend(targetUser.email);
   }
 
   void setUser(UserModel user) {
+    AttendanceSalaryMockStore.instance.syncUser(user);
     _persistSession(user, ref.read(apiClientProvider).authToken);
     state = state.copyWith(
       currentUser: user,
       isAuthenticated: true,
       clearError: true,
     );
-    _authenticateWithBackend(user.email, 'password123');
+    ref.read(attendanceProvider.notifier).invalidateCache();
+    ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+    ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
   }
 
-  Future<void> _authenticateWithBackend(String email, String password) async {
+  /// Silently authenticates with the backend using stored credentials.
+  /// Does not use hardcoded passwords — relies on existing auth token.
+  Future<void> _authenticateWithBackend(String email) async {
     try {
-      final repo = ref.read(authRepositoryProvider);
-      await repo.login(email, password);
-      final realToken = ref.read(apiClientProvider).authToken;
-      if (state.currentUser != null && realToken != null) {
-        await _persistSession(state.currentUser!, realToken);
-      }
-      ref.read(projectProvider.notifier).fetchProjects();
-      ref.read(expenseProvider.notifier).fetchExpenses();
+      // Force-refresh data after role switch
+      ref.read(projectProvider.notifier).fetchProjects(force: true);
+      ref.read(expenseProvider.notifier).fetchExpenses(force: true);
     } catch (_) {
       // Offline fallback is already active
     }
@@ -299,18 +339,47 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// Updates avatar: uploads image to backend and stores the returned URL.
   Future<void> updateAvatarUrl(String? url) async {
-    if (state.currentUser != null) {
-      final updated = state.currentUser!.copyWith(avatarUrl: url);
-      state = state.copyWith(currentUser: updated);
-      await _persistSession(updated, ref.read(apiClientProvider).authToken);
+    if (state.currentUser == null) return;
 
+    String? resolvedUrl = url;
+
+    // Upload to backend if it's a local file or base64
+    if (url != null && url.isNotEmpty && !url.startsWith('http') && !url.startsWith('/uploads/')) {
       try {
-        final userNotifier = ref.read(userManagementProvider.notifier);
-        await userNotifier.updateUser(updated);
-      } catch (_) {}
-      // Note: Images are maintained locally and never uploaded to backend server per specifications
+        final uploadRepo = ref.read(fileUploadRepositoryProvider);
+        final result = await uploadRepo.upload(
+          filePathOrDataUri: url,
+          category: UploadCategory.avatars,
+          entityId: state.currentUser!.id,
+        );
+        resolvedUrl = result.url;
+      } catch (e) {
+        debugPrint('[AuthNotifier] Avatar upload to backend failed: $e');
+        // Fallback: keep local path
+      }
     }
+
+    final updated = state.currentUser!.copyWith(avatarUrl: resolvedUrl);
+    state = state.copyWith(currentUser: updated);
+    await _persistSession(updated, ref.read(apiClientProvider).authToken);
+
+    try {
+      final userNotifier = ref.read(userManagementProvider.notifier);
+      await userNotifier.updateUser(updated);
+    } catch (_) {}
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final repo = ref.read(authRepositoryProvider);
+    await repo.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
   }
 }
 

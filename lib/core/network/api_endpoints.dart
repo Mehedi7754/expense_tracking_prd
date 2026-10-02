@@ -85,4 +85,24 @@ class ApiEndpoints {
   static String get receiptComplianceReport => resolve(AppEnv.endpointReportsReceiptCompliance);
   static String get reportsSummary => resolve(AppEnv.endpointReportsSummary);
   static String get exportReport => resolve(AppEnv.endpointReportsExport);
+
+  // Attendance & Geo-Location Tracking
+  static String get attendance => resolve(AppEnv.endpointAttendance);
+  static String get attendanceCheckIn => resolve(AppEnv.endpointAttendanceCheckIn);
+  static String get attendanceSummary => resolve(AppEnv.endpointAttendanceSummary);
+  static String get attendanceOverview => resolve(AppEnv.endpointAttendanceOverview);
+  static String get confirmAbsence => resolve('${AppEnv.endpointAttendance}/confirm-absence');
+
+  // Salary & Attendance Deductions
+  static String get salary => resolve(AppEnv.endpointSalary);
+  static String employeeSalary(String userId) => resolve('${AppEnv.endpointSalary}/employee/$userId');
+  static String calculateSalary(String userId) => resolve('${AppEnv.endpointSalary}/calculate/$userId');
+  static String get saveSalaryCalculation => resolve('${AppEnv.endpointSalary}/save-calculation');
+  static String get salaryReport => resolve(AppEnv.endpointSalaryReport);
+  static String get holidays => resolve(AppEnv.endpointHolidays);
+  static String holidayById(String id) => resolve('${AppEnv.endpointHolidays}/$id');
+  static String get leaves => resolve(AppEnv.endpointLeaves);
+  static String leaveById(String id) => resolve('${AppEnv.endpointLeaves}/$id');
+  static String salaryAdjustments(String userId) => resolve('${AppEnv.endpointSalary}/adjustments/$userId');
+  static String get addSalaryAdjustment => resolve('${AppEnv.endpointSalary}/adjustments');
 }

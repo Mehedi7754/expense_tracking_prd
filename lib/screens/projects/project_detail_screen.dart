@@ -97,7 +97,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
     ProjectModel project,
     List<ExpenseModel> expenses,
   ) {
-    final directCost = expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final validExpenses = expenses.where((e) => e.status != ExpenseStatus.rejected);
+    final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     final officeBenefit = directCost * project.officeBenefitRate;
     final totalCost = directCost + officeBenefit;
     final totalRevenue = project.amountReceived;
@@ -105,7 +106,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
     final profitMargin = project.grossProjectValue > 0 ? (profit / project.grossProjectValue) * 100 : 0.0;
     final receivable = project.amountReceivable;
 
-    final unreceiptedAmount = expenses.where((e) => !e.hasReceipt).fold<double>(0.0, (sum, e) => sum + e.amount);
+    final unreceiptedAmount = validExpenses.where((e) => !e.hasReceipt).fold<double>(0.0, (sum, e) => sum + e.amount);
     final receiptCompliance = directCost > 0 ? (((directCost - unreceiptedAmount) / directCost) * 100) : 100.0;
     final budgetVariance = project.budget > 0 ? (((totalCost - project.budget) / project.budget) * 100) : 0.0;
 
@@ -309,8 +310,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final directCost = expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
-    final totalTaxIncurred = expenses.fold<double>(0.0, (sum, e) => sum + e.taxAmount);
+    final validExpenses = expenses.where((e) => e.status != ExpenseStatus.rejected);
+    final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final totalTaxIncurred = validExpenses.fold<double>(0.0, (sum, e) => sum + e.taxAmount);
     final costIncurred = directCost;
     final expectedRemaining = project.estimatedRemainingCost;
     final projectedFinalCost = costIncurred + expectedRemaining;
@@ -319,7 +321,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
         ? (projectedProfit / project.grossProjectValue) * 100
         : 0.0;
 
-    final unreceiptedAmount = expenses.where((e) => !e.hasReceipt).fold<double>(0.0, (sum, e) => sum + e.amount);
+    final unreceiptedAmount = validExpenses.where((e) => !e.hasReceipt).fold<double>(0.0, (sum, e) => sum + e.amount);
     final unreceiptedRatio = directCost > 0 ? (unreceiptedAmount / directCost) * 100 : 0.0;
 
     return SingleChildScrollView(
@@ -1058,7 +1060,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
 
           final budget = project.categoryBudgets[key] ?? 0.0;
           final actual = expenses
-              .where((e) => e.categoryName.toLowerCase().contains(name.toLowerCase().split(' ').first))
+              .where((e) =>
+                  e.status != ExpenseStatus.rejected &&
+                  e.categoryName.toLowerCase().contains(name.toLowerCase().split(' ').first))
               .fold<double>(0.0, (sum, e) => sum + e.amount);
 
           final remaining = budget - actual;

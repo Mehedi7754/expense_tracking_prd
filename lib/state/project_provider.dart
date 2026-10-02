@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/utils/environment_utils.dart';
+import '../core/utils/fetch_cache_mixin.dart';
 import '../models/client_model.dart';
 import '../models/project_model.dart';
 import '../models/user_model.dart';
@@ -11,12 +12,7 @@ import '../repositories/project_repository.dart';
 
 const String _kCustomProjectsKey = 'gw_custom_projects_cache';
 
-bool _isTestEnvironment() {
-  if (kIsWeb) return false;
-  return Platform.environment.containsKey('FLUTTER_TEST');
-}
-
-class ProjectNotifier extends Notifier<List<ProjectModel>> {
+class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin {
   @override
   List<ProjectModel> build() {
     _loadCachedProjects();
@@ -24,7 +20,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
   }
 
   Future<void> _loadCachedProjects() async {
-    if (_isTestEnvironment()) return;
+    if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString(_kCustomProjectsKey);
@@ -47,7 +43,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
   }
 
   Future<void> _persistProjects() async {
-    if (_isTestEnvironment()) return;
+    if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = state.map((p) => p.toJson()).toList();
@@ -73,7 +69,12 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
     }).toList();
   }
 
-  Future<void> fetchProjects() async {
+  /// Fetches projects from backend with cache check.
+  /// Set [force] to `true` for pull-to-refresh or post-mutation sync.
+  Future<void> fetchProjects({bool force = false}) async {
+    if (!shouldFetch(force: force, hasData: state.isNotEmpty)) return;
+
+    markFetchStarted();
     try {
       final repo = ref.read(projectRepositoryProvider);
       final remoteProjects = await repo.getProjects();
@@ -126,8 +127,10 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
 
       state = [...mergedProjects, ...localOnly];
       await _persistProjects();
+      markFetchCompleted();
       debugPrint('[ProjectNotifier] Synchronized ${remoteProjects.length} projects from backend with progress & team persistence');
     } catch (e) {
+      markFetchFailed();
       debugPrint('[ProjectNotifier] Backend fetch failed, using offline projects: $e');
     }
   }
@@ -211,6 +214,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
           if (p.id == newProj.id || p.projectId == newProj.projectId) saved else p,
       ];
       await _persistProjects();
+      invalidateCache(); // Force next navigation fetch to sync
       debugPrint('[ProjectNotifier] Successfully created project on backend: ${saved.projectId}');
       return saved;
     } catch (e) {
@@ -226,6 +230,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
         if (p.id == updated.id) updated else p,
     ];
     await _persistProjects();
+    invalidateCache(); // Force next navigation fetch to sync
 
     try {
       final repo = ref.read(projectRepositoryProvider);
@@ -274,6 +279,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
           p,
     ];
     await _persistProjects();
+    invalidateCache();
 
     try {
       final repo = ref.read(projectRepositoryProvider);
@@ -299,6 +305,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
           p,
     ];
     await _persistProjects();
+    invalidateCache();
 
     try {
       final repo = ref.read(projectRepositoryProvider);
@@ -336,6 +343,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
           p,
     ];
     await _persistProjects();
+    invalidateCache();
 
     if (updatedProj != null) {
       try {
@@ -365,6 +373,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
           p,
     ];
     await _persistProjects();
+    invalidateCache();
 
     if (updatedProj != null) {
       try {
@@ -393,6 +402,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> {
           p,
     ];
     await _persistProjects();
+    invalidateCache();
 
     if (updatedProj != null) {
       try {

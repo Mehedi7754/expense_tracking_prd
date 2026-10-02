@@ -1,8 +1,9 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/utils/environment_utils.dart';
+import '../core/utils/fetch_cache_mixin.dart';
 import '../models/comment_model.dart';
 import '../models/expense_model.dart';
 import '../models/user_model.dart';
@@ -10,11 +11,6 @@ import '../models/user_role.dart';
 import '../repositories/expense_repository.dart';
 
 const String _kCustomExpensesKey = 'gw_custom_expenses_cache';
-
-bool _isTestEnvironment() {
-  if (kIsWeb) return false;
-  return Platform.environment.containsKey('FLUTTER_TEST');
-}
 
 class MemberReceiptSummary {
   final String memberId;
@@ -40,7 +36,7 @@ class MemberReceiptSummary {
   });
 }
 
-class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
+class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin {
   @override
   List<ExpenseModel> build() {
     _loadCachedExpenses();
@@ -48,7 +44,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
   }
 
   Future<void> _loadCachedExpenses() async {
-    if (_isTestEnvironment()) return;
+    if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString(_kCustomExpensesKey);
@@ -71,7 +67,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
   }
 
   Future<void> _persistExpenses() async {
-    if (_isTestEnvironment()) return;
+    if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = state.map((e) => e.toJson()).toList();
@@ -81,11 +77,17 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
     }
   }
 
+  /// Fetches expenses from backend with cache check.
+  /// Set [force] to `true` for pull-to-refresh or post-mutation sync.
   Future<void> fetchExpenses({
+    bool force = false,
     String? projectId,
     String? employeeId,
     String? status,
   }) async {
+    if (!shouldFetch(force: force, hasData: state.isNotEmpty)) return;
+
+    markFetchStarted();
     try {
       final repo = ref.read(expenseRepositoryProvider);
       final remoteExpenses = await repo.getExpenses(
@@ -100,7 +102,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
         await _persistExpenses();
         debugPrint('[ExpenseNotifier] Synchronized ${remoteExpenses.length} expenses from backend');
       }
+      markFetchCompleted();
     } catch (e) {
+      markFetchFailed();
       debugPrint('[ExpenseNotifier] Offline: keeping cached expenses: $e');
     }
   }
@@ -253,6 +257,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           if (exp.id == newExpense.id) saved else exp,
       ];
       await _persistExpenses();
+      invalidateCache(); // Force next navigation fetch to sync
       return saved;
     } catch (e) {
       debugPrint('[ExpenseNotifier] Error submitting expense to backend: $e. Retained in local storage.');
@@ -280,6 +285,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -312,6 +318,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -343,6 +350,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -374,6 +382,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -431,8 +440,11 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
-    final updated = state.firstWhere((e) => e.id == id);
+    final idx = state.indexWhere((e) => e.id == id);
+    if (idx == -1) return;
+    final updated = state[idx];
     try {
       final repo = ref.read(expenseRepositoryProvider);
       await repo.updateExpense(updated);
@@ -450,6 +462,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -468,12 +481,14 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
-      for (final id in ids) {
-        await repo.updateStatus(id, ExpenseStatus.approved);
-      }
+      await Future.wait(
+        ids.map((id) => repo.updateStatus(id, ExpenseStatus.approved)),
+        eagerError: false,
+      );
     } catch (_) {
       // Offline fallback
     }
@@ -488,12 +503,14 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
-      for (final id in ids) {
-        await repo.updateStatus(id, ExpenseStatus.rejected, rejectionReason: reason);
-      }
+      await Future.wait(
+        ids.map((id) => repo.updateStatus(id, ExpenseStatus.rejected, rejectionReason: reason)),
+        eagerError: false,
+      );
     } catch (_) {
       // Offline fallback
     }
@@ -508,6 +525,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
           exp,
     ];
     await _persistExpenses();
+    invalidateCache();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -520,6 +538,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> {
   void withdrawExpense(String id) {
     state = state.where((exp) => !(exp.id == id && exp.status == ExpenseStatus.pending)).toList();
     _persistExpenses();
+    invalidateCache();
   }
 
   Future<void> addComment({

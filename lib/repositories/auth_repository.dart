@@ -136,6 +136,19 @@ class AuthRepository {
     }
     return null;
   }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _client.post(
+      '/auth/change-password',
+      body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    );
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

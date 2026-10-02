@@ -44,6 +44,18 @@ class RoutePaths {
   static const String settings = '/settings';
   static const String employeeDetail = '/employees/:id';
 
+  // Attendance & Geo-Location Tracking
+  static const String attendanceDashboard = '/attendance';
+  static const String myAttendance = '/attendance/my';
+
+  // Salary & Attendance Deductions
+  static const String salaryDashboard = '/salary';
+  static const String salaryDetailPattern = '/salary/:id';
+  static const String mySalary = '/salary/my';
+  static const String holidaysManagement = '/admin/holidays';
+
+  static String salaryDetail(String id) => '/salary/$id';
+
   static String projectDetail(String id) => '/projects/$id';
   static String editProject(String id) => '/projects/$id/edit';
   static String addRevenue(String id) => '/projects/$id/revenue/new';

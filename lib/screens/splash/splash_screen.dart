@@ -6,8 +6,6 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/routing/route_paths.dart';
 import '../../state/auth_provider.dart';
-import '../../state/expense_provider.dart';
-import '../../state/project_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -44,13 +42,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _checkAuth() async {
     // Restore session from persistent local storage
+    // restoreSession() already triggers fetchProjects/fetchExpenses/fetchUsers
     try {
       await ref.read(authProvider.notifier).restoreSession();
-      final auth = ref.read(authProvider);
-      if (auth.isAuthenticated) {
-        ref.read(projectProvider.notifier).fetchProjects();
-        ref.read(expenseProvider.notifier).fetchExpenses();
-      }
     } catch (_) {}
     await Future.delayed(const Duration(milliseconds: 1600));
     if (!mounted) return;

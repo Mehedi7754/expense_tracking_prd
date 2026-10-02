@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS projects (
     is_closed BOOLEAN NOT NULL DEFAULT FALSE,
     closed_at TIMESTAMPTZ,
     closing_summary JSONB,
+    image_url TEXT,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
@@ -614,3 +615,116 @@ FROM users u
 JOIN expenses e ON u.id = e.employee_id
 JOIN projects p ON e.project_id = p.id
 GROUP BY u.id, u.full_name, p.id, p.name;
+
+-- ----------------------------------------------------------------------------
+-- 8. ATTENDANCE & GEO-LOCATION TRACKING (PRD Section 31)
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS attendance_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    session_type VARCHAR(20) NOT NULL DEFAULT 'morning' CHECK (session_type IN ('morning', 'afternoon')),
+    login_time TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    latitude NUMERIC(10, 7),
+    longitude NUMERIC(10, 7),
+    address_text TEXT DEFAULT '',
+    device_info TEXT DEFAULT '',
+    status VARCHAR(20) NOT NULL DEFAULT 'present' CHECK (status IN ('present', 'late', 'half_day', 'missing', 'confirmed_absent')),
+    notes TEXT DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_user_date_session UNIQUE (user_id, date, session_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON attendance_records(user_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance_records(date DESC);
+
+-- ----------------------------------------------------------------------------
+-- 9. MONTHLY SALARY, HOLIDAYS, LEAVES & ATTENDANCE-BASED DEDUCTIONS
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS employee_salaries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+    monthly_salary NUMERIC(15, 2) NOT NULL DEFAULT 50000.00 CHECK (monthly_salary >= 0),
+    currency VARCHAR(3) NOT NULL DEFAULT 'BDT',
+    standard_working_days INT NOT NULL DEFAULT 22 CHECK (standard_working_days > 0),
+    effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+    effective_to DATE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS idx_employee_salaries_user_id ON employee_salaries(user_id);
+
+CREATE TABLE IF NOT EXISTS holidays (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    date DATE NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS idx_holidays_date ON holidays(date);
+
+CREATE TABLE IF NOT EXISTS leave_records (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    leave_type VARCHAR(50) NOT NULL DEFAULT 'paid' CHECK (leave_type IN ('paid', 'unpaid', 'sick', 'casual', 'maternity', 'emergency')),
+    reason TEXT NOT NULL DEFAULT '',
+    is_approved BOOLEAN NOT NULL DEFAULT TRUE,
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT chk_leave_dates CHECK (end_date >= start_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_leave_records_user_dates ON leave_records(user_id, start_date, end_date);
+
+CREATE TABLE IF NOT EXISTS salary_calculations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    month INT NOT NULL CHECK (month BETWEEN 1 AND 12),
+    year INT NOT NULL CHECK (year >= 2000),
+    base_salary NUMERIC(15, 2) NOT NULL CHECK (base_salary >= 0),
+    working_days INT NOT NULL CHECK (working_days > 0),
+    present_days NUMERIC(5, 1) NOT NULL DEFAULT 0.0,
+    absent_days NUMERIC(5, 1) NOT NULL DEFAULT 0.0,
+    missing_days NUMERIC(5, 1) NOT NULL DEFAULT 0.0,
+    holidays_count INT NOT NULL DEFAULT 0,
+    weekend_days INT NOT NULL DEFAULT 0,
+    paid_leave_days NUMERIC(5, 1) NOT NULL DEFAULT 0.0,
+    unpaid_leave_days NUMERIC(5, 1) NOT NULL DEFAULT 0.0,
+    daily_rate NUMERIC(15, 2) NOT NULL CHECK (daily_rate >= 0),
+    total_deductions NUMERIC(15, 2) NOT NULL DEFAULT 0.00 CHECK (total_deductions >= 0),
+    bonus_or_additions NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+    final_payable NUMERIC(15, 2) NOT NULL CHECK (final_payable >= 0),
+    status VARCHAR(20) NOT NULL DEFAULT 'calculated' CHECK (status IN ('calculated', 'confirmed', 'paid')),
+    notes TEXT DEFAULT '',
+    calculated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    calculated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_user_month_year UNIQUE (user_id, month, year)
+);
+
+CREATE INDEX IF NOT EXISTS idx_salary_calc_user_period ON salary_calculations(user_id, year, month);
+CREATE INDEX IF NOT EXISTS idx_salary_calc_period ON salary_calculations(year, month);
+
+CREATE TABLE IF NOT EXISTS salary_adjustments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    salary_calculation_id UUID REFERENCES salary_calculations(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    adjustment_type VARCHAR(20) NOT NULL CHECK (adjustment_type IN ('deduction', 'addition', 'override', 'bonus', 'penalty')),
+    amount NUMERIC(15, 2) NOT NULL,
+    reason TEXT NOT NULL,
+    adjusted_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+CREATE INDEX IF NOT EXISTS idx_salary_adj_calc_id ON salary_adjustments(salary_calculation_id);
+

@@ -488,6 +488,45 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                   child: Column(
                     children: [
+                      if (user.role.canManageAttendanceAndSalary) ...[
+                        _buildSettingsTile(
+                          icon: Icons.location_on_outlined,
+                          iconColor: const Color(0xFF4F46E5),
+                          title: 'Attendance & Geo-Tracking',
+                          subtitle: 'Live staff pins, morning/afternoon records & audit',
+                          onTap: () => context.push(RoutePaths.attendanceDashboard),
+                          isDark: isDark,
+                        ),
+                        _buildDivider(isDark),
+                        _buildSettingsTile(
+                          icon: Icons.payments_outlined,
+                          iconColor: const Color(0xFF10B981),
+                          title: 'Salary & Attendance Deductions',
+                          subtitle: 'Monthly payroll calculations, daily rates & absence deductions',
+                          onTap: () => context.push(RoutePaths.salaryDashboard),
+                          isDark: isDark,
+                        ),
+                        _buildDivider(isDark),
+                      ] else ...[
+                        _buildSettingsTile(
+                          icon: Icons.location_on_outlined,
+                          iconColor: const Color(0xFF4F46E5),
+                          title: 'My Attendance & Location',
+                          subtitle: 'Morning/Afternoon check-in and GPS history',
+                          onTap: () => context.push(RoutePaths.myAttendance),
+                          isDark: isDark,
+                        ),
+                        _buildDivider(isDark),
+                        _buildSettingsTile(
+                          icon: Icons.payments_outlined,
+                          iconColor: const Color(0xFF10B981),
+                          title: 'My Salary Statement',
+                          subtitle: 'Monthly salary, working days and attendance deductions',
+                          onTap: () => context.push(RoutePaths.mySalary),
+                          isDark: isDark,
+                        ),
+                        _buildDivider(isDark),
+                      ],
                       _buildSettingsTile(
                         icon: Icons.analytics_outlined,
                         iconColor: const Color(0xFF4F46E5),
@@ -660,17 +699,18 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-class _ChangePasswordDialog extends StatefulWidget {
+class _ChangePasswordDialog extends ConsumerStatefulWidget {
   const _ChangePasswordDialog();
 
   @override
-  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+  ConsumerState<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
 }
 
-class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
   late final TextEditingController _currentPw;
   late final TextEditingController _newPw;
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -686,6 +726,30 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
     super.dispose();
   }
 
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    try {
+      await ref.read(authProvider.notifier).changePassword(
+        currentPassword: _currentPw.text.trim(),
+        newPassword: _newPw.text.trim(),
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        NotificationBanner.showSuccess(context, 'Password updated successfully.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        final msg = e.toString().contains('400') || e.toString().contains('incorrect')
+            ? 'Current password is incorrect'
+            : 'Failed to update password: $e';
+        NotificationBanner.showError(context, msg);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -699,6 +763,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
             TextFormField(
               controller: _currentPw,
               obscureText: true,
+              enabled: !_isLoading,
               decoration: const InputDecoration(labelText: 'Current Password'),
               validator: (v) => v == null || v.isEmpty ? 'Required' : null,
             ),
@@ -706,6 +771,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
             TextFormField(
               controller: _newPw,
               obscureText: true,
+              enabled: !_isLoading,
               decoration: const InputDecoration(labelText: 'New Password (min 6 chars)'),
               validator: (v) => v == null || v.length < 6 ? 'At least 6 characters' : null,
             ),
@@ -713,20 +779,24 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF4F46E5),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              Navigator.pop(context);
-              NotificationBanner.showSuccess(context, 'Password updated successfully.');
-            }
-          },
-          child: const Text('Update'),
+          onPressed: _isLoading ? null : _submit,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Update'),
         ),
       ],
     );

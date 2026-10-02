@@ -10,6 +10,8 @@ import '../../screens/admin/company_setup_screen.dart';
 import '../../screens/admin/cost_estimator_screen.dart';
 import '../../screens/admin/user_management_screen.dart';
 import '../../screens/approvals/approvals_queue_screen.dart';
+import '../../screens/attendance/attendance_dashboard_screen.dart';
+import '../../screens/attendance/my_attendance_screen.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/login_screen.dart';
 import '../../screens/auth/register_screen.dart';
@@ -32,6 +34,10 @@ import '../../screens/projects/project_team_screen.dart';
 import '../../screens/projects/projects_list_screen.dart';
 import '../../screens/reports/company_dashboard_screen.dart';
 import '../../screens/reports/reports_screen.dart';
+import '../../screens/salary/salary_dashboard_screen.dart';
+import '../../screens/salary/salary_detail_screen.dart';
+import '../../screens/salary/my_salary_screen.dart';
+import '../../screens/salary/holidays_management_screen.dart';
 import '../../screens/splash/splash_screen.dart';
 import '../../screens/tasks/add_edit_task_screen.dart';
 import '../../screens/tasks/task_detail_screen.dart';
@@ -305,6 +311,37 @@ final routerProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['id'] ?? '';
           return EmployeeDetailScreen(employeeId: id);
         },
+      ),
+
+      // Attendance & Geo-Location Tracking
+      GoRoute(
+        path: RoutePaths.attendanceDashboard,
+        builder: (context, state) => const AttendanceDashboardScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.myAttendance,
+        builder: (context, state) => const MyAttendanceScreen(),
+      ),
+
+      // Salary & Attendance Deductions
+      GoRoute(
+        path: RoutePaths.salaryDashboard,
+        builder: (context, state) => const SalaryDashboardScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.mySalary,
+        builder: (context, state) => const MySalaryScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.salaryDetailPattern,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return SalaryDetailScreen(userId: id);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.holidaysManagement,
+        builder: (context, state) => const HolidaysManagementScreen(),
       ),
     ],
   );

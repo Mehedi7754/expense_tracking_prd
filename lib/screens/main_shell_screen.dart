@@ -8,8 +8,6 @@ import '../models/user_role.dart';
 import '../state/auth_provider.dart';
 import '../state/expense_provider.dart';
 import '../state/notification_provider.dart';
-import '../state/project_provider.dart';
-import '../state/user_management_provider.dart';
 import 'approvals/approvals_queue_screen.dart';
 import 'expenses/my_expenses_screen.dart';
 import 'expenses/receipt_compliance_screen.dart';
@@ -32,11 +30,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(projectProvider.notifier).fetchProjects();
-      ref.read(expenseProvider.notifier).fetchExpenses();
-      ref.read(userManagementProvider.notifier).fetchUsers();
-    });
+    // Auth flow (login/restoreSession) already triggers fetches.
+    // TTL cache in each notifier prevents redundant calls on tab switches.
   }
 
   @override

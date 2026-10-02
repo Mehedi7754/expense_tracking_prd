@@ -10,10 +10,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     config: ConfigService,
     private readonly db: DatabaseService,
   ) {
+    const jwtSecret = config.get<string>('JWT_SECRET');
+    if (!jwtSecret) {
+      throw new Error('SECURITY: JWT_SECRET environment variable is not configured. Server cannot start without a valid secret.');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: config.get<string>('JWT_SECRET', 'spendwise_super_secret_jwt_key_2026_enterprise_pfis'),
+      secretOrKey: jwtSecret,
     });
   }
 

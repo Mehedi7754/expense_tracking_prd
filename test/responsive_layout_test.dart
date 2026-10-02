@@ -16,6 +16,13 @@ import 'package:expense_tracking_prd/screens/auth/login_screen.dart';
 import 'package:expense_tracking_prd/screens/auth/register_screen.dart';
 import 'package:expense_tracking_prd/screens/projects/project_detail_screen.dart';
 import 'package:expense_tracking_prd/screens/expenses/expense_detail_screen.dart';
+import 'package:expense_tracking_prd/screens/attendance/attendance_dashboard_screen.dart';
+import 'package:expense_tracking_prd/screens/attendance/widgets/member_geo_location_modal.dart';
+import 'package:expense_tracking_prd/screens/salary/salary_dashboard_screen.dart';
+import 'package:expense_tracking_prd/screens/salary/salary_detail_screen.dart';
+import 'package:expense_tracking_prd/screens/salary/my_salary_screen.dart';
+import 'package:expense_tracking_prd/screens/attendance/my_attendance_screen.dart';
+import 'package:expense_tracking_prd/models/attendance_model.dart';
 import 'package:expense_tracking_prd/state/auth_provider.dart';
 import 'package:expense_tracking_prd/state/user_management_provider.dart';
 import 'package:expense_tracking_prd/state/project_provider.dart';
@@ -569,5 +576,165 @@ void main() {
     expect(find.text('Equipment Details'), findsOneWidget);
     expect(find.text('AWS Cloud Compute & GPU Cluster'), findsOneWidget);
     expect(find.text('Tax Calculation Breakdown'), findsOneWidget);
+  });
+
+  testWidgets('AttendanceDashboardScreen renders minimal employee cards with zero overflow on 320px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: AttendanceDashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('MemberGeoLocationModal renders cleanly without overflow on 320px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    final mockEmp = EmployeeDailyAttendance(
+      userId: 'usr_eleanor',
+      userName: 'Eleanor Vance',
+      userEmail: 'eleanor@gw.com',
+      department: 'Corporate Governance',
+      designation: 'Managing Director / Admin',
+      role: 'admin',
+      status: 'missing',
+      date: '2026-10-02',
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: MemberGeoLocationModal(
+              employee: mockEmp,
+              date: '2026-10-02',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Eleanor Vance'), findsOneWidget);
+  });
+
+  testWidgets('SalaryDashboardScreen renders minimal salary cards with zero overflow on 320px mobile width', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: SalaryDashboardScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SalaryDetailScreen renders without overflow on 320px mobile width (fixing Image 1 184px overflow)', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.mainAdmin);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: SalaryDetailScreen(userId: 'a0000000-0000-0000-0000-000000000001'),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Eleanor Vance'), findsOneWidget);
+    expect(find.text('Monthly Base'), findsOneWidget);
+    expect(find.text('Payable Days'), findsOneWidget);
+    expect(find.text('Daily Rate'), findsOneWidget);
+  });
+
+  testWidgets('MySalaryScreen renders cleanly on 320px mobile width without overflow', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.projectMember);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: MySalaryScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('MyAttendanceScreen renders cleanly on 320px mobile width without overflow', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(320, 700);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final container = ProviderContainer();
+    container.read(authProvider.notifier).switchRole(UserRole.projectMember);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: MyAttendanceScreen(),
+        ),
+      ),
+    );
+
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 300));
+    final err = tester.takeException();
+    expect(err, isNull);
   });
 }

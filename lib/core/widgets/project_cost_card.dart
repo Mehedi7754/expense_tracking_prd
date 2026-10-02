@@ -81,8 +81,9 @@ class ProjectCostCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Financial calculations
-    final directCost = projectExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    // Financial calculations (PRD: Exclude rejected claims from project expenditure)
+    final validExpenses = projectExpenses.where((e) => e.status != ExpenseStatus.rejected);
+    final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     final officeBenefit = directCost * project.officeBenefitRate;
     final costIncurred = directCost + officeBenefit;
     final totalBudget = project.budget > 0 ? project.budget : (project.grossProjectValue * 0.85);

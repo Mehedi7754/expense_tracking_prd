@@ -10,6 +10,7 @@ import '../../core/utils/image_utils.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/client_model.dart';
 import '../../models/project_model.dart';
+import '../../repositories/file_upload_repository.dart';
 import '../../state/auth_provider.dart';
 import '../../state/project_provider.dart';
 import '../../state/settings_provider.dart';
@@ -1502,8 +1503,20 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       if (picked != null) {
         final base64Uri = await AppImageHelper.fileToBase64DataUri(File(picked.path));
         setState(() => _imageUrl = base64Uri);
-        if (mounted) {
-          NotificationBanner.showSuccess(context, 'Project image selected and prepared for upload');
+        try {
+          final uploadResult = await ref.read(fileUploadRepositoryProvider).upload(
+            filePathOrDataUri: picked.path,
+            category: UploadCategory.projects,
+            entityId: widget.projectId,
+          );
+          if (mounted) {
+            setState(() => _imageUrl = uploadResult.url);
+            NotificationBanner.showSuccess(context, 'Project image uploaded successfully');
+          }
+        } catch (_) {
+          if (mounted) {
+            NotificationBanner.showInfo(context, 'Project image selected (offline ready)');
+          }
         }
       }
     } catch (e) {

@@ -95,4 +95,14 @@ class UserModel {
       'assigned_project_ids': assignedProjectIds,
     };
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is UserModel &&
+          runtimeType == other.runtimeType &&
+          (id.isNotEmpty ? id == other.id : email == other.email);
+
+  @override
+  int get hashCode => id.isNotEmpty ? id.hashCode : email.hashCode;
 }

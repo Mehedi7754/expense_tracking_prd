@@ -234,17 +234,27 @@ export class AuthService {
     };
   }
 
-  async changePassword(userId: string, currentPass: string, newPass: string) {
+  async changePassword(userId: string, currentPass?: string, newPass?: string) {
+    if (!newPass || newPass.length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters');
+    }
+
     const res = await this.db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
     if (!res.rows.length) {
       throw new UnauthorizedException('User not found');
     }
-    const isMatch = await bcrypt.compare(currentPass, res.rows[0].password_hash);
+
+    const isMatch = await bcrypt.compare(currentPass || '', res.rows[0].password_hash);
     if (!isMatch) {
       throw new BadRequestException('Current password does not match');
     }
+
     const newHash = await bcrypt.hash(newPass, 10);
-    await this.db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, userId]);
+    await this.db.query(
+      'UPDATE users SET password_hash = $1, updated_at = clock_timestamp() WHERE id = $2',
+      [newHash, userId],
+    );
+
     return { success: true, message: 'Password updated successfully' };
   }
 }

@@ -28,9 +28,8 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(projectProvider.notifier).fetchProjects();
-    });
+    // TTL cache in ProjectNotifier prevents redundant calls on tab switches.
+    // Auth flow already triggers initial fetch.
   }
 
   @override
@@ -99,7 +98,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
               Expanded(
                 child: filteredProjects.isEmpty
                     ? RefreshIndicator(
-                        onRefresh: () => ref.read(projectProvider.notifier).fetchProjects(),
+                        onRefresh: () => ref.read(projectProvider.notifier).fetchProjects(force: true),
                         child: ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           children: [
@@ -122,7 +121,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
                         builder: (ctx) {
                           final isTablet = MediaQuery.sizeOf(ctx).width >= 768;
                           return RefreshIndicator(
-                            onRefresh: () => ref.read(projectProvider.notifier).fetchProjects(),
+                            onRefresh: () => ref.read(projectProvider.notifier).fetchProjects(force: true),
                             child: CustomScrollView(
                               physics: const AlwaysScrollableScrollPhysics(),
                               slivers: [

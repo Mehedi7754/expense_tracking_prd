@@ -8,6 +8,7 @@ import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
+import '../../repositories/file_upload_repository.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
@@ -261,6 +262,21 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       officeDetails = OfficeCostDetails(subCategory: _officeSubCategory);
     }
 
+    // Bug 8 fix: Upload receipt to server so managers can view it on any device.
+    // Falls back to local path if upload fails (offline-ready).
+    String? uploadedReceiptUrl = _receiptPath ?? _receiptFileName;
+    if (uploadedReceiptUrl != null && uploadedReceiptUrl.isNotEmpty && !uploadedReceiptUrl.startsWith('http')) {
+      try {
+        final uploadResult = await ref.read(fileUploadRepositoryProvider).upload(
+          filePathOrDataUri: uploadedReceiptUrl,
+          category: UploadCategory.receipts,
+        );
+        uploadedReceiptUrl = uploadResult.url;
+      } catch (_) {
+        // Offline: keep the local path as fallback
+      }
+    }
+
     final created = await ref.read(expenseProvider.notifier).submitExpense(
           employeeId: user.id,
           employeeName: user.name,
@@ -278,7 +294,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           note: _noteController.text.trim(),
           date: _selectedDate,
           hasReceipt: _hasReceipt,
-          receiptPhotoUrl: _receiptPath ?? _receiptFileName,
+          receiptPhotoUrl: uploadedReceiptUrl,
           equipmentDetails: equipDetails,
           transportationDetails: transDetails,
           foodDetails: foodDetails,

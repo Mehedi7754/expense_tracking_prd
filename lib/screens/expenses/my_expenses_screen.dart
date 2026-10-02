@@ -44,7 +44,7 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
 
   Future<void> _handleRefresh() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
+    await ref.read(expenseProvider.notifier).fetchExpenses(force: true);
     if (mounted) setState(() => _isLoading = false);
   }
 
