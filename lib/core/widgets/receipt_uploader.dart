@@ -223,10 +223,14 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
     }
 
     if (isServerUrl) {
+      final baseUrl = _resolveBaseUrl(ref);
+      final finalUrl = path.startsWith('http')
+          ? path
+          : (path.startsWith('/') ? '$baseUrl$path' : '$baseUrl/$path');
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Image.network(
-          path.startsWith('http') ? path : '${_resolveBaseUrl(ref)}$path',
+          finalUrl,
           height: isExpanded ? 400 : 160,
           width: double.infinity,
           fit: BoxFit.cover,

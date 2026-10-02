@@ -265,6 +265,8 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
 
     DateTime parsedDate = DateTime.tryParse(attendanceState.selectedDate) ?? DateTime.now();
     final formattedDateTitle = DateFormat('EEE, MMM d, yyyy').format(parsedDate);
+    final isWeekend = parsedDate.weekday == DateTime.friday || parsedDate.weekday == DateTime.saturday;
+    final isHoliday = employees.isNotEmpty && employees.every((e) => e.status == 'holiday');
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
@@ -362,6 +364,59 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
                   ),
 
                   const SizedBox(height: 12),
+                  if (isWeekend) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? const Color(0xFF3B82F6).withAlpha(80) : const Color(0xFFBFDBFE)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.beach_access_rounded, size: 18, color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Weekend Non-Working Day (Friday & Saturday) — Staff are excused and no salary cuts apply.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (isHoliday) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2E1065).withAlpha(50) : const Color(0xFFFAF5FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isDark ? const Color(0xFF8B5CF6).withAlpha(80) : const Color(0xFFDDD6FE)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.celebration_rounded, size: 18, color: isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Official Company Holiday — Non-working day with zero absence deductions.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? const Color(0xFFC4B5FD) : const Color(0xFF6D28D9),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   // 2. KPI METRICS CARDS
                   Row(
@@ -608,6 +663,14 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
       statusColor = const Color(0xFFEF4444);
       statusLabel = 'Absent';
       statusIcon = Icons.cancel_rounded;
+    } else if (emp.status == 'weekend') {
+      statusColor = const Color(0xFF3B82F6);
+      statusLabel = 'Weekend';
+      statusIcon = Icons.beach_access_rounded;
+    } else if (emp.status == 'holiday') {
+      statusColor = const Color(0xFF8B5CF6);
+      statusLabel = 'Holiday';
+      statusIcon = Icons.celebration_rounded;
     } else {
       statusColor = const Color(0xFF64748B);
       statusLabel = 'Not Logged';

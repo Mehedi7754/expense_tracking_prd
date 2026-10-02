@@ -154,6 +154,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.myExpenses,
         builder: (context, state) => const MyExpensesScreen(),
       ),
+      // Bug 9 Fix: Alias for /expenses/my-expenses so legacy links do not get trapped by /expenses/:id
+      GoRoute(
+        path: '/expenses/my-expenses',
+        builder: (context, state) => const MyExpensesScreen(),
+      ),
       GoRoute(
         path: RoutePaths.receiptCompliance,
         builder: (context, state) => const ReceiptComplianceScreen(),
@@ -210,6 +215,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RoutePaths.addRevenuePattern,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return AddRevenueScreen(projectId: id);
+        },
+      ),
+      // Bug 2 Fix: Singular /revenue/new alias so both singular and plural work seamlessly
+      GoRoute(
+        path: '/projects/:id/revenue/new',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return AddRevenueScreen(projectId: id);
