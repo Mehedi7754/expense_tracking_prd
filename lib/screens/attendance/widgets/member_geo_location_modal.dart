@@ -304,7 +304,14 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
     return base / days;
   }
 
+  bool get _isNonWorkingDay {
+    final status = widget.employee.status;
+    return status == 'weekend' || status == 'holiday';
+  }
+
   double get _todayDeduction {
+    // Bug 1 Fix: Zero deduction on weekends and holidays
+    if (_isNonWorkingDay) return 0.0;
     final status = widget.employee.status;
     if (status == 'present') return 0.0;
     if (status == 'half_day') return _dailySalaryRate * 0.5;
@@ -628,8 +635,8 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                           ),
                   ),
 
-                  // Absence confirmation button if unlogged
-                  if (emp.isMissing) ...[
+                  // Bug 1 Fix: Only show absence confirmation on actual working days
+                  if (emp.isMissing && !_isNonWorkingDay) ...[
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -643,6 +650,35 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                         onPressed: _showConfirmAbsenceDialog,
+                      ),
+                    ),
+                  ] else if (_isNonWorkingDay) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.beach_access_rounded, size: 16, color: Color(0xFF3B82F6)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              widget.employee.status == 'weekend'
+                                  ? 'Friday & Saturday are non-working days. No deduction applies.'
+                                  : 'This is an official holiday. No absence deduction applies.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1D4ED8),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

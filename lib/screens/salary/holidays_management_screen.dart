@@ -140,6 +140,7 @@ class _HolidaysManagementScreenState extends ConsumerState<HolidaysManagementScr
         label: const Text('Add Holiday', style: TextStyle(fontWeight: FontWeight.w800)),
         onPressed: _showAddHolidayDialog,
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: holidays.isEmpty
           ? Center(
               child: Column(
@@ -157,7 +158,7 @@ class _HolidaysManagementScreenState extends ConsumerState<HolidaysManagementScr
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               itemCount: holidays.length,
               itemBuilder: (context, index) {
                 final h = holidays[index];

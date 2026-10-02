@@ -96,6 +96,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
         icon: const Icon(Icons.person_add_rounded),
         label: const Text('Add User'),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
@@ -111,7 +112,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               itemCount: filtered.length,
               itemBuilder: (ctx, i) {
                 final user = filtered[i];

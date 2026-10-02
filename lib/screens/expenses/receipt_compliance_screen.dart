@@ -220,73 +220,121 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
         ),
         const SizedBox(height: 14),
 
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Container(
+        // Bug 12 Fix: Show a swipe hint only on narrow mobile screens
+        if (MediaQuery.of(context).size.width < 600)
+          Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF0F9FF),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFBAE6FD),
+              ),
             ),
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Member', style: TextStyle(fontWeight: FontWeight.w800))),
-                DataColumn(label: Text('Project', style: TextStyle(fontWeight: FontWeight.w800))),
-                DataColumn(label: Text('Total Cost', style: TextStyle(fontWeight: FontWeight.w800))),
-                DataColumn(label: Text('No Receipt', style: TextStyle(fontWeight: FontWeight.w800))),
-                DataColumn(label: Text('%', style: TextStyle(fontWeight: FontWeight.w800))),
-                DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.w800))),
-              ],
-              rows: summaries.map((s) {
-                return DataRow(
-                  cells: [
-                    DataCell(Text(s.memberName, style: const TextStyle(fontWeight: FontWeight.w700))),
-                    DataCell(Text(s.projectName, style: const TextStyle(fontSize: 12))),
-                    DataCell(Text(CurrencyFormatter.format(s.totalClaimed, compact: true))),
-                    DataCell(Text(CurrencyFormatter.format(s.unreceiptedAmount, compact: true))),
-                    DataCell(
-                      Text(
-                        '${s.unreceiptedRatio.toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
-                        ),
-                      ),
+            child: const Row(
+              children: [
+                Icon(Icons.swipe_rounded, size: 15, color: Color(0xFF0284C7)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Swipe left to see all columns',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0369A1),
                     ),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: (s.isExceedingThreshold ? AppColors.error : AppColors.success).withAlpha(20),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              s.isExceedingThreshold ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
-                              size: 13,
-                              color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
-                            ),
-                            const SizedBox(width: 4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // Bug 12 Fix: Scrollbar with thumbVisibility makes the horizontal scroll
+        // indicator always visible — critical for users who don’t know to swipe.
+        Builder(builder: (ctx) {
+          final controller = ScrollController();
+          return Scrollbar(
+            controller: controller,
+            thumbVisibility: true,
+            child: SingleChildScrollView(
+              controller: controller,
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: MediaQuery.of(context).size.width - 32,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                  ),
+                  child: DataTable(
+                    horizontalMargin: 16,
+                    columnSpacing: 20,
+                    columns: const [
+                      DataColumn(label: Text('Member', style: TextStyle(fontWeight: FontWeight.w800))),
+                      DataColumn(label: Text('Project', style: TextStyle(fontWeight: FontWeight.w800))),
+                      DataColumn(label: Text('Total Cost', style: TextStyle(fontWeight: FontWeight.w800))),
+                      DataColumn(label: Text('No Receipt', style: TextStyle(fontWeight: FontWeight.w800))),
+                      DataColumn(label: Text('%', style: TextStyle(fontWeight: FontWeight.w800))),
+                      DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.w800))),
+                    ],
+                    rows: summaries.map((s) {
+                      return DataRow(
+                        cells: [
+                          DataCell(Text(s.memberName, style: const TextStyle(fontWeight: FontWeight.w700))),
+                          DataCell(Text(s.projectName, style: const TextStyle(fontSize: 12))),
+                          DataCell(Text(CurrencyFormatter.format(s.totalClaimed, compact: true))),
+                          DataCell(Text(CurrencyFormatter.format(s.unreceiptedAmount, compact: true))),
+                          DataCell(
                             Text(
-                              s.isExceedingThreshold ? 'Review' : 'Compliant',
+                              '${s.unreceiptedRatio.toStringAsFixed(0)}%',
                               style: TextStyle(
-                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                                 color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
+                          ),
+                          DataCell(
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: (s.isExceedingThreshold ? AppColors.error : AppColors.success).withAlpha(20),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    s.isExceedingThreshold ? Icons.warning_amber_rounded : Icons.check_circle_rounded,
+                                    size: 13,
+                                    color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    s.isExceedingThreshold ? 'Review' : 'Compliant',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: s.isExceedingThreshold ? AppColors.error : AppColors.success,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        }),
+
       ],
     );
   }

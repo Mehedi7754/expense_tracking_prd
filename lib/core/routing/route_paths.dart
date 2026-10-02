@@ -10,7 +10,7 @@ class RoutePaths {
   // Shell / Tabs
   static const String home = '/home';
   static const String submitExpense = '/expenses/submit';
-  static const String myExpenses = '/expenses/my-expenses';
+  static const String myExpenses = '/expenses/my';
   static const String approvalsQueue = '/approvals';
   static const String projects = '/projects';
   static const String projectsList = '/projects';
@@ -30,7 +30,7 @@ class RoutePaths {
   static const String projectDetailPattern = '/projects/:id';
   static const String addProject = '/projects/new';
   static const String editProjectPattern = '/projects/:id/edit';
-  static const String addRevenuePattern = '/projects/:id/revenue/new';
+  static const String addRevenuePattern = '/projects/:id/revenues/new';
   static const String projectTeamPattern = '/projects/:id/team';
   static const String taskDetail = '/tasks/:id';
   static const String addTask = '/tasks/new';
@@ -58,7 +58,7 @@ class RoutePaths {
 
   static String projectDetail(String id) => '/projects/$id';
   static String editProject(String id) => '/projects/$id/edit';
-  static String addRevenue(String id) => '/projects/$id/revenue/new';
+  static String addRevenue(String id) => '/projects/$id/revenues/new';
   static String projectTeam(String id) => '/projects/$id/team';
   static String expenseDetail(String id) => '/expenses/$id';
   static String editExpense(String id) => '/expenses/$id/edit';

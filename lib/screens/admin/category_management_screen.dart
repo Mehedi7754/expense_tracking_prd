@@ -57,14 +57,8 @@ class CategoryManagementScreen extends ConsumerWidget {
                 icon: const Icon(Icons.arrow_back_rounded),
                 onPressed: () => context.pop(),
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.add_rounded),
-                  tooltip: 'Add Category',
-                  onPressed: () => _showAddEditDialog(context, ref),
-                ),
-                const SizedBox(width: 8),
-              ],
+              // Bug 10 Fix: Removed duplicate 'Add Category' AppBar icon
+              // — the FAB below is the single, canonical entry point.
             ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'admin_add_category_fab',
@@ -74,11 +68,12 @@ class CategoryManagementScreen extends ConsumerWidget {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Add Category'),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 80),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
             itemCount: categories.length,
             itemBuilder: (ctx, i) {
               final cat = categories[i];

@@ -434,7 +434,12 @@ export class SalaryService {
           (morningRecord && morningRecord.status === 'confirmed_absent') ||
           (afternoonRecord && afternoonRecord.status === 'confirmed_absent');
 
-        if (isExplicitlyConfirmedAbsent) {
+        // Bug 7 Fix: Do NOT deduct salary for today — the workday is still in progress
+        const isToday = dateStr === todayIso;
+        if (isToday) {
+          status = 'upcoming';
+          notes = 'Workday still in progress (no deduction)';
+        } else if (isExplicitlyConfirmedAbsent) {
           status = 'confirmed_absent';
           deductionUnits = 1.0;
           confirmedAbsentDays += 1;

@@ -58,14 +58,81 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
-        title: const Text('Client-Level Analysis (PRD Section 21)', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text(
+          'Client-Level Analysis',
+          style: TextStyle(fontWeight: FontWeight.w800),
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 850),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-        children: [
+      // Bug 13 Fix: Show a meaningful empty state when no clients are configured
+      body: clients.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFEFF6FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.corporate_fare_rounded,
+                        size: 48,
+                        color: isDark
+                            ? const Color(0xFF818CF8)
+                            : const Color(0xFF4F46E5),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'No Client Data Available',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Create projects and assign clients to unlock\nclient-level revenue and cost analytics.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4F46E5),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.folder_open_rounded, size: 18),
+                      label: const Text('Go to Projects',
+                          style: TextStyle(fontWeight: FontWeight.w700)),
+                      onPressed: () => context.push(RoutePaths.projects),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 850),
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
           // Client Dropdown Selector
           DropdownButtonFormField<ClientModel>(
             value: _selectedClient,
@@ -80,7 +147,82 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
           ),
           const SizedBox(height: 16),
 
-          if (_selectedClient != null) ...[
+          if (_selectedClient == null) ...[
+            // Bug 13 Fix: Placeholder when no client is selected (e.g. clients list
+            // loaded but _selectedClient is null due to state reset)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 48),
+                child: Column(
+                  children: [
+                    Icon(Icons.analytics_outlined,
+                        size: 42, color: Color(0xFF94A3B8)),
+                    SizedBox(height: 12),
+                    Text(
+                      'Select a client above to view analysis',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF94A3B8),
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else if (clientProjects.isEmpty) ...[
+            // Bug 13 Fix: Selected client has no linked projects yet
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 48),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFFAFAFF),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE0E7FF),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.folder_off_outlined,
+                        size: 36,
+                        color: isDark
+                            ? const Color(0xFF818CF8)
+                            : const Color(0xFF6366F1),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'No Projects for ${_selectedClient!.name}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Assign this client to a project to see\nrevenue, cost, and margin analytics here.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+
             // Client Overview Card
             Container(
               padding: const EdgeInsets.all(16),
@@ -210,12 +352,12 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
                   ),
                 );
               }),
-            ],
-          ],
-          ),
-        ),
-      ),
-    );
+            ], // else clientProjects.isNotEmpty
+          ], // children of ListView
+                ), // ListView
+              ), // ConstrainedBox
+            ), // Center
+    ); // Scaffold
   }
 
   Widget _buildMetricTile(String label, String value, Color color) {

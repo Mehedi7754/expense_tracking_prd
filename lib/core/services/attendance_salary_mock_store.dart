@@ -343,9 +343,23 @@ class AttendanceSalaryMockStore {
       }
     }
 
+    // Bug 1 & 5 Fix: Determine if selected date is a non-working day
+    // (weekend = Fri/Sat in Bangladesh, or an official holiday)
+    final targetDateObj = DateTime.tryParse(targetDate);
+    final isWeekendDay = targetDateObj != null &&
+        (targetDateObj.weekday == DateTime.friday ||
+            targetDateObj.weekday == DateTime.saturday);
+    final isHolidayDay = _holidays.any((h) =>
+        h.date == targetDate ||
+        (h.isRecurring &&
+            targetDate.length >= 5 &&
+            h.date.length >= 5 &&
+            targetDate.endsWith(h.date.substring(4))));
+    final isNonWorkingDay = isWeekendDay || isHolidayDay;
+
     for (final user in usersToProcess) {
       final userRecords = _records.where((r) => r.userId == user.id && r.date == targetDate).toList();
-      
+
       AttendanceRecordModel? morning;
       AttendanceRecordModel? afternoon;
 
@@ -354,15 +368,20 @@ class AttendanceSalaryMockStore {
         if (rec.isAfternoon) afternoon = rec;
       }
 
-      String status = 'missing';
-      if (morning != null && afternoon != null) {
+      String status;
+      if (isWeekendDay) {
+        // Bug 1 Fix: Never penalise employees for being absent on a weekend
+        status = 'weekend';
+      } else if (isHolidayDay) {
+        // Bug 5 Fix: Official holidays are non-working — not absences
+        status = 'holiday';
+      } else if (morning != null && afternoon != null) {
         status = 'present';
         presentCount++;
       } else if (morning != null || afternoon != null) {
         status = 'half_day';
         halfDayCount++;
       } else {
-        // Check if explicitly confirmed absent
         final isConfirmed = userRecords.any((r) => r.status == 'confirmed_absent');
         status = isConfirmed ? 'confirmed_absent' : 'missing';
         missingCount++;
@@ -386,9 +405,9 @@ class AttendanceSalaryMockStore {
     return DailyAttendanceOverview(
       date: targetDate,
       totalEmployees: usersToProcess.length,
-      presentCount: presentCount,
-      halfDayCount: halfDayCount,
-      missingCount: missingCount,
+      presentCount: isNonWorkingDay ? 0 : presentCount,
+      halfDayCount: isNonWorkingDay ? 0 : halfDayCount,
+      missingCount: isNonWorkingDay ? 0 : missingCount,
       employees: employeeDailies,
     );
   }

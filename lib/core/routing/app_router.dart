@@ -158,6 +158,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.receiptCompliance,
         builder: (context, state) => const ReceiptComplianceScreen(),
       ),
+      // Bug 4 Fix: /expenses/new must be registered BEFORE /expenses/:id
+      // so GoRouter doesn't treat 'new' as an expense ID.
+      GoRoute(
+        path: '/expenses/new',
+        builder: (context, state) => const SubmitExpenseScreen(),
+      ),
       GoRoute(
         path: RoutePaths.expenseDetailPattern,
         builder: (context, state) {

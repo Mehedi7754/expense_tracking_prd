@@ -181,7 +181,8 @@ export class ExpensesService {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!categoryId || !uuidRegex.test(categoryId)) {
       const cleanSlug = (categoryId || '').toString().replace(/^cat_/, '');
-      const rawName = data.categoryName || data.category_name || (categoryId ? categoryId.toString().replace(/^cat_/, '') : 'General');
+      const rawName = data.categoryName || data.category_name ||
+        (categoryId ? categoryId.toString().replace(/^cat_/, '') : 'General');
       const formatted = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
       let mappedName = rawName;
