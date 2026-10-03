@@ -177,6 +177,10 @@ export class AuthService {
       fields.push(`full_name = $${idx++}`);
       values.push(data.name ?? data.full_name);
     }
+    if (data.email !== undefined && typeof data.email === 'string' && data.email.trim().length > 0) {
+      fields.push(`email = $${idx++}`);
+      values.push(data.email.trim().toLowerCase());
+    }
     if (data.phone !== undefined) {
       fields.push(`phone = $${idx++}`);
       values.push(data.phone);

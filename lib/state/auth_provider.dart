@@ -234,10 +234,10 @@ class AuthNotifier extends Notifier<AuthState> {
         isLoading: false,
         clearError: true,
       );
-      // TTL cache prevents duplicates if restoreSession already fetched
-      ref.read(projectProvider.notifier).fetchProjects();
-      ref.read(expenseProvider.notifier).fetchExpenses();
-      ref.read(userManagementProvider.notifier).fetchUsers();
+      // Invalidate caches and fetch fresh authoritative server data on login
+      ref.read(projectProvider.notifier).fetchProjects(force: true);
+      ref.read(expenseProvider.notifier).fetchExpenses(force: true);
+      ref.read(userManagementProvider.notifier).fetchUsers(force: true);
 
       // Invalidate attendance & salary cache and fetch fresh real overview
       ref.read(attendanceProvider.notifier).invalidateCache();
@@ -369,6 +369,41 @@ class AuthNotifier extends Notifier<AuthState> {
       final userNotifier = ref.read(userManagementProvider.notifier);
       await userNotifier.updateUser(updated);
     } catch (_) {}
+  }
+
+  Future<UserModel> updateAccountDetails({
+    required String name,
+    required String email,
+    required String phone,
+  }) async {
+    if (state.currentUser == null) throw StateError('No authenticated user');
+
+    final repo = ref.read(authRepositoryProvider);
+    UserModel updated;
+    try {
+      updated = await repo.updateProfile({
+        'name': name.trim(),
+        'email': email.trim().toLowerCase(),
+        'phone': phone.trim(),
+      });
+    } catch (_) {
+      // Fallback: update locally
+      updated = state.currentUser!.copyWith(
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: phone.trim(),
+      );
+    }
+
+    state = state.copyWith(currentUser: updated);
+    await _persistSession(updated, ref.read(apiClientProvider).authToken);
+
+    try {
+      final userNotifier = ref.read(userManagementProvider.notifier);
+      await userNotifier.updateUser(updated);
+    } catch (_) {}
+
+    return updated;
   }
 
   Future<void> changePassword({

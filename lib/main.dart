@@ -11,24 +11,27 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppEnv.initialize();
 
-  // Initialize OS-level push notification service
-  await PushNotificationService.instance.initialize();
-
-  // Schedule daily attendance reminders (only fires on mobile)
-  await PushNotificationService.instance.scheduleDailyAttendanceReminder(
-    id: 1,
-    title: '📍 Morning Check-in Reminder',
-    body: "Don't forget to mark your attendance for today!",
-    hour: 9,
-    minute: 0,
-  );
-  await PushNotificationService.instance.scheduleDailyAttendanceReminder(
-    id: 2,
-    title: '📍 End-of-Day Check-out',
-    body: 'Please mark your check-out before leaving.',
-    hour: 17,
-    minute: 0,
-  );
+  // Initialize OS-level push notification service safely
+  try {
+    await PushNotificationService.instance.initialize();
+    // Fire schedule in background
+    PushNotificationService.instance.scheduleDailyAttendanceReminder(
+      id: 1,
+      title: '📍 Morning Check-in Reminder',
+      body: "Don't forget to mark your attendance for today!",
+      hour: 9,
+      minute: 0,
+    );
+    PushNotificationService.instance.scheduleDailyAttendanceReminder(
+      id: 2,
+      title: '📍 End-of-Day Check-out',
+      body: 'Please mark your check-out before leaving.',
+      hour: 17,
+      minute: 0,
+    );
+  } catch (e) {
+    debugPrint('[Main] PushNotificationService init: $e');
+  }
 
   runApp(
     const ProviderScope(

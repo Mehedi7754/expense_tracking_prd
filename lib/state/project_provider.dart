@@ -122,7 +122,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
 
       // Preserve locally created projects that have not yet reached the backend
       final localOnly = state
-          .where((p) => !remoteIds.contains(p.id) && !remoteCodes.contains(p.projectId))
+          .where((p) => p.id.startsWith('proj_') && !remoteIds.contains(p.id) && !remoteCodes.contains(p.projectId))
           .toList();
 
       state = [...mergedProjects, ...localOnly];

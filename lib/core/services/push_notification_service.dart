@@ -54,6 +54,8 @@ class PushNotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin == null) return;
 
+    await androidPlugin.requestNotificationsPermission();
+
     await androidPlugin.createNotificationChannel(
       const AndroidNotificationChannel(
         _channelExpenses,
@@ -146,32 +148,34 @@ class PushNotificationService {
     required int hour,
     required int minute,
   }) async {
-    if (!_initialized || kIsWeb) return;
-
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      _nextInstanceOfTime(hour, minute),
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _channelAttendance,
-          'Attendance Reminders',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        _nextInstanceOfTime(hour, minute),
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            _channelAttendance,
+            'Attendance Reminders',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
         ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time, // repeat daily at same time
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time, // repeat daily at same time
+      );
+    } catch (e) {
+      debugPrint('[PushNotificationService] scheduleDailyAttendanceReminder error: $e');
+    }
   }
 
   /// Cancel a specific scheduled notification.

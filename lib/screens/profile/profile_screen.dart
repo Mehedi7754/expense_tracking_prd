@@ -20,6 +20,13 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  void _showEditProfileDialog(BuildContext context, WidgetRef ref, UserModel user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _EditProfileDialog(user: user),
+    );
+  }
+
   void _handleLogout(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
@@ -290,9 +297,26 @@ class ProfileScreen extends ConsumerWidget {
 
                       const SizedBox(height: 12),
 
-                      Text(
-                        user.name,
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              user.name,
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: () => _showEditProfileDialog(context, ref, user),
+                            borderRadius: BorderRadius.circular(8),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.edit_outlined, size: 16, color: Color(0xFF4F46E5)),
+                            ),
+                          ),
+                        ],
                       ),
 
                       const SizedBox(height: 2),
@@ -560,6 +584,15 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       _buildDivider(isDark),
                       _buildSettingsTile(
+                        icon: Icons.person_outline_rounded,
+                        iconColor: const Color(0xFF6366F1),
+                        title: 'Edit Profile & Details',
+                        subtitle: 'Update full name, email address & phone number',
+                        onTap: () => _showEditProfileDialog(context, ref, user),
+                        isDark: isDark,
+                      ),
+                      _buildDivider(isDark),
+                      _buildSettingsTile(
                         icon: Icons.lock_outline_rounded,
                         iconColor: const Color(0xFFD97706),
                         title: 'Change Password',
@@ -816,3 +849,122 @@ class _ChangePasswordDialogState extends ConsumerState<_ChangePasswordDialog> {
     );
   }
 }
+
+class _EditProfileDialog extends ConsumerStatefulWidget {
+  final UserModel user;
+  const _EditProfileDialog({required this.user});
+
+  @override
+  ConsumerState<_EditProfileDialog> createState() => _EditProfileDialogState();
+}
+
+class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneController;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.user.name);
+    _emailController = TextEditingController(text: widget.user.email);
+    _phoneController = TextEditingController(text: widget.user.phone ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+
+    try {
+      await ref.read(authProvider.notifier).updateAccountDetails(
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim().toLowerCase(),
+        phone: _phoneController.text.trim(),
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        NotificationBanner.showSuccess(context, 'Profile details updated successfully.');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        NotificationBanner.showError(context, 'Failed to update profile: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Edit Account Details', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                enabled: !_isLoading,
+                decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline, size: 20)),
+                validator: (v) => v == null || v.trim().isEmpty ? 'Name is required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _emailController,
+                enabled: !_isLoading,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined, size: 20)),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Email is required';
+                  if (!v.contains('@') || !v.contains('.')) return 'Enter a valid email';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _phoneController,
+                enabled: !_isLoading,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_outlined, size: 20)),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF4F46E5),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: _isLoading ? null : _submit,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : const Text('Save Changes'),
+        ),
+      ],
+    );
+  }
+}
+

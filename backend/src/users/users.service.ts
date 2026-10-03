@@ -125,6 +125,10 @@ export class UsersService {
       fields.push(`full_name = $${idx++}`);
       values.push(data.name || data.fullName || data.full_name);
     }
+    if (data.email !== undefined && typeof data.email === 'string' && data.email.trim().length > 0) {
+      fields.push(`email = $${idx++}`);
+      values.push(data.email.trim().toLowerCase());
+    }
     if (data.role) {
       fields.push(`role = $${idx++}`);
       values.push(data.role);

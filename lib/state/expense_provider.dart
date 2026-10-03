@@ -96,12 +96,18 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
         employeeId: employeeId,
         status: status,
       );
-      if (remoteExpenses.isNotEmpty) {
+      if (projectId == null && employeeId == null && status == null) {
+        // Authoritative catalog sync: retain only un-synced offline creations
+        final localPending = state.where((e) => e.id.startsWith('exp_')).toList();
+        state = [...remoteExpenses, ...localPending];
+        await _persistExpenses();
+        debugPrint('[ExpenseNotifier] Synchronized ${remoteExpenses.length} expenses from backend (${localPending.length} offline pending)');
+      } else {
         final remoteIds = remoteExpenses.map((e) => e.id).toSet();
         final localOnly = state.where((e) => !remoteIds.contains(e.id)).toList();
         state = [...remoteExpenses, ...localOnly];
         await _persistExpenses();
-        debugPrint('[ExpenseNotifier] Synchronized ${remoteExpenses.length} expenses from backend');
+        debugPrint('[ExpenseNotifier] Synchronized ${remoteExpenses.length} filtered expenses from backend');
       }
       markFetchCompleted();
     } catch (e) {

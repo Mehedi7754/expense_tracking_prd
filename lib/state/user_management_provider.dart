@@ -98,16 +98,11 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
 
     markFetchStarted();
     try {
-      final mergedMap = <String, UserModel>{};
-      for (final u in state) {
-        _addOrUpdateUser(mergedMap, u);
-      }
-
+      List<UserModel>? fetched;
       // 1. Try querying backend /users endpoint
       try {
         final client = ref.read(apiClientProvider);
         final response = await client.get('/users');
-        List<UserModel> fetched = [];
         if (response is List) {
           fetched = response
               .whereType<Map<String, dynamic>>()
@@ -121,11 +116,26 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
               .where((u) => u.isActive)
               .toList();
         }
+      } catch (_) {
+        // Backend /users may be unavailable or offline
+      }
+
+      final mergedMap = <String, UserModel>{};
+      if (fetched != null) {
         for (final u in fetched) {
           _addOrUpdateUser(mergedMap, u);
         }
-      } catch (_) {
-        // Backend /users may be unavailable or offline; harvest authentic database users from related providers
+        // Retain only local offline creations that haven't synced
+        for (final u in state) {
+          if (u.id.startsWith('user_')) {
+            _addOrUpdateUser(mergedMap, u);
+          }
+        }
+      } else {
+        // Offline: preserve existing state
+        for (final u in state) {
+          _addOrUpdateUser(mergedMap, u);
+        }
       }
 
       // 2. Synchronize current logged-in user
@@ -135,7 +145,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
           _addOrUpdateUser(mergedMap, curUser);
         }
       } catch (_) {}
-
 
       state = mergedMap.values.toList();
       await _persistUsers();
