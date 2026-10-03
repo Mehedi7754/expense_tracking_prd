@@ -8,9 +8,19 @@ import {
 import { UploadsService, UploadCategory } from './uploads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+
 class UploadFileDto {
+  @IsString()
+  @IsNotEmpty()
   file!: string;       // base64 data URI or raw base64
+
+  @IsString()
+  @IsNotEmpty()
   category!: string;   // 'receipts' | 'avatars' | 'projects'
+
+  @IsOptional()
+  @IsString()
   entityId?: string;   // Optional: expense ID, user ID, or project ID
 }
 

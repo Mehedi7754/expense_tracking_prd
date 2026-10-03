@@ -21,6 +21,7 @@ import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
 import '../../state/user_management_provider.dart';
+import '../../repositories/file_upload_repository.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   final String projectId;
@@ -1354,18 +1355,36 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen>
   Future<void> _pickAndApplyImage(BuildContext context, ProjectModel project, ImageSource source) async {
     try {
       final picker = ImagePicker();
+      // Compression: downscale to max 1280x800 and quality 75 for optimal memory & network performance
       final picked = await picker.pickImage(
         source: source,
-        maxWidth: 1600,
-        maxHeight: 1000,
-        imageQuality: 85,
+        maxWidth: 1280,
+        maxHeight: 800,
+        imageQuality: 75,
       );
       if (picked != null) {
         final base64Uri = await AppImageHelper.fileToBase64DataUri(File(picked.path));
-        final updated = project.copyWith(imageUrl: base64Uri);
-        await ref.read(projectProvider.notifier).updateProject(updated);
+        // Apply immediately to state for zero-lag UI feedback
+        final updatedWithUri = project.copyWith(imageUrl: base64Uri);
+        await ref.read(projectProvider.notifier).updateProject(updatedWithUri);
+
+        // Upload through file upload pipeline if online
+        try {
+          final uploadResult = await ref.read(fileUploadRepositoryProvider).upload(
+            filePathOrDataUri: picked.path,
+            category: UploadCategory.projects,
+            entityId: project.id,
+          );
+          if (uploadResult.url.isNotEmpty && uploadResult.url != base64Uri) {
+            final updatedWithUrl = project.copyWith(imageUrl: uploadResult.url);
+            await ref.read(projectProvider.notifier).updateProject(updatedWithUrl);
+          }
+        } catch (_) {
+          // If file endpoint was unreachable, the compressed base64 URI is already persisted to the project in DB
+        }
+
         if (context.mounted) {
-          NotificationBanner.showSuccess(context, 'Project image uploaded and saved to server');
+          NotificationBanner.showSuccess(context, 'Project cover image updated successfully');
         }
       }
     } catch (e) {

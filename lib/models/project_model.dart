@@ -643,7 +643,8 @@ class ProjectModel {
       if (progressUpdatedById != null) 'progress_updated_by_id': progressUpdatedById,
       if (createdById != null && createdById!.isNotEmpty) 'created_by': demoToUuid[createdById] ?? createdById,
       if (createdById != null && createdById!.isNotEmpty) 'created_by_id': demoToUuid[createdById] ?? createdById,
-      if (!forApi && imageUrl != null && imageUrl!.isNotEmpty) 'image_url': imageUrl,
+      'image_url': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
+      'imageUrl': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
     };
   }
 

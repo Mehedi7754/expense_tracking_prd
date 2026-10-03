@@ -37,14 +37,14 @@ void main() {
 
     test('2. Authentication with wrong password throws UnauthorizedException', () async {
       expect(
-        () => authRepo.login('admin@pfis.com', 'WrongPassword!'),
+        () => authRepo.login('admin@gw.com', 'WrongPassword!'),
         throwsA(isA<UnauthorizedException>()),
       );
     });
 
     test('3. Authentication login succeeds and sets Bearer token', () async {
-      final user = await authRepo.login('admin@pfis.com', 'password123');
-      expect(user.email, 'admin@pfis.com');
+      final user = await authRepo.login('admin@gw.com', 'password123');
+      expect(user.email, 'admin@gw.com');
       expect(client.authToken, isNotNull);
       expect(client.authToken!.isNotEmpty, true);
     });
@@ -52,7 +52,7 @@ void main() {
     test('4. Authenticated current user profile (/auth/me)', () async {
       final profile = await authRepo.getCurrentUser();
       expect(profile, isNotNull);
-      expect(profile!.email, 'admin@pfis.com');
+      expect(profile!.email, 'admin@gw.com');
     });
 
     test('5. Fetch live categories via CategoryRepository', () async {
