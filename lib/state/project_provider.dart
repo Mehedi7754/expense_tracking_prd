@@ -11,6 +11,7 @@ import '../models/user_role.dart';
 import '../repositories/project_repository.dart';
 
 const String _kCustomProjectsKey = 'gw_custom_projects_cache';
+const String _kDeletedProjectIdsKey = 'gw_deleted_project_ids_cache';
 
 class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin {
   @override
@@ -19,9 +20,33 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
     return const [];
   }
 
+  Future<Set<String>> _getDeletedProjectIds() async {
+    if (EnvironmentUtils.isTestEnvironment) return {};
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_kDeletedProjectIdsKey) ?? [];
+      return list.toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _recordDeletedProjectIds(Iterable<String> ids) async {
+    if (EnvironmentUtils.isTestEnvironment) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final current = (prefs.getStringList(_kDeletedProjectIdsKey) ?? []).toSet();
+      current.addAll(ids.where((id) => id.isNotEmpty));
+      await prefs.setStringList(_kDeletedProjectIdsKey, current.toList());
+    } catch (e) {
+      debugPrint('[ProjectNotifier] Error recording deleted project ids: $e');
+    }
+  }
+
   Future<void> _loadCachedProjects() async {
     if (EnvironmentUtils.isTestEnvironment) return;
     try {
+      final deletedIds = await _getDeletedProjectIds();
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString(_kCustomProjectsKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
@@ -29,6 +54,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
         final customProjects = decoded
             .whereType<Map<String, dynamic>>()
             .map(ProjectModel.fromJson)
+            .where((p) => !deletedIds.contains(p.id) && !deletedIds.contains(p.projectId))
             .toList();
 
         state = customProjects;
@@ -76,8 +102,13 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
 
     markFetchStarted();
     try {
+      final deletedIds = await _getDeletedProjectIds();
       final repo = ref.read(projectRepositoryProvider);
-      final remoteProjects = await repo.getProjects();
+      final rawRemoteProjects = await repo.getProjects();
+      final remoteProjects = rawRemoteProjects
+          .where((p) => !deletedIds.contains(p.id) && !deletedIds.contains(p.projectId))
+          .toList();
+
       final remoteIds = remoteProjects.map((p) => p.id).toSet();
       final remoteCodes = remoteProjects.map((p) => p.projectId).toSet();
 
@@ -122,7 +153,12 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
 
       // Preserve locally created projects that have not yet reached the backend
       final localOnly = state
-          .where((p) => p.id.startsWith('proj_') && !remoteIds.contains(p.id) && !remoteCodes.contains(p.projectId))
+          .where((p) =>
+              p.id.startsWith('proj_') &&
+              !deletedIds.contains(p.id) &&
+              !deletedIds.contains(p.projectId) &&
+              !remoteIds.contains(p.id) &&
+              !remoteCodes.contains(p.projectId))
           .toList();
 
       state = [...mergedProjects, ...localOnly];
@@ -412,6 +448,42 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
       } catch (e) {
         debugPrint('[ProjectNotifier] Error uploading unassigned member to backend: $e');
       }
+    }
+  }
+
+  /// Deletes a project from local state and remote backend database.
+  Future<void> deleteProject(String projectId) async {
+    final candidateIds = <String>{projectId};
+    ProjectModel? target;
+
+    for (final p in state) {
+      if (p.id == projectId || p.projectId == projectId) {
+        target = p;
+        if (p.id.isNotEmpty) candidateIds.add(p.id);
+        if (p.projectId.isNotEmpty) candidateIds.add(p.projectId);
+      }
+    }
+
+    await _recordDeletedProjectIds(candidateIds);
+
+    state = state
+        .where((p) =>
+            !candidateIds.contains(p.id) &&
+            !candidateIds.contains(p.projectId))
+        .toList();
+    await _persistProjects();
+    invalidateCache();
+
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      for (final id in candidateIds) {
+        try {
+          await repo.deleteProject(id);
+        } catch (_) {}
+      }
+      debugPrint('[ProjectNotifier] Successfully deleted project $projectId on backend');
+    } catch (e) {
+      debugPrint('[ProjectNotifier] Error deleting project on backend: $e. Retained local deletion.');
     }
   }
 }

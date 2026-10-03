@@ -479,23 +479,50 @@ export class ProjectsService {
     } catch (_) {}
 
     return this.db.transaction(async (client) => {
-      // Unlink expenses and tasks to prevent Foreign Key constraints from blocking deletion
+      // 1. Delete comments on expenses belonging to this project
       await client.query(
-        'UPDATE expenses SET project_id = NULL WHERE project_id::text = $1 OR project_id::text = $2',
+        `DELETE FROM expense_comments
+         WHERE expense_id IN (
+           SELECT id FROM expenses WHERE project_id::text = $1 OR project_id::text = $2
+         )`,
         [dbId, projectCode],
       );
+
+      // 2. Delete notifications referencing expenses or this project
       await client.query(
-        'UPDATE tasks SET project_id = NULL WHERE project_id::text = $1 OR project_id::text = $2',
+        `DELETE FROM notifications
+         WHERE related_project_id::text = $1 OR related_project_id::text = $2
+            OR related_expense_id IN (
+              SELECT id FROM expenses WHERE project_id::text = $1 OR project_id::text = $2
+            )`,
         [dbId, projectCode],
       );
+
+      // 3. Delete expenses belonging to this project (not-null FK column)
+      await client.query(
+        'DELETE FROM expenses WHERE project_id::text = $1 OR project_id::text = $2',
+        [dbId, projectCode],
+      );
+
+      // 4. Delete tasks belonging to this project (not-null FK column)
+      await client.query(
+        'DELETE FROM tasks WHERE project_id::text = $1 OR project_id::text = $2',
+        [dbId, projectCode],
+      );
+
+      // 5. Delete project revenues
       await client.query(
         'DELETE FROM project_revenues WHERE project_id::text = $1 OR project_id::text = $2',
         [dbId, projectCode],
       );
+
+      // 6. Delete project members
       await client.query(
         'DELETE FROM project_members WHERE project_id::text = $1 OR project_id::text = $2',
         [dbId, projectCode],
       );
+
+      // 7. Delete project record
       const res = await client.query(
         'DELETE FROM projects WHERE id::text = $1 OR id::text = $2 OR project_code = $1 OR project_code = $2 RETURNING *',
         [dbId, projectCode],
