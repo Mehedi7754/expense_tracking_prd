@@ -1,8 +1,18 @@
 enum NotificationType {
   expenseApproved,
   expenseRejected,
+  expenseSubmitted,
   budgetWarning,
   commentAdded,
+  attendanceReminder,
+  attendanceLate,
+  absenceDeducted,
+  salaryReady,
+  payrollFinalized,
+  revenueReceived,
+  memberAdded,
+  userRegistration,
+  securityAlert,
   general;
 
   String get displayName {
@@ -11,10 +21,30 @@ enum NotificationType {
         return 'Expense Approved';
       case NotificationType.expenseRejected:
         return 'Expense Rejected';
+      case NotificationType.expenseSubmitted:
+        return 'New Submission';
       case NotificationType.budgetWarning:
         return 'Budget Warning';
       case NotificationType.commentAdded:
         return 'New Comment';
+      case NotificationType.attendanceReminder:
+        return 'Attendance Reminder';
+      case NotificationType.attendanceLate:
+        return 'Late Check-in';
+      case NotificationType.absenceDeducted:
+        return 'Absence Deduction';
+      case NotificationType.salaryReady:
+        return 'Salary Statement';
+      case NotificationType.payrollFinalized:
+        return 'Payroll Finalized';
+      case NotificationType.revenueReceived:
+        return 'Revenue Received';
+      case NotificationType.memberAdded:
+        return 'Team Update';
+      case NotificationType.userRegistration:
+        return 'New User';
+      case NotificationType.securityAlert:
+        return 'Security Alert';
       case NotificationType.general:
         return 'Notification';
     }
@@ -26,16 +56,37 @@ enum NotificationType {
         return NotificationType.expenseApproved;
       case 'expenserejected':
         return NotificationType.expenseRejected;
+      case 'expensesubmitted':
+        return NotificationType.expenseSubmitted;
       case 'budgetwarning':
         return NotificationType.budgetWarning;
       case 'commentadded':
         return NotificationType.commentAdded;
+      case 'attendancereminder':
+        return NotificationType.attendanceReminder;
+      case 'attendancelate':
+        return NotificationType.attendanceLate;
+      case 'absencededucted':
+        return NotificationType.absenceDeducted;
+      case 'salaryready':
+        return NotificationType.salaryReady;
+      case 'payrollfinalized':
+        return NotificationType.payrollFinalized;
+      case 'revenuereceived':
+        return NotificationType.revenueReceived;
+      case 'memberadded':
+        return NotificationType.memberAdded;
+      case 'userregistration':
+        return NotificationType.userRegistration;
+      case 'securityalert':
+        return NotificationType.securityAlert;
       case 'general':
       default:
         return NotificationType.general;
     }
   }
 }
+
 
 class NotificationModel {
   final String id;

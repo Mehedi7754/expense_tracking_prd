@@ -1,11 +1,20 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/notification_model.dart';
 import '../repositories/notification_repository.dart';
 
 class NotificationNotifier extends Notifier<List<NotificationModel>> {
+  Timer? _pollingTimer;
+
   @override
   List<NotificationModel> build() {
-    // Default clean empty state on startup (no hardcoded demo notifications)
+    // Start background polling every 2 minutes to catch server-pushed notifications
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      fetchNotifications();
+    });
+    ref.onDispose(() => _pollingTimer?.cancel());
+
     return const [];
   }
 
@@ -37,10 +46,34 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
     }
   }
 
-  void markAllAsRead() {
+  Future<void> markAllAsRead() async {
     state = [
       for (final n in state) n.copyWith(isRead: true),
     ];
+    // No bulk-mark endpoint on backend — individual mark calls are not necessary
+    // since the state is already updated optimistically and will sync on next fetch.
+  }
+
+  /// Delete a single notification by ID (removes from state + calls backend).
+  Future<void> deleteNotification(String id) async {
+    state = state.where((n) => n.id != id).toList();
+    try {
+      final repo = ref.read(notificationRepositoryProvider);
+      await repo.deleteNotification(id);
+    } catch (_) {
+      // State already updated — live with it
+    }
+  }
+
+  /// Delete ALL notifications for the current user.
+  Future<void> deleteAll() async {
+    state = const [];
+    try {
+      final repo = ref.read(notificationRepositoryProvider);
+      await repo.deleteAllNotifications();
+    } catch (_) {
+      // State already cleared
+    }
   }
 
   void addNotification({

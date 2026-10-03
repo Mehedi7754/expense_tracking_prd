@@ -23,13 +23,14 @@ void main() {
       final store = AttendanceSalaryMockStore.instance;
       await store.ensureInitialized();
 
-      const memberId = 'a0000000-0000-0000-0000-000000000003';
+      const memberId = 'a0000000-0000-0000-0000-000000000001';
       final today = DateTime.now().toIso8601String().substring(0, 10);
 
       // Verify clean initial state without dummy data
       final initialOverview = await store.getDailyOverview(today);
       expect(initialOverview.employees.isNotEmpty, isTrue);
       final initialMember = initialOverview.employees.firstWhere((e) => e.userId == memberId);
+
       expect(initialMember.morning, isNull);
       expect(initialMember.afternoon, isNull);
 

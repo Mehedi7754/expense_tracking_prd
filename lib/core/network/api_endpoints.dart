@@ -79,6 +79,9 @@ class ApiEndpoints {
   static String get notifications => resolve(AppEnv.endpointNotifications);
   static String notificationById(String id) => resolve('${AppEnv.endpointNotifications}/$id');
   static String markNotificationRead(String id) => resolve('${AppEnv.endpointNotifications}/$id/read');
+  static String deleteNotification(String id) => resolve('${AppEnv.endpointNotifications}/$id');
+  static String get deleteAllNotifications => resolve('${AppEnv.endpointNotifications}/all');
+
 
   // Reports & Financial Analytics
   static String get financialSummaryReport => resolve(AppEnv.endpointReportsFinancialSummary);

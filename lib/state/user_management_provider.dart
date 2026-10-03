@@ -23,57 +23,8 @@ const List<UserModel> kAuthenticDatabaseUsers = [
     phone: '+880 1711-000001',
     assignedProjectIds: ['d0000000-0000-0000-0000-000000000001'],
   ),
-  UserModel(
-    id: 'a0000000-0000-0000-0000-000000000002',
-    name: 'Sarah Jenkins',
-    email: 'manager@pfis.com',
-    role: UserRole.projectManager,
-    department: 'Project Management & Field Ops',
-    designation: 'Senior Project Manager',
-    phone: '+880 1711-000002',
-    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002'],
-  ),
-  UserModel(
-    id: 'a0000000-0000-0000-0000-000000000003',
-    name: 'Fahim Ahmed',
-    email: 'fahim@pfis.com',
-    role: UserRole.projectMember,
-    department: 'Field Survey & Operations',
-    designation: 'Field Team Lead',
-    phone: '+880 1812-345678',
-    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001'],
-  ),
-  UserModel(
-    id: 'a0000000-0000-0000-0000-000000000004',
-    name: 'Tanvir Hossain',
-    email: 'finance@pfis.com',
-    role: UserRole.finance,
-    department: 'Finance & Compliance',
-    designation: 'Chief Financial Officer',
-    phone: '+880 1711-000004',
-    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001'],
-  ),
-  UserModel(
-    id: 'a0000000-0000-0000-0000-000000000005',
-    name: 'Michael Chang',
-    email: 'michael@pfis.com',
-    role: UserRole.projectManager,
-    department: 'Engineering',
-    designation: 'Staff Software Architect',
-    phone: '+880 1711-000005',
-    assignedProjectIds: ['d0000000-0000-0000-0000-000000000002'],
-  ),
-  UserModel(
-    id: 'a0000000-0000-0000-0000-000000000006',
-    name: 'Karim Ullah',
-    email: 'karim@pfis.com',
-    role: UserRole.projectMember,
-    department: 'Field Survey & Operations',
-    designation: 'Senior Field Engineer',
-    phone: '+880 1812-345679',
-    assignedProjectIds: ['d0000000-0000-0000-0000-000000000003'],
-  ),
 ];
+
 
 class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMixin {
   @override
@@ -162,11 +113,13 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
           fetched = response
               .whereType<Map<String, dynamic>>()
               .map(UserModel.fromJson)
+              .where((u) => u.isActive)
               .toList();
         } else if (response is Map<String, dynamic> && response['data'] is List) {
           fetched = (response['data'] as List)
               .whereType<Map<String, dynamic>>()
               .map(UserModel.fromJson)
+              .where((u) => u.isActive)
               .toList();
         }
         for (final u in fetched) {
@@ -179,29 +132,11 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
       // 2. Synchronize current logged-in user
       try {
         final curUser = ref.read(authProvider).currentUser;
-        if (curUser != null) {
+        if (curUser != null && curUser.isActive) {
           _addOrUpdateUser(mergedMap, curUser);
         }
       } catch (_) {}
 
-      // 3. Synchronize users from expenses
-      try {
-        final expenses = ref.read(expenseProvider);
-        for (final exp in expenses) {
-          if (exp.employeeId.isNotEmpty) {
-            _addOrUpdateUser(
-              mergedMap,
-              UserModel(
-                id: exp.employeeId,
-                name: exp.employeeName.isNotEmpty ? exp.employeeName : 'Team Member',
-                email: '${exp.employeeName.toLowerCase().replaceAll(' ', '.')}@pfis.com',
-                role: UserRole.projectMember,
-                department: 'Operations',
-              ),
-            );
-          }
-        }
-      } catch (_) {}
 
       state = mergedMap.values.toList();
       await _persistUsers();

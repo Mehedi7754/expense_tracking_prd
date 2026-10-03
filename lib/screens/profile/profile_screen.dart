@@ -8,6 +8,7 @@ import '../../core/routing/route_paths.dart';
 import '../../core/utils/image_utils.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/user_model.dart';
+import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -59,7 +60,10 @@ class ProfileScreen extends ConsumerWidget {
         imageQuality: 85,
       );
       if (pickedFile != null) {
-        final base64Uri = await AppImageHelper.fileToBase64DataUri(File(pickedFile.path));
+        final bytes = await pickedFile.readAsBytes();
+        final ext = pickedFile.name.split('.').last.toLowerCase();
+        final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+        final base64Uri = AppImageHelper.bytesToBase64DataUri(bytes, mime: mime);
         await ref.read(authProvider.notifier).updateAvatarUrl(base64Uri);
         if (context.mounted) {
           NotificationBanner.showSuccess(context, 'Profile photo updated and saved to server');
@@ -488,6 +492,17 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                   child: Column(
                     children: [
+                      if (user.role == UserRole.mainAdmin || user.role == UserRole.projectManager) ...[
+                        _buildSettingsTile(
+                          icon: Icons.admin_panel_settings_outlined,
+                          iconColor: const Color(0xFF6366F1),
+                          title: 'Company Hub & Governance',
+                          subtitle: 'Users, roles, company setup, categories & audit logs',
+                          onTap: () => context.push(RoutePaths.userManagement),
+                          isDark: isDark,
+                        ),
+                        _buildDivider(isDark),
+                      ],
                       if (user.role.canManageAttendanceAndSalary) ...[
                         _buildSettingsTile(
                           icon: Icons.location_on_outlined,

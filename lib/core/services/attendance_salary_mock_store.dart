@@ -8,6 +8,7 @@ import '../../models/salary_model.dart';
 import '../../models/user_model.dart';
 import '../../models/user_role.dart';
 import '../../state/user_management_provider.dart';
+import '../utils/environment_utils.dart';
 
 /// Resilient local storage and fallback mock store for Employee Attendance & Salary calculations.
 /// Guarantees zero network errors on mobile and enables instant offline capability.
@@ -107,10 +108,12 @@ class AttendanceSalaryMockStore {
         }
       }
       _seedDefaultHolidaysIfEmpty();
+      _seedDefaultRecordsIfEmpty();
     } catch (e) {
       debugPrint('[AttendanceSalaryMockStore] Error initializing store: $e');
       _seedDefaultSalariesIfEmpty();
       _seedDefaultHolidaysIfEmpty();
+      _seedDefaultRecordsIfEmpty();
     }
   }
 
@@ -167,6 +170,52 @@ class AttendanceSalaryMockStore {
       HolidayModel(id: 'hol-4', date: '2026-05-01', name: 'May Day', isRecurring: true),
       HolidayModel(id: 'hol-5', date: '2026-12-16', name: 'Victory Day', isRecurring: true),
     ]);
+  }
+
+  void _seedDefaultRecordsIfEmpty() {
+    if (EnvironmentUtils.isTestEnvironment) return;
+    if (_records.isNotEmpty) return;
+    final now = DateTime.now();
+    final today = DateFormat('yyyy-MM-dd').format(now);
+    final yesterday = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 1)));
+
+    final seedList = [
+      (
+        userId: 'a0000000-0000-0000-0000-000000000001',
+        userName: 'Eleanor Vance',
+        email: 'admin@pfis.com',
+        dept: 'Corporate Governance',
+        desig: 'Managing Director / Admin',
+        lat: 23.7508,
+        lng: 90.3934,
+        address: 'Kawran Bazar Tech Zone',
+        session: 'morning',
+      ),
+    ];
+
+    for (final d in [today, yesterday, '2026-10-02', '2026-10-03']) {
+      for (final s in seedList) {
+        _records.add(AttendanceRecordModel(
+          id: 'rec-$d-${s.userId.substring(0, 8)}-${s.session}',
+          userId: s.userId,
+          userName: s.userName,
+          userEmail: s.email,
+          department: s.dept,
+          designation: s.desig,
+          avatarUrl: '',
+          date: d,
+          sessionType: s.session,
+          loginTime: DateTime.tryParse('${d}T09:15:00Z') ?? now,
+          latitude: s.lat,
+          longitude: s.lng,
+          addressText: s.address,
+          deviceInfo: 'OnePlus IN2015',
+          status: 'present',
+          notes: 'GPS Verified Location Check-in',
+          createdAt: now,
+        ));
+      }
+    }
   }
 
   Future<void> _saveRecords() async {

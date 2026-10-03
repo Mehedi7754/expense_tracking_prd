@@ -165,7 +165,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
 
       final currentUser = ref.read(authProvider).currentUser;
       final userId = currentUser?.id ?? 'a0000000-0000-0000-0000-000000000003';
-      final deviceInfo = Platform.isAndroid ? 'Android' : (Platform.isIOS ? 'iOS' : 'Web/Desktop');
+      final deviceInfo = kIsWeb ? 'Web Browser' : (Platform.isAndroid ? 'Android' : (Platform.isIOS ? 'iOS' : 'Desktop'));
 
       final repo = ref.read(attendanceRepositoryProvider);
 

@@ -62,38 +62,139 @@ class _AttendanceMapViewState extends State<AttendanceMapView> {
     final markers = validRecords.map((record) {
       final isMorning = record.isMorning;
       final markerColor = isMorning ? const Color(0xFF4F46E5) : const Color(0xFF10B981);
+      final initial = record.userName.isNotEmpty ? record.userName[0].toUpperCase() : 'U';
 
       return Marker(
         point: LatLng(record.latitude!, record.longitude!),
-        width: 44,
-        height: 44,
+        width: 96,
+        height: 74,
+        alignment: Alignment.topCenter,
         child: GestureDetector(
           onTap: () {
             if (widget.onMarkerTap != null) {
               widget.onMarkerTap!(record);
             }
           },
-          child: Tooltip(
-            message: '${record.userName} (${isMorning ? "Morning" : "Afternoon"})\n${record.formattedTime}',
-            child: Container(
-              decoration: BoxDecoration(
-                color: markerColor,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: markerColor.withAlpha(90),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. Employee Name Tag Pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: markerColor.withAlpha(140),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(35),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: markerColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        record.userName.split(' ').first,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 2),
+
+              // 2. Teardrop Map Pin Head with User Initial & Session Badge
+              Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: markerColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: markerColor.withAlpha(120),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        initial,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: -1,
+                    right: -1,
+                    child: Container(
+                      padding: const EdgeInsets.all(1.5),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
+                        size: 9,
+                        color: markerColor,
+                      ),
+                    ),
                   ),
                 ],
               ),
-              child: Icon(
-                isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
-                color: Colors.white,
-                size: 20,
+
+              // 3. Pin Needle Pointer pointing straight down to coordinate
+              Transform.translate(
+                offset: const Offset(0, -7),
+                child: Icon(
+                  Icons.arrow_drop_down,
+                  color: markerColor,
+                  size: 20,
+                ),
               ),
-            ),
+
+              // Ground Shadow
+              Container(
+                width: 12,
+                height: 2.5,
+                decoration: BoxDecoration(
+                  color: Colors.black.withAlpha(50),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ],
           ),
         ),
       );

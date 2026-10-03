@@ -487,7 +487,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
 
     final container = ProviderContainer();
-    container.read(authProvider.notifier).switchRole(UserRole.projectMember);
+    container.read(authProvider.notifier).setUser(TestFixtures.testUsers[2]);
     container.read(userManagementProvider.notifier).setUsers(TestFixtures.testUsers);
     container.read(projectProvider.notifier).setProjects(TestFixtures.testProjects);
     container.read(expenseProvider.notifier).setExpenses(TestFixtures.testExpenses);

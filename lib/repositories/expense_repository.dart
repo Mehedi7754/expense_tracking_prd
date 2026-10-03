@@ -77,13 +77,44 @@ class ExpenseRepository {
     ExpenseStatus status, {
     String? rejectionReason,
   }) async {
-    final response = await _client.patch(
-      ApiEndpoints.expenseStatus(expenseId),
-      body: {
-        'status': status.name,
-        if (rejectionReason != null) 'rejection_reason': rejectionReason,
-      },
-    );
+    dynamic response;
+    try {
+      if (status == ExpenseStatus.approved) {
+        response = await _client.post(
+          ApiEndpoints.approveExpense(expenseId),
+          body: {'comment': 'Approved by reviewer'},
+        );
+      } else if (status == ExpenseStatus.rejected) {
+        response = await _client.post(
+          ApiEndpoints.rejectExpense(expenseId),
+          body: {'rejectionReason': rejectionReason ?? 'Rejected by reviewer'},
+        );
+      } else {
+        response = await _client.put(
+          ApiEndpoints.expenseById(expenseId),
+          body: {'status': status.name},
+        );
+      }
+    } catch (_) {
+      // Fallback for endpoints or servers implementing PATCH status or direct PUT
+      try {
+        response = await _client.put(
+          ApiEndpoints.expenseById(expenseId),
+          body: {
+            'status': status.name,
+            if (rejectionReason != null) 'rejection_reason': rejectionReason,
+          },
+        );
+      } catch (_) {
+        response = await _client.patch(
+          ApiEndpoints.expenseStatus(expenseId),
+          body: {
+            'status': status.name,
+            if (rejectionReason != null) 'rejection_reason': rejectionReason,
+          },
+        );
+      }
+    }
 
     final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
         ? response['data'] as Map<String, dynamic>

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/services/push_notification_service.dart';
 import '../core/utils/environment_utils.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/comment_model.dart';
@@ -258,12 +259,21 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       ];
       await _persistExpenses();
       invalidateCache(); // Force next navigation fetch to sync
+
+      // Fire OS-level push notification to confirm submission
+      PushNotificationService.instance.showExpenseAlert(
+        title: 'Expense Submitted ✓',
+        body: '${categoryName} claim of ${currency} ${amount.toStringAsFixed(0)} submitted for review.',
+        expenseId: saved.id,
+      );
+
       return saved;
     } catch (e) {
       debugPrint('[ExpenseNotifier] Error submitting expense to backend: $e. Retained in local storage.');
       return newExpense;
     }
   }
+
 
   /// PRD Section 13: Justification Workflow
   Future<void> submitJustification({

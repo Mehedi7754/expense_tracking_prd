@@ -55,12 +55,7 @@ ON CONFLICT (id) DO NOTHING;
 -- 4. Insert Default Users (Password: "password123")
 INSERT INTO users (id, email, password_hash, full_name, role, department, designation, phone)
 VALUES
-    ('a0000000-0000-0000-0000-000000000001', 'admin@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Eleanor Vance', 'main_admin', 'Corporate Governance', 'Managing Director / Admin', '+880 1711-000001'),
-    ('a0000000-0000-0000-0000-000000000002', 'manager@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Sarah Jenkins', 'project_manager', 'Project Management & Field Ops', 'Senior Project Manager', '+880 1711-000002'),
-    ('a0000000-0000-0000-0000-000000000003', 'fahim@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Fahim Ahmed', 'project_member', 'Field Survey & Operations', 'Field Team Lead', '+880 1812-345678'),
-    ('a0000000-0000-0000-0000-000000000004', 'finance@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'David Chen', 'finance', 'Finance & Compliance', 'Chief Financial Officer', '+880 1711-000004'),
-    ('a0000000-0000-0000-0000-000000000005', 'viewer@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Rahim Chowdhury', 'viewer', 'External Audit & Advisory', 'External Financial Auditor', '+880 1711-000005'),
-    ('a0000000-0000-0000-0000-000000000006', 'karim@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Karim Ullah', 'project_member', 'Field Survey & Operations', 'Senior Field Specialist', '+880 1812-998877')
+    ('a0000000-0000-0000-0000-000000000001', 'admin@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Eleanor Vance', 'main_admin', 'Corporate Governance', 'Managing Director / Admin', '+880 1711-000001')
 ON CONFLICT (email) DO NOTHING;
 
 -- 5. Insert Core Projects
@@ -194,126 +189,15 @@ ON CONFLICT (id) DO NOTHING;
 -- 6. Insert Team Members Assignments
 INSERT INTO project_members (project_id, user_id, role_in_project)
 VALUES
-    ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Admin Sponsor'),
-    ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'Project Manager'),
-    ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000003', 'Field Team Lead'),
-    ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000004', 'Finance Controller'),
-    ('d0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000002', 'Project Manager'),
-    ('d0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000005', 'External Auditor'),
-    ('d0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000002', 'Project Manager'),
-    ('d0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000006', 'Senior Field Specialist')
+    ('d0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Admin Sponsor')
 ON CONFLICT (project_id, user_id) DO NOTHING;
 
 -- 7. Insert Project Revenues
 INSERT INTO project_revenues (id, project_id, amount, date, note, created_by)
 VALUES
-    ('f0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 500000.00, '2026-02-01', 'Advance Mobilization Payment', 'a0000000-0000-0000-0000-000000000004'),
-    ('f0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', 1000000.00, '2026-06-15', 'Sprint Milestone 4 Delivery Signoff', 'a0000000-0000-0000-0000-000000000004'),
-    ('f0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000002', 1000000.00, '2026-04-10', 'Beta Testing & Payment Gateway Integration', 'a0000000-0000-0000-0000-000000000004'),
-    ('f0000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000003', 600000.00, '2026-05-20', 'AI Model Validation & Clinician UAT Signoff', 'a0000000-0000-0000-0000-000000000004')
+    ('f0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 500000.00, '2026-02-01', 'Advance Mobilization Payment', 'a0000000-0000-0000-0000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
--- 8. Insert Initial Expenses
-INSERT INTO expenses (
-    id,
-    employee_id,
-    project_id,
-    amount,
-    currency,
-    category_id,
-    note,
-    date,
-    has_receipt,
-    receipt_photo_url,
-    status,
-    justification_status,
-    justification_reason,
-    justification_comment,
-    category_details
-) VALUES
-(
-    'e1000000-0000-0000-0000-000000000001',
-    'a0000000-0000-0000-0000-000000000003', -- Fahim Ahmed
-    'd0000000-0000-0000-0000-000000000001', -- Enterprise Cloud ERP
-    40000.00,
-    'BDT',
-    'c0000000-0000-0000-0000-000000000001', -- Equipment
-    'Server rack mounting rails and gigabit patch panels',
-    '2026-08-10',
-    TRUE,
-    'sample_receipt_invoice.jpg',
-    'approved',
-    'none',
-    NULL,
-    NULL,
-    '{"equipment_name": "Server Rack Mounting Rails", "serial_number": "RACK-2026-001"}'::jsonb
-),
-(
-    'e1000000-0000-0000-0000-000000000002',
-    'a0000000-0000-0000-0000-000000000003', -- Fahim Ahmed
-    'd0000000-0000-0000-0000-000000000001', -- Enterprise Cloud ERP
-    35000.00,
-    'BDT',
-    'c0000000-0000-0000-0000-000000000002', -- Transportation
-    'Inter-datacenter hardware deployment transit',
-    '2026-08-18',
-    FALSE,
-    NULL,
-    'pending',
-    'submitted',
-    'Emergency equipment transit van driver did not provide printed receipt',
-    'Delivered critical failover cluster switches to backup site at 2 AM',
-    '{"transportation_type": "inter_district", "from_location": "Dhaka Main DC", "to_location": "Kaliakoir Disaster Recovery DC"}'::jsonb
-),
-(
-    'e1000000-0000-0000-0000-000000000003',
-    'a0000000-0000-0000-0000-000000000003', -- Fahim Ahmed
-    'd0000000-0000-0000-0000-000000000001', -- Enterprise Cloud ERP
-    25000.00,
-    'BDT',
-    'c0000000-0000-0000-0000-000000000003', -- Food
-    'Field engineer overtime meals during 48-hour continuous migration window',
-    '2026-08-22',
-    FALSE,
-    NULL,
-    'pending',
-    'submitted',
-    'Night market food stalls in IT park only accept cash without memo receipts',
-    'Catered food for 6 field systems engineers on overnight cutover duty',
-    '{"meal_type": "dinner", "number_of_people": 6, "cost_per_person": 4166.67}'::jsonb
-),
-(
-    'e1000000-0000-0000-0000-000000000004',
-    'a0000000-0000-0000-0000-000000000006', -- Karim Ullah
-    'd0000000-0000-0000-0000-000000000003', -- AI-Powered Telehealth
-    50000.00,
-    'BDT',
-    'c0000000-0000-0000-0000-000000000005', -- Office Cost
-    'HIPAA compliance security certification & dev team tooling licenses',
-    '2026-08-25',
-    TRUE,
-    'sample_receipt_invoice.jpg',
-    'approved',
-    'none',
-    NULL,
-    NULL,
-    '{"sub_category": "Software Licenses", "justification": "HIPAA tools"}'::jsonb
-),
-(
-    'e1000000-0000-0000-0000-000000000005',
-    'a0000000-0000-0000-0000-000000000006', -- Karim Ullah
-    'd0000000-0000-0000-0000-000000000003', -- AI-Powered Telehealth
-    70000.00,
-    'BDT',
-    'c0000000-0000-0000-0000-000000000002', -- Transportation
-    'Hospital partner integration site visits and doctor onboarding travel',
-    '2026-09-08',
-    FALSE,
-    NULL,
-    'pending',
-    'submitted',
-    'Local transport receipts unavailable from ride drivers',
-    'Multiple hospital visits across 10 days for doctor app pilot',
-    '{"transportation_type": "local", "from_location": "BioHealth Lab", "to_location": "Partner Hospitals"}'::jsonb
-)
-ON CONFLICT (id) DO NOTHING;
+-- 8. Clean Initial Expenses
+-- All demo mock expenses cleared; production system starts clean with Super Admin.
+
