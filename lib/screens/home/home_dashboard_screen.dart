@@ -29,6 +29,20 @@ class HomeDashboardScreen extends ConsumerStatefulWidget {
 class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   String _activeFilter = 'all'; // all, profitable, approaching, overbudget
 
+  Widget _buildAvatarInitials(String name) {
+    final initials = name.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase();
+    return Center(
+      child: Text(
+        initials.isEmpty ? 'U' : initials,
+        style: const TextStyle(
+          color: Color(0xFF4F46E5),
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -98,21 +112,24 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'GW Project Financials',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      letterSpacing: -0.3,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'GW Project Financials',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 1),
                   Text(
                     'Expense & Budget Tracking',
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                       fontWeight: FontWeight.w500,
                     ),
@@ -125,42 +142,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           ],
         ),
         actions: [
-          // Professional Secure Role Indicator Badge (Non-interactive for security)
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1B4B) : const Color(0xFFEEF2FF),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF4338CA) : const Color(0xFFC7D2FE),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF10B981),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    role.displayName,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : const Color(0xFF4F46E5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           // Notification Bell
           IconButton(
             icon: Stack(
@@ -188,7 +169,34 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             ),
             onPressed: () => context.push(RoutePaths.notifications),
           ),
-          const SizedBox(width: 4),
+          // User Profile Avatar in Top Right Corner
+          GestureDetector(
+            onTap: () => context.push(RoutePaths.profile),
+            child: Padding(
+              padding: const EdgeInsets.only(right: 14, left: 4),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFF4F46E5),
+                    width: 1.5,
+                  ),
+                  color: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
+                ),
+                child: ClipOval(
+                  child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                      ? Image.network(
+                          user.avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _buildAvatarInitials(user.name),
+                        )
+                      : _buildAvatarInitials(user?.name ?? 'U'),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
       body: RefreshIndicator(
@@ -337,8 +345,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                                     color: Colors.white70,
                                     fontWeight: FontWeight.w600,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               SizedBox(width: 5),
@@ -387,27 +393,30 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
 
                     const SizedBox(height: 18),
 
-                    // 3 Translucent Frosted Glass Mini-Pills (Image 2 style)
-                    Row(
-                      children: [
-                        _buildFrostedMiniStat(
-                          icon: Icons.payments_outlined,
-                          label: 'Incurred',
-                          value: CurrencyFormatter.format(totalCostIncurred, compact: true),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFrostedMiniStat(
-                          icon: Icons.receipt_long_outlined,
-                          label: 'Net Revenue',
-                          value: CurrencyFormatter.format(projectedRevenue, compact: true),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFrostedMiniStat(
-                          icon: Icons.business_center_outlined,
-                          label: 'Active',
-                          value: '${activeProjects.length} Projects',
-                        ),
-                      ],
+                    // 3 Translucent Frosted Glass Mini-Pills (Equal Height, Uniform Alignment)
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildFrostedMiniStat(
+                            icon: Icons.payments_outlined,
+                            label: 'Incurred',
+                            value: CurrencyFormatter.format(totalCostIncurred, compact: true),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFrostedMiniStat(
+                            icon: Icons.receipt_long_outlined,
+                            label: 'Net Revenue',
+                            value: CurrencyFormatter.format(projectedRevenue, compact: true),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFrostedMiniStat(
+                            icon: Icons.business_center_outlined,
+                            label: 'Active',
+                            value: '${activeProjects.length} Projects',
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -476,8 +485,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     fontSize: 16,
                     letterSpacing: -0.3,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               InkWell(
@@ -651,8 +658,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                               color: Colors.white70,
                               fontWeight: FontWeight.w600,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         SizedBox(width: 8),
@@ -670,26 +675,29 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        _buildFrostedMiniStat(
-                          icon: Icons.receipt_rounded,
-                          label: 'Unreceipted',
-                          value: '${unreceiptedRatio.toStringAsFixed(0)}%',
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFrostedMiniStat(
-                          icon: Icons.assignment_turned_in_outlined,
-                          label: 'Receipted',
-                          value: '${(100 - unreceiptedRatio).toStringAsFixed(0)}%',
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFrostedMiniStat(
-                          icon: Icons.folder_outlined,
-                          label: 'Projects',
-                          value: '${assignedProjects.length} Assigned',
-                        ),
-                      ],
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildFrostedMiniStat(
+                            icon: Icons.receipt_rounded,
+                            label: 'Unreceipted',
+                            value: '${unreceiptedRatio.toStringAsFixed(0)}%',
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFrostedMiniStat(
+                            icon: Icons.assignment_turned_in_outlined,
+                            label: 'Receipted',
+                            value: '${(100 - unreceiptedRatio).toStringAsFixed(0)}%',
+                          ),
+                          const SizedBox(width: 8),
+                          _buildFrostedMiniStat(
+                            icon: Icons.folder_outlined,
+                            label: 'Projects',
+                            value: '${assignedProjects.length} Assigned',
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -919,7 +927,8 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        constraints: const BoxConstraints(minHeight: 58),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white.withAlpha(25),
           borderRadius: BorderRadius.circular(12),
@@ -927,29 +936,38 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
-                Icon(icon, color: Colors.white70, size: 13),
-                const SizedBox(width: 4),
+                Icon(icon, color: Colors.white70, size: 12),
+                const SizedBox(width: 3),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 3),
+            const SizedBox(height: 4),
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Text(
                 value,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
                 ),
@@ -1082,8 +1100,6 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                     fontSize: 11,
                     color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -1400,8 +1416,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.3,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -1412,8 +1426,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                             fontSize: 12,
                             color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -1560,8 +1572,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
               fontWeight: FontWeight.w600,
               color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 3),
           Text(
@@ -1572,8 +1582,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
               color: color,
               letterSpacing: -0.3,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -1669,8 +1677,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
           ),
         ],
       ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
     );
   }
 
@@ -1808,8 +1814,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.2,
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -1818,8 +1822,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                               fontSize: 11.5,
                               color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -1912,8 +1914,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                                   ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C))
                                   : (isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1955,7 +1955,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                                   fontWeight: FontWeight.w600,
                                   color: isDark ? Colors.white70 : const Color(0xFF334155),
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             Text(
@@ -1999,8 +1998,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                                   fontWeight: FontWeight.w600,
                                   color: Color(0xFF4F46E5),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -2047,8 +2044,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                                   Text(
                                     e.note.isNotEmpty ? e.note : e.categoryName,
                                     style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
                                   _buildExpenseReceiptSubtitle(
@@ -2163,8 +2158,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                           Text(
                             cat.categoryName,
                             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, letterSpacing: -0.2),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -2173,8 +2166,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                               fontSize: 11.5,
                               color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -2256,7 +2247,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                               child: Text(
                                 '${entry.key}: ',
                                 style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             Text(
@@ -2311,8 +2301,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                                   Text(
                                     e.note.isNotEmpty ? e.note : e.projectName,
                                     style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
                                   _buildExpenseReceiptSubtitle(
@@ -2431,8 +2419,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                           Text(
                             p.name,
                             style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, letterSpacing: -0.2),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
                           Text(
@@ -2441,8 +2427,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                               fontSize: 11.5,
                               color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
@@ -2520,8 +2504,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                         child: Text(
                           'Incurred: ${CurrencyFormatter.format(pSummary.totalIncurred)}',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -2533,8 +2515,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                             fontWeight: FontWeight.w600,
                             color: isDark ? Colors.white60 : const Color(0xFF64748B),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -2564,8 +2544,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                           child: Text(
                             '${entry.key}: ${CurrencyFormatter.format(entry.value)}',
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         );
                       }).toList(),
@@ -2610,8 +2588,6 @@ class _PortfolioFinancialDetailsSheetState extends ConsumerState<_PortfolioFinan
                                   Text(
                                     e.note.isNotEmpty ? e.note : e.categoryName,
                                     style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(height: 2),
                                   _buildExpenseReceiptSubtitle(

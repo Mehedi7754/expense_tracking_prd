@@ -227,7 +227,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           HomeDashboardScreen(),
           ProjectsListScreen(),
           ApprovalsQueueScreen(),
-          ProfileScreen(),
+          AttendanceDashboardScreen(),
         ];
 
       case UserRole.viewer:

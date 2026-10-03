@@ -100,9 +100,9 @@ class AppBottomNavBar extends StatelessWidget {
         badgeCount: pendingApprovalsCount,
       ),
       const NavItemData(
-        label: 'Profile',
-        icon: Icons.person_outline_rounded,
-        activeIcon: Icons.person_rounded,
+        label: 'Attendance',
+        icon: Icons.access_time_rounded,
+        activeIcon: Icons.access_time_filled_rounded,
       ),
     ];
   }
@@ -142,38 +142,28 @@ class AppBottomNavBar extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 600),
             child: Row(
               children: [
-                // Left Item 1 (Index 0)
-                Expanded(
-                  child: _buildNavItem(
-                    item: leftItems[0],
-                    isSelected: currentIndex == 0,
-                    onTap: () => onTap(0),
-                    activeColor: activeColor,
-                    inactiveColor: inactiveColor,
+                // Left Items
+                for (int i = 0; i < leftItems.length; i++)
+                  Expanded(
+                    child: _buildNavItem(
+                      item: leftItems[i],
+                      isSelected: currentIndex == i,
+                      onTap: () => onTap(i),
+                      activeColor: activeColor,
+                      inactiveColor: inactiveColor,
+                    ),
                   ),
-                ),
-
-                // Left Item 2 (Index 1)
-                Expanded(
-                  child: _buildNavItem(
-                    item: leftItems[1],
-                    isSelected: currentIndex == 1,
-                    onTap: () => onTap(1),
-                    activeColor: activeColor,
-                    inactiveColor: inactiveColor,
-                  ),
-                ),
 
                 // Center Floating Circular Add Button (Image 2 style)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Transform.translate(
                     offset: const Offset(0, -10), // Float slightly above dock
                     child: GestureDetector(
                       onTap: onAddTap,
                       child: Container(
-                        width: 50,
-                        height: 50,
+                        width: 48,
+                        height: 48,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
@@ -193,7 +183,7 @@ class AppBottomNavBar extends StatelessWidget {
                           child: Icon(
                             Icons.add_rounded,
                             color: Colors.white,
-                            size: 28,
+                            size: 26,
                           ),
                         ),
                       ),
@@ -201,27 +191,17 @@ class AppBottomNavBar extends StatelessWidget {
                   ),
                 ),
 
-                // Right Item 1 (Index 2)
-                Expanded(
-                  child: _buildNavItem(
-                    item: rightItems[0],
-                    isSelected: currentIndex == 2,
-                    onTap: () => onTap(2),
-                    activeColor: activeColor,
-                    inactiveColor: inactiveColor,
+                // Right Items
+                for (int j = 0; j < rightItems.length; j++)
+                  Expanded(
+                    child: _buildNavItem(
+                      item: rightItems[j],
+                      isSelected: currentIndex == (leftItems.length + j),
+                      onTap: () => onTap(leftItems.length + j),
+                      activeColor: activeColor,
+                      inactiveColor: inactiveColor,
+                    ),
                   ),
-                ),
-
-                // Right Item 2 (Index 3)
-                Expanded(
-                  child: _buildNavItem(
-                    item: rightItems[1],
-                    isSelected: currentIndex == 3,
-                    onTap: () => onTap(3),
-                    activeColor: activeColor,
-                    inactiveColor: inactiveColor,
-                  ),
-                ),
               ],
             ),
           ),
