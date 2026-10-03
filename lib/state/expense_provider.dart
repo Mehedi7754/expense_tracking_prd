@@ -263,7 +263,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       // Fire OS-level push notification to confirm submission
       PushNotificationService.instance.showExpenseAlert(
         title: 'Expense Submitted ✓',
-        body: '${categoryName} claim of ${currency} ${amount.toStringAsFixed(0)} submitted for review.',
+        body: '$categoryName claim of $currency ${amount.toStringAsFixed(0)} submitted for review.',
         expenseId: saved.id,
       );
 

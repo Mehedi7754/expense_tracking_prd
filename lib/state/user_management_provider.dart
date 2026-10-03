@@ -7,7 +7,6 @@ import '../core/utils/fetch_cache_mixin.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import 'auth_provider.dart';
-import 'expense_provider.dart';
 
 const String _kCustomUsersKey = 'gw_custom_users_cache';
 

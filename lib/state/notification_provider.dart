@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/utils/environment_utils.dart';
 import '../models/notification_model.dart';
 import '../repositories/notification_repository.dart';
 
@@ -8,12 +9,14 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
 
   @override
   List<NotificationModel> build() {
-    // Start background polling every 2 minutes to catch server-pushed notifications
-    _pollingTimer?.cancel();
-    _pollingTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      fetchNotifications();
-    });
-    ref.onDispose(() => _pollingTimer?.cancel());
+    // Start background polling every 2 minutes in live app (skip in test environment)
+    if (!EnvironmentUtils.isTestEnvironment) {
+      _pollingTimer?.cancel();
+      _pollingTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+        fetchNotifications();
+      });
+      ref.onDispose(() => _pollingTimer?.cancel());
+    }
 
     return const [];
   }

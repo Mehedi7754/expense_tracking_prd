@@ -34,21 +34,31 @@ class NotificationDetailScreen extends ConsumerWidget {
     Color badgeTextColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
     switch (notif.type) {
       case NotificationType.expenseRejected:
+      case NotificationType.absenceDeducted:
+      case NotificationType.securityAlert:
         badgeBg = isDark ? AppColors.darkCrimsonLight : AppColors.crimsonLight;
         badgeTextColor = isDark ? AppColors.crimsonAccent : AppColors.crimsonDark;
         break;
       case NotificationType.expenseApproved:
+      case NotificationType.salaryReady:
+      case NotificationType.payrollFinalized:
+      case NotificationType.revenueReceived:
         badgeBg = isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight;
         badgeTextColor = isDark ? AppColors.emeraldAccent : AppColors.emeraldDark;
         break;
       case NotificationType.budgetWarning:
+      case NotificationType.attendanceReminder:
+      case NotificationType.attendanceLate:
         badgeBg = isDark ? AppColors.darkAmberLight : AppColors.amberLight;
         badgeTextColor = isDark ? AppColors.amberAccent : AppColors.amberDark;
         break;
       case NotificationType.commentAdded:
+      case NotificationType.expenseSubmitted:
         badgeBg = isDark ? AppColors.darkIndigoLight : AppColors.indigoLight;
         badgeTextColor = isDark ? AppColors.indigoAccent : AppColors.indigoDark;
         break;
+      case NotificationType.memberAdded:
+      case NotificationType.userRegistration:
       case NotificationType.general:
         badgeBg = isDark ? AppColors.brandPrimary.withAlpha(40) : AppColors.brandPrimary.withAlpha(25);
         badgeTextColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
