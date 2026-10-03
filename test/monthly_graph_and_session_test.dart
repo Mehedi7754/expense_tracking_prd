@@ -69,8 +69,8 @@ void main() {
       // Verify period updated and quarter labels render dynamically for current quarter
       expect(find.text('This Quarter'), findsOneWidget);
       const fullMonths = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      final now = DateTime.now();
-      final qIndex = (now.month - 1) ~/ 3;
+      final refDate = DateTime(2026, 9, 30);
+      final qIndex = (refDate.month - 1) ~/ 3;
       final qStartMonth = qIndex * 3 + 1;
       expect(find.text(fullMonths[qStartMonth]), findsOneWidget);
       expect(find.text(fullMonths[qStartMonth + 1]), findsOneWidget);
