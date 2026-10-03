@@ -66,11 +66,10 @@ class AppBottomNavBar extends StatelessWidget {
   List<NavItemData> _getRightItems() {
     if (role == UserRole.projectMember) {
       return [
-        NavItemData(
-          label: 'Compliance',
-          icon: Icons.verified_user_outlined,
-          activeIcon: Icons.verified_user_rounded,
-          badgeCount: unreadNotificationsCount,
+        const NavItemData(
+          label: 'Attendance',
+          icon: Icons.access_time_rounded,
+          activeIcon: Icons.access_time_filled_rounded,
         ),
         const NavItemData(
           label: 'Profile',
