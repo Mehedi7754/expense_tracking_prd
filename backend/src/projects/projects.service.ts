@@ -138,8 +138,10 @@ export class ProjectsService {
 
   async create(data: any, createdById: string) {
     return this.db.transaction(async (client) => {
-      const gross = Number(data.grossProjectValue || data.gross_project_value || 0);
-      const taxRate = Number(data.taxRate || data.tax_rate || 0.1);
+      const rawGross = Number(data.grossProjectValue || data.gross_project_value || 0);
+      const gross = Math.max(0, isNaN(rawGross) ? 0 : rawGross);
+      const rawTaxRate = Number(data.taxRate || data.tax_rate || 0.1);
+      const taxRate = Math.max(0, Math.min(1, isNaN(rawTaxRate) ? 0.1 : rawTaxRate));
 
       // Normalize assignment_type to snake_case enum
       const rawAssignment = (data.assignment_type || data.assignmentType || 'direct_consultancy').toString();
@@ -167,11 +169,14 @@ export class ProjectsService {
         taxStatus = 'included';
       }
 
-      const netRevenue = taxStatus === 'included' ? gross * (1 - taxRate) : gross;
-      const budget = Number(data.budget || gross * 0.85);
-      const advanceReceived = Number(data.advanceReceived || data.advance_received || 0);
-      const amountReceived = Number(data.amountReceived || data.amount_received || 0);
-      const receivable = gross - amountReceived;
+      const netRevenue = Math.max(0, taxStatus === 'included' ? gross * (1 - taxRate) : gross);
+      const rawBudget = Number(data.budget || gross * 0.85);
+      const budget = Math.max(0, isNaN(rawBudget) ? 0 : rawBudget);
+      const rawAdvance = Number(data.advanceReceived || data.advance_received || 0);
+      const advanceReceived = Math.max(0, isNaN(rawAdvance) ? 0 : rawAdvance);
+      const rawReceived = Number(data.amountReceived || data.amount_received || 0);
+      const amountReceived = Math.max(0, isNaN(rawReceived) ? 0 : rawReceived);
+      const receivable = Math.max(0, gross - amountReceived);
 
       // Project code auto-generation if not supplied
       let projectCode = data.projectId || data.project_code;
@@ -320,11 +325,13 @@ export class ProjectsService {
     }
     if (data.budget !== undefined) {
       fields.push(`budget = $${idx++}`);
-      values.push(Number(data.budget));
+      const val = Number(data.budget);
+      values.push(Math.max(0, isNaN(val) ? 0 : val));
     }
     if (data.estimatedRemainingCost !== undefined || data.estimated_remaining_cost !== undefined) {
       fields.push(`estimated_remaining_cost = $${idx++}`);
-      values.push(Number(data.estimatedRemainingCost ?? data.estimated_remaining_cost));
+      const val = Number(data.estimatedRemainingCost ?? data.estimated_remaining_cost);
+      values.push(Math.max(0, isNaN(val) ? 0 : val));
     }
     if (data.status !== undefined) {
       fields.push(`status = $${idx++}`);
@@ -459,4 +466,55 @@ export class ProjectsService {
 
     return this.findOne(projectId);
   }
+
+  async delete(id: string, user?: any) {
+    let dbId = id;
+    let projectCode = id;
+    try {
+      const existing = await this.findOne(id, user);
+      if (existing) {
+        dbId = existing.id;
+        projectCode = existing.projectId || id;
+      }
+    } catch (_) {}
+
+    return this.db.transaction(async (client) => {
+      // Unlink expenses and tasks to prevent Foreign Key constraints from blocking deletion
+      await client.query(
+        'UPDATE expenses SET project_id = NULL WHERE project_id::text = $1 OR project_id::text = $2',
+        [dbId, projectCode],
+      );
+      await client.query(
+        'UPDATE tasks SET project_id = NULL WHERE project_id::text = $1 OR project_id::text = $2',
+        [dbId, projectCode],
+      );
+      await client.query(
+        'DELETE FROM project_revenues WHERE project_id::text = $1 OR project_id::text = $2',
+        [dbId, projectCode],
+      );
+      await client.query(
+        'DELETE FROM project_members WHERE project_id::text = $1 OR project_id::text = $2',
+        [dbId, projectCode],
+      );
+      const res = await client.query(
+        'DELETE FROM projects WHERE id::text = $1 OR id::text = $2 OR project_code = $1 OR project_code = $2 RETURNING *',
+        [dbId, projectCode],
+      );
+
+      try {
+        await this.auditLogsService.log(
+          {
+            action: 'PROJECT_DELETED',
+            entityType: 'Project',
+            entityId: dbId,
+            details: { id, dbId, projectCode },
+          },
+          user ? { id: user.id } : undefined,
+        );
+      } catch (_) {}
+
+      return { success: true, message: `Project ${id} deleted successfully`, deletedCount: res.rowCount };
+    });
+  }
 }
+

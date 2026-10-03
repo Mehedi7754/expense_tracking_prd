@@ -85,4 +85,17 @@ export class AttendanceController {
   ) {
     return this.attendanceService.confirmAbsence(body.userId, body.date, body.notes, req.user.id);
   }
+
+  @Get('settings')
+  async getTimingSettings() {
+    return this.attendanceService.getTimingSettings();
+  }
+
+  @Roles('main_admin')
+  @Post('settings')
+  async updateTimingSettings(
+    @Body() body: { morningStartHour?: number; morningEndHour: number; afternoonStartHour?: number; afternoonEndHour?: number },
+  ) {
+    return this.attendanceService.updateTimingSettings(body);
+  }
 }

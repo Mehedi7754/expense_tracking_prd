@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -80,10 +80,32 @@ export class UsersService {
     };
   }
 
-  async create(data: any) {
+  async create(data: any, creator?: any) {
     const email = (data.email || '').trim().toLowerCase();
     const fullName = data.name || data.fullName || data.full_name || email.split('@')[0];
-    const role = data.role || 'project_member';
+    let rawRole = (data.role || 'project_member').toString();
+    const cleanRole = rawRole.toLowerCase().replace(/_/g, '');
+    let role = 'project_member';
+    if (cleanRole === 'mainadmin' || cleanRole === 'admin') {
+      role = 'main_admin';
+    } else if (cleanRole === 'projectmanager' || cleanRole === 'manager') {
+      role = 'project_manager';
+    } else if (cleanRole === 'finance') {
+      role = 'finance';
+    } else if (cleanRole === 'viewer') {
+      role = 'viewer';
+    } else {
+      role = 'project_member';
+    }
+    
+    // Strict Role Hierarchy: Only main_admin can create/assign main_admin
+    const creatorRole = creator?.role?.replace(/_/g, '').toLowerCase();
+    if (role === 'main_admin') {
+      if (creatorRole !== 'mainadmin') {
+        throw new ForbiddenException('Only Super Admin can assign the Admin / Super Admin role.');
+      }
+    }
+
     const department = data.department || '';
     const designation = data.designation || '';
     const phone = data.phone || '';
@@ -94,6 +116,7 @@ export class UsersService {
        VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
        ON CONFLICT (email) DO UPDATE
        SET full_name = EXCLUDED.full_name,
+           password_hash = EXCLUDED.password_hash,
            role = EXCLUDED.role,
            department = EXCLUDED.department,
            designation = EXCLUDED.designation,
@@ -116,7 +139,7 @@ export class UsersService {
     };
   }
 
-  async update(id: string, data: any) {
+  async update(id: string, data: any, updater?: any) {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -130,8 +153,29 @@ export class UsersService {
       values.push(data.email.trim().toLowerCase());
     }
     if (data.role) {
+      const rawTarget = data.role.toString();
+      const cleanTarget = rawTarget.toLowerCase().replace(/_/g, '');
+      let mappedRole = 'project_member';
+      if (cleanTarget === 'mainadmin' || cleanTarget === 'admin') {
+        mappedRole = 'main_admin';
+      } else if (cleanTarget === 'projectmanager' || cleanTarget === 'manager') {
+        mappedRole = 'project_manager';
+      } else if (cleanTarget === 'finance') {
+        mappedRole = 'finance';
+      } else if (cleanTarget === 'viewer') {
+        mappedRole = 'viewer';
+      } else {
+        mappedRole = 'project_member';
+      }
+
+      const updaterRole = updater?.role?.replace(/_/g, '').toLowerCase();
+      if (mappedRole === 'main_admin') {
+        if (updaterRole !== 'mainadmin') {
+          throw new ForbiddenException('Only Super Admin can assign the Admin / Super Admin role.');
+        }
+      }
       fields.push(`role = $${idx++}`);
-      values.push(data.role);
+      values.push(mappedRole);
     }
     if (data.department !== undefined) {
       fields.push(`department = $${idx++}`);
@@ -144,6 +188,11 @@ export class UsersService {
     if (data.phone !== undefined) {
       fields.push(`phone = $${idx++}`);
       values.push(data.phone);
+    }
+    if (data.password && typeof data.password === 'string' && data.password.trim().length > 0) {
+      const passwordHash = await bcrypt.hash(data.password.trim(), 10);
+      fields.push(`password_hash = $${idx++}`);
+      values.push(passwordHash);
     }
     if (data.isActive !== undefined || data.is_active !== undefined) {
       fields.push(`is_active = $${idx++}`);

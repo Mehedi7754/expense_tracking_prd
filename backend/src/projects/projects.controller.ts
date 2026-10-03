@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Param,
   Body,
   UseGuards,
@@ -64,6 +65,12 @@ export class ProjectsController {
   @Post(':id/close')
   async closeProject(@Param('id') id: string, @Body() body: any) {
     return this.projectsService.closeProject(id, body);
+  }
+
+  @Roles('main_admin', 'project_manager')
+  @Delete(':id')
+  async deleteProject(@Param('id') id: string, @Request() req: any) {
+    return this.projectsService.delete(id, req.user);
   }
 }
 

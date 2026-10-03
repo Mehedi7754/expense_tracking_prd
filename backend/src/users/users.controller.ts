@@ -9,6 +9,7 @@ import {
   Body,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -39,16 +40,16 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-  @Roles('main_admin')
+  @Roles('main_admin', 'project_manager')
   @Post()
-  async createUser(@Body() body: any) {
-    return this.usersService.create(body);
+  async createUser(@Body() body: any, @Request() req: any) {
+    return this.usersService.create(body, req.user);
   }
 
-  @Roles('main_admin')
+  @Roles('main_admin', 'project_manager')
   @Put(':id')
-  async updateUser(@Param('id') id: string, @Body() body: any) {
-    return this.usersService.update(id, body);
+  async updateUser(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    return this.usersService.update(id, body, req.user);
   }
 
   @Roles('main_admin')

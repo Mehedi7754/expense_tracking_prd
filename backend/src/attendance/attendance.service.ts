@@ -28,17 +28,93 @@ export class AttendanceService {
 
   constructor(private readonly db: DatabaseService) {}
 
+  private officeTimingSettings = {
+    morningStartHour: 9,
+    morningEndHour: 13,
+    afternoonStartHour: 13,
+    afternoonEndHour: 18,
+    weekendDays: [5, 6],
+    deductionType: 'rate_based',
+    fullDayDeductionAmount: 1.0,
+    halfDayDeductionAmount: 0.5,
+    shifts: [
+      {
+        id: 'shift_default',
+        name: 'General Office Shift',
+        morningStartHour: 9,
+        morningEndHour: 13,
+        afternoonStartHour: 13,
+        afternoonEndHour: 18,
+        isDefault: true,
+      },
+      {
+        id: 'shift_morning',
+        name: 'Early Morning Shift',
+        morningStartHour: 7,
+        morningEndHour: 11,
+        afternoonStartHour: 11,
+        afternoonEndHour: 15,
+        isDefault: false,
+      },
+      {
+        id: 'shift_evening',
+        name: 'Evening Shift',
+        morningStartHour: 14,
+        morningEndHour: 18,
+        afternoonStartHour: 18,
+        afternoonEndHour: 22,
+        isDefault: false,
+      },
+    ],
+    userShifts: {} as Record<string, string>,
+  };
+
+  async getTimingSettings() {
+    try {
+      const res = await this.db.query(
+        `SELECT value FROM app_settings WHERE key = 'attendance_timing_settings'`,
+      );
+      if (res.rows.length > 0) {
+        const parsed = JSON.parse(res.rows[0].value);
+        this.officeTimingSettings = { ...this.officeTimingSettings, ...parsed };
+      }
+    } catch (_) {}
+    return this.officeTimingSettings;
+  }
+
+  async updateTimingSettings(settings: Partial<typeof this.officeTimingSettings>) {
+    this.officeTimingSettings = {
+      ...this.officeTimingSettings,
+      ...settings,
+      afternoonStartHour: settings.morningEndHour !== undefined ? settings.morningEndHour : this.officeTimingSettings.afternoonStartHour,
+    };
+    try {
+      await this.db.query(
+        `CREATE TABLE IF NOT EXISTS app_settings (key VARCHAR(255) PRIMARY KEY, value TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`,
+      );
+      await this.db.query(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES ('attendance_timing_settings', $1, CURRENT_TIMESTAMP)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+        [JSON.stringify(this.officeTimingSettings)],
+      );
+    } catch (e) {
+      this.logger.warn(`Could not persist timing settings to db: ${e}`);
+    }
+    return this.officeTimingSettings;
+  }
+
   /**
-   * Determine session based on time if not provided:
-   * Morning: 00:00 - 12:59
-   * Afternoon: 13:00 - 23:59
+   * Determine session based on configured office timing if not provided:
+   * Morning: 00:00 - morningEndHour
+   * Afternoon: morningEndHour - 23:59
    */
   private resolveSessionType(explicitSession?: 'morning' | 'afternoon'): 'morning' | 'afternoon' {
     if (explicitSession === 'morning' || explicitSession === 'afternoon') {
       return explicitSession;
     }
     const currentHour = new Date().getHours();
-    return currentHour < 13 ? 'morning' : 'afternoon';
+    return currentHour < this.officeTimingSettings.morningEndHour ? 'morning' : 'afternoon';
   }
 
   async checkIn(userId: string, dto: CheckInDto): Promise<AttendanceRecord> {
@@ -262,10 +338,12 @@ export class AttendanceService {
     );
     const holidayName = holidayRes.rows.length ? holidayRes.rows[0].name : null;
 
-    // Check weekend (Friday = 5, Saturday = 6 in regional calendar)
+    // Check weekend against configured off-days (1=Mon, 2=Tue, ... 5=Fri, 6=Sat, 7=Sun)
     const targetDateObj = new Date(targetDate + 'T00:00:00Z');
     const dayOfWeek = targetDateObj.getUTCDay();
-    const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
+    const dartWeekday = dayOfWeek === 0 ? 7 : dayOfWeek;
+    const configuredWeekendDays = this.officeTimingSettings.weekendDays || [5, 6];
+    const isWeekend = configuredWeekendDays.includes(dartWeekday);
 
     const employees = usersRes.rows.map((user) => {
       const userAtt = attMap[user.id] || {};

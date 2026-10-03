@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { DatabaseService } from '../database/database.service';
@@ -78,61 +78,9 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    const existing = await this.db.query(
-      'SELECT id FROM users WHERE email = $1',
-      [dto.email.trim().toLowerCase()],
+    throw new ForbiddenException(
+      'Public registration is disabled. All employee and manager accounts must be created by an authorized Admin or Super Admin.',
     );
-
-    if (existing.rows.length) {
-      throw new ConflictException('Email already registered');
-    }
-
-    // Security fix: Public registration cannot create main_admin or finance accounts
-    let roleEnum = 'project_member';
-    if (dto.role) {
-      const mapped = this.mapRole(dto.role);
-      if (mapped === 'project_manager' || mapped === 'project_member') {
-        roleEnum = mapped;
-      }
-    }
-    const passwordHash = await bcrypt.hash(dto.password, 10);
-
-    const insertRes = await this.db.query(
-      `INSERT INTO users (email, password_hash, full_name, role, department, designation, phone)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, email, full_name, role, department, designation, phone, avatar_url`,
-      [
-        dto.email.trim().toLowerCase(),
-        passwordHash,
-        dto.name.trim(),
-        roleEnum,
-        dto.department || 'Operations',
-        dto.designation || '',
-        dto.phone || '',
-      ],
-    );
-
-    const row = insertRes.rows[0];
-    const payload = { sub: row.id, email: row.email, role: row.role };
-    const token = this.jwtService.sign(payload);
-
-    const user = {
-      id: row.id,
-      name: row.full_name,
-      email: row.email,
-      role: row.role,
-      department: row.department,
-      designation: row.designation,
-      phone: row.phone,
-      avatarUrl: row.avatar_url,
-      assignedProjectIds: [],
-    };
-
-    return {
-      token,
-      accessToken: token,
-      user,
-    };
   }
 
   async getProfile(userId: string) {
