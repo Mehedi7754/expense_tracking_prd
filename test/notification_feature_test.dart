@@ -1,7 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:expense_tracking_prd/models/notification_model.dart';
+import 'package:expense_tracking_prd/screens/notifications/notifications_screen.dart';
 import 'package:expense_tracking_prd/state/notification_provider.dart';
+
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -160,4 +163,119 @@ void main() {
       expect(container.read(notificationProvider).every((n) => n.isRead), isTrue);
     });
   });
+
+  group('NotificationsScreen Widget Tests', () {
+    testWidgets('Renders EmptyStateWidget when no notifications exist', (tester) async {
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: NotificationsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Notifications'), findsOneWidget);
+      expect(find.text('No Notifications'), findsOneWidget);
+      expect(find.text('You are all caught up! There are no alerts for your account right now.'), findsOneWidget);
+    });
+
+    testWidgets('Renders notification cards with delete button and unread indicator', (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(notificationProvider.notifier);
+      notifier.addNotification(
+        userId: '',
+        title: 'New Expense Submitted',
+        message: 'A claim for Travel was submitted',
+        fullExplanation: 'Full claim info',
+        type: NotificationType.expenseSubmitted,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: NotificationsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('New Expense Submitted'), findsOneWidget);
+      expect(find.text('A claim for Travel was submitted'), findsOneWidget);
+      expect(find.text('Mark All Read'), findsOneWidget);
+      expect(find.byTooltip('Delete All'), findsOneWidget);
+
+      // Verify individual delete button works
+      final deleteBtn = find.byTooltip('Delete');
+      expect(deleteBtn, findsOneWidget);
+
+      await tester.tap(deleteBtn);
+      await tester.pumpAndSettle();
+
+      // Card is removed
+      expect(find.text('New Expense Submitted'), findsNothing);
+      expect(find.text('No Notifications'), findsOneWidget);
+    });
+
+    testWidgets('Delete All button shows confirmation dialog and cancels or deletes', (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(notificationProvider.notifier);
+      notifier.addNotification(
+        userId: '',
+        title: 'Alert 1',
+        message: 'Message 1',
+        fullExplanation: 'Exp 1',
+        type: NotificationType.general,
+      );
+      notifier.addNotification(
+        userId: '',
+        title: 'Alert 2',
+        message: 'Message 2',
+        fullExplanation: 'Exp 2',
+        type: NotificationType.budgetWarning,
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: NotificationsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alert 1'), findsOneWidget);
+      expect(find.text('Alert 2'), findsOneWidget);
+
+      // Tap Delete All
+      await tester.tap(find.byTooltip('Delete All'));
+      await tester.pumpAndSettle();
+
+      // Dialog appears
+      expect(find.text('Delete All Notifications'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      // Cancel first
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Alert 1'), findsOneWidget);
+
+      // Tap Delete All again and confirm
+      await tester.tap(find.byTooltip('Delete All'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(TextButton, 'Delete All'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No Notifications'), findsOneWidget);
+    });
+  });
 }
+
