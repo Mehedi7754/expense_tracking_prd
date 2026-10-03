@@ -59,4 +59,20 @@ export class NotificationsService {
     );
     return { success: true };
   }
+
+  async delete(id: string, userId: string) {
+    await this.db.query(
+      'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+      [id, userId],
+    );
+    return { success: true };
+  }
+
+  async deleteAll(userId: string) {
+    await this.db.query(
+      'DELETE FROM notifications WHERE user_id = $1',
+      [userId],
+    );
+    return { success: true };
+  }
 }

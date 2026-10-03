@@ -277,8 +277,31 @@ export class ExpensesService {
       console.error('Failed to log audit for expense create:', e);
     }
 
+    // Notify all admins and project managers about the new submission
+    try {
+      const recipientsRes = await this.db.query(
+        `SELECT id FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
+        [employeeId],
+      );
+      const submitterName = user?.fullName || user?.full_name || user?.email || 'A team member';
+      for (const recipient of recipientsRes.rows) {
+        await this.notificationsService.create({
+          userId: recipient.id,
+          title: 'New Expense Submitted',
+          message: `${submitterName} submitted a ${created.categoryName} expense of ${created.amount} ${created.currency} for ${created.projectName}.`,
+          fullExplanation: `${submitterName} submitted a new expense claim:\n• Category: ${created.categoryName}\n• Amount: ${created.amount} ${created.currency}\n• Project: ${created.projectName}\n• Date: ${created.date}\n\nPlease review and approve or reject from the Approvals section.`,
+          type: 'expense_submitted',
+          relatedProjectId: created.projectId,
+          relatedExpenseId: created.id,
+        });
+      }
+    } catch (e) {
+      console.error('Failed to send submission notifications:', e);
+    }
+
     return created;
   }
+
 
   async update(id: string, data: any, user?: any) {
     const existing = await this.findOne(id, user);
