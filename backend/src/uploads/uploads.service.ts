@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 export type UploadCategory = 'receipts' | 'avatars' | 'projects';
 
@@ -9,6 +10,9 @@ export type UploadCategory = 'receipts' | 'avatars' | 'projects';
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
   private readonly uploadsRoot: string;
+  private s3Client?: S3Client;
+  private readonly s3Bucket?: string;
+  private readonly s3PublicUrlPrefix?: string;
 
   // Maximum file size: 10 MB
   private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -24,6 +28,29 @@ export class UploadsService {
   constructor() {
     this.uploadsRoot = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
     this.ensureDirectories();
+
+    // S3 / MinIO Object Storage Configuration
+    const s3Endpoint = process.env.S3_ENDPOINT || process.env.MINIO_ENDPOINT;
+    const s3Region = process.env.S3_REGION || process.env.AWS_REGION || 'us-east-1';
+    const s3AccessKey = process.env.S3_ACCESS_KEY_ID || process.env.MINIO_ROOT_USER || process.env.AWS_ACCESS_KEY_ID;
+    const s3SecretKey = process.env.S3_SECRET_ACCESS_KEY || process.env.MINIO_ROOT_PASSWORD || process.env.AWS_SECRET_ACCESS_KEY;
+    this.s3Bucket = process.env.S3_BUCKET_NAME || process.env.MINIO_BUCKET || 'gw-uploads';
+    this.s3PublicUrlPrefix = process.env.S3_PUBLIC_URL_PREFIX || process.env.STORAGE_CDN_URL;
+
+    if (s3AccessKey && s3SecretKey) {
+      this.s3Client = new S3Client({
+        endpoint: s3Endpoint, // e.g. http://minio:9000 or https://s3.amazonaws.com
+        region: s3Region,
+        credentials: {
+          accessKeyId: s3AccessKey,
+          secretAccessKey: s3SecretKey,
+        },
+        forcePathStyle: true, // Needed for MinIO and self-hosted S3
+      });
+      this.logger.log(`Initialized S3/MinIO Storage provider for bucket: ${this.s3Bucket} (Endpoint: ${s3Endpoint || 'AWS'})`);
+    } else {
+      this.logger.log('S3/MinIO credentials not provided. Using local disk / persistent volume storage.');
+    }
   }
 
   /**
@@ -45,7 +72,7 @@ export class UploadsService {
   }
 
   /**
-   * Saves an uploaded file (from base64 data URI or raw base64) to disk.
+   * Saves an uploaded file (from base64 data URI or raw base64) to S3/MinIO bucket or disk.
    * Returns the public URL path for the saved file.
    */
   async saveFile(
@@ -91,12 +118,44 @@ export class UploadsService {
     const timestamp = Date.now();
     const prefix = entityId ? `${entityId.substring(0, 8)}_` : '';
     const filename = `${prefix}${timestamp}_${hash}.${extension}`;
+    const objectKey = `${category}/${filename}`;
 
-    // 5. Write to disk
-    const filePath = path.join(this.uploadsRoot, category, filename);
-    await fs.promises.writeFile(filePath, buffer);
+    // 5. Always persist to local disk as fallback/cache
+    try {
+      const filePath = path.join(this.uploadsRoot, category, filename);
+      await fs.promises.writeFile(filePath, buffer);
+    } catch (e: any) {
+      this.logger.warn(`Could not write local copy of upload: ${e.message}`);
+    }
 
-    // 6. Return public URL path (relative to API base)
+    // 6. If S3 / MinIO is configured, stream to object bucket
+    if (this.s3Client && this.s3Bucket) {
+      try {
+        await this.s3Client.send(
+          new PutObjectCommand({
+            Bucket: this.s3Bucket,
+            Key: objectKey,
+            Body: buffer,
+            ContentType: mimeType,
+          }),
+        );
+        this.logger.log(`Uploaded ${objectKey} to S3/MinIO bucket (${this.s3Bucket})`);
+
+        // If a public CDN prefix is configured (e.g. https://cdn.example.com or MinIO public endpoint)
+        if (this.s3PublicUrlPrefix) {
+          const publicUrl = `${this.s3PublicUrlPrefix.replace(/\/$/, '')}/${objectKey}`;
+          return {
+            url: publicUrl,
+            filename,
+            sizeBytes: buffer.length,
+          };
+        }
+      } catch (s3Err: any) {
+        this.logger.error(`Failed to upload to S3/MinIO: ${s3Err.message}`, s3Err.stack);
+      }
+    }
+
+    // 7. Return local static URL path
     const url = `/uploads/${category}/${filename}`;
     this.logger.log(`Saved ${category} upload: ${filename} (${(buffer.length / 1024).toFixed(1)} KB)`);
 
@@ -108,19 +167,37 @@ export class UploadsService {
   }
 
   /**
-   * Deletes a previously uploaded file.
+   * Deletes a previously uploaded file from both S3 and local storage.
    */
   async deleteFile(category: UploadCategory, filename: string): Promise<boolean> {
     const safeFilename = path.basename(filename);
+    const objectKey = `${category}/${safeFilename}`;
+
+    // 1. Delete from S3 if configured
+    if (this.s3Client && this.s3Bucket) {
+      try {
+        await this.s3Client.send(
+          new DeleteObjectCommand({
+            Bucket: this.s3Bucket,
+            Key: objectKey,
+          }),
+        );
+        this.logger.log(`Deleted S3/MinIO object: ${objectKey}`);
+      } catch (s3Err: any) {
+        this.logger.warn(`Failed to delete S3/MinIO object ${objectKey}: ${s3Err.message}`);
+      }
+    }
+
+    // 2. Delete from local disk
     const filePath = path.join(this.uploadsRoot, category, safeFilename);
     try {
       if (fs.existsSync(filePath)) {
         await fs.promises.unlink(filePath);
-        this.logger.log(`Deleted upload: ${category}/${safeFilename}`);
+        this.logger.log(`Deleted local upload: ${category}/${safeFilename}`);
         return true;
       }
-    } catch (e) {
-      this.logger.warn(`Failed to delete upload ${category}/${safeFilename}: ${e}`);
+    } catch (e: any) {
+      this.logger.warn(`Failed to delete upload ${category}/${safeFilename}: ${e.message}`);
     }
     return false;
   }
