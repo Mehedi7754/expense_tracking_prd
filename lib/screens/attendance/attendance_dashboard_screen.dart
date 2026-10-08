@@ -261,16 +261,10 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
         avatarMap[u.id] = u.avatarUrl!;
       }
     }
-    for (final u in kAuthenticDatabaseUsers) {
-      if (u.avatarUrl != null && u.avatarUrl!.isNotEmpty && !avatarMap.containsKey(u.id)) {
-        avatarMap[u.id] = u.avatarUrl!;
-      }
-    }
 
     List<EmployeeDailyAttendance> rawEmployees = overview?.employees ?? [];
-    if (rawEmployees.isEmpty) {
-      final sourceUsers = allUsers.isNotEmpty ? allUsers : kAuthenticDatabaseUsers;
-      rawEmployees = sourceUsers
+    if (rawEmployees.isEmpty && allUsers.isNotEmpty) {
+      rawEmployees = allUsers
           .where((u) => u.isActive && u.role.requiresAttendanceCheckIn)
           .map((u) {
             final userRecords = records.where((r) => r.userId == u.id).toList();
@@ -298,14 +292,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
           })
           .toList();
     }
-
-    final employees = rawEmployees.where((e) {
-      final name = e.userName.toLowerCase();
-      final email = e.userEmail.toLowerCase();
-      return !name.contains('eleanor') &&
-          !email.contains('eleanor') &&
-          email != 'admin@pfis.com';
-    }).toList();
+    final employees = rawEmployees;
 
     final totalStaff = employees.length;
     final presentCount = employees.where((e) => e.status == 'present').length;

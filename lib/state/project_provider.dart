@@ -12,7 +12,6 @@ import '../repositories/project_repository.dart';
 import 'notification_provider.dart';
 
 const String _kCustomProjectsKey = 'gw_custom_projects_cache';
-const String _kDeletedProjectIdsKey = 'gw_deleted_project_ids_cache';
 
 class ProjectNotifier extends Notifier<List<ProjectModel>>
     with FetchCacheMixin {
@@ -22,41 +21,9 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     return const [];
   }
 
-  Future<Set<String>> _getDeletedProjectIds() async {
-    if (EnvironmentUtils.isTestEnvironment) return {};
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList(_kDeletedProjectIdsKey) ?? [];
-      return list.toSet();
-    } catch (_) {
-      return {};
-    }
-  }
-
-  Future<void> _recordDeletedProjectIds(Iterable<String> ids) async {
-    if (EnvironmentUtils.isTestEnvironment) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final current =
-          (prefs.getStringList(_kDeletedProjectIdsKey) ?? []).toSet();
-      current.addAll(ids.where((id) => id.isNotEmpty));
-      await prefs.setStringList(_kDeletedProjectIdsKey, current.toList());
-    } catch (_) {}
-  }
-
-  bool _isProjectDeleted(ProjectModel p, Set<String> deletedSet) {
-    if (deletedSet.contains(p.id)) return true;
-    if (deletedSet.contains(p.projectId)) return true;
-    if (deletedSet.contains(p.id.toLowerCase())) return true;
-    if (deletedSet.contains(p.projectId.toLowerCase())) return true;
-    if (deletedSet.contains(p.name.trim().toLowerCase())) return true;
-    return false;
-  }
-
   Future<void> _loadCachedProjects() async {
     if (EnvironmentUtils.isTestEnvironment) return;
     try {
-      final deletedIds = await _getDeletedProjectIds();
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString(_kCustomProjectsKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
@@ -65,7 +32,6 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
             decoded
                 .whereType<Map<String, dynamic>>()
                 .map(ProjectModel.fromJson)
-                .where((p) => !_isProjectDeleted(p, deletedIds))
                 .toList();
 
         state = customProjects;
@@ -110,15 +76,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     markFetchStarted();
     try {
       final repo = ref.read(projectRepositoryProvider);
-      final rawRemoteProjects = await repo.getProjects();
-
-      // Fetch deletedIds AFTER API call to prevent race condition if deletion happens during fetch
-      final deletedIds = await _getDeletedProjectIds();
-
-      final remoteProjects =
-          rawRemoteProjects
-              .where((p) => !_isProjectDeleted(p, deletedIds))
-              .toList();
+      final remoteProjects = await repo.getProjects();
 
       state = remoteProjects;
       await _persistProjects();
@@ -506,45 +464,14 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
 
   /// Deletes a project from local state and remote backend database.
   Future<void> deleteProject(String projectId) async {
-    final candidateIds = <String>{
-      projectId.trim(),
-      projectId.trim().toLowerCase(),
-    };
-
-    for (final p in state) {
-      if (p.id == projectId ||
-          p.projectId == projectId ||
-          p.id.toLowerCase() == projectId.toLowerCase() ||
-          p.projectId.toLowerCase() == projectId.toLowerCase() ||
-          p.name.trim().toLowerCase() == projectId.trim().toLowerCase()) {
-        if (p.id.isNotEmpty) {
-          candidateIds.add(p.id);
-          candidateIds.add(p.id.toLowerCase());
-        }
-        if (p.projectId.isNotEmpty) {
-          candidateIds.add(p.projectId);
-          candidateIds.add(p.projectId.toLowerCase());
-        }
-        if (p.name.isNotEmpty) {
-          candidateIds.add(p.name.trim());
-          candidateIds.add(p.name.trim().toLowerCase());
-        }
-      }
-    }
-
-    await _recordDeletedProjectIds(candidateIds);
-
-    state = state.where((p) => !_isProjectDeleted(p, candidateIds)).toList();
+    final cleanId = projectId.trim();
+    state = state.where((p) => p.id != cleanId && p.projectId != cleanId).toList();
     await _persistProjects();
     invalidateCache();
 
     try {
       final repo = ref.read(projectRepositoryProvider);
-      for (final id in candidateIds) {
-        try {
-          await repo.deleteProject(id);
-        } catch (_) {}
-      }
+      await repo.deleteProject(cleanId);
     } catch (_) {}
 
     await fetchProjects(force: true);
