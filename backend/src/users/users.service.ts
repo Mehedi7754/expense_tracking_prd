@@ -236,10 +236,15 @@ export class UsersService {
   }
 
   async delete(id: string) {
-    await this.db.query(
-      `UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = $1`,
-      [id],
-    );
+    try {
+      await this.db.query(`DELETE FROM users WHERE id = $1`, [id]);
+    } catch (_) {
+      // Fallback if foreign keys exist with RESTRICT: set is_active = FALSE
+      await this.db.query(
+        `UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = $1`,
+        [id],
+      );
+    }
     return { success: true };
   }
 

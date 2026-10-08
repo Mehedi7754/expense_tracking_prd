@@ -11,36 +11,12 @@ const String _kCustomUserPasswordsKey = 'gw_custom_user_passwords_cache';
 class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMixin {
   @override
   List<UserModel> build() {
-    _loadCachedUsers();
+    fetchUsers(force: true);
     return const [];
   }
 
-  Future<void> _loadCachedUsers() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_kCustomUsersKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final List<dynamic> decoded = jsonDecode(jsonStr);
-        final customUsers = decoded
-            .whereType<Map<String, dynamic>>()
-            .map(UserModel.fromJson)
-            .where((u) => u.isActive)
-            .toList();
-
-        state = customUsers;
-      }
-      fetchUsers(force: true);
-    } catch (_) {
-      state = const [];
-    }
-  }
-
   Future<void> _persistUsers() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonList = state.map((u) => u.toJson()).toList();
-      await prefs.setString(_kCustomUsersKey, jsonEncode(jsonList));
-    } catch (_) {}
+    // No-op: server is the single source of truth
   }
 
   static Future<void> _saveLocalPassword(String email, String password) async {
