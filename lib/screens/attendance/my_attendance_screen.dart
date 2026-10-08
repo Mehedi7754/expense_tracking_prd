@@ -32,8 +32,9 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
       } catch (_) {}
       if (!mounted) return;
       final user = ref.read(authProvider).currentUser;
-      final effectiveId = user?.id ?? 'a0000000-0000-0000-0000-000000000003';
-      ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: effectiveId, force: true);
+      if (user != null && user.id.isNotEmpty) {
+        ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: user.id, force: true);
+      }
     });
   }
 
@@ -74,7 +75,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     final attendanceState = ref.watch(attendanceProvider);
 
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final effectiveUserId = user?.id ?? 'a0000000-0000-0000-0000-000000000003';
+    final effectiveUserId = user?.id ?? '';
     final myRecords = attendanceState.records.where((r) => r.userId == effectiveUserId).toList();
 
     AttendanceRecordModel? todayMorning;

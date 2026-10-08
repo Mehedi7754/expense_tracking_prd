@@ -507,33 +507,11 @@ class ProjectModel {
     );
   }
 
-  static const Map<String, String> demoToUuid = {
-    'usr_adm_01': 'a0000000-0000-0000-0000-000000000001',
-    'usr_mgr_01': 'a0000000-0000-0000-0000-000000000002',
-    'usr_emp_01': 'a0000000-0000-0000-0000-000000000003',
-    'usr_fin_01': 'a0000000-0000-0000-0000-000000000004',
-    'usr_view_01': 'a0000000-0000-0000-0000-000000000005',
-  };
-
-  static const Map<String, String> uuidToDemo = {
-    'a0000000-0000-0000-0000-000000000001': 'usr_adm_01',
-    'a0000000-0000-0000-0000-000000000002': 'usr_mgr_01',
-    'a0000000-0000-0000-0000-000000000003': 'usr_emp_01',
-    'a0000000-0000-0000-0000-000000000004': 'usr_fin_01',
-    'a0000000-0000-0000-0000-000000000005': 'usr_view_01',
-  };
-
   bool hasMember(String userId) {
-    if (createdById != null &&
-        (createdById == userId ||
-            demoToUuid[userId] == createdById ||
-            uuidToDemo[userId] == createdById)) {
+    if (createdById != null && createdById == userId) {
       return true;
     }
-    if (teamMemberIds.contains(userId)) return true;
-    final mapped = demoToUuid[userId] ?? uuidToDemo[userId];
-    if (mapped != null && teamMemberIds.contains(mapped)) return true;
-    return false;
+    return teamMemberIds.contains(userId);
   }
 
   factory ProjectModel.fromJson(Map<String, dynamic> json) {

@@ -146,8 +146,15 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     String? notes,
   }) async {
     final currentUser = ref.read(authProvider).currentUser;
+    if (currentUser == null || currentUser.id.isEmpty) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: 'User session not found. Please log in.',
+      );
+      return false;
+    }
     // Super Admin & non-attendance roles do not check in
-    if (currentUser != null && !currentUser.role.requiresAttendanceCheckIn) {
+    if (!currentUser.role.requiresAttendanceCheckIn) {
       state = state.copyWith(
         isSubmitting: false,
         errorMessage: '${currentUser.role.displayName} is exempt from attendance check-in.',
@@ -155,7 +162,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       return false;
     }
 
-    final userId = currentUser?.id ?? 'a0000000-0000-0000-0000-000000000003';
+    final userId = currentUser.id;
 
     // 0. Enforce session window: morning locks at the divider, afternoon opens at the divider
     final settings = ref.read(attendanceSettingsProvider).value;
@@ -187,8 +194,6 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       final address = locResult.addressText;
       final resolvedNotes = notes ?? '';
 
-      final currentUser = ref.read(authProvider).currentUser;
-      final userId = currentUser?.id ?? 'a0000000-0000-0000-0000-000000000003';
       final deviceInfo = kIsWeb ? 'Web Browser' : (Platform.isAndroid ? 'Android' : (Platform.isIOS ? 'iOS' : 'Desktop'));
 
       final repo = ref.read(attendanceRepositoryProvider);

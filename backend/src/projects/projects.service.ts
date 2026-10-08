@@ -187,19 +187,8 @@ export class ProjectsService {
         projectCode = `PRJ-${new Date().getFullYear()}-${num.toString().padStart(3, '0')}-${rand}`;
       }
 
-      const demoUserMap: Record<string, string> = {
-        'usr_adm_01': 'a0000000-0000-0000-0000-000000000001',
-        'usr_mgr_01': 'a0000000-0000-0000-0000-000000000002',
-        'usr_emp_01': 'a0000000-0000-0000-0000-000000000003',
-        'usr_fin_01': 'a0000000-0000-0000-0000-000000000004',
-        'usr_view_01': 'a0000000-0000-0000-0000-000000000005',
-      };
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-      let validCreatedBy = demoUserMap[createdById] || createdById;
-      if (!uuidRegex.test(validCreatedBy)) {
-        validCreatedBy = 'a0000000-0000-0000-0000-000000000001';
-      }
+      const validCreatedBy = (createdById && uuidRegex.test(createdById)) ? createdById : null;
 
       let clientId = data.clientId || data.client_id || null;
       if (clientId && !uuidRegex.test(clientId)) {
@@ -348,16 +337,9 @@ export class ProjectsService {
 
     if (data.teamMemberIds !== undefined || data.team_member_ids !== undefined) {
       const rawMembers: string[] = data.teamMemberIds || data.team_member_ids || [];
-      const demoUserMap: Record<string, string> = {
-        'usr_adm_01': 'a0000000-0000-0000-0000-000000000001',
-        'usr_mgr_01': 'a0000000-0000-0000-0000-000000000002',
-        'usr_emp_01': 'a0000000-0000-0000-0000-000000000003',
-        'usr_fin_01': 'a0000000-0000-0000-0000-000000000004',
-        'usr_view_01': 'a0000000-0000-0000-0000-000000000005',
-      };
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       for (const rawMember of rawMembers) {
-        let memberId = demoUserMap[rawMember] || rawMember;
+        let memberId = rawMember;
         if (typeof memberId === 'string' && memberId.includes('@')) {
           const uRes = await this.db.query('SELECT id FROM users WHERE email = $1', [memberId.trim().toLowerCase()]);
           if (uRes.rows.length) {
