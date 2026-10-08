@@ -4,9 +4,6 @@ import '../models/holiday_model.dart';
 import '../models/leave_model.dart';
 import '../models/salary_model.dart';
 import '../repositories/salary_repository.dart';
-import '../core/services/attendance_salary_mock_store.dart';
-import 'auth_provider.dart';
-import 'user_management_provider.dart';
 
 class SalaryState {
   final OrgSalaryReportModel? orgReport;
@@ -103,24 +100,16 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
     markFetchStarted();
     state = state.copyWith(isLoading: true, clearError: true);
 
-    final users = ref.read(userManagementProvider);
-    final curUser = ref.read(authProvider).currentUser;
-    if (curUser != null) {
-      AttendanceSalaryMockStore.instance.syncUser(curUser);
-    }
-    AttendanceSalaryMockStore.instance.syncUsers(users);
-
     try {
       final repo = ref.read(salaryRepositoryProvider);
-      final report = await repo.getOrgSalaryReport(m, y, users);
+      final report = await repo.getOrgSalaryReport(m, y);
       if (!ref.mounted) return;
       markFetchCompleted();
       state = state.copyWith(orgReport: report, isLoading: false);
-    } catch (_) {
-      final fallback = await AttendanceSalaryMockStore.instance.getOrgSalaryReport(m, y, users);
+    } catch (e) {
       if (!ref.mounted) return;
       markFetchCompleted();
-      state = state.copyWith(orgReport: fallback, isLoading: false, clearError: true);
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }
 
@@ -138,11 +127,10 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
       if (!ref.mounted) return;
       markFetchCompleted();
       state = state.copyWith(currentCalculation: calc, isLoading: false, clearError: true);
-    } catch (_) {
-      final fallback = await AttendanceSalaryMockStore.instance.calculateSalary(userId, m, y);
+    } catch (e) {
       if (!ref.mounted) return;
       markFetchCompleted();
-      state = state.copyWith(currentCalculation: fallback, isLoading: false, clearError: true);
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
     }
   }
 

@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../core/network/api_exceptions.dart';
-import '../core/services/attendance_salary_mock_store.dart';
 import '../core/services/location_service.dart';
 import '../core/services/push_notification_service.dart';
 import '../core/utils/fetch_cache_mixin.dart';
@@ -92,23 +91,18 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
         users = ref.read(userManagementProvider);
       } catch (_) {}
     }
-    final curUser = ref.read(authProvider).currentUser;
-    if (curUser != null) {
-      AttendanceSalaryMockStore.instance.syncUser(curUser);
-    }
-    if (users.isNotEmpty) {
-      AttendanceSalaryMockStore.instance.syncUsers(users);
-    }
 
     try {
       final repo = ref.read(attendanceRepositoryProvider);
       final overview = await repo.getDailyOverview(targetDate, users);
       markFetchCompleted();
       state = state.copyWith(dailyOverview: overview, isLoading: false, clearError: true);
-    } catch (_) {
+    } catch (e) {
       markFetchCompleted();
-      final fallback = await AttendanceSalaryMockStore.instance.getDailyOverview(targetDate, users);
-      state = state.copyWith(dailyOverview: fallback, isLoading: false, clearError: true);
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      );
     }
   }
 
@@ -136,15 +130,12 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       );
       markFetchCompleted();
       state = state.copyWith(records: records, isLoading: false, clearError: true);
-    } catch (_) {
+    } catch (e) {
       markFetchCompleted();
-      final fallback = await AttendanceSalaryMockStore.instance.getAttendanceRecords(
-        userId: targetUser,
-        date: date ?? (month == null ? targetDate : null),
-        month: month,
-        year: year,
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
       );
-      state = state.copyWith(records: fallback, isLoading: false, clearError: true);
     }
   }
 
@@ -220,16 +211,6 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
         }
         rethrow;
       } catch (_) {
-        await AttendanceSalaryMockStore.instance.checkIn(
-          userId: userId,
-          latitude: lat,
-          longitude: lng,
-          addressText: address,
-          sessionType: explicitSession,
-          deviceInfo: deviceInfo,
-          notes: resolvedNotes,
-          currentUser: currentUser,
-        );
         await LocationService.queueOfflineCheckIn(
           userId: userId,
           latitude: lat,
@@ -255,8 +236,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
 
       state = state.copyWith(isSubmitting: false, clearError: true);
       return true;
-    } catch (_) {
-      state = state.copyWith(isSubmitting: false, clearError: true);
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.toString());
       return false;
     }
   }
@@ -361,13 +342,9 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       }
       state = state.copyWith(isSubmitting: false, clearError: true);
       return success;
-    } catch (_) {
-      await AttendanceSalaryMockStore.instance.confirmAbsence(userId: userId, date: date, notes: notes);
-      invalidateCache();
-      await fetchDailyOverview(force: true);
-      await fetchAttendanceRecords(force: true);
-      state = state.copyWith(isSubmitting: false, clearError: true);
-      return true;
+    } catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.toString());
+      return false;
     }
   }
 }

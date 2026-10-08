@@ -8,7 +8,6 @@ import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/file_upload_repository.dart';
-import '../core/services/attendance_salary_mock_store.dart';
 import 'attendance_provider.dart';
 import 'expense_provider.dart';
 import 'project_provider.dart';
@@ -94,7 +93,6 @@ class AuthNotifier extends Notifier<AuthState> {
           isLoading: false,
           clearError: true,
         );
-        AttendanceSalaryMockStore.instance.syncUser(user);
         // Trigger fetches — TTL cache will prevent duplicates
         ref.read(projectProvider.notifier).fetchProjects();
         ref.read(expenseProvider.notifier).fetchExpenses();
@@ -152,7 +150,6 @@ class AuthNotifier extends Notifier<AuthState> {
       ref
           .read(userManagementProvider.notifier)
           .findOrAddMemberByEmail(user.email, name: user.name);
-      AttendanceSalaryMockStore.instance.syncUser(user);
 
       final token =
           ref.read(apiClientProvider).authToken ?? 'reg_token_${user.id}';
@@ -240,7 +237,6 @@ class AuthNotifier extends Notifier<AuthState> {
       }
 
       await _persistSession(authUser, token);
-      AttendanceSalaryMockStore.instance.syncUser(authUser);
       state = state.copyWith(
         currentUser: authUser,
         isAuthenticated: true,
@@ -313,7 +309,6 @@ class AuthNotifier extends Notifier<AuthState> {
                 department: 'Operations',
               );
     }
-    AttendanceSalaryMockStore.instance.syncUser(targetUser);
     _persistSession(targetUser, 'session_token_${targetUser.id}');
     state = state.copyWith(
       currentUser: targetUser,
@@ -328,7 +323,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   void setUser(UserModel user) {
-    AttendanceSalaryMockStore.instance.syncUser(user);
     _persistSession(user, ref.read(apiClientProvider).authToken);
     state = state.copyWith(
       currentUser: user,

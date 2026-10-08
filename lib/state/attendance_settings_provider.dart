@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../core/services/attendance_salary_mock_store.dart';
 import '../repositories/attendance_repository.dart';
 import 'attendance_provider.dart';
 
@@ -301,7 +300,6 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
       }
     } catch (_) {}
 
-    AttendanceSalaryMockStore.instance.syncSettings(initial);
     return initial;
   }
 
@@ -310,7 +308,6 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
     await prefs.setString(_kAttendanceSettingsKey, jsonEncode(newSettings.toJson()));
     await prefs.setInt(_kOldMorningEndKey, newSettings.morningEndHour);
 
-    AttendanceSalaryMockStore.instance.syncSettings(newSettings);
     state = AsyncValue.data(newSettings);
 
     try {

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
-import '../core/services/attendance_salary_mock_store.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
@@ -174,7 +173,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
 
       state = mergedMap.values.where((u) => !_isForbiddenUser(u, deletedSet)).toList();
       await _persistUsers();
-      AttendanceSalaryMockStore.instance.syncUsers(state);
       markFetchCompleted();
     } catch (_) {
       markFetchFailed();
@@ -257,7 +255,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
   void setUsers(List<UserModel> users) {
     state = users;
     _persistUsers();
-    AttendanceSalaryMockStore.instance.syncUsers(users);
   }
 
   Future<UserModel> addUser({
@@ -319,8 +316,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
       // Offline fallback
     }
 
-    AttendanceSalaryMockStore.instance.syncUser(newUser);
-
     return newUser;
   }
 
@@ -345,8 +340,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     } catch (_) {
       // Offline fallback
     }
-
-    AttendanceSalaryMockStore.instance.syncUser(updated);
   }
 
   Future<void> assignUserToProject(String userId, String projectId) async {
@@ -403,12 +396,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
         if (u.id == userId) updated else u,
     ];
     await _persistUsers();
-
-    if (!updated.isActive) {
-      AttendanceSalaryMockStore.instance.removeUser(userId);
-    } else {
-      AttendanceSalaryMockStore.instance.syncUser(updated);
-    }
 
     try {
       final client = ref.read(apiClientProvider);
@@ -470,10 +457,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
       final newDeleted = {...currentDeleted, ...deletedIds}.toList();
       await prefs.setStringList(_kDeletedUserIdsKey, newDeleted);
     } catch (_) {}
-
-    for (final id in deletedIds) {
-      AttendanceSalaryMockStore.instance.removeUser(id);
-    }
 
     try {
       final client = ref.read(apiClientProvider);
