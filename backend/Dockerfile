@@ -4,10 +4,10 @@ FROM node:22-alpine AS builder
 WORKDIR /usr/src/app
 
 COPY package*.json tsconfig*.json nest-cli.json ./
-RUN npm ci --quiet
+RUN npm ci
 
 COPY src/ ./src/
-ENV NODE_OPTIONS="--max-old-space-size=512"
+ENV NODE_OPTIONS="--max-old-space-size=1024"
 RUN npm run build
 
 # Stage 2: Production Runner
