@@ -326,6 +326,9 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
         shifts: newSettings.shifts.map((s) => s.toJson()).toList(),
         userShifts: newSettings.userShifts,
       );
+      // Immediately refresh attendance state & daily overview so UI reflects real-time off-days & shift changes
+      ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+      ref.read(attendanceProvider.notifier).fetchAttendanceRecords(force: true);
     } catch (_) {}
   }
 

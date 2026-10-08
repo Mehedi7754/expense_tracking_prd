@@ -778,23 +778,39 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
     String statusLabel;
     IconData statusIcon;
 
-    if (emp.status == 'present') {
+    final settingsState = ref.watch(attendanceSettingsProvider);
+    final currentSettings = settingsState.value;
+    final userShift = currentSettings?.getShiftForUser(emp.userId);
+    final weekendDays = userShift?.weekendDays ?? currentSettings?.weekendDays ?? const [];
+
+    final dateStr = ref.watch(attendanceProvider).selectedDate;
+    final parsedDate = DateTime.tryParse(dateStr) ?? DateTime.now();
+    final isWeekendForDate = weekendDays.contains(parsedDate.weekday);
+
+    String effectiveStatus = emp.status;
+    if (!isWeekendForDate && effectiveStatus == 'weekend') {
+      effectiveStatus = 'missing';
+    } else if (isWeekendForDate && (effectiveStatus == 'missing' || effectiveStatus.isEmpty)) {
+      effectiveStatus = 'weekend';
+    }
+
+    if (effectiveStatus == 'present') {
       statusColor = const Color(0xFF10B981);
       statusLabel = 'Present';
       statusIcon = Icons.check_circle_rounded;
-    } else if (emp.status == 'half_day') {
+    } else if (effectiveStatus == 'half_day') {
       statusColor = const Color(0xFFF59E0B);
       statusLabel = 'Half Day';
       statusIcon = Icons.timelapse_rounded;
-    } else if (emp.status == 'confirmed_absent') {
+    } else if (effectiveStatus == 'confirmed_absent') {
       statusColor = const Color(0xFFEF4444);
       statusLabel = 'Absent';
       statusIcon = Icons.cancel_rounded;
-    } else if (emp.status == 'weekend') {
+    } else if (effectiveStatus == 'weekend') {
       statusColor = const Color(0xFF3B82F6);
       statusLabel = 'Weekend';
       statusIcon = Icons.beach_access_rounded;
-    } else if (emp.status == 'holiday') {
+    } else if (effectiveStatus == 'holiday') {
       statusColor = const Color(0xFF8B5CF6);
       statusLabel = 'Holiday';
       statusIcon = Icons.celebration_rounded;

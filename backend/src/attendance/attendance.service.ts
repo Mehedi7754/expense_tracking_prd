@@ -110,10 +110,17 @@ export class AttendanceService {
       ...settings,
     };
 
+    if (settings.weekendDays) {
+      this.officeTimingSettings.weekendDays = settings.weekendDays;
+    }
+
     // Ensure default shift and top-level timings remain tightly synchronized
     if (this.officeTimingSettings.shifts && this.officeTimingSettings.shifts.length > 0) {
       const defaultShift =
         this.officeTimingSettings.shifts.find((s) => s.isDefault) || this.officeTimingSettings.shifts[0];
+      if (settings.weekendDays && defaultShift) {
+        defaultShift.weekendDays = settings.weekendDays;
+      }
       if (settings.morningEndHour !== undefined && !settings.shifts) {
         defaultShift.morningEndHour = settings.morningEndHour;
         defaultShift.afternoonStartHour = settings.morningEndHour;
@@ -369,8 +376,8 @@ export class AttendanceService {
   async getDailyOverview(dateStr?: string) {
     await this.getTimingSettings();
     const targetDate = dateStr || new Date().toISOString().split('T')[0];
-    const targetDateObj = new Date(targetDate);
-    const dayOfWeek = targetDateObj.getDay() === 0 ? 7 : targetDateObj.getDay();
+    const targetDateObj = new Date(targetDate.includes('T') ? targetDate : `${targetDate}T00:00:00Z`);
+    const dayOfWeek = targetDateObj.getUTCDay() === 0 ? 7 : targetDateObj.getUTCDay();
 
     // Query all active non-exempt users
     const usersRes = await this.db.query(
@@ -409,7 +416,8 @@ export class AttendanceService {
 
     const employees = usersRes.rows.map((user: any) => {
       const shift = this.getShiftForUser(user.id);
-      const isWeekend = (shift.weekendDays || [5, 6]).includes(dayOfWeek);
+      const shiftWeekends = shift?.weekendDays || this.officeTimingSettings.weekendDays || [5, 6];
+      const isWeekend = shiftWeekends.includes(dayOfWeek);
       const rec = byUser[user.id];
 
       let status = 'missing';
