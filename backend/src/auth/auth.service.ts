@@ -93,9 +93,46 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    throw new ForbiddenException(
-      'Public registration is disabled. All employee and manager accounts must be created by an authorized Admin or Super Admin.',
+    const countRes = await this.db.query('SELECT COUNT(*) as count FROM users');
+    const totalUsers = parseInt(countRes.rows[0]?.count || '0', 10);
+    
+    // Only allow self-registration if zero users exist in the entire database (First-Time Super Admin Bootstrapping)
+    if (totalUsers > 0) {
+      throw new ForbiddenException(
+        'Public registration is disabled. All employee and manager accounts must be created by an authorized Admin or Super Admin.',
+      );
+    }
+
+    const email = dto.email.trim().toLowerCase();
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const fullName = dto.fullName || dto.name || 'System Administrator';
+
+    const insertRes = await this.db.query(
+      `INSERT INTO users (email, password_hash, full_name, role, designation, department, is_active)
+       VALUES ($1, $2, $3, 'main_admin', 'System Administrator', 'Executive', TRUE)
+       RETURNING id, email, full_name, role, department, designation, phone, avatar_url`,
+      [email, hashedPassword, fullName],
     );
+
+    const userRow = insertRes.rows[0];
+    const payload = { sub: userRow.id, email: userRow.email, role: userRow.role };
+    const token = this.jwtService.sign(payload);
+
+    return {
+      token,
+      accessToken: token,
+      user: {
+        id: userRow.id,
+        name: userRow.full_name,
+        email: userRow.email,
+        role: userRow.role,
+        department: userRow.department,
+        designation: userRow.designation,
+        phone: userRow.phone,
+        avatarUrl: userRow.avatar_url,
+        assignedProjectIds: [],
+      },
+    };
   }
 
   async getProfile(userId: string) {
