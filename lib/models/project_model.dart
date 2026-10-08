@@ -519,12 +519,9 @@ class ProjectModel {
       if (raw is List) {
         final result = <String>{};
         for (final item in raw) {
-          final s = item.toString();
-          result.add(s);
-          if (uuidToDemo.containsKey(s)) {
-            result.add(uuidToDemo[s]!);
-          } else if (demoToUuid.containsKey(s)) {
-            result.add(demoToUuid[s]!);
+          final s = item.toString().trim();
+          if (s.isNotEmpty) {
+            result.add(s);
           }
         }
         return result.toList();
@@ -629,7 +626,6 @@ class ProjectModel {
 
   Map<String, dynamic> toJson({bool forApi = false, bool isNewCreation = false}) {
     final validTeamMembers = teamMemberIds
-        .map((id) => demoToUuid[id] ?? id)
         .where((id) => id.trim().isNotEmpty)
         .toList();
 
@@ -684,8 +680,8 @@ class ProjectModel {
       if (progressUpdatedAt != null) 'progress_updated_at': progressUpdatedAt!.toIso8601String(),
       if (progressUpdatedByName != null) 'progress_updated_by_name': progressUpdatedByName,
       if (progressUpdatedById != null) 'progress_updated_by_id': progressUpdatedById,
-      if (createdById != null && createdById!.isNotEmpty) 'created_by': demoToUuid[createdById] ?? createdById,
-      if (createdById != null && createdById!.isNotEmpty) 'created_by_id': demoToUuid[createdById] ?? createdById,
+      if (createdById != null && createdById!.isNotEmpty) 'created_by': createdById,
+      if (createdById != null && createdById!.isNotEmpty) 'created_by_id': createdById,
       'image_url': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
       'imageUrl': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
       'progress_notes': progressNotes.map((n) => n.toJson()).toList(),
