@@ -10,6 +10,7 @@ import 'state/settings_provider.dart';
 import 'state/auth_provider.dart';
 import 'models/user_role.dart';
 import 'core/services/notification_router.dart';
+import 'state/attendance_settings_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
