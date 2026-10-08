@@ -244,13 +244,13 @@ export class ProjectsService {
       const rawMembers: string[] = data.teamMemberIds || data.team_member_ids || [];
       const teamMembers = [...rawMembers];
       // Ensure the project creator is always added as a project member
-      if (uuidRegex.test(validCreatedBy) && !teamMembers.some((m) => (demoUserMap[m] || m) === validCreatedBy)) {
+      if (validCreatedBy && uuidRegex.test(validCreatedBy) && !teamMembers.includes(validCreatedBy)) {
         teamMembers.unshift(validCreatedBy);
       }
 
       const insertedMembers: string[] = [];
       for (const rawMember of teamMembers) {
-        let memberId = demoUserMap[rawMember] || rawMember;
+        let memberId = rawMember;
         if (typeof memberId === 'string' && memberId.includes('@')) {
           const uRes = await client.query('SELECT id FROM users WHERE email = $1', [memberId.trim().toLowerCase()]);
           if (uRes.rows.length) {
