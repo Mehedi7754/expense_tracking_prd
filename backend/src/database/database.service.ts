@@ -136,11 +136,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query(`
         INSERT INTO users (id, email, password_hash, full_name, role, department, designation, phone, is_active)
         VALUES
-          ('a0000000-0000-0000-0000-000000000001', 'admin@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Eleanor Vance', 'main_admin', 'Corporate Governance', 'Managing Director / Admin', '+880 1711-000001', TRUE),
-          ('a0000000-0000-0000-0000-000000000002', 'admin@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Super Admin', 'main_admin', 'Management', 'System Administrator', '+880 1711-000002', TRUE),
-          ('a0000000-0000-0000-0000-000000000003', 'manager@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Project Manager', 'project_manager', 'Engineering', 'Lead PM', '+880 1711-000003', TRUE),
-          ('a0000000-0000-0000-0000-000000000004', 'employee@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'John Employee', 'project_member', 'Development', 'Software Engineer', '+880 1711-000004', TRUE),
-          ('a0000000-0000-0000-0000-000000000005', 'finance@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Finance Officer', 'finance', 'Accounts', 'Finance Lead', '+880 1711-000005', TRUE)
+          ('a0000000-0000-0000-0000-000000000001', 'admin@pfis.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Eleanor Vance', 'main_admin'::user_role_type, 'Corporate Governance', 'Managing Director / Admin', '+880 1711-000001', TRUE),
+          ('a0000000-0000-0000-0000-000000000002', 'admin@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Super Admin', 'main_admin'::user_role_type, 'Management', 'System Administrator', '+880 1711-000002', TRUE),
+          ('a0000000-0000-0000-0000-000000000003', 'manager@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Project Manager', 'project_manager'::user_role_type, 'Engineering', 'Lead PM', '+880 1711-000003', TRUE),
+          ('a0000000-0000-0000-0000-000000000004', 'employee@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'John Employee', 'project_member'::user_role_type, 'Development', 'Software Engineer', '+880 1711-000004', TRUE),
+          ('a0000000-0000-0000-0000-000000000005', 'finance@example.com', '$2a$10$NcceR3EX5RYDA/ogM9Sys.TztdGvbBlJ4K630rzHG4E9Iole0NK6S', 'Finance Officer', 'finance'::user_role_type, 'Accounts', 'Finance Lead', '+880 1711-000005', TRUE)
         ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, is_active = TRUE;
       `);
       this.logger.log('Verified core seed users in PostgreSQL.');
