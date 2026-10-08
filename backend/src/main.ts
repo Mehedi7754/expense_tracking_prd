@@ -35,13 +35,7 @@ async function bootstrap() {
     }),
   );
 
-  // Serve uploaded files as static assets at /uploads/*
-  const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
-  app.useStaticAssets({
-    root: uploadsDir,
-    prefix: '/uploads/',
-    decorateReply: false,
-  });
+  // Static assets are handled by manual fastify routes below to allow DB fallback
 
   // Direct fastify route for /uploads/* with PostgreSQL fallback
   try {
@@ -58,8 +52,8 @@ async function bootstrap() {
         .header('Cache-Control', 'public, max-age=31536000, immutable')
         .send(file.buffer);
     };
+    // Direct fastify route for root /uploads/* (non-prefixed requests)
     fastify.get('/uploads/:category/:filename', serveUpload);
-    fastify.get('/api/v1/uploads/:category/:filename', serveUpload);
   } catch (_) {}
 
   const port = Number(process.env.PORT) || 8080;
@@ -67,6 +61,7 @@ async function bootstrap() {
 
   await app.listen(port, host);
   logger.log(`GW Project NestJS Backend running at http://${host}:${port}/api/v1`);
+  const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
   logger.log(`Static uploads served from: ${uploadsDir}`);
 }
 bootstrap();

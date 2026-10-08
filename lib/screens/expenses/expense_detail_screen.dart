@@ -9,6 +9,7 @@ import '../../core/widgets/comment_thread_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/receipt_uploader.dart';
 import '../../core/widgets/status_chip.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../models/expense_model.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
@@ -279,6 +280,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
                       _DetailRow(
                         label: 'Submitted By',
                         value: expense.employeeName,
+                        avatarUrl: expense.employeeAvatar,
                         icon: Icons.person_outline_rounded,
                         isDark: isDark,
                       ),
@@ -773,12 +775,14 @@ class _DetailRow extends StatelessWidget {
   final String value;
   final IconData icon;
   final bool isDark;
+  final String? avatarUrl;
 
   const _DetailRow({
     required this.label,
     required this.value,
     required this.icon,
     required this.isDark,
+    this.avatarUrl,
   });
 
   @override
@@ -801,13 +805,28 @@ class _DetailRow extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (avatarUrl != null) ...[
+                AppAvatar(
+                  imageUrl: avatarUrl,
+                  name: value,
+                  size: 20,
+                ),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

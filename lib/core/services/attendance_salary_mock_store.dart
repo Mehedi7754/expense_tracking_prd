@@ -359,7 +359,7 @@ class AttendanceSalaryMockStore {
     final usersToProcess = <UserModel>[];
     final seenUserIds = <String>{};
 
-    if (explicitUsers != null) {
+    if (explicitUsers != null && explicitUsers.isNotEmpty) {
       for (final u in explicitUsers) {
         if (u.isActive && u.role.requiresAttendanceCheckIn && !isUserDeleted(u)) {
           if (seenUserIds.add(u.id)) {
@@ -373,6 +373,15 @@ class AttendanceSalaryMockStore {
         if (u.isActive && u.role.requiresAttendanceCheckIn && !isUserDeleted(u)) {
           if (seenUserIds.add(u.id)) {
             usersToProcess.add(u);
+          }
+        }
+      }
+      if (usersToProcess.isEmpty) {
+        for (final u in kAuthenticDatabaseUsers) {
+          if (u.isActive && u.role.requiresAttendanceCheckIn && !isUserDeleted(u)) {
+            if (seenUserIds.add(u.id)) {
+              usersToProcess.add(u);
+            }
           }
         }
       }

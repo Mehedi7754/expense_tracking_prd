@@ -1,0 +1,242 @@
+{
+  "id": "flow-000",
+  "name": "01_login_employee",
+  "sourceFile": ".maestro/01_login_employee.yaml",
+  "device": {
+    "id": "38d8f89a",
+    "name": "OnePlus IN2015",
+    "platform": "android",
+    "osVersion": "33",
+    "isSimulator": false
+  },
+  "startTime": "2026-10-06T02:22:34.106732585+06:00",
+  "endTime": "2026-10-06T02:22:34.781944879+06:00",
+  "duration": 675,
+  "commands": [
+    {
+      "id": "cmd-000",
+      "index": 0,
+      "type": "launchApp",
+      "yaml": "launchApp (clearState)",
+      "status": "failed",
+      "startTime": "2026-10-06T02:22:34.107479906+06:00",
+      "endTime": "2026-10-06T02:22:34.773398511+06:00",
+      "duration": 665,
+      "error": {
+        "type": "unknown",
+        "message": "launchApp: failed to clear app state for 'com.example.expense_tracking_prd' — is the app installed? (cause: adb shell pm clear com.example.expense_tracking_prd: exit status 255: \nException occurred while executing 'clear':\njava.lang.SecurityException: PID 19881 does not have permission android.permission.CLEAR_APP_USER_DATA to clear data of package com.example.expense_tracking_prd\n\tat com.android.server.am.ActivityManagerService.clearApplicationUserData(ActivityManagerService.java:4170)\n\tat com.android.server.pm.PackageManagerShellCommand.runClear(PackageManagerShellCommand.java:2347)\n\tat com.android.server.pm.PackageManagerShellCommand.onCommand(PackageManagerShellCommand.java:278)\n\tat com.android.modules.utils.BasicShellCommandHandler.exec(BasicShellCommandHandler.java:97)\n\tat android.os.ShellCommand.exec(ShellCommand.java:38)\n\tat com.android.server.pm.PackageManagerService$IPackageManagerImpl.onShellCommand(PackageManagerService.java:6381)\n\tat android.os.Binder.shellCommand(Binder.java:1073)\n\tat android.os.Binder.onTransact(Binder.java:901)\n\tat android.content.pm.IPackageManager$Stub.onTransact(IPackageManager.java:4313)\n\tat com.android.server.pm.PackageManagerService$IPackageManagerImpl.onTransact(PackageManagerService.java:6365)\n\tat android.os.Binder.execTransactInternal(Binder.java:1331)\n\tat android.os.Binder.execTransact(Binder.java:1268)\n)"
+      },
+      "artifacts": {
+        "screenshotAfter": "assets/flow-000/cmd-000-after.png",
+        "viewHierarchy": "assets/flow-000/cmd-000-hierarchy.xml"
+      }
+    },
+    {
+      "id": "cmd-001",
+      "index": 1,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Email\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Email"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-002",
+      "index": 2,
+      "type": "inputText",
+      "yaml": "inputText: \"employee@example.com\"",
+      "status": "skipped",
+      "params": {
+        "text": "employee@example.com"
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-003",
+      "index": 3,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Password\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Password"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-004",
+      "index": 4,
+      "type": "inputText",
+      "yaml": "inputText: \"password\"",
+      "status": "skipped",
+      "params": {
+        "text": "password"
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-005",
+      "index": 5,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Login\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Login"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-006",
+      "index": 6,
+      "type": "extendedWaitUntil",
+      "yaml": "extendedWaitUntil: visible text=\"Home\"",
+      "status": "skipped",
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-007",
+      "index": 7,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"Home\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Home"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-008",
+      "index": 8,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Expenses\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Expenses"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-009",
+      "index": 9,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"Submit Expense\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Submit Expense"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-010",
+      "index": 10,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Attendance\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Attendance"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-011",
+      "index": 11,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"Check In\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Check In"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-012",
+      "index": 12,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Projects\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Projects"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-013",
+      "index": 13,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"My Projects\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "My Projects"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-014",
+      "index": 14,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Profile\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Profile"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-015",
+      "index": 15,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Logout\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Logout"
+        }
+      },
+      "artifacts": {}
+    }
+  ],
+  "stepLatency": {
+    "count": 1,
+    "mean": 665,
+    "p50": 665,
+    "p95": 665,
+    "max": 665,
+    "slowestType": "launchApp"
+  },
+  "artifacts": {}
+}

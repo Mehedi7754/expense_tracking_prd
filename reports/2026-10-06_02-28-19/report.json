@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "updateSeq": 9,
+  "status": "running",
+  "startTime": "2026-10-06T02:28:23.231030488+06:00",
+  "lastUpdated": "2026-10-06T02:28:35.205410937+06:00",
+  "device": {
+    "id": "38d8f89a",
+    "name": "OnePlus IN2015",
+    "platform": "android",
+    "osVersion": "33",
+    "isSimulator": false
+  },
+  "app": {
+    "id": "com.example.expense_tracking_prd",
+    "version": "1.0.0",
+    "build": "1"
+  },
+  "maestroRunner": {
+    "version": "1.1.28",
+    "driver": "devicelab"
+  },
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "running": 1,
+    "pending": 0
+  },
+  "flows": [
+    {
+      "index": 0,
+      "id": "flow-000",
+      "name": "02_login_manager",
+      "sourceFile": ".maestro/02_login_manager.yaml",
+      "device": {
+        "id": "38d8f89a",
+        "name": "OnePlus IN2015",
+        "platform": "android",
+        "osVersion": "33",
+        "isSimulator": false
+      },
+      "dataFile": "flows/flow-000.json",
+      "assetsDir": "assets/flow-000",
+      "status": "running",
+      "updateSeq": 7,
+      "lastUpdated": "2026-10-06T02:28:35.20540826+06:00",
+      "commands": {
+        "total": 17,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "running": 1,
+        "pending": 10,
+        "current": 6
+      },
+      "attempts": 0
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import '../../models/attendance_model.dart';
 import '../../models/user_role.dart';
 import '../../state/attendance_provider.dart';
 import '../../state/auth_provider.dart';
+import '../../state/attendance_settings_provider.dart';
 import '../../state/user_management_provider.dart';
 import 'my_attendance_screen.dart';
 import 'widgets/attendance_map_view.dart';
@@ -30,6 +31,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(userManagementProvider.notifier).fetchUsers();
       ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
       ref.read(attendanceProvider.notifier).fetchAttendanceRecords(force: true);
     });
@@ -99,7 +101,9 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
             Row(
               children: [
                 AppAvatar(
-                  imageUrl: record.avatarUrl,
+                  imageUrl: (record.avatarUrl.isNotEmpty)
+                      ? record.avatarUrl
+                      : (ref.read(userManagementProvider).where((u) => u.id == record.userId).firstOrNull?.avatarUrl ?? ''),
                   name: record.userName,
                   size: 44,
                 ),
@@ -251,18 +255,63 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
     final overview = attendanceState.dailyOverview;
     final records = attendanceState.records;
 
-    final totalStaff = overview?.totalEmployees ?? allUsers.length;
-    final presentCount = overview?.presentCount ?? 0;
-    final halfDayCount = overview?.halfDayCount ?? 0;
-    final missingCount = overview?.missingCount ?? 0;
+    final avatarMap = <String, String>{};
+    for (final u in allUsers) {
+      if (u.avatarUrl != null && u.avatarUrl!.isNotEmpty) {
+        avatarMap[u.id] = u.avatarUrl!;
+      }
+    }
+    for (final u in kAuthenticDatabaseUsers) {
+      if (u.avatarUrl != null && u.avatarUrl!.isNotEmpty && !avatarMap.containsKey(u.id)) {
+        avatarMap[u.id] = u.avatarUrl!;
+      }
+    }
 
-    final employees = (overview?.employees ?? []).where((e) {
+    List<EmployeeDailyAttendance> rawEmployees = overview?.employees ?? [];
+    if (rawEmployees.isEmpty) {
+      final sourceUsers = allUsers.isNotEmpty ? allUsers : kAuthenticDatabaseUsers;
+      rawEmployees = sourceUsers
+          .where((u) => u.isActive && u.role.requiresAttendanceCheckIn)
+          .map((u) {
+            final userRecords = records.where((r) => r.userId == u.id).toList();
+            final hasMorning = userRecords.any((r) => r.isMorning);
+            final hasAfternoon = userRecords.any((r) => !r.isMorning);
+            String status = 'missing';
+            if (hasMorning && hasAfternoon) {
+              status = 'present';
+            } else if (hasMorning || hasAfternoon) {
+              status = 'half_day';
+            }
+            return EmployeeDailyAttendance(
+              userId: u.id,
+              userName: u.name,
+              userEmail: u.email,
+              department: u.department,
+              designation: u.designation ?? u.role.displayName,
+              avatarUrl: u.avatarUrl ?? '',
+              role: u.role.displayName,
+              date: attendanceState.selectedDate,
+              status: status,
+              morning: userRecords.where((r) => r.isMorning).firstOrNull,
+              afternoon: userRecords.where((r) => !r.isMorning).firstOrNull,
+            );
+          })
+          .toList();
+    }
+
+    final employees = rawEmployees.where((e) {
       final name = e.userName.toLowerCase();
       final email = e.userEmail.toLowerCase();
       return !name.contains('eleanor') &&
           !email.contains('eleanor') &&
           email != 'admin@pfis.com';
     }).toList();
+
+    final totalStaff = employees.length;
+    final presentCount = employees.where((e) => e.status == 'present').length;
+    final halfDayCount = employees.where((e) => e.status == 'half_day').length;
+    final missingCount = employees.where((e) => e.status == 'missing' || e.status == 'confirmed_absent').length;
+
     final filteredEmployees = employees.where((e) {
       if (_statusFilter == 'present') return e.status == 'present';
       if (_statusFilter == 'half_day') return e.status == 'half_day';
@@ -272,7 +321,9 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
 
     DateTime parsedDate = DateTime.tryParse(attendanceState.selectedDate) ?? DateTime.now();
     final formattedDateTitle = DateFormat('EEE, MMM d, yyyy').format(parsedDate);
-    final isWeekend = parsedDate.weekday == DateTime.friday || parsedDate.weekday == DateTime.saturday;
+    final settingsState = ref.watch(attendanceSettingsProvider);
+    final weekendDays = settingsState.value?.weekendDays ?? [DateTime.friday, DateTime.saturday];
+    final isWeekend = weekendDays.contains(parsedDate.weekday);
     final isHoliday = employees.isNotEmpty && employees.every((e) => e.status == 'holiday');
 
     return Scaffold(
@@ -297,6 +348,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh Attendance',
             onPressed: () {
+              ref.read(userManagementProvider.notifier).fetchUsers();
               ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
               ref.read(attendanceProvider.notifier).fetchAttendanceRecords(force: true);
               ref.read(attendanceProvider.notifier).syncOfflineCheckIns();
@@ -638,7 +690,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
                       ),
                     )
                   else
-                    ...filteredEmployees.map((emp) => _buildEmployeeAttendanceCard(emp, isDark)),
+                    ...filteredEmployees.map((emp) => _buildEmployeeAttendanceCard(emp, isDark, avatarMap)),
 
                   const SizedBox(height: 32),
                 ],
@@ -721,7 +773,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
     );
   }
 
-  Widget _buildEmployeeAttendanceCard(EmployeeDailyAttendance emp, bool isDark) {
+  Widget _buildEmployeeAttendanceCard(EmployeeDailyAttendance emp, bool isDark, [Map<String, String>? avatarMap]) {
     Color statusColor;
     String statusLabel;
     IconData statusIcon;
@@ -752,6 +804,10 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
       statusIcon = Icons.radio_button_unchecked_rounded;
     }
 
+    final effectiveAvatar = emp.avatarUrl.isNotEmpty
+        ? emp.avatarUrl
+        : (avatarMap?[emp.userId] ?? '');
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -778,7 +834,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
             child: Row(
               children: [
                 AppAvatar(
-                  imageUrl: emp.avatarUrl,
+                  imageUrl: effectiveAvatar,
                   name: emp.userName,
                   size: 40,
                 ),

@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "updateSeq": 8,
+  "status": "failed",
+  "startTime": "2026-10-06T02:22:34.08845436+06:00",
+  "endTime": "2026-10-06T02:22:34.809195492+06:00",
+  "lastUpdated": "2026-10-06T02:22:34.816428266+06:00",
+  "device": {
+    "id": "38d8f89a",
+    "name": "OnePlus IN2015",
+    "platform": "android",
+    "osVersion": "33",
+    "isSimulator": false
+  },
+  "app": {
+    "id": "com.example.expense_tracking_prd",
+    "version": "1.0.0",
+    "build": "1"
+  },
+  "maestroRunner": {
+    "version": "1.1.28",
+    "driver": "devicelab"
+  },
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "running": 0,
+    "pending": 0
+  },
+  "flows": [
+    {
+      "index": 0,
+      "id": "flow-000",
+      "name": "01_login_employee",
+      "sourceFile": ".maestro/01_login_employee.yaml",
+      "device": {
+        "id": "38d8f89a",
+        "name": "OnePlus IN2015",
+        "platform": "android",
+        "osVersion": "33",
+        "isSimulator": false
+      },
+      "dataFile": "flows/flow-000.json",
+      "assetsDir": "assets/flow-000",
+      "status": "failed",
+      "updateSeq": 3,
+      "endTime": "2026-10-06T02:22:34.781944879+06:00",
+      "duration": 675,
+      "lastUpdated": "2026-10-06T02:22:34.79421683+06:00",
+      "commands": {
+        "total": 16,
+        "passed": 0,
+        "failed": 1,
+        "skipped": 15,
+        "running": 0,
+        "pending": 0
+      },
+      "attempts": 0,
+      "error": "launchApp: failed to clear app state for 'com.example.expense_tracking_prd' — is the app installed? (cause: adb shell pm clear com.example.expense_tracking_prd: exit status 255: \nException occurred while executing 'clear':\njava.lang.SecurityException: PID 19881 does not have permission android.permission.CLEAR_APP_USER_DATA to clear data of package com.example.expense_tracking_prd\n\tat com.android.server.am.ActivityManagerService.clearApplicationUserData(ActivityManagerService.java:4170)\n\tat com.android.server.pm.PackageManagerShellCommand.runClear(PackageManagerShellCommand.java:2347)\n\tat com.android.server.pm.PackageManagerShellCommand.onCommand(PackageManagerShellCommand.java:278)\n\tat com.android.modules.utils.BasicShellCommandHandler.exec(BasicShellCommandHandler.java:97)\n\tat android.os.ShellCommand.exec(ShellCommand.java:38)\n\tat com.android.server.pm.PackageManagerService$IPackageManagerImpl.onShellCommand(PackageManagerService.java:6381)\n\tat android.os.Binder.shellCommand(Binder.java:1073)\n\tat android.os.Binder.onTransact(Binder.java:901)\n\tat android.content.pm.IPackageManager$Stub.onTransact(IPackageManager.java:4313)\n\tat com.android.server.pm.PackageManagerService$IPackageManagerImpl.onTransact(PackageManagerService.java:6365)\n\tat android.os.Binder.execTransactInternal(Binder.java:1331)\n\tat android.os.Binder.execTransact(Binder.java:1268)\n)"
+    }
+  ]
+}

@@ -468,66 +468,87 @@ export class ProjectsService {
   }
 
   async delete(id: string, user?: any) {
-    let dbId = id;
-    let projectCode = id;
-    let projectName = id;
-    try {
-      const existing = await this.findOne(id, user);
-      if (existing) {
-        dbId = existing.id;
-        projectCode = existing.projectId || id;
-        projectName = existing.name || id;
-      }
-    } catch (_) {}
+    const rawTarget = (id || '').trim();
+    if (!rawTarget) {
+      return { success: false, message: 'Invalid project ID', deletedCount: 0 };
+    }
+
+    // Resolve all matching project IDs, project codes, and names
+    const findRes = await this.db.query(
+      `SELECT id::text AS id, project_code, name FROM projects 
+       WHERE id::text = $1 
+          OR project_code = $1 
+          OR LOWER(project_code) = LOWER($1) 
+          OR LOWER(name) = LOWER($1)`,
+      [rawTarget],
+    );
+
+    const idsToDelete = new Set<string>([rawTarget]);
+    const codesToDelete = new Set<string>([rawTarget]);
+    const namesToDelete = new Set<string>([rawTarget]);
+
+    for (const row of findRes.rows) {
+      if (row.id) idsToDelete.add(row.id.toString());
+      if (row.project_code) codesToDelete.add(row.project_code.toString());
+      if (row.name) namesToDelete.add(row.name.toString());
+    }
 
     return this.db.transaction(async (client) => {
+      const idList = Array.from(idsToDelete);
+      const codeList = Array.from(codesToDelete);
+      const nameList = Array.from(namesToDelete);
+
       // 1. Delete comments on expenses belonging to this project
       await client.query(
         `DELETE FROM expense_comments
          WHERE expense_id IN (
-           SELECT id FROM expenses WHERE project_id::text = $1 OR project_id::text = $2
+           SELECT id FROM expenses WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])
          )`,
-        [dbId, projectCode],
+        [idList, codeList],
       );
 
       // 2. Delete notifications referencing expenses or this project
       await client.query(
         `DELETE FROM notifications
-         WHERE related_project_id::text = $1 OR related_project_id::text = $2
+         WHERE related_project_id::text = ANY($1::text[]) OR related_project_id::text = ANY($2::text[])
             OR related_expense_id IN (
-              SELECT id FROM expenses WHERE project_id::text = $1 OR project_id::text = $2
+              SELECT id FROM expenses WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])
             )`,
-        [dbId, projectCode],
+        [idList, codeList],
       );
 
-      // 3. Delete expenses belonging to this project (not-null FK column)
+      // 3. Delete expenses belonging to this project
       await client.query(
-        'DELETE FROM expenses WHERE project_id::text = $1 OR project_id::text = $2',
-        [dbId, projectCode],
+        'DELETE FROM expenses WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
+        [idList, codeList],
       );
 
-      // 4. Delete tasks belonging to this project (not-null FK column)
+      // 4. Delete tasks belonging to this project
       await client.query(
-        'DELETE FROM tasks WHERE project_id::text = $1 OR project_id::text = $2',
-        [dbId, projectCode],
+        'DELETE FROM tasks WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
+        [idList, codeList],
       );
 
       // 5. Delete project revenues
       await client.query(
-        'DELETE FROM project_revenues WHERE project_id::text = $1 OR project_id::text = $2',
-        [dbId, projectCode],
+        'DELETE FROM project_revenues WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
+        [idList, codeList],
       );
 
       // 6. Delete project members
       await client.query(
-        'DELETE FROM project_members WHERE project_id::text = $1 OR project_id::text = $2',
-        [dbId, projectCode],
+        'DELETE FROM project_members WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
+        [idList, codeList],
       );
 
       // 7. Delete project record
       const res = await client.query(
-        'DELETE FROM projects WHERE id::text = $1 OR id::text = $2 OR project_code = $1 OR project_code = $2 OR LOWER(name) = LOWER($3) RETURNING *',
-        [dbId, projectCode, projectName],
+        `DELETE FROM projects 
+         WHERE id::text = ANY($1::text[]) 
+            OR project_code = ANY($2::text[]) 
+            OR LOWER(name) = ANY(SELECT LOWER(x) FROM unnest($3::text[]) x) 
+         RETURNING *`,
+        [idList, codeList, nameList],
       );
 
       try {
@@ -535,8 +556,8 @@ export class ProjectsService {
           {
             action: 'PROJECT_DELETED',
             entityType: 'Project',
-            entityId: dbId,
-            details: { id, dbId, projectCode, projectName },
+            entityId: idList[0],
+            details: { id, idList, codeList, nameList },
           },
           user ? { id: user.id } : undefined,
         );

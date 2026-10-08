@@ -1,0 +1,259 @@
+{
+  "id": "flow-000",
+  "name": "01_login_employee",
+  "sourceFile": ".maestro/01_login_employee.yaml",
+  "device": {
+    "id": "38d8f89a",
+    "name": "OnePlus IN2015",
+    "platform": "android",
+    "osVersion": "33",
+    "isSimulator": false
+  },
+  "startTime": "2026-10-06T02:37:48.788532712+06:00",
+  "endTime": "2026-10-06T02:38:08.528802573+06:00",
+  "duration": 19740,
+  "commands": [
+    {
+      "id": "cmd-000",
+      "index": 0,
+      "type": "launchApp",
+      "yaml": "launchApp",
+      "status": "passed",
+      "startTime": "2026-10-06T02:37:48.789052113+06:00",
+      "endTime": "2026-10-06T02:37:50.474351692+06:00",
+      "duration": 1685,
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-001",
+      "index": 1,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Email\"",
+      "status": "failed",
+      "startTime": "2026-10-06T02:37:50.475181437+06:00",
+      "endTime": "2026-10-06T02:38:08.520291285+06:00",
+      "duration": 18045,
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Email"
+        }
+      },
+      "error": {
+        "type": "element_not_found",
+        "message": "Element not found: handler_error: Element not found in any of 10 strategies (cause: context deadline exceeded: handler_error: Element not found in any of 10 strategies)"
+      },
+      "artifacts": {
+        "screenshotAfter": "assets/flow-000/cmd-001-after.png",
+        "viewHierarchy": "assets/flow-000/cmd-001-hierarchy.xml"
+      }
+    },
+    {
+      "id": "cmd-002",
+      "index": 2,
+      "type": "inputText",
+      "yaml": "inputText: \"employee@example.com\"",
+      "status": "skipped",
+      "params": {
+        "text": "employee@example.com"
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-003",
+      "index": 3,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Password\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Password"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-004",
+      "index": 4,
+      "type": "inputText",
+      "yaml": "inputText: \"password\"",
+      "status": "skipped",
+      "params": {
+        "text": "password"
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-005",
+      "index": 5,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Sign In to GW project\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Sign In to GW project"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-006",
+      "index": 6,
+      "type": "extendedWaitUntil",
+      "yaml": "extendedWaitUntil: visible text=\"GW Project Financials\"",
+      "status": "skipped",
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-007",
+      "index": 7,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"GW Project Financials\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "GW Project Financials"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-008",
+      "index": 8,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Expenses\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Expenses"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-009",
+      "index": 9,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"My Expenses\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "My Expenses"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-010",
+      "index": 10,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Attendance\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Attendance"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-011",
+      "index": 11,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"My Attendance \u0026 Location\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "My Attendance \u0026 Location"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-012",
+      "index": 12,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Projects\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Projects"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-013",
+      "index": 13,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"My Projects\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "My Projects"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-014",
+      "index": 14,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Profile\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Profile"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-015",
+      "index": 15,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Sign Out\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Sign Out"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-016",
+      "index": 16,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Sign Out\"",
+      "status": "skipped",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Sign Out"
+        }
+      },
+      "artifacts": {}
+    }
+  ],
+  "stepLatency": {
+    "count": 2,
+    "mean": 9865,
+    "p50": 1685,
+    "p95": 18045,
+    "max": 18045,
+    "slowestType": "tapOn"
+  },
+  "artifacts": {}
+}

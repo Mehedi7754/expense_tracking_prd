@@ -242,22 +242,15 @@ class AttendanceSettingsState {
       });
     }
 
-    int morningStart = (json['morningStartHour'] as num?)?.toInt() ?? 9;
-    int morningEnd = (json['morningEndHour'] as num?)?.toInt() ?? 13;
-    int afternoonStart = (json['afternoonStartHour'] as num?)?.toInt() ?? morningEnd;
-    int afternoonEnd = (json['afternoonEndHour'] as num?)?.toInt() ?? 18;
-
     final defaultShiftIdx = shiftList.indexWhere((s) => s.isDefault || s.id == 'shift_default');
-    if (defaultShiftIdx >= 0) {
-      final def = shiftList[defaultShiftIdx];
-      // Keep them strictly aligned
-      shiftList[defaultShiftIdx] = def.copyWith(
-        morningStartHour: morningStart,
-        morningEndHour: morningEnd,
-        afternoonStartHour: morningEnd,
-        afternoonEndHour: afternoonEnd,
-        weekendDays: weekend,
-      );
+    final defaultShift = defaultShiftIdx >= 0 ? shiftList[defaultShiftIdx] : (shiftList.isNotEmpty ? shiftList.first : null);
+
+    int morningStart = defaultShift?.morningStartHour ?? (json['morningStartHour'] as num?)?.toInt() ?? 9;
+    int morningEnd = defaultShift?.morningEndHour ?? (json['morningEndHour'] as num?)?.toInt() ?? 13;
+    int afternoonStart = defaultShift?.afternoonStartHour ?? morningEnd;
+    int afternoonEnd = defaultShift?.afternoonEndHour ?? (json['afternoonEndHour'] as num?)?.toInt() ?? 18;
+    if (defaultShift != null && defaultShift.weekendDays.isNotEmpty) {
+      weekend = defaultShift.weekendDays;
     }
 
     return AttendanceSettingsState(

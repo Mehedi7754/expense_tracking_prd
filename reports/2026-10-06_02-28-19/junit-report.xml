@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="0" skipped="0" errors="0" time="0.000">
+  <testsuite name="maestro-runner" tests="1" failures="0" skipped="0" errors="0" time="0.000" timestamp="2026-10-06T02:28:23+06:00">
+    <testcase name="02_login_manager" classname="02_login_manager" time="0.000">
+      <properties>
+        <property name="file" value=".maestro/02_login_manager.yaml"/>
+        <property name="device.name" value="OnePlus IN2015"/>
+        <property name="device.id" value="38d8f89a"/>
+        <property name="device.platform" value="android"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

@@ -2264,10 +2264,22 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'By ${exp.employeeName} • ${DateFormatter.formatShort(exp.date)}',
-                  style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    AppAvatar(
+                      imageUrl: exp.employeeAvatar,
+                      name: exp.employeeName,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'By ${exp.employeeName} • ${DateFormatter.formatShort(exp.date)}',
+                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 6),
               Text(exp.note, style: const TextStyle(fontSize: 13)),

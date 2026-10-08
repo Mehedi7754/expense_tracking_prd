@@ -1,0 +1,208 @@
+{
+  "uuid": "flow-000",
+  "historyId": "0fef3f90",
+  "fullName": "01_login_employee",
+  "name": "01_login_employee",
+  "status": "failed",
+  "stage": "finished",
+  "start": 0,
+  "stop": 1791232099008,
+  "labels": [
+    {
+      "name": "suite",
+      "value": "01_login_employee"
+    },
+    {
+      "name": "parentSuite",
+      "value": "01_login_employee.yaml"
+    },
+    {
+      "name": "framework",
+      "value": "maestro"
+    },
+    {
+      "name": "severity",
+      "value": "normal"
+    },
+    {
+      "name": "host",
+      "value": "OnePlus IN2015"
+    },
+    {
+      "name": "thread",
+      "value": "38d8f89a"
+    }
+  ],
+  "statusDetails": {
+    "message": "Element 'Home' not visible within 10s (cause: context deadline exceeded)",
+    "trace": ""
+  },
+  "steps": [
+    {
+      "name": "launchApp",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1791232076244,
+      "stop": 1791232076634,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1791232076635,
+      "stop": 1791232082633,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "inputText",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1791232082634,
+      "stop": 1791232086438,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1791232086439,
+      "stop": 1791232087448,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "inputText",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1791232087449,
+      "stop": 1791232087633,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "passed",
+      "stage": "finished",
+      "start": 1791232087634,
+      "stop": 1791232088615,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "extendedWaitUntil",
+      "status": "failed",
+      "stage": "finished",
+      "start": 1791232088615,
+      "stop": 1791232099000,
+      "steps": [],
+      "attachments": [
+        {
+          "name": "After",
+          "source": "8422657d40ffcfda30462f06443309393537061b31094ccc5d3f38177de47a62-attachment.png",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    }
+  ],
+  "attachments": [
+    {
+      "name": "Screenshot",
+      "source": "8422657d40ffcfda30462f06443309393537061b31094ccc5d3f38177de47a62-attachment.png",
+      "type": "image/png"
+    }
+  ]
+}

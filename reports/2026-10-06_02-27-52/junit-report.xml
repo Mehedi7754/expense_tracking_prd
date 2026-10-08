@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="1" skipped="0" errors="0" time="22.800">
+  <testsuite name="maestro-runner" tests="1" failures="1" skipped="0" errors="0" time="22.800" timestamp="2026-10-06T02:27:56+06:00">
+    <testcase name="01_login_employee" classname="01_login_employee" time="22.765">
+      <properties>
+        <property name="file" value=".maestro/01_login_employee.yaml"/>
+        <property name="device.name" value="OnePlus IN2015"/>
+        <property name="device.id" value="38d8f89a"/>
+        <property name="device.platform" value="android"/>
+      </properties>
+      <failure message="Element &apos;Home&apos; not visible within 10s (cause: context deadline exceeded)" type="TestError">Element &apos;Home&apos; not visible within 10s (cause: context deadline exceeded)</failure>
+      <system-out>[[ATTACHMENT|assets/flow-000/cmd-006-after.png]]</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

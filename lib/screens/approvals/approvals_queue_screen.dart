@@ -12,7 +12,7 @@ import '../../models/expense_model.dart';
 import '../../models/user_model.dart';
 import '../../state/expense_provider.dart';
 import '../../state/user_management_provider.dart';
-import '../../core/utils/image_utils.dart';
+import '../../core/widgets/app_avatar.dart';
 
 class ApprovalsQueueScreen extends ConsumerStatefulWidget {
   const ApprovalsQueueScreen({super.key});
@@ -298,36 +298,10 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                   const SizedBox(width: 4),
                 ],
                 // Left squircle profile image
-                Builder(
-                  builder: (ctx) {
-                    final user = allUsers.cast<UserModel?>().firstWhere((u) => u?.id == exp.employeeId, orElse: () => null);
-                    
-                    return Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: iconBg,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                          ? AppImageHelper.buildImage(
-                              path: user.avatarUrl,
-                              fit: BoxFit.cover,
-                              placeholder: () => Center(child: Icon(Icons.person, color: iconColor, size: 28)),
-                            )
-                          : Center(
-                              child: Text(
-                                user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
-                                style: TextStyle(
-                                  color: iconColor,
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                    );
-                  },
+                AppAvatar(
+                  imageUrl: exp.employeeAvatar,
+                  name: exp.employeeName,
+                  size: 50,
                 ),
                 const SizedBox(width: 12),
                 // Middle column: Claimant Name, Project & Relative Time, and Receipt Status

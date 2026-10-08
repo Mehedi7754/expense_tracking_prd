@@ -1,0 +1,16 @@
+appId: com.example.expense_tracking_prd
+---
+- launchApp
+- assertVisible: "Email" 
+- tapOn: "Email"
+- inputText: "employee@example.com"
+- tapOn: "Password"
+- inputText: "password"
+- tapOn: "Login"
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 5000
+- tapOn: "Expenses"
+- tapOn: "Attendance"
+- tapOn: "Projects"
+- tapOn: "Profile"

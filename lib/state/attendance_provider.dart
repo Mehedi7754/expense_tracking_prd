@@ -85,12 +85,20 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     markFetchStarted();
     state = state.copyWith(isLoading: true, clearError: true);
 
-    final users = ref.read(userManagementProvider);
+    var users = ref.read(userManagementProvider);
+    if (users.isEmpty) {
+      try {
+        await ref.read(userManagementProvider.notifier).fetchUsers();
+        users = ref.read(userManagementProvider);
+      } catch (_) {}
+    }
     final curUser = ref.read(authProvider).currentUser;
     if (curUser != null) {
       AttendanceSalaryMockStore.instance.syncUser(curUser);
     }
-    AttendanceSalaryMockStore.instance.syncUsers(users);
+    if (users.isNotEmpty) {
+      AttendanceSalaryMockStore.instance.syncUsers(users);
+    }
 
     try {
       final repo = ref.read(attendanceRepositoryProvider);

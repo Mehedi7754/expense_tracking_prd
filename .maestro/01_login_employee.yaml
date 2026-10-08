@@ -1,0 +1,28 @@
+appId: com.example.expense_tracking_prd
+---
+- launchApp
+- runFlow:
+    when:
+      notVisible: "Email"
+    commands:
+      - tapOn: "Profile"
+      - tapOn: "Sign Out"
+      - tapOn: "Sign Out"
+- tapOn: "Email"
+- inputText: "employee@example.com"
+- tapOn: "Password"
+- inputText: "password"
+- tapOn: "Sign In to GW project"
+- extendedWaitUntil:
+    visible: "GW Project Financials"
+    timeout: 10000
+- assertVisible: "GW Project Financials"
+- tapOn: "Expenses"
+- assertVisible: "My Expenses"
+- tapOn: "Attendance"
+- assertVisible: "My Attendance & Location"
+- tapOn: "Projects"
+- assertVisible: "My Projects"
+- tapOn: "Profile"
+- tapOn: "Sign Out"
+- tapOn: "Sign Out"

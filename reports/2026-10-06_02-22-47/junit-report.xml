@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="1" failures="1" skipped="0" errors="0" time="30.634">
+  <testsuite name="maestro-runner" tests="1" failures="1" skipped="0" errors="0" time="30.634" timestamp="2026-10-06T02:22:50+06:00">
+    <testcase name="01_login_employee" classname="01_login_employee" time="30.608">
+      <properties>
+        <property name="file" value=".maestro/01_login_employee.yaml"/>
+        <property name="device.name" value="OnePlus IN2015"/>
+        <property name="device.id" value="38d8f89a"/>
+        <property name="device.platform" value="android"/>
+      </properties>
+      <failure message="Element not found: handler_error: Element not found in any of 10 strategies (cause: context deadline exceeded: handler_error: Element not found in any of 10 strategies)" type="ElementInteractionError">Element not found: handler_error: Element not found in any of 10 strategies (cause: context deadline exceeded: handler_error: Element not found in any of 10 strategies)</failure>
+      <system-out>[[ATTACHMENT|assets/flow-000/cmd-005-after.png]]</system-out>
+    </testcase>
+  </testsuite>
+</testsuites>

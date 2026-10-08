@@ -89,7 +89,9 @@ export class ExpensesService {
     let sql = `
       SELECT e.*,
         u.full_name AS employee_name,
+        u.avatar_url AS employee_avatar,
         p.name AS project_name,
+        p.image_url AS project_image_url,
         c.name AS category_name,
         c.icon_name AS category_icon,
         COALESCE(
@@ -146,7 +148,9 @@ export class ExpensesService {
     const sql = `
       SELECT e.*,
         u.full_name AS employee_name,
+        u.avatar_url AS employee_avatar,
         p.name AS project_name,
+        p.image_url AS project_image_url,
         c.name AS category_name,
         c.icon_name AS category_icon,
         COALESCE(

@@ -1,0 +1,248 @@
+{
+  "id": "flow-000",
+  "name": "01_login_employee",
+  "sourceFile": ".maestro/01_login_employee.yaml",
+  "device": {
+    "id": "38d8f89a",
+    "name": "OnePlus IN2015",
+    "platform": "android",
+    "osVersion": "33",
+    "isSimulator": false
+  },
+  "startTime": "2026-10-06T02:39:04.880442896+06:00",
+  "commands": [
+    {
+      "id": "cmd-000",
+      "index": 0,
+      "type": "launchApp",
+      "yaml": "launchApp",
+      "status": "passed",
+      "startTime": "2026-10-06T02:39:04.881069499+06:00",
+      "endTime": "2026-10-06T02:39:05.305281212+06:00",
+      "duration": 424,
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-001",
+      "index": 1,
+      "type": "runFlow",
+      "yaml": "runFlow",
+      "status": "running",
+      "startTime": "2026-10-06T02:39:05.306291311+06:00",
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-002",
+      "index": 2,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Email\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Email"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-003",
+      "index": 3,
+      "type": "inputText",
+      "yaml": "inputText: \"employee@example.com\"",
+      "status": "pending",
+      "params": {
+        "text": "employee@example.com"
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-004",
+      "index": 4,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Password\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Password"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-005",
+      "index": 5,
+      "type": "inputText",
+      "yaml": "inputText: \"password\"",
+      "status": "pending",
+      "params": {
+        "text": "password"
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-006",
+      "index": 6,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Sign In to GW project\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Sign In to GW project"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-007",
+      "index": 7,
+      "type": "extendedWaitUntil",
+      "yaml": "extendedWaitUntil: visible text=\"GW Project Financials\"",
+      "status": "pending",
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-008",
+      "index": 8,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"GW Project Financials\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "GW Project Financials"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-009",
+      "index": 9,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Expenses\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Expenses"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-010",
+      "index": 10,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"My Expenses\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "My Expenses"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-011",
+      "index": 11,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Attendance\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Attendance"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-012",
+      "index": 12,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"My Attendance \u0026 Location\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "My Attendance \u0026 Location"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-013",
+      "index": 13,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Projects\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Projects"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-014",
+      "index": 14,
+      "type": "assertVisible",
+      "yaml": "assertVisible: text=\"My Projects\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "My Projects"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-015",
+      "index": 15,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Profile\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Profile"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-016",
+      "index": 16,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Sign Out\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Sign Out"
+        }
+      },
+      "artifacts": {}
+    },
+    {
+      "id": "cmd-017",
+      "index": 17,
+      "type": "tapOn",
+      "yaml": "tapOn: text=\"Sign Out\"",
+      "status": "pending",
+      "params": {
+        "selector": {
+          "type": "text",
+          "value": "Sign Out"
+        }
+      },
+      "artifacts": {}
+    }
+  ],
+  "artifacts": {}
+}

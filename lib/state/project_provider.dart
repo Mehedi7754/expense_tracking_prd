@@ -120,70 +120,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
               .where((p) => !_isProjectDeleted(p, deletedIds))
               .toList();
 
-      final remoteIds = remoteProjects.map((p) => p.id).toSet();
-      final remoteCodes = remoteProjects.map((p) => p.projectId).toSet();
-
-      final localMap = <String, ProjectModel>{for (final p in state) p.id: p};
-      final mergedProjects = <ProjectModel>[];
-
-      for (final remote in remoteProjects) {
-        final local = localMap[remote.id];
-        if (local != null) {
-          // Merge team members: combine so no assigned member is dropped
-          final combinedMembers =
-              {...remote.teamMemberIds, ...local.teamMemberIds}.toList();
-
-          double progress = remote.progressPercentage;
-          DateTime? progressUpdatedAt = remote.progressUpdatedAt;
-          String? progressUpdatedByName = remote.progressUpdatedByName;
-          String? progressUpdatedById = remote.progressUpdatedById;
-
-          if (local.progressUpdatedAt != null &&
-              (remote.progressUpdatedAt == null ||
-                  local.progressUpdatedAt!.isAfter(
-                    remote.progressUpdatedAt!,
-                  ))) {
-            progress = local.progressPercentage;
-            progressUpdatedAt = local.progressUpdatedAt;
-            progressUpdatedByName = local.progressUpdatedByName;
-            progressUpdatedById = local.progressUpdatedById;
-          } else if (remote.progressPercentage > 0) {
-            progress = remote.progressPercentage;
-          } else if (local.progressPercentage > 0) {
-            progress = local.progressPercentage;
-          }
-
-          final merged = remote.copyWith(
-            teamMemberIds: combinedMembers,
-            progressPercentage: progress,
-            progressUpdatedAt: progressUpdatedAt,
-            progressUpdatedByName: progressUpdatedByName,
-            progressUpdatedById: progressUpdatedById,
-          );
-          mergedProjects.add(merged);
-        } else {
-          mergedProjects.add(remote);
-        }
-      }
-
-      // Preserve locally created projects that have not yet reached the backend
-      final localOnly =
-          state
-              .where(
-                (p) =>
-                    p.id.startsWith('proj_') &&
-                    !_isProjectDeleted(p, deletedIds) &&
-                    !remoteIds.contains(p.id) &&
-                    !remoteCodes.contains(p.projectId) &&
-                    !remoteProjects.any(
-                      (r) =>
-                          r.name.trim().toLowerCase() ==
-                          p.name.trim().toLowerCase(),
-                    ),
-              )
-              .toList();
-
-      state = [...mergedProjects, ...localOnly];
+      state = remoteProjects;
       await _persistProjects();
       markFetchCompleted();
     } catch (_) {
@@ -589,6 +526,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
           candidateIds.add(p.projectId.toLowerCase());
         }
         if (p.name.isNotEmpty) {
+          candidateIds.add(p.name.trim());
           candidateIds.add(p.name.trim().toLowerCase());
         }
       }
@@ -608,6 +546,8 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
         } catch (_) {}
       }
     } catch (_) {}
+
+    await fetchProjects(force: true);
   }
 }
 

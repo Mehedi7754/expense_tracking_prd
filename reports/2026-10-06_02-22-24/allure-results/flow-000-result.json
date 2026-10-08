@@ -1,0 +1,199 @@
+{
+  "uuid": "flow-000",
+  "historyId": "0fef3f90",
+  "fullName": "01_login_employee",
+  "name": "01_login_employee",
+  "status": "failed",
+  "stage": "finished",
+  "start": 0,
+  "stop": 1791231754781,
+  "labels": [
+    {
+      "name": "suite",
+      "value": "01_login_employee"
+    },
+    {
+      "name": "parentSuite",
+      "value": "01_login_employee.yaml"
+    },
+    {
+      "name": "framework",
+      "value": "maestro"
+    },
+    {
+      "name": "severity",
+      "value": "normal"
+    },
+    {
+      "name": "host",
+      "value": "OnePlus IN2015"
+    },
+    {
+      "name": "thread",
+      "value": "38d8f89a"
+    }
+  ],
+  "statusDetails": {
+    "message": "launchApp: failed to clear app state for 'com.example.expense_tracking_prd' — is the app installed? (cause: adb shell pm clear com.example.expense_tracking_prd: exit status 255: \nException occurred while executing 'clear':\njava.lang.SecurityException: PID 19881 does not have permission android.permission.CLEAR_APP_USER_DATA to clear data of package com.example.expense_tracking_prd\n\tat com.android.server.am.ActivityManagerService.clearApplicationUserData(ActivityManagerService.java:4170)\n\tat com.android.server.pm.PackageManagerShellCommand.runClear(PackageManagerShellCommand.java:2347)\n\tat com.android.server.pm.PackageManagerShellCommand.onCommand(PackageManagerShellCommand.java:278)\n\tat com.android.modules.utils.BasicShellCommandHandler.exec(BasicShellCommandHandler.java:97)\n\tat android.os.ShellCommand.exec(ShellCommand.java:38)\n\tat com.android.server.pm.PackageManagerService$IPackageManagerImpl.onShellCommand(PackageManagerService.java:6381)\n\tat android.os.Binder.shellCommand(Binder.java:1073)\n\tat android.os.Binder.onTransact(Binder.java:901)\n\tat android.content.pm.IPackageManager$Stub.onTransact(IPackageManager.java:4313)\n\tat com.android.server.pm.PackageManagerService$IPackageManagerImpl.onTransact(PackageManagerService.java:6365)\n\tat android.os.Binder.execTransactInternal(Binder.java:1331)\n\tat android.os.Binder.execTransact(Binder.java:1268)\n)",
+    "trace": ""
+  },
+  "steps": [
+    {
+      "name": "launchApp",
+      "status": "failed",
+      "stage": "finished",
+      "start": 1791231754107,
+      "stop": 1791231754773,
+      "steps": [],
+      "attachments": [
+        {
+          "name": "After",
+          "source": "0432c175cf7e39843d8dffc05b0a2f093629abe21bd2c2dd1553bb918c5a2a3b-attachment.png",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "inputText",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "inputText",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "extendedWaitUntil",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "assertVisible",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    },
+    {
+      "name": "tapOn",
+      "status": "skipped",
+      "stage": "finished",
+      "start": 0,
+      "stop": 0,
+      "steps": [],
+      "attachments": null
+    }
+  ],
+  "attachments": [
+    {
+      "name": "Screenshot",
+      "source": "0432c175cf7e39843d8dffc05b0a2f093629abe21bd2c2dd1553bb918c5a2a3b-attachment.png",
+      "type": "image/png"
+    }
+  ]
+}

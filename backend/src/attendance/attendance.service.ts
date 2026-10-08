@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CheckInDto } from './dto/check-in.dto';
@@ -208,21 +208,7 @@ export class AttendanceService {
     let recordId: string;
 
     if (existing.rows.length > 0) {
-      recordId = existing.rows[0].id;
-      // Update check-in record
-      await this.db.query(
-        `UPDATE attendance_records
-         SET login_time = clock_timestamp(),
-             latitude = $1,
-             longitude = $2,
-             address_text = COALESCE(NULLIF($3, ''), address_text),
-             device_info = COALESCE(NULLIF($4, ''), device_info),
-             notes = COALESCE(NULLIF($5, ''), notes),
-             updated_at = clock_timestamp()
-         WHERE id = $6`,
-        [dto.latitude, dto.longitude, address, deviceInfo, notes, recordId],
-      );
-      this.logger.log(`Updated attendance check-in for user ${userId} (${session}) at [${dto.latitude}, ${dto.longitude}]`);
+      throw new ConflictException(`You have already checked in for the ${session} session today.`);
     } else {
       const res = await this.db.query(
         `INSERT INTO attendance_records (user_id, date, session_type, login_time, latitude, longitude, address_text, device_info, status, notes)

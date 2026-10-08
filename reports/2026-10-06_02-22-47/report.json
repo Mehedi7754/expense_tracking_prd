@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "updateSeq": 13,
+  "status": "failed",
+  "startTime": "2026-10-06T02:22:50.643546337+06:00",
+  "endTime": "2026-10-06T02:23:21.277812443+06:00",
+  "lastUpdated": "2026-10-06T02:23:21.284785356+06:00",
+  "device": {
+    "id": "38d8f89a",
+    "name": "OnePlus IN2015",
+    "platform": "android",
+    "osVersion": "33",
+    "isSimulator": false
+  },
+  "app": {
+    "id": "com.example.expense_tracking_prd",
+    "version": "1.0.0",
+    "build": "1"
+  },
+  "maestroRunner": {
+    "version": "1.1.28",
+    "driver": "devicelab"
+  },
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "running": 0,
+    "pending": 0
+  },
+  "flows": [
+    {
+      "index": 0,
+      "id": "flow-000",
+      "name": "01_login_employee",
+      "sourceFile": ".maestro/01_login_employee.yaml",
+      "device": {
+        "id": "38d8f89a",
+        "name": "OnePlus IN2015",
+        "platform": "android",
+        "osVersion": "33",
+        "isSimulator": false
+      },
+      "dataFile": "flows/flow-000.json",
+      "assetsDir": "assets/flow-000",
+      "status": "failed",
+      "updateSeq": 8,
+      "endTime": "2026-10-06T02:23:21.262827888+06:00",
+      "duration": 30608,
+      "lastUpdated": "2026-10-06T02:23:21.272206635+06:00",
+      "commands": {
+        "total": 16,
+        "passed": 5,
+        "failed": 1,
+        "skipped": 10,
+        "running": 0,
+        "pending": 0
+      },
+      "attempts": 0,
+      "error": "Element not found: handler_error: Element not found in any of 10 strategies (cause: context deadline exceeded: handler_error: Element not found in any of 10 strategies)"
+    }
+  ]
+}

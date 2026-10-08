@@ -319,8 +319,10 @@ class ExpenseModel {
   final String id;
   final String employeeId;
   final String employeeName;
+  final String? employeeAvatar;
   final String projectId;
   final String projectName;
+  final String? projectImageUrl;
   final String? taskId;
   final String? taskTitle;
   final double amount; // Total Direct Expense Cost (Base Cost + Tax)
@@ -361,8 +363,10 @@ class ExpenseModel {
     required this.id,
     required this.employeeId,
     required this.employeeName,
+    this.employeeAvatar,
     required this.projectId,
     required this.projectName,
+    this.projectImageUrl,
     this.taskId,
     this.taskTitle,
     required this.amount,
@@ -417,8 +421,10 @@ class ExpenseModel {
     String? id,
     String? employeeId,
     String? employeeName,
+    String? employeeAvatar,
     String? projectId,
     String? projectName,
+    String? projectImageUrl,
     String? taskId,
     String? taskTitle,
     double? amount,
@@ -455,8 +461,10 @@ class ExpenseModel {
       id: id ?? this.id,
       employeeId: employeeId ?? this.employeeId,
       employeeName: employeeName ?? this.employeeName,
+      employeeAvatar: employeeAvatar ?? this.employeeAvatar,
       projectId: projectId ?? this.projectId,
       projectName: projectName ?? this.projectName,
+      projectImageUrl: projectImageUrl ?? this.projectImageUrl,
       taskId: taskId ?? this.taskId,
       taskTitle: taskTitle ?? this.taskTitle,
       amount: amount ?? this.amount,
@@ -545,8 +553,10 @@ class ExpenseModel {
       id: (json['id'] ?? '').toString(),
       employeeId: (json['employee_id'] ?? json['employeeId'] ?? '').toString(),
       employeeName: (json['employee_name'] ?? json['employeeName'] ?? '').toString(),
+      employeeAvatar: (json['employee_avatar'] ?? json['employeeAvatar'])?.toString(),
       projectId: (json['project_id'] ?? json['projectId'] ?? '').toString(),
       projectName: (json['project_name'] ?? json['projectName'] ?? '').toString(),
+      projectImageUrl: (json['project_image_url'] ?? json['projectImageUrl'])?.toString(),
       taskId: json['task_id']?.toString() ?? json['taskId']?.toString(),
       taskTitle: json['task_title']?.toString() ?? json['taskTitle']?.toString(),
       amount: parseDouble(json['amount']),
@@ -596,8 +606,10 @@ class ExpenseModel {
       'id': id,
       'employee_id': employeeId,
       'employee_name': employeeName,
+      if (employeeAvatar != null) 'employee_avatar': employeeAvatar,
       'project_id': projectId,
       'project_name': projectName,
+      if (projectImageUrl != null) 'project_image_url': projectImageUrl,
       if (taskId != null) 'task_id': taskId,
       if (taskTitle != null) 'task_title': taskTitle,
       'amount': amount,
