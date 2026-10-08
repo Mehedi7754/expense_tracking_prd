@@ -97,30 +97,36 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
 
     final currentHour = DateTime.now().hour;
     final isAdminRole = user?.role == null || !user!.role.requiresAttendanceCheckIn;
-    final timing = ref.watch(attendanceSettingsProvider).value;
-    final startH = timing?.morningStartHour ?? 9;
-    final dividerH = timing?.morningEndHour ?? 13;
-    final endH = timing?.afternoonEndHour ?? 18;
+    final settings = ref.watch(attendanceSettingsProvider).value;
+    final shift = settings?.getShiftForUser(effectiveUserId) ?? const AttendanceShift(id: 'shift_default', name: 'General Shift');
+    final startH = shift.morningStartHour;
+    final dividerH = shift.morningEndHour;
+    final endH = shift.afternoonEndHour;
+    final isWeekendToday = shift.weekendDays.contains(DateTime.now().weekday);
+
     String fmtH(int h) => '${(h % 12 == 0 ? 12 : h % 12).toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
-    final isMorningSlot = currentHour >= startH && currentHour < dividerH;
-    final isAfternoonSlot = currentHour >= dividerH;
+    final isMorningSlot = !isWeekendToday && currentHour >= startH && currentHour < dividerH;
+    final isAfternoonSlot = !isWeekendToday && currentHour >= dividerH && currentHour < endH;
 
     String currentSlotBadge;
     Color currentSlotBadgeColor;
     if (isAdminRole) {
       currentSlotBadge = 'Management Exempt';
       currentSlotBadgeColor = const Color(0xFF6366F1);
+    } else if (isWeekendToday) {
+      currentSlotBadge = '${shift.name} • Off-Day';
+      currentSlotBadgeColor = const Color(0xFF10B981);
     } else if (isMorningSlot) {
-      currentSlotBadge = 'Morning Shift';
+      currentSlotBadge = '${shift.name} • Morning';
       currentSlotBadgeColor = const Color(0xFF2563EB);
     } else if (currentHour >= dividerH && currentHour < endH) {
-      currentSlotBadge = 'Afternoon Shift';
+      currentSlotBadge = '${shift.name} • Afternoon';
       currentSlotBadgeColor = const Color(0xFF0D9488);
     } else if (currentHour >= endH) {
-      currentSlotBadge = 'Evening Departure';
-      currentSlotBadgeColor = const Color(0xFF10B981);
+      currentSlotBadge = '${shift.name} • Shift Over';
+      currentSlotBadgeColor = const Color(0xFF64748B);
     } else {
-      currentSlotBadge = 'Outside Hours';
+      currentSlotBadge = '${shift.name} • Off Hours';
       currentSlotBadgeColor = const Color(0xFF64748B);
     }
 

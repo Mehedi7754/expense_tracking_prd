@@ -248,15 +248,38 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     return '${hh.toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
   }
 
-  /// Session for "now" based on the divider (morningEndHour).
-  static String resolveSession(AttendanceSettingsState? s) {
+  /// Session for "now" based on the divider or employee's shift.
+  static String resolveSession(AttendanceSettingsState? s, {String? userId}) {
+    if (s != null && userId != null) {
+      final shift = s.getShiftForUser(userId);
+      return DateTime.now().hour < shift.morningEndHour ? 'morning' : 'afternoon';
+    }
     final divider = s?.morningEndHour ?? 13;
     return DateTime.now().hour < divider ? 'morning' : 'afternoon';
   }
 
   /// Returns null when check-in is allowed; otherwise a reason.
-  /// Morning: locks at divider. Afternoon: requires after divider.
-  static String? checkInWindowError(String session, AttendanceSettingsState? s) {
+  /// Evaluates specific shift timings and weekly off-days if userId is provided.
+  static String? checkInWindowError(String session, AttendanceSettingsState? s, {String? userId}) {
+    if (s != null && userId != null) {
+      final shift = s.getShiftForUser(userId);
+      final h = DateTime.now().hour;
+      final weekday = DateTime.now().weekday; // 1=Mon..7=Sun
+
+      if (shift.weekendDays.contains(weekday)) {
+        return 'Today is a weekly off-day for your shift (${shift.name}). Check-in is not required.';
+      }
+
+      if (session == 'morning') {
+        if (h < shift.morningStartHour) return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';
+        if (h >= shift.morningEndHour) return 'Morning check-in for ${shift.name} is locked after ${_fmt(shift.morningEndHour)}.';
+      } else {
+        if (h < shift.afternoonStartHour) return 'Afternoon check-in for ${shift.name} opens at ${_fmt(shift.afternoonStartHour)}.';
+        if (h >= shift.afternoonEndHour) return 'Afternoon shift for ${shift.name} ended at ${_fmt(shift.afternoonEndHour)}.';
+      }
+      return null;
+    }
+
     final divider = s?.morningEndHour ?? 13;
     final h = DateTime.now().hour;
     
