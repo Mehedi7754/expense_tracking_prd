@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/services/attendance_salary_mock_store.dart';
 import '../repositories/attendance_repository.dart';
+import 'attendance_provider.dart';
 
 const _kAttendanceSettingsKey = 'gw_attendance_settings_json_v3';
 const _kOldMorningEndKey = 'gw_attendance_settings_morning_end_hour';
