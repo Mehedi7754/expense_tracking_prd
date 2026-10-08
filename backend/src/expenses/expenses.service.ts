@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { DatabaseService } from '../database/database.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class ExpensesService {
@@ -9,6 +10,7 @@ export class ExpensesService {
     private readonly db: DatabaseService,
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   private mapExpenseRow(e: any, comments: any[] = []) {
@@ -280,7 +282,7 @@ export class ExpensesService {
     // Notify all admins and project managers about the new submission
     try {
       const recipientsRes = await this.db.query(
-        `SELECT id FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
+        `SELECT id, email FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
         [employeeId],
       );
       const submitterName = user?.fullName || user?.full_name || user?.email || 'A team member';
@@ -294,6 +296,17 @@ export class ExpensesService {
           relatedProjectId: created.projectId,
           relatedExpenseId: created.id,
         });
+
+        if (recipient.email) {
+          await this.emailService.sendNewExpenseNotification(
+            recipient.email,
+            submitterName,
+            created.amount,
+            created.currency,
+            created.categoryName,
+            created.projectName
+          );
+        }
       }
     } catch (e) {
       console.error('Failed to send submission notifications:', e);
@@ -342,6 +355,18 @@ export class ExpensesService {
     if (data.hasReceipt !== undefined || data.has_receipt !== undefined) {
       fields.push(`has_receipt = $${idx++}`);
       values.push(Boolean(data.hasReceipt ?? data.has_receipt));
+    }
+    if (data.receiptPhotoUrl !== undefined || data.receipt_photo_url !== undefined) {
+      fields.push(`receipt_photo_url = $${idx++}`);
+      values.push(data.receiptPhotoUrl ?? data.receipt_photo_url ?? null);
+    }
+    if (data.justificationStatus !== undefined || data.justification_status !== undefined) {
+      fields.push(`justification_status = $${idx++}`);
+      values.push(data.justificationStatus ?? data.justification_status);
+    }
+    if (data.categoryDetails !== undefined || data.category_details !== undefined) {
+      fields.push(`category_details = $${idx++}`);
+      values.push(JSON.stringify(data.categoryDetails ?? data.category_details ?? {}));
     }
 
     if (fields.length === 0) {

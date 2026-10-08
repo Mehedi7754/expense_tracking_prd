@@ -18,8 +18,12 @@ describe('ExpensesService Unit & Business Rules', () => {
     mockNotifications = {
       create: jest.fn().mockResolvedValue(true),
     };
+    const mockEmailService = {
+      sendCheckInConfirmation: jest.fn().mockResolvedValue({}),
+      sendNewExpenseNotification: jest.fn().mockResolvedValue({}),
+    };
 
-    service = new ExpensesService(mockDb, mockAudit, mockNotifications);
+    service = new ExpensesService(mockDb, mockAudit, mockNotifications, mockEmailService as any);
   });
 
   describe('Anti-Fraud and Approval Rules', () => {

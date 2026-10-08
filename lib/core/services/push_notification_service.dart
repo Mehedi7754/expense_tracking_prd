@@ -29,7 +29,7 @@ class PushNotificationService {
       tz.initializeTimeZones();
     } catch (_) {}
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@mipmap/launcher_icon');
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -124,7 +124,17 @@ class PushNotificationService {
         _channelGeneral,
         'General Notifications',
         description: 'Budget warnings, salary, payroll, and other alerts',
-        importance: Importance.defaultImportance,
+        importance: Importance.high,
+        playSound: true,
+      ),
+    );
+
+    await androidPlugin.createNotificationChannel(
+      const AndroidNotificationChannel(
+        'high_importance_channel',
+        'Important Notifications',
+        description: 'High priority alerts and push notifications',
+        importance: Importance.high,
         playSound: true,
       ),
     );
@@ -171,7 +181,7 @@ class PushNotificationService {
           _channelName(channel),
           importance: Importance.max,
           priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
+          icon: '@mipmap/launcher_icon',
           enableVibration: true,
           playSound: true,
           tag: notificationId,
@@ -240,7 +250,7 @@ class PushNotificationService {
             'Attendance Reminders',
             importance: Importance.high,
             priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
+            icon: '@mipmap/launcher_icon',
           ),
           iOS: const DarwinNotificationDetails(
             presentAlert: true,

@@ -14,7 +14,7 @@ export class UsersService {
     let sql = `
       SELECT id, email, full_name, role, department, designation, phone, avatar_url, is_active
       FROM users
-      WHERE 1=1
+      WHERE is_active = TRUE
     `;
     const params: any[] = [];
 

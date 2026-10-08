@@ -18,9 +18,11 @@ class _AttendanceSettingsScreenState
   late bool _isDeductionEnabled;
   late double _fullDayDeductionAmount;
   late double _halfDayDeductionAmount;
+  late int _gracePeriodMinutes;
 
   final TextEditingController _fullDayCtrl = TextEditingController();
   final TextEditingController _halfDayCtrl = TextEditingController();
+  final TextEditingController _gracePeriodCtrl = TextEditingController();
   bool _saving = false;
   bool _initialized = false;
 
@@ -34,8 +36,10 @@ class _AttendanceSettingsScreenState
       _isDeductionEnabled = s.isDeductionEnabled;
       _fullDayDeductionAmount = s.fullDayDeductionAmount;
       _halfDayDeductionAmount = s.halfDayDeductionAmount;
+      _gracePeriodMinutes = s.gracePeriodMinutes;
       _fullDayCtrl.text = _fullDayDeductionAmount.toStringAsFixed(1);
       _halfDayCtrl.text = _halfDayDeductionAmount.toStringAsFixed(1);
+      _gracePeriodCtrl.text = _gracePeriodMinutes.toString();
       _initialized = true;
     }
   }
@@ -44,12 +48,14 @@ class _AttendanceSettingsScreenState
   void dispose() {
     _fullDayCtrl.dispose();
     _halfDayCtrl.dispose();
+    _gracePeriodCtrl.dispose();
     super.dispose();
   }
 
   String _hourLabel(int h) {
-    final period = h < 12 ? 'AM' : 'PM';
-    final displayH = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    final cleanH = ((h % 24) + 24) % 24;
+    final period = cleanH < 12 ? 'AM' : 'PM';
+    final displayH = cleanH == 0 ? 12 : (cleanH > 12 ? cleanH - 12 : cleanH);
     return '$displayH:00 $period';
   }
 
@@ -78,6 +84,7 @@ class _AttendanceSettingsScreenState
     setState(() => _saving = true);
     final fullVal = double.tryParse(_fullDayCtrl.text) ?? _fullDayDeductionAmount;
     final halfVal = double.tryParse(_halfDayCtrl.text) ?? _halfDayDeductionAmount;
+    final graceVal = int.tryParse(_gracePeriodCtrl.text) ?? _gracePeriodMinutes;
 
     final currentSettings = ref.read(attendanceSettingsProvider).value ?? const AttendanceSettingsState();
     final updated = currentSettings.copyWith(
@@ -85,6 +92,7 @@ class _AttendanceSettingsScreenState
       isDeductionEnabled: _isDeductionEnabled,
       fullDayDeductionAmount: fullVal,
       halfDayDeductionAmount: halfVal,
+      gracePeriodMinutes: graceVal,
     );
 
     await ref.read(attendanceSettingsProvider.notifier).updateSettings(updated);
@@ -243,7 +251,7 @@ class _AttendanceSettingsScreenState
                                     fontWeight: FontWeight.w800,
                                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                                   ),
-                                  items: List.generate(12, (i) => i + 5).map((h) {
+                                  items: List.generate(24, (h) => h).map((h) {
                                     return DropdownMenuItem<int>(
                                       value: h,
                                       child: Text(_hourLabel(h)),
@@ -253,8 +261,6 @@ class _AttendanceSettingsScreenState
                                     if (val != null) {
                                       setDlgState(() {
                                         startH = val;
-                                        if (cutoffH <= startH) cutoffH = startH + 4;
-                                        if (endH <= cutoffH) endH = cutoffH + 4;
                                       });
                                     }
                                   },
@@ -289,7 +295,7 @@ class _AttendanceSettingsScreenState
                                     fontWeight: FontWeight.w800,
                                     color: isDark ? Colors.white : const Color(0xFF0F172A),
                                   ),
-                                  items: List.generate(14, (i) => i + 11).map((h) {
+                                  items: List.generate(24, (h) => h).map((h) {
                                     return DropdownMenuItem<int>(
                                       value: h,
                                       child: Text(_hourLabel(h)),
@@ -299,7 +305,6 @@ class _AttendanceSettingsScreenState
                                     if (val != null) {
                                       setDlgState(() {
                                         endH = val;
-                                        if (cutoffH >= endH) cutoffH = endH - 2;
                                       });
                                     }
                                   },
@@ -352,7 +357,7 @@ class _AttendanceSettingsScreenState
                           child: DropdownButton<int>(
                             value: cutoffH,
                             style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF4F46E5), fontSize: 14),
-                            items: List.generate(10, (i) => i + 9).map((h) {
+                            items: List.generate(24, (h) => h).map((h) {
                               return DropdownMenuItem<int>(
                                 value: h,
                                 child: Text(_hourLabel(h)),
@@ -454,7 +459,7 @@ class _AttendanceSettingsScreenState
                               morningEndHour: cutoffH,
                               afternoonStartHour: cutoffH,
                               afternoonEndHour: endH,
-                              weekendDays: weekendDays.isEmpty ? const [5, 6] : weekendDays,
+                              weekendDays: weekendDays,
                               isDefault: isEditing ? existingShift.isDefault : false,
                             );
 
@@ -552,6 +557,8 @@ class _AttendanceSettingsScreenState
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: _buildStickySaveButton(isDark),
       body: settingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error loading settings: $e')),
@@ -559,7 +566,7 @@ class _AttendanceSettingsScreenState
           final users = ref.watch(userManagementProvider);
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 100),
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 140),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -600,13 +607,15 @@ class _AttendanceSettingsScreenState
                             child: const Icon(Icons.access_time_filled_rounded, color: Color(0xFF4F46E5), size: 18),
                           ),
                           const SizedBox(width: 10),
-                          Text(
-                            'Shift & Schedule Management',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14.5,
-                              letterSpacing: -0.2,
+                          Expanded(
+                            child: Text(
+                              'Shift & Schedule Management',
+                              style: TextStyle(
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14.5,
+                                letterSpacing: -0.2,
+                              ),
                             ),
                           ),
                         ],
@@ -635,103 +644,209 @@ class _AttendanceSettingsScreenState
                     children: [
                       ...settings.shifts.map((shift) {
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(15),
+                          margin: const EdgeInsets.only(bottom: 14),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(16),
+                            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            borderRadius: BorderRadius.circular(18),
                             border: Border.all(
                               color: shift.isDefault
-                                  ? const Color(0xFF4F46E5).withValues(alpha: 0.6)
+                                  ? const Color(0xFF4F46E5).withValues(alpha: 0.5)
                                   : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                               width: shift.isDefault ? 1.5 : 1,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isDark ? Colors.black : const Color(0xFF64748B)).withValues(alpha: isDark ? 0.2 : 0.04),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Shift Header: Name + Badge on Left, Action buttons on Right
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(7),
+                                    padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF4F46E5).withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(10),
+                                      color: const Color(0xFF4F46E5).withValues(alpha: isDark ? 0.25 : 0.1),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Icon(
-                                      shift.isDefault ? Icons.star_rounded : Icons.schedule_rounded,
+                                      shift.isDefault ? Icons.auto_awesome_rounded : Icons.schedule_rounded,
                                       color: const Color(0xFF4F46E5),
                                       size: 18,
                                     ),
                                   ),
                                   const SizedBox(width: 10),
                                   Expanded(
-                                    child: Text(
-                                      shift.name,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 14,
-                                        letterSpacing: -0.2,
-                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                      ),
+                                    child: Wrap(
+                                      crossAxisAlignment: WrapCrossAlignment.center,
+                                      spacing: 6,
+                                      runSpacing: 4,
+                                      children: [
+                                        Text(
+                                          shift.name,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 14.5,
+                                            letterSpacing: -0.2,
+                                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                        if (shift.isDefault)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF4F46E5).withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: const Text(
+                                              'Default',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w800,
+                                                color: Color(0xFF4F46E5),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
                                   ),
-                                  if (shift.isDefault)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF4F46E5).withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(8),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined, size: 18),
+                                        onPressed: () => _showShiftDialog(existingShift: shift),
+                                        tooltip: 'Edit Shift',
+                                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                        padding: const EdgeInsets.all(6),
                                       ),
-                                      child: const Text('Default Shift', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF4F46E5))),
-                                    ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined, size: 18),
-                                    onPressed: () => _showShiftDialog(existingShift: shift),
-                                    tooltip: 'Edit Shift',
+                                      if (!shift.isDefault)
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                                          onPressed: () => _confirmDeleteShift(shift),
+                                          tooltip: 'Delete Shift',
+                                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                          padding: const EdgeInsets.all(6),
+                                        ),
+                                    ],
                                   ),
-                                  if (!shift.isDefault)
-                                    IconButton(
-                                      icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                                      onPressed: () => _confirmDeleteShift(shift),
-                                      tooltip: 'Delete Shift',
-                                    ),
                                 ],
+                              ),
+                              const SizedBox(height: 10),
+                              // Timing summary banner
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF0F172A).withValues(alpha: 0.6) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Timing: ${_hourLabel(shift.morningStartHour)} → ${_hourLabel(shift.afternoonEndHour)} • Midday Cutoff: ${_hourLabel(shift.morningEndHour)}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              LayoutBuilder(
+                                builder: (ctx, constraints) {
+                                  final isCompact = constraints.maxWidth < 360;
+                                  final morning = _sessionChip(
+                                    '☀️ Morning Slot',
+                                    '${_hourLabel(shift.morningStartHour)} – ${_hourLabel(shift.morningEndHour)}',
+                                    const Color(0xFF4F46E5),
+                                    isDark: isDark,
+                                  );
+                                  final afternoon = _sessionChip(
+                                    '🌙 Afternoon Slot',
+                                    '${_hourLabel(shift.morningEndHour)} – ${_hourLabel(shift.afternoonEndHour)}',
+                                    const Color(0xFF10B981),
+                                    isDark: isDark,
+                                  );
+
+                                  if (isCompact) {
+                                    return Column(
+                                      children: [
+                                        morning,
+                                        const SizedBox(height: 8),
+                                        afternoon,
+                                      ],
+                                    );
+                                  }
+
+                                  return Row(
+                                    children: [
+                                      Expanded(child: morning),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: afternoon),
+                                    ],
+                                  );
+                                },
                               ),
                               const SizedBox(height: 12),
                               Row(
                                 children: [
-                                  Expanded(
-                                    child: _sessionChip(
-                                      '☀️ Morning Slot',
-                                      '${_hourLabel(shift.morningStartHour)} – ${_hourLabel(shift.morningEndHour)}',
-                                      const Color(0xFF4F46E5),
-                                      isDark: isDark,
-                                    ),
+                                  Icon(
+                                    Icons.beach_access_rounded,
+                                    size: 13,
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _sessionChip(
-                                      '🌙 Afternoon Slot',
-                                      '${_hourLabel(shift.morningEndHour)} – ${_hourLabel(shift.afternoonEndHour)}',
-                                      const Color(0xFF10B981),
-                                      isDark: isDark,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF64748B)),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Off-Days: ${shift.weekendDays.isEmpty ? 'None' : shift.weekendDays.map((d) => _dayShort(d)).join(', ')}',
+                                    'Off-Days:',
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                       color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                     ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: shift.weekendDays.isEmpty
+                                        ? Text(
+                                            'None',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                                            ),
+                                          )
+                                        : Wrap(
+                                            spacing: 4,
+                                            runSpacing: 4,
+                                            children: shift.weekendDays.map((d) {
+                                              return Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                decoration: BoxDecoration(
+                                                  color: isDark
+                                                      ? const Color(0xFF334155)
+                                                      : const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                                                    width: 0.8,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  _dayShort(d),
+                                                  style: TextStyle(
+                                                    fontSize: 10.5,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: isDark ? Colors.white70 : const Color(0xFF334155),
+                                                  ),
+                                                ),
+                                              );
+                                            }).toList(),
+                                          ),
                                   ),
                                 ],
                               ),
@@ -1037,6 +1152,51 @@ class _AttendanceSettingsScreenState
                             ),
                           ],
                         ),
+
+                        const SizedBox(height: 16),
+                        
+                        // Grace Period Input
+                        Text(
+                          'Late Check-in Grace Period',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Minutes allowed after shift start before marked as LATE (Default: 15)',
+                          style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          width: double.infinity,
+                          child: TextField(
+                            controller: _gracePeriodCtrl,
+                            keyboardType: TextInputType.number,
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                            decoration: InputDecoration(
+                              hintText: '15',
+                              suffixText: ' minutes',
+                              filled: true,
+                              fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -1137,33 +1297,6 @@ class _AttendanceSettingsScreenState
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 28),
-
-                // Save Payroll Rules Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    onPressed: _saving ? null : _saveDeductions,
-                    child: _saving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Save Payroll Deduction Rules',
-                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
-                          ),
-                  ),
-                ),
               ],
             ),
           );
@@ -1254,6 +1387,47 @@ class _AttendanceSettingsScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStickySaveButton(bool isDark) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF4F46E5).withValues(alpha: 0.38),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: FloatingActionButton.extended(
+        onPressed: _saving ? null : _saveDeductions,
+        backgroundColor: const Color(0xFF4F46E5),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        highlightElevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        icon: _saving
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+            : const Icon(Icons.check_circle_rounded, size: 20),
+        label: Text(
+          _saving ? 'Saving...' : 'Save Settings',
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+            letterSpacing: -0.2,
+          ),
+        ),
       ),
     );
   }

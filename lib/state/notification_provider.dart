@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/utils/environment_utils.dart';
 import '../models/notification_model.dart';
 import '../repositories/notification_repository.dart';
+import '../core/services/push_notification_service.dart';
 
 const String _kCustomNotificationsKey = 'gw_custom_notifications_cache';
 const String _kDeletedNotificationIdsKey = 'gw_deleted_notification_ids_v2';
@@ -139,6 +140,35 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
 
       final merged = [...filteredRemoteList, ...recentLocalOnly];
       merged.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Trigger OS-level push notification for newly received unread notifications
+      final existingIds = state.map((n) => n.id).toSet();
+      for (final n in filteredRemoteList) {
+        if (!n.isRead && !existingIds.contains(n.id) && now.difference(n.timestamp).inMinutes < 60) {
+          final type = n.type.name.toLowerCase();
+          if (type.contains('expense')) {
+            PushNotificationService.instance.showExpenseAlert(
+              title: n.title,
+              body: n.message,
+              notificationId: n.id,
+              expenseId: n.relatedExpenseId,
+            );
+          } else if (type.contains('attendance')) {
+            PushNotificationService.instance.showAttendanceReminder(
+              title: n.title,
+              body: n.message,
+              notificationId: n.id,
+            );
+          } else {
+            PushNotificationService.instance.showImmediate(
+              title: n.title,
+              body: n.message,
+              notificationId: n.id,
+            );
+          }
+        }
+      }
+
       state = merged;
       await _persistNotifications();
     } catch (_) {
@@ -254,6 +284,27 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
     );
     state = [newNotif, ...state];
     _persistNotifications();
+
+    if (type == NotificationType.expenseApproved || type == NotificationType.expenseRejected || type == NotificationType.expenseSubmitted) {
+      PushNotificationService.instance.showExpenseAlert(
+        title: title,
+        body: message,
+        notificationId: newNotif.id,
+        expenseId: relatedExpenseId,
+      );
+    } else if (type == NotificationType.attendanceReminder) {
+      PushNotificationService.instance.showAttendanceReminder(
+        title: title,
+        body: message,
+        notificationId: newNotif.id,
+      );
+    } else {
+      PushNotificationService.instance.showImmediate(
+        title: title,
+        body: message,
+        notificationId: newNotif.id,
+      );
+    }
   }
 }
 

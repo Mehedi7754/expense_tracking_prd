@@ -676,7 +676,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   iconColor: const Color(0xFFD97706),
                   iconBg: isDark ? const Color(0xFF78350F).withAlpha(40) : const Color(0xFFFFFBEB),
                   title: 'Budget Allocation',
-                  subtitle: 'Category expenditure & 30% automatic office benefit',
+                  subtitle: 'Category expenditure & automatic markup margin',
                   children: [
                     _buildCompactBudgetRow('Equipment', Icons.construction_rounded, _equipBudgetController, isDark),
                     const SizedBox(height: 8),
@@ -758,7 +758,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Office Benefit (30%) Calculation Summary Card
+                    // Markup Margin Calculation Summary Card
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
@@ -795,7 +795,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  'Office Benefit (${(_officeBenefitRate * 100).toInt()}%)',
+                                  'Markup Margin (${(_officeBenefitRate * 100).toInt()}%)',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),

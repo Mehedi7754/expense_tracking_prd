@@ -178,16 +178,31 @@ class FcmService {
       final client = ApiClient();
       client.setAuthToken(authToken);
 
-      final response = await client.post(
-        ApiEndpoints.resolve('/users/fcm-token'),
-        body: {
-          'token': tokenToSync,
-          'deviceInfo': 'Android',
-        },
-      );
-      debugPrint('[FCM] Successfully registered token with backend: $response');
+      try {
+        final response = await client.post(
+          ApiEndpoints.resolve('/users/fcm-token'),
+          body: {
+            'token': tokenToSync,
+            'deviceInfo': 'Android',
+          },
+        );
+        debugPrint('[FCM] Successfully registered token with backend: $response');
+      } catch (err) {
+        try {
+          final response = await client.post(
+            ApiEndpoints.resolve('/notifications/fcm-token'),
+            body: {
+              'token': tokenToSync,
+              'deviceInfo': 'Android',
+            },
+          );
+          debugPrint('[FCM] Successfully registered token via notifications endpoint: $response');
+        } catch (e2) {
+          debugPrint('[FCM] Exception syncing token: $err / $e2');
+        }
+      }
     } catch (e) {
-      debugPrint('[FCM] Exception syncing token: $e');
+      debugPrint('[FCM] Failed to sync token with backend: $e');
     }
   }
 }

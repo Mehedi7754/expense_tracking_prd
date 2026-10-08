@@ -242,105 +242,143 @@ class _MinimalAreaChartState extends ConsumerState<MinimalAreaChart> {
 
           const SizedBox(height: 10),
 
-          // Tier 2: Micro-Metric Stat Cards (Never Cut Off)
+          // Tier 2: Micro-Metric Stat Cards (Never Cut Off, Tappable to open details)
           Row(
             children: [
               // Metric 1: Total
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: widget.onTap,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                      width: 1.0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              children: [
+                                Text(
+                                  chartData.totalMetricLabel.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 9.0,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? AppColors.darkTextMuted : const Color(0xFF64748B),
+                                    letterSpacing: 0.2,
+                                  ),
+                                  maxLines: 1,
+                                ),
+                                if (widget.onTap != null) ...[
+                                  const SizedBox(width: 3),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 11,
+                                    color: isDark ? AppColors.darkTextMuted : const Color(0xFF64748B),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              CurrencyFormatter.format(totalAmount, currency: currency, compact: totalAmount >= 100000),
+                              style: TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w900,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          chartData.totalMetricLabel.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 9.0,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.darkTextMuted : const Color(0xFF64748B),
-                            letterSpacing: 0.2,
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          CurrencyFormatter.format(totalAmount, currency: currency, compact: totalAmount >= 100000),
-                          style: TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w900,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            letterSpacing: -0.3,
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               // Metric 2: Weekly / Period Average
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: widget.onTap,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                      width: 1.0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6.5),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Row(
+                              children: [
+                                Text(
+                                  chartData.avgMetricLabel.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 9.0,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? AppColors.darkTextMuted : const Color(0xFF64748B),
+                                    letterSpacing: 0.2,
+                                  ),
+                                  maxLines: 1,
+                                ),
+                                if (widget.onTap != null) ...[
+                                  const SizedBox(width: 3),
+                                  const Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 11,
+                                    color: Color(0xFF4F46E5),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              CurrencyFormatter.format(chartData.avgAmount, currency: currency, compact: chartData.avgAmount >= 100000),
+                              style: const TextStyle(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF4F46E5),
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          chartData.avgMetricLabel.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 9.0,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? AppColors.darkTextMuted : const Color(0xFF64748B),
-                            letterSpacing: 0.2,
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          CurrencyFormatter.format(chartData.avgAmount, currency: currency, compact: chartData.avgAmount >= 100000),
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF4F46E5),
-                            letterSpacing: -0.3,
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),

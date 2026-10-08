@@ -296,8 +296,8 @@ class AuthNotifier extends Notifier<AuthState> {
 
   void switchRole(UserRole role) {
     UserModel targetUser;
-    final matching =
-        kAuthenticDatabaseUsers.where((u) => u.role == role).toList();
+    final liveUsers = ref.read(userManagementProvider);
+    final matching = liveUsers.where((u) => u.role == role && u.isActive).toList();
     if (matching.isNotEmpty) {
       targetUser = matching.first;
     } else {
@@ -308,7 +308,7 @@ class AuthNotifier extends Notifier<AuthState> {
               : UserModel(
                 id: 'role_${role.name}',
                 name: role.displayName,
-                email: '${role.name}@pfis.com',
+                email: '${role.name}@gw.com',
                 role: role,
                 department: 'Operations',
               );

@@ -10,7 +10,9 @@ import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/role_badge.dart';
 import '../../models/user_model.dart';
 import '../../models/user_role.dart';
+import '../../state/attendance_provider.dart';
 import '../../state/auth_provider.dart';
+import '../../state/salary_provider.dart';
 import '../../state/user_management_provider.dart';
 
 class UserManagementScreen extends ConsumerStatefulWidget {
@@ -83,13 +85,18 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               backgroundColor: AppColors.crimson,
               foregroundColor: Colors.white,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              ref.read(userManagementProvider.notifier).deleteUser(user.id);
-              NotificationBanner.showWarning(
-                context,
-                'Employee ${user.name} permanently deleted.',
-              );
+              await ref.read(userManagementProvider.notifier).deleteUser(user.id);
+              ref.read(attendanceProvider.notifier).invalidateCache();
+              ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+              ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
+              if (context.mounted) {
+                NotificationBanner.showWarning(
+                  context,
+                  'Employee ${user.name} permanently deleted.',
+                );
+              }
             },
             child: const Text('Delete Permanently'),
           ),

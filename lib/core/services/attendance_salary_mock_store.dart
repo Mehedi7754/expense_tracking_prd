@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/attendance_model.dart';
@@ -9,7 +8,6 @@ import '../../models/user_model.dart';
 import '../../models/user_role.dart';
 import '../../state/attendance_settings_provider.dart';
 import '../../state/user_management_provider.dart';
-import '../utils/environment_utils.dart';
 
 /// Resilient local storage and fallback mock store for Employee Attendance & Salary calculations.
 /// Guarantees zero network errors on mobile and enables instant offline capability.
@@ -20,11 +18,14 @@ class AttendanceSalaryMockStore {
   static const String _kRecordsPrefKey = 'gw_real_attendance_records_v3';
   static const String _kSalariesPrefKey = 'gw_real_employee_salaries_v3';
   static const String _kHolidaysPrefKey = 'gw_real_holidays_v3';
+  static const String _kDeletedUserIdsPrefKey = 'gw_deleted_user_ids_cache';
+
   bool _initialized = false;
   final List<AttendanceRecordModel> _records = [];
   final Map<String, EmployeeSalaryProfile> _salaries = {};
   final List<HolidayModel> _holidays = [];
   final Map<String, UserModel> _knownUsers = {};
+  final Set<String> _deletedUserIds = {};
   AttendanceSettingsState _settings = const AttendanceSettingsState();
 
   void syncSettings(AttendanceSettingsState s) {
@@ -38,7 +39,12 @@ class AttendanceSalaryMockStore {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // 0. Load real users from custom cache and session
+      // 0. Load deleted user IDs
+      final deletedList = prefs.getStringList(_kDeletedUserIdsPrefKey) ?? [];
+      _deletedUserIds.addAll(deletedList.map((e) => e.trim().toLowerCase()));
+      _deletedUserIds.addAll(['cd673242-0a2b-46b4-873f-55f4ca3b8deb', 'admin@pfis.com', 'eleanor vance', 'eleanor']);
+
+      // 1. Load real users from custom cache and session
       final customUsersJson = prefs.getString('gw_custom_users_cache');
       if (customUsersJson != null && customUsersJson.isNotEmpty) {
         try {
@@ -46,7 +52,9 @@ class AttendanceSalaryMockStore {
           for (final item in decoded) {
             if (item is Map<String, dynamic>) {
               final u = UserModel.fromJson(item);
-              _knownUsers[u.id] = u;
+              if (u.isActive && !isUserDeleted(u)) {
+                _knownUsers[u.id] = u;
+              }
             }
           }
         } catch (_) {}
@@ -57,53 +65,51 @@ class AttendanceSalaryMockStore {
         try {
           final Map<String, dynamic> decoded = jsonDecode(sessionUserJson);
           final u = UserModel.fromJson(decoded);
-          _knownUsers[u.id] = u;
+          if (u.isActive && !isUserDeleted(u)) {
+            _knownUsers[u.id] = u;
+          }
         } catch (_) {}
       }
 
-      // Ensure authentic database users are registered alongside custom/session users
-      for (final u in kAuthenticDatabaseUsers) {
-        if (!_knownUsers.containsKey(u.id)) {
-          _knownUsers[u.id] = u;
+      if (_knownUsers.isEmpty) {
+        for (final u in kAuthenticDatabaseUsers) {
+          if (u.isActive && !isUserDeleted(u)) {
+            _knownUsers[u.id] = u;
+          }
         }
       }
-      
-      // 1. Load Salaries
+
+      // 2. Load Salaries
       final salariesJson = prefs.getString(_kSalariesPrefKey);
       if (salariesJson != null && salariesJson.isNotEmpty) {
         final Map<String, dynamic> decoded = jsonDecode(salariesJson);
         decoded.forEach((key, val) {
           if (val is Map<String, dynamic>) {
-            _salaries[key] = EmployeeSalaryProfile.fromJson(val);
+            final profile = EmployeeSalaryProfile.fromJson(val);
+            if (!isUserIdDeleted(profile.userId) &&
+                !isUserIdDeleted(profile.userEmail) &&
+                !profile.userName.toLowerCase().contains('eleanor')) {
+              _salaries[key] = profile;
+            }
           }
         });
       }
-      _seedDefaultSalariesIfEmpty();
 
-      // 2. Load Real Attendance Records from device storage
+      // 3. Load Real Attendance Records from device storage
       final recordsJson = prefs.getString(_kRecordsPrefKey);
       if (recordsJson != null && recordsJson.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(recordsJson);
         for (final item in decoded) {
           if (item is Map<String, dynamic>) {
             final rec = AttendanceRecordModel.fromJson(item);
-            _records.add(rec);
-            if (!_knownUsers.containsKey(rec.userId)) {
-              _knownUsers[rec.userId] = UserModel(
-                id: rec.userId,
-                name: rec.userName,
-                email: rec.userEmail,
-                department: rec.department,
-                designation: rec.designation,
-                role: UserRole.projectMember,
-                avatarUrl: rec.avatarUrl,
-              );
+            if (!isRecordDeleted(rec)) {
+              _records.add(rec);
             }
           }
         }
       }
 
-      // 3. Load Holidays
+      // 4. Load Holidays
       final holidaysJson = prefs.getString(_kHolidaysPrefKey);
       if (holidaysJson != null && holidaysJson.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(holidaysJson);
@@ -114,15 +120,16 @@ class AttendanceSalaryMockStore {
         }
       }
       _seedDefaultHolidaysIfEmpty();
-      _seedDefaultRecordsIfEmpty();
     } catch (_) {
-      _seedDefaultSalariesIfEmpty();
       _seedDefaultHolidaysIfEmpty();
-      _seedDefaultRecordsIfEmpty();
     }
   }
 
   void syncUser(UserModel user) {
+    if (!user.isActive || _deletedUserIds.contains(user.id.toLowerCase()) || _deletedUserIds.contains(user.email.trim().toLowerCase())) {
+      removeUser(user.id);
+      return;
+    }
     _knownUsers[user.id] = user;
     if (!_salaries.containsKey(user.id)) {
       _salaries[user.id] = EmployeeSalaryProfile(
@@ -142,26 +149,16 @@ class AttendanceSalaryMockStore {
   }
 
   void syncUsers(List<UserModel> users) {
-    for (final u in users) {
-      syncUser(u);
-    }
-  }
+    final activeIds = users
+        .where((u) => u.isActive && !_deletedUserIds.contains(u.id.toLowerCase()) && !_deletedUserIds.contains(u.email.trim().toLowerCase()))
+        .map((u) => u.id)
+        .toSet();
 
-  void _seedDefaultSalariesIfEmpty() {
-    for (final user in _knownUsers.values) {
-      if (!_salaries.containsKey(user.id)) {
-        _salaries[user.id] = EmployeeSalaryProfile(
-          id: 'sal-${user.id.length > 8 ? user.id.substring(0, 8) : user.id}',
-          userId: user.id,
-          userName: user.name,
-          userEmail: user.email,
-          department: user.department,
-          designation: user.designation ?? user.role.displayName,
-          monthlySalary: 50000.0,
-          currency: 'BDT',
-          standardWorkingDays: 22,
-          effectiveFrom: '2026-01-01',
-        );
+    _knownUsers.removeWhere((id, u) => !activeIds.contains(id) || !u.isActive || _deletedUserIds.contains(id.toLowerCase()) || _deletedUserIds.contains(u.email.trim().toLowerCase()));
+
+    for (final u in users) {
+      if (u.isActive && !_deletedUserIds.contains(u.id.toLowerCase()) && !_deletedUserIds.contains(u.email.trim().toLowerCase())) {
+        syncUser(u);
       }
     }
   }
@@ -175,52 +172,6 @@ class AttendanceSalaryMockStore {
       HolidayModel(id: 'hol-4', date: '2026-05-01', name: 'May Day', isRecurring: true),
       HolidayModel(id: 'hol-5', date: '2026-12-16', name: 'Victory Day', isRecurring: true),
     ]);
-  }
-
-  void _seedDefaultRecordsIfEmpty() {
-    if (EnvironmentUtils.isTestEnvironment) return;
-    if (_records.isNotEmpty) return;
-    final now = DateTime.now();
-    final today = DateFormat('yyyy-MM-dd').format(now);
-    final yesterday = DateFormat('yyyy-MM-dd').format(now.subtract(const Duration(days: 1)));
-
-    final seedList = [
-      (
-        userId: 'a0000000-0000-0000-0000-000000000001',
-        userName: 'Eleanor Vance',
-        email: 'admin@pfis.com',
-        dept: 'Corporate Governance',
-        desig: 'Managing Director / Admin',
-        lat: 23.7508,
-        lng: 90.3934,
-        address: 'Kawran Bazar Tech Zone',
-        session: 'morning',
-      ),
-    ];
-
-    for (final d in [today, yesterday, '2026-10-02', '2026-10-03']) {
-      for (final s in seedList) {
-        _records.add(AttendanceRecordModel(
-          id: 'rec-$d-${s.userId.substring(0, 8)}-${s.session}',
-          userId: s.userId,
-          userName: s.userName,
-          userEmail: s.email,
-          department: s.dept,
-          designation: s.desig,
-          avatarUrl: '',
-          date: d,
-          sessionType: s.session,
-          loginTime: DateTime.tryParse('${d}T09:15:00Z') ?? now,
-          latitude: s.lat,
-          longitude: s.lng,
-          addressText: s.address,
-          deviceInfo: 'OnePlus IN2015',
-          status: 'present',
-          notes: 'GPS Verified Location Check-in',
-          createdAt: now,
-        ));
-      }
-    }
   }
 
   Future<void> _saveRecords() async {
@@ -281,17 +232,13 @@ class AttendanceSalaryMockStore {
 
     UserModel? resolvedUser = currentUser ?? _knownUsers[userId];
     if (resolvedUser == null) {
-      try {
-        resolvedUser = kAuthenticDatabaseUsers.firstWhere((u) => u.id == userId);
-      } catch (_) {
-        resolvedUser = UserModel(
-          id: userId,
-          name: 'Team Member',
-          email: 'member@pfis.com',
-          role: UserRole.projectMember,
-          department: 'Field Operations',
-        );
-      }
+      resolvedUser = UserModel(
+        id: userId,
+        name: 'Team Member',
+        email: '',
+        role: UserRole.projectMember,
+        department: 'Field Operations',
+      );
       syncUser(resolvedUser);
     }
 
@@ -323,6 +270,28 @@ class AttendanceSalaryMockStore {
     return record;
   }
 
+  bool isUserIdDeleted(String id) {
+    final clean = id.trim().toLowerCase();
+    return _deletedUserIds.contains(clean) ||
+        clean.contains('eleanor') ||
+        clean == 'admin@pfis.com';
+  }
+
+  bool isUserDeleted(UserModel u) {
+    return isUserIdDeleted(u.id) ||
+        isUserIdDeleted(u.email) ||
+        isUserIdDeleted(u.name) ||
+        u.name.toLowerCase().contains('eleanor');
+  }
+
+  bool isRecordDeleted(AttendanceRecordModel r) {
+    return isUserIdDeleted(r.userId) ||
+        isUserIdDeleted(r.userEmail) ||
+        isUserIdDeleted(r.userName) ||
+        r.userName.toLowerCase().contains('eleanor') ||
+        r.userEmail.toLowerCase().contains('eleanor');
+  }
+
   Future<List<AttendanceRecordModel>> getAttendanceRecords({
     String? userId,
     String? date,
@@ -333,6 +302,7 @@ class AttendanceSalaryMockStore {
     await ensureInitialized();
 
     return _records.where((r) {
+      if (isRecordDeleted(r)) return false;
       if (userId != null && userId.isNotEmpty && r.userId != userId) return false;
       if (date != null && date.isNotEmpty && r.date != date) return false;
       if (sessionType != null && sessionType.isNotEmpty && r.sessionType != sessionType) return false;
@@ -347,15 +317,35 @@ class AttendanceSalaryMockStore {
     }).toList();
   }
 
+  void removeUser(String userId) {
+    final clean = userId.trim().toLowerCase();
+    _deletedUserIds.add(clean);
+    final u = _knownUsers[userId];
+    if (u != null) {
+      if (u.email.isNotEmpty) _deletedUserIds.add(u.email.trim().toLowerCase());
+      if (u.name.isNotEmpty) _deletedUserIds.add(u.name.trim().toLowerCase());
+    }
+    _knownUsers.remove(userId);
+    _records.removeWhere((r) => isRecordDeleted(r) || r.userId.toLowerCase() == clean);
+    _salaries.remove(userId);
+    _saveDeletedUserIds();
+    _saveSalaries();
+    _saveRecords();
+  }
+
+  Future<void> _saveDeletedUserIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_kDeletedUserIdsPrefKey, _deletedUserIds.toList());
+    } catch (_) {}
+  }
+
   Future<DailyAttendanceOverview> getDailyOverview([
     String? date,
     List<UserModel>? explicitUsers,
     List<int>? explicitWeekendDays,
   ]) async {
     await ensureInitialized();
-    if (explicitUsers != null && explicitUsers.isNotEmpty) {
-      syncUsers(explicitUsers);
-    }
 
     final targetDate = (date != null && date.isNotEmpty)
         ? date
@@ -369,48 +359,22 @@ class AttendanceSalaryMockStore {
     final usersToProcess = <UserModel>[];
     final seenUserIds = <String>{};
 
-    for (final u in _knownUsers.values) {
-      if (u.role.requiresAttendanceCheckIn) {
-        if (seenUserIds.add(u.id)) {
-          usersToProcess.add(u);
+    if (explicitUsers != null) {
+      for (final u in explicitUsers) {
+        if (u.isActive && u.role.requiresAttendanceCheckIn && !isUserDeleted(u)) {
+          if (seenUserIds.add(u.id)) {
+            usersToProcess.add(u);
+            syncUser(u);
+          }
         }
       }
-    }
-
-    final targetRecords = _records.where((r) => r.date == targetDate).toList();
-    for (final rec in targetRecords) {
-      if (seenUserIds.add(rec.userId)) {
-        final u = UserModel(
-          id: rec.userId,
-          name: rec.userName,
-          email: rec.userEmail,
-          department: rec.department,
-          designation: rec.designation,
-          role: UserRole.projectMember,
-          avatarUrl: rec.avatarUrl,
-        );
-        syncUser(u);
-        usersToProcess.add(u);
-      }
-    }
-
-    if (usersToProcess.isEmpty) {
-      for (final u in kAuthenticDatabaseUsers) {
-        if (u.role.requiresAttendanceCheckIn) {
-          if (seenUserIds.add(u.id)) usersToProcess.add(u);
+    } else {
+      for (final u in _knownUsers.values) {
+        if (u.isActive && u.role.requiresAttendanceCheckIn && !isUserDeleted(u)) {
+          if (seenUserIds.add(u.id)) {
+            usersToProcess.add(u);
+          }
         }
-      }
-      if (usersToProcess.isEmpty) {
-        final fallback = UserModel(
-          id: 'e0000000-0000-0000-0000-000000000002',
-          name: 'Tariq Ahmed',
-          email: 'tariq@pfis.com',
-          role: UserRole.projectMember,
-          department: 'Field Operations',
-          designation: 'Field Engineer',
-        );
-        syncUser(fallback);
-        usersToProcess.add(fallback);
       }
     }
 
@@ -496,18 +460,13 @@ class AttendanceSalaryMockStore {
 
     _records.removeWhere((r) => r.userId == userId && r.date == date);
 
-    UserModel user;
-    try {
-      user = kAuthenticDatabaseUsers.firstWhere((u) => u.id == userId);
-    } catch (_) {
-      user = UserModel(
-        id: userId,
-        name: 'Team Member',
-        email: '',
-        role: UserRole.projectMember,
-        department: 'General',
-      );
-    }
+    UserModel user = _knownUsers[userId] ?? UserModel(
+      id: userId,
+      name: 'Team Member',
+      email: '',
+      role: UserRole.projectMember,
+      department: 'General',
+    );
 
     final confirmedRecord = AttendanceRecordModel(
       id: 'abs-${DateTime.now().millisecondsSinceEpoch}',
@@ -540,28 +499,24 @@ class AttendanceSalaryMockStore {
 
     UserModel? user = _knownUsers[userId];
     if (user == null) {
-      try {
-        user = kAuthenticDatabaseUsers.firstWhere((u) => u.id == userId);
-      } catch (_) {
-        final rec = _records.cast<AttendanceRecordModel?>().firstWhere((r) => r?.userId == userId, orElse: () => null);
-        if (rec != null) {
-          user = UserModel(
-            id: userId,
-            name: rec.userName,
-            email: rec.userEmail,
-            department: rec.department,
-            designation: rec.designation,
-            role: UserRole.projectMember,
-          );
-        } else {
-          user = UserModel(
-            id: userId,
-            name: 'Employee',
-            email: 'employee@pfis.com',
-            role: UserRole.projectMember,
-            department: 'Operations',
-          );
-        }
+      final rec = _records.cast<AttendanceRecordModel?>().firstWhere((r) => r?.userId == userId, orElse: () => null);
+      if (rec != null) {
+        user = UserModel(
+          id: userId,
+          name: rec.userName,
+          email: rec.userEmail,
+          department: rec.department,
+          designation: rec.designation,
+          role: UserRole.projectMember,
+        );
+      } else {
+        user = UserModel(
+          id: userId,
+          name: 'Employee',
+          email: 'employee@gw.com',
+          role: UserRole.projectMember,
+          department: 'Operations',
+        );
       }
       syncUser(user);
     }
@@ -623,7 +578,6 @@ class AttendanceSalaryMockStore {
     final now = DateTime.now();
 
     final dailyBreakdown = <DailyBreakdownItemModel>[];
-    double totalDeductionsUnits = 0.0;
     int scheduledWorkingDays = 0;
     int presentDaysCount = 0;
     int halfDaysCount = 0;
@@ -632,8 +586,7 @@ class AttendanceSalaryMockStore {
     int weekendCount = 0;
     int holidayCount = 0;
 
-    final resolvedUser = _knownUsers[userId] ??
-        kAuthenticDatabaseUsers.cast<UserModel?>().firstWhere((u) => u?.id == userId, orElse: () => null);
+    final resolvedUser = _knownUsers[userId];
     final isExemptRole = resolvedUser != null && !resolvedUser.role.requiresAttendanceCheckIn;
 
     for (int day = 1; day <= daysInMonth; day++) {
@@ -710,8 +663,6 @@ class AttendanceSalaryMockStore {
         deductionUnits = 1.0; // Unlogged absence cut
         missingLoginDaysCount++;
       }
-
-      totalDeductionsUnits += deductionUnits;
 
       dailyBreakdown.add(DailyBreakdownItemModel(
         date: dateStr,
@@ -796,12 +747,17 @@ class AttendanceSalaryMockStore {
     final seenUserIds = <String>{};
 
     for (final u in _knownUsers.values) {
-      if (seenUserIds.add(u.id)) {
-        usersToProcess.add(u);
+      if (u.isActive && !_deletedUserIds.contains(u.id.toLowerCase()) && !_deletedUserIds.contains(u.email.trim().toLowerCase())) {
+        if (seenUserIds.add(u.id)) {
+          usersToProcess.add(u);
+        }
       }
     }
 
     for (final r in _records) {
+      if (_deletedUserIds.contains(r.userId.toLowerCase()) || _deletedUserIds.contains(r.userEmail.trim().toLowerCase())) {
+        continue;
+      }
       final parsed = DateTime.tryParse(r.date);
       if (parsed != null && parsed.month == month && parsed.year == year) {
         if (seenUserIds.add(r.userId)) {
@@ -817,12 +773,6 @@ class AttendanceSalaryMockStore {
           syncUser(u);
           usersToProcess.add(u);
         }
-      }
-    }
-
-    if (usersToProcess.isEmpty) {
-      for (final u in kAuthenticDatabaseUsers) {
-        if (seenUserIds.add(u.id)) usersToProcess.add(u);
       }
     }
 

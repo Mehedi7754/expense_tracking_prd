@@ -9,7 +9,6 @@ import '../../core/widgets/notification_banner.dart';
 import '../../models/attendance_model.dart';
 import '../../models/user_role.dart';
 import '../../state/attendance_provider.dart';
-import '../../state/attendance_settings_provider.dart';
 import '../../state/auth_provider.dart';
 import '../../state/user_management_provider.dart';
 import 'my_attendance_screen.dart';
@@ -257,7 +256,13 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
     final halfDayCount = overview?.halfDayCount ?? 0;
     final missingCount = overview?.missingCount ?? 0;
 
-    final employees = overview?.employees ?? [];
+    final employees = (overview?.employees ?? []).where((e) {
+      final name = e.userName.toLowerCase();
+      final email = e.userEmail.toLowerCase();
+      return !name.contains('eleanor') &&
+          !email.contains('eleanor') &&
+          email != 'admin@pfis.com';
+    }).toList();
     final filteredEmployees = employees.where((e) {
       if (_statusFilter == 'present') return e.status == 'present';
       if (_statusFilter == 'half_day') return e.status == 'half_day';
@@ -273,7 +278,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
       appBar: AppBar(
-        title: const Text('Attendance & Geo-Tracking', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        title: const Text('Attendance', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
         elevation: 0,
         backgroundColor: Colors.transparent,
         actions: [
@@ -309,73 +314,99 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
                 children: [
                   // Office Timing Configuration Banner (Super Admin)
                   if (currentUser?.role == UserRole.mainAdmin) ...[
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkSurface : Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => context.push(RoutePaths.attendanceSettings),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppColors.darkSurface : Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(isDark ? 20 : 6),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF4F46E5).withValues(alpha: isDark ? 0.25 : 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(
+                                  Icons.tune_rounded,
+                                  color: Color(0xFF4F46E5),
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Shift & Timing Rules',
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Configure schedules, off-days & payroll',
+                                      style: TextStyle(
+                                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Manage',
+                                      style: TextStyle(
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 10,
+                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(isDark ? 20 : 6),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              Icons.access_time_rounded,
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Office Hours & Shift Timing',
-                                  style: TextStyle(
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Text(
-                                  'Morning Cutoff: ${ref.watch(attendanceSettingsProvider).value?.morningEndHour ?? 13}:00 • Afternoon begins immediately',
-                                  style: TextStyle(
-                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F172A),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              minimumSize: const Size(0, 30),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              elevation: 0,
-                            ),
-                            onPressed: () => context.push(RoutePaths.attendanceSettings),
-                            child: const Text('Configure', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
-                          ),
-                        ],
                       ),
                     ),
                   ],

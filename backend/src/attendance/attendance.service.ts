@@ -3,6 +3,8 @@ import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CheckInDto } from './dto/check-in.dto';
 
+import { EmailService } from '../email/email.service';
+
 export interface AttendanceRecord {
   id: string;
   userId: string;
@@ -41,6 +43,7 @@ export class AttendanceService {
   constructor(
     private readonly db: DatabaseService,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   private officeTimingSettings = {
@@ -52,6 +55,7 @@ export class AttendanceService {
     deductionType: 'rate_based',
     fullDayDeductionAmount: 1.0,
     halfDayDeductionAmount: 0.5,
+    gracePeriodMinutes: 15,
     shifts: [
       {
         id: 'shift_default',
@@ -143,11 +147,11 @@ export class AttendanceService {
   async checkIn(userId: string, dto: CheckInDto): Promise<AttendanceRecord> {
     await this.getTimingSettings();
 
-    // 1. Check user role — Super Admin & Finance are exempt from attendance check-in
+    // 1. Check user role — Super Admin & Finance are exempt from attendance rules, but allowed to check in for testing
     const userRoleRes = await this.db.query('SELECT role, full_name, email FROM users WHERE id = $1', [userId]);
     const user = userRoleRes.rows[0];
     if (user?.role === 'main_admin' || user?.role === 'finance') {
-      throw new BadRequestException('Attendance check-in is strictly for employees, not required for administrators.');
+      this.logger.log(`Privileged user ${userId} (${user.role}) is recording check-in.`);
     }
 
     // 2. Resolve local office hour (Bangladesh Standard Time: UTC+6) and assigned user shift
@@ -167,27 +171,8 @@ export class AttendanceService {
     } else if (explicit === 'afternoon') {
       session = 'afternoon';
     } else {
-      if (currentHour >= morningStart && currentHour < morningEnd) {
-        session = 'morning';
-      } else if (currentHour >= afternoonStart && currentHour < afternoonEnd) {
-        session = 'afternoon';
-      } else {
-        throw new BadRequestException(
-          `Check-in is only available during your shift (${userShift.name}) sessions: Morning (${morningStart}:00) and Afternoon (${afternoonStart}:00 - ${afternoonEnd}:00).`
-        );
-      }
-    }
-
-    // Validate window
-    if (session === 'morning' && (currentHour < morningStart || currentHour >= morningEnd)) {
-      throw new BadRequestException(
-        `Morning check-in for ${userShift.name} is open between ${morningStart}:00 and ${morningEnd}:00.`
-      );
-    }
-    if (session === 'afternoon' && (currentHour < afternoonStart || currentHour >= afternoonEnd)) {
-      throw new BadRequestException(
-        `Afternoon check-in for ${userShift.name} is open between ${afternoonStart}:00 and ${afternoonEnd}:00.`
-      );
+      const divider = userShift.morningEndHour ?? 13;
+      session = currentHour < divider ? 'morning' : 'afternoon';
     }
 
     const address = dto.addressText || dto.address_text || '';
@@ -238,7 +223,24 @@ export class AttendanceService {
     try {
       const userRes = await this.db.query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
       const empName = userRes.rows[0]?.full_name || 'Team member';
+      const empEmail = userRes.rows[0]?.email || '';
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      // Calculate Late Status based on configurable grace period
+      const currentMinute = dhakaNow.getMinutes();
+      const gracePeriod = this.officeTimingSettings.gracePeriodMinutes ?? 15;
+      let isLate = false;
+      if (session === 'morning') {
+        if (currentHour > morningStart || (currentHour === morningStart && currentMinute > gracePeriod)) {
+          isLate = true;
+        }
+      } else {
+        if (currentHour > afternoonStart || (currentHour === afternoonStart && currentMinute > gracePeriod)) {
+          isLate = true;
+        }
+      }
+
+      const statusTag = isLate ? '⚠️ LATE' : '✅ ON TIME';
 
       // Notify employee with attendance confirmation
       await this.notificationsService.create({
@@ -249,7 +251,20 @@ export class AttendanceService {
         type: 'attendance_reminder',
       });
 
-      // Notify Super Admin & Managers about the employee check-in
+      // Send Email to Employee (using dynamic import to avoid circular dep if any, or injected if available. Wait, I should inject EmailService into AttendanceService!)
+      // Let's rely on the EmailService injection (which I will add in the constructor).
+      if (this.emailService && empEmail) {
+        await this.emailService.sendCheckInConfirmation(
+          empEmail,
+          empName,
+          session,
+          timeStr,
+          address || 'Office Premises',
+          isLate
+        );
+      }
+
+      // Notify Super Admin & Managers about the employee check-in (FCM Push)
       const adminsRes = await this.db.query(
         `SELECT id FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
         [userId],
@@ -257,14 +272,14 @@ export class AttendanceService {
       for (const admin of adminsRes.rows) {
         await this.notificationsService.create({
           userId: admin.id,
-          title: 'Employee Checked In 📍',
+          title: `Employee Checked In: ${statusTag}`,
           message: `${empName} recorded attendance for ${session} session at ${timeStr}.`,
           fullExplanation: `${empName} logged in for the ${session} session on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
           type: 'attendance_reminder',
         });
       }
     } catch (e) {
-      this.logger.warn(`Could not create attendance notifications: ${e}`);
+      this.logger.warn(`Could not create attendance notifications/emails: ${e}`);
     }
 
     return fetched;
@@ -296,7 +311,7 @@ export class AttendanceService {
               a.status, a.notes, a.created_at::text as "createdAt"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
-       WHERE a.date = CURRENT_DATE
+       WHERE a.date = CURRENT_DATE AND u.is_active = TRUE
        ORDER BY a.login_time DESC`,
     );
     return res.rows;
@@ -317,7 +332,7 @@ export class AttendanceService {
               a.status, a.notes, a.created_at::text as "createdAt"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
-       WHERE a.user_id = $1 AND a.date >= $2 AND a.date < $3
+       WHERE a.user_id = $1 AND a.date >= $2 AND a.date < $3 AND u.is_active = TRUE
        ORDER BY a.date ASC, a.session_type ASC`,
       [userId, startDate, endDate],
     );
@@ -339,7 +354,7 @@ export class AttendanceService {
               a.status, a.notes, a.created_at::text as "createdAt"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
-       WHERE a.date >= $1 AND a.date < $2
+       WHERE a.date >= $1 AND a.date < $2 AND u.is_active = TRUE
        ORDER BY a.date ASC, a.session_type ASC`,
       [startDate, endDate],
     );

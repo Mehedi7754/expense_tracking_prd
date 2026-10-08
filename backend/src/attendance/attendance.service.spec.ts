@@ -12,7 +12,11 @@ describe('AttendanceService Unit & Session Logic', () => {
     mockNotifications = {
       create: jest.fn().mockResolvedValue({}),
     };
-    service = new AttendanceService(mockDb, mockNotifications);
+    const mockEmailService = {
+      sendCheckInConfirmation: jest.fn().mockResolvedValue({}),
+      sendNewExpenseNotification: jest.fn().mockResolvedValue({}),
+    };
+    service = new AttendanceService(mockDb, mockNotifications, mockEmailService as any);
   });
 
   describe('checkIn', () => {
@@ -37,8 +41,10 @@ describe('AttendanceService Unit & Session Logic', () => {
         deviceInfo: 'Flutter Mobile App',
       };
 
-      // Query 1: User role check
+      // Query 0: getTimingSettings
       mockDb.query
+        .mockResolvedValueOnce({ rows: [] })
+      // Query 1: User role check
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
         // Query 2: Check existing check-in -> none
         .mockResolvedValueOnce({ rows: [] })
@@ -46,27 +52,31 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({
           rows: [{ id: 'att-rec-1' }],
         })
-        // Query 3: getRecordById
+        // Query 4: getRecordById
         .mockResolvedValueOnce({
           rows: [
             {
               id: 'att-rec-1',
-              user_id: userId,
+              userId: userId,
               date: '2026-10-02',
-              session_type: 'morning',
-              login_time: new Date().toISOString(),
-              latitude: '23.8103',
-              longitude: '90.4125',
-              address_text: 'Dhaka, Bangladesh',
-              device_info: 'Flutter Mobile App',
+              sessionType: 'morning',
+              loginTime: new Date().toISOString(),
+              latitude: 23.8103,
+              longitude: 90.4125,
+              addressText: 'Dhaka, Bangladesh',
+              deviceInfo: 'Flutter Mobile App',
               status: 'present',
               notes: '',
-              created_at: new Date().toISOString(),
-              full_name: 'Fahim Ahmed',
-              email: 'fahim@pfis.com',
+              createdAt: new Date().toISOString(),
+              userName: 'Fahim Ahmed',
+              userEmail: 'fahim@pfis.com',
             },
           ],
-        });
+        })
+        // Query 5: user fullname + email query
+        .mockResolvedValueOnce({ rows: [{ full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 6: get admins for push notification
+        .mockResolvedValueOnce({ rows: [{ id: 'admin1' }] });
 
       const result = await service.checkIn(userId, checkInDto);
       expect(result.id).toBe('att-rec-1');
@@ -83,36 +93,42 @@ describe('AttendanceService Unit & Session Logic', () => {
         addressText: 'Updated Location, Dhaka',
       };
 
-      // Query 1: User role check
+      // Query 0: getTimingSettings
       mockDb.query
+        .mockResolvedValueOnce({ rows: [] })
+      // Query 1: User role check
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
         // Query 2: Check existing -> found
         .mockResolvedValueOnce({
           rows: [{ id: 'existing-rec' }],
         })
-        // Query 2: Update query
+        // Query 3: Update query
         .mockResolvedValueOnce({ rows: [] })
-        // Query 3: getRecordById
+        // Query 4: getRecordById
         .mockResolvedValueOnce({
           rows: [
             {
               id: 'existing-rec',
-              user_id: userId,
+              userId: userId,
               date: '2026-10-02',
-              session_type: 'morning',
-              login_time: new Date().toISOString(),
-              latitude: '23.8120',
-              longitude: '90.4140',
-              address_text: 'Updated Location, Dhaka',
-              device_info: '',
+              sessionType: 'morning',
+              loginTime: new Date().toISOString(),
+              latitude: 23.8120,
+              longitude: 90.4140,
+              addressText: 'Updated Location, Dhaka',
+              deviceInfo: '',
               status: 'present',
               notes: '',
-              created_at: new Date().toISOString(),
-              full_name: 'Fahim Ahmed',
-              email: 'fahim@pfis.com',
+              createdAt: new Date().toISOString(),
+              userName: 'Fahim Ahmed',
+              userEmail: 'fahim@pfis.com',
             },
           ],
-        });
+        })
+        // Query 5: user fullname + email query
+        .mockResolvedValueOnce({ rows: [{ full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 6: get admins for push notification
+        .mockResolvedValueOnce({ rows: [{ id: 'admin1' }] });
 
       const result = await service.checkIn(userId, checkInDto);
       expect(result.id).toBe('existing-rec');

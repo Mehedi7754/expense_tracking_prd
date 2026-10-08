@@ -108,6 +108,9 @@ class AttendanceSettingsState {
   /// Mapping of employee ID to assigned shift ID ({userId: shiftId})
   final Map<String, String> userShifts;
 
+  /// Grace period in minutes for late check-in
+  final int gracePeriodMinutes;
+
   const AttendanceSettingsState({
     this.morningStartHour = 9,
     this.morningEndHour = 13,
@@ -118,6 +121,7 @@ class AttendanceSettingsState {
     this.isDeductionEnabled = true,
     this.fullDayDeductionAmount = 1.0,
     this.halfDayDeductionAmount = 0.5,
+    this.gracePeriodMinutes = 15,
     this.shifts = const [
       AttendanceShift(
         id: 'shift_default',
@@ -173,6 +177,7 @@ class AttendanceSettingsState {
     bool? isDeductionEnabled,
     double? fullDayDeductionAmount,
     double? halfDayDeductionAmount,
+    int? gracePeriodMinutes,
     List<AttendanceShift>? shifts,
     Map<String, String>? userShifts,
   }) {
@@ -186,6 +191,7 @@ class AttendanceSettingsState {
       isDeductionEnabled: isDeductionEnabled ?? this.isDeductionEnabled,
       fullDayDeductionAmount: fullDayDeductionAmount ?? this.fullDayDeductionAmount,
       halfDayDeductionAmount: halfDayDeductionAmount ?? this.halfDayDeductionAmount,
+      gracePeriodMinutes: gracePeriodMinutes ?? this.gracePeriodMinutes,
       shifts: shifts ?? this.shifts,
       userShifts: userShifts ?? this.userShifts,
     );
@@ -201,6 +207,7 @@ class AttendanceSettingsState {
         'isDeductionEnabled': isDeductionEnabled,
         'fullDayDeductionAmount': fullDayDeductionAmount,
         'halfDayDeductionAmount': halfDayDeductionAmount,
+        'gracePeriodMinutes': gracePeriodMinutes,
         'shifts': shifts.map((s) => s.toJson()).toList(),
         'userShifts': userShifts,
       };
@@ -245,6 +252,7 @@ class AttendanceSettingsState {
       isDeductionEnabled: isDeductionEnabled,
       fullDayDeductionAmount: (json['fullDayDeductionAmount'] as num?)?.toDouble() ?? 1.0,
       halfDayDeductionAmount: (json['halfDayDeductionAmount'] as num?)?.toDouble() ?? 0.5,
+      gracePeriodMinutes: (json['gracePeriodMinutes'] as num?)?.toInt() ?? 15,
       shifts: shiftList,
       userShifts: userMap,
     );

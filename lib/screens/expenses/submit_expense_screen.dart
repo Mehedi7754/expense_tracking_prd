@@ -9,6 +9,7 @@ import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
 import '../../core/services/background_receipt_uploader.dart';
+import '../../repositories/file_upload_repository.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
@@ -38,6 +39,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   bool _hasReceipt = true; // PRD Section 10: Receipt available Yes/No
   String? _receiptFileName;
   String? _receiptPath;
+  String? _serverReceiptUrl;
+  bool _isUploadingReceipt = false;
   bool _isSubmitting = false;
 
   // Category A: Equipment
@@ -145,6 +148,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           _receiptPath = image.path;
           _receiptFileName = image.name.isNotEmpty ? image.name : image.path.split(RegExp(r'[/\\]')).last;
         });
+        _uploadPickedReceipt(image.path);
         if (mounted) {
           NotificationBanner.showSuccess(
             context,
@@ -164,6 +168,28 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     }
   }
 
+  Future<void> _uploadPickedReceipt(String filePath) async {
+    setState(() => _isUploadingReceipt = true);
+    try {
+      final uploadRepo = ref.read(fileUploadRepositoryProvider);
+      final res = await uploadRepo.upload(
+        filePathOrDataUri: filePath,
+        category: UploadCategory.receipts,
+      );
+      if (mounted) {
+        setState(() {
+          _serverReceiptUrl = res.url;
+          _isUploadingReceipt = false;
+        });
+        NotificationBanner.showSuccess(context, 'Receipt uploaded successfully to cloud!');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isUploadingReceipt = false);
+      }
+    }
+  }
+
   Future<void> _pickDocumentOrMedia() async {
     try {
       final picker = ImagePicker();
@@ -173,6 +199,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           _receiptPath = file.path;
           _receiptFileName = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
         });
+        _uploadPickedReceipt(file.path);
         if (mounted) {
           NotificationBanner.showSuccess(context, 'Receipt file attached: $_receiptFileName');
         }
@@ -186,6 +213,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             _receiptPath = file.path;
             _receiptFileName = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
           });
+          _uploadPickedReceipt(file.path);
           if (mounted) {
             NotificationBanner.showSuccess(context, 'Receipt file attached: $_receiptFileName');
           }
@@ -292,7 +320,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           note: _noteController.text.trim(),
           date: _selectedDate,
           hasReceipt: _hasReceipt,
-          receiptPhotoUrl: localReceiptPath,
+          receiptPhotoUrl: _serverReceiptUrl ?? localReceiptPath,
           equipmentDetails: equipDetails,
           transportationDetails: transDetails,
           foodDetails: foodDetails,
@@ -300,11 +328,15 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           officeCostDetails: officeDetails,
         );
 
-    // If a local receipt photo was chosen, enqueue background upload without blocking UI
-    if (localReceiptPath != null && localReceiptPath.isNotEmpty && !localReceiptPath.startsWith('http')) {
+    // If receipt hasn't finished remote uploading yet, enqueue background upload
+    final effectiveReceipt = _serverReceiptUrl ?? localReceiptPath;
+    if (effectiveReceipt != null &&
+        effectiveReceipt.isNotEmpty &&
+        !effectiveReceipt.startsWith('http') &&
+        !effectiveReceipt.startsWith('/uploads')) {
       BackgroundReceiptUploader.instance.enqueue(
         expenseId: created.id,
-        localFilePath: localReceiptPath,
+        localFilePath: effectiveReceipt,
         ref: ref,
       );
     }
@@ -312,7 +344,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     if (mounted) {
       NotificationBanner.showSuccess(
         context,
-        _hasReceipt ? 'Expense submitted! Receipt uploading in background...' : 'Expense claim submitted for approval',
+        _hasReceipt ? 'Expense submitted successfully!' : 'Expense claim submitted for approval',
       );
       context.pop();
     }
@@ -914,14 +946,28 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                _receiptFileName!,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      _receiptFileName!,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (_isUploadingReceipt) ...[
+                                    const SizedBox(width: 8),
+                                    const SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             IconButton(
@@ -932,6 +978,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                               onPressed: () => setState(() {
                                 _receiptFileName = null;
                                 _receiptPath = null;
+                                _serverReceiptUrl = null;
                                 _hasReceipt = false; // Turn off the toggle automatically when receipt is removed
                               }),
                             ),

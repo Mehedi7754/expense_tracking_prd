@@ -375,8 +375,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         ),
 
         // Curved Area Graph (Image 2 style)
-        const MinimalAreaChart(
+        MinimalAreaChart(
           title: 'Monthly Earnings',
+          onTap: () => context.push(RoutePaths.monthlyEarningsDetail),
         ),
 
         const SizedBox(height: 8),

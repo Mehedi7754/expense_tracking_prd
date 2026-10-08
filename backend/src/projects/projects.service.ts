@@ -114,7 +114,7 @@ export class ProjectsService {
           '[]'::json
         ) AS team_members
       FROM projects p
-      WHERE p.id::text = $1 OR p.project_code = $1`,
+      WHERE p.id::text = $1 OR p.project_code = $1 OR LOWER(p.name) = LOWER($1)`,
       [id],
     );
 
@@ -470,11 +470,13 @@ export class ProjectsService {
   async delete(id: string, user?: any) {
     let dbId = id;
     let projectCode = id;
+    let projectName = id;
     try {
       const existing = await this.findOne(id, user);
       if (existing) {
         dbId = existing.id;
         projectCode = existing.projectId || id;
+        projectName = existing.name || id;
       }
     } catch (_) {}
 
@@ -524,8 +526,8 @@ export class ProjectsService {
 
       // 7. Delete project record
       const res = await client.query(
-        'DELETE FROM projects WHERE id::text = $1 OR id::text = $2 OR project_code = $1 OR project_code = $2 RETURNING *',
-        [dbId, projectCode],
+        'DELETE FROM projects WHERE id::text = $1 OR id::text = $2 OR project_code = $1 OR project_code = $2 OR LOWER(name) = LOWER($3) RETURNING *',
+        [dbId, projectCode, projectName],
       );
 
       try {
@@ -534,7 +536,7 @@ export class ProjectsService {
             action: 'PROJECT_DELETED',
             entityType: 'Project',
             entityId: dbId,
-            details: { id, dbId, projectCode },
+            details: { id, dbId, projectCode, projectName },
           },
           user ? { id: user.id } : undefined,
         );

@@ -10,7 +10,6 @@ import '../../core/services/location_service.dart';
 import '../../core/widgets/location_permission_dialog.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/attendance_model.dart';
-import '../../models/user_role.dart';
 import '../../state/attendance_provider.dart';
 import '../../state/attendance_settings_provider.dart';
 import '../../state/auth_provider.dart';
@@ -39,13 +38,6 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
   }
 
   Future<void> _handleManualCheckIn(String session) async {
-    final windowErr = AttendanceNotifier.checkInWindowError(
-        session, ref.read(attendanceSettingsProvider).value);
-    if (windowErr != null) {
-      NotificationBanner.showWarning(context, windowErr);
-      return;
-    }
-
     final success = await ref.read(attendanceProvider.notifier).checkIn(explicitSession: session);
     if (!mounted) return;
 
@@ -574,23 +566,27 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                 ],
               ),
             )
-          else if (isCorrectTimeSlot)
+          else
             GFButton(
               onPressed: isSubmitting ? null : onCheckIn,
               text: title.toLowerCase().contains('morning') ? 'Punch In' : 'Punch Out',
-              icon: const Icon(
-                CupertinoIcons.arrow_right_circle_fill,
+              icon: Icon(
+                isCorrectTimeSlot ? CupertinoIcons.arrow_right_circle_fill : CupertinoIcons.clock_fill,
                 size: 13,
-                color: Colors.white,
+                color: isCorrectTimeSlot
+                    ? Colors.white
+                    : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5)),
               ),
-              type: GFButtonType.solid,
+              type: isCorrectTimeSlot ? GFButtonType.solid : GFButtonType.outline,
               shape: GFButtonShape.pills,
               color: title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5),
               size: GFSize.SMALL,
-              textStyle: const TextStyle(
+              textStyle: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                color: Colors.white,
+                color: isCorrectTimeSlot
+                    ? Colors.white
+                    : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5)),
               ),
               child: isSubmitting
                   ? const SizedBox(
@@ -599,38 +595,6 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : null,
-            )
-          else
-            // Locked badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8.5, vertical: 4),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
-                  width: 1.0,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    CupertinoIcons.lock_fill,
-                    size: 10,
-                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
-                  ),
-                  const SizedBox(width: 3.5),
-                  Text(
-                    'Locked',
-                    style: TextStyle(
-                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
             ),
         ],
       ),

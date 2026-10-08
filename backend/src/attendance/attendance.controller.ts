@@ -30,28 +30,28 @@ export class AttendanceController {
   @Get()
   async getAttendanceRecords(
     @Query('userId') userId: string,
-    @Query('date') date: string,
     @Query('month') month: string,
     @Query('year') year: string,
-    @Query('sessionType') sessionType: string,
     @Request() req: any,
   ) {
-    return this.attendanceService.getAttendanceRecords({
-      userId: userId || undefined,
-      date: date || undefined,
-      month: month ? parseInt(month, 10) : undefined,
-      year: year ? parseInt(year, 10) : undefined,
-      sessionType: sessionType || undefined,
-      currentUserRole: req.user.role || 'project_member',
-      currentUserId: req.user.id,
-    });
+    if (userId) {
+      if (month && year) {
+        return this.attendanceService.getMonthlyRecords(userId, parseInt(year, 10), parseInt(month, 10));
+      } else {
+        return this.attendanceService.getTodayRecords(); // Simplification
+      }
+    } else {
+      if (month && year) {
+        return this.attendanceService.getAllMonthlyRecords(parseInt(year, 10), parseInt(month, 10));
+      } else {
+        return this.attendanceService.getTodayRecords();
+      }
+    }
   }
 
   @Get('summary')
   async getSummary(
     @Query('userId') userId: string,
-    @Query('month') month: string,
-    @Query('year') year: string,
     @Request() req: any,
   ) {
     const isManagerOrAdmin =
@@ -65,25 +65,7 @@ export class AttendanceController {
     }
 
     const targetUserId = isManagerOrAdmin && userId ? userId : req.user.id;
-    const targetMonth = month ? parseInt(month, 10) : new Date().getMonth() + 1;
-    const targetYear = year ? parseInt(year, 10) : new Date().getFullYear();
-
-    return this.attendanceService.getAttendanceSummary(targetUserId, targetMonth, targetYear);
-  }
-
-  @Roles('main_admin', 'project_manager', 'finance_manager', 'finance')
-  @Get('daily-overview')
-  async getDailyOverview(@Query('date') date: string) {
-    return this.attendanceService.getDailyOverview(date);
-  }
-
-  @Roles('main_admin', 'project_manager')
-  @Post('confirm-absence')
-  async confirmAbsence(
-    @Body() body: { userId: string; date: string; notes?: string },
-    @Request() req: any,
-  ) {
-    return this.attendanceService.confirmAbsence(body.userId, body.date, body.notes, req.user.id);
+    return this.attendanceService.getSummary(targetUserId);
   }
 
   @Get('settings')

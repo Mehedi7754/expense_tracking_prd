@@ -44,6 +44,15 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     } catch (_) {}
   }
 
+  bool _isProjectDeleted(ProjectModel p, Set<String> deletedSet) {
+    if (deletedSet.contains(p.id)) return true;
+    if (deletedSet.contains(p.projectId)) return true;
+    if (deletedSet.contains(p.id.toLowerCase())) return true;
+    if (deletedSet.contains(p.projectId.toLowerCase())) return true;
+    if (deletedSet.contains(p.name.trim().toLowerCase())) return true;
+    return false;
+  }
+
   Future<void> _loadCachedProjects() async {
     if (EnvironmentUtils.isTestEnvironment) return;
     try {
@@ -56,11 +65,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
             decoded
                 .whereType<Map<String, dynamic>>()
                 .map(ProjectModel.fromJson)
-                .where(
-                  (p) =>
-                      !deletedIds.contains(p.id) &&
-                      !deletedIds.contains(p.projectId),
-                )
+                .where((p) => !_isProjectDeleted(p, deletedIds))
                 .toList();
 
         state = customProjects;
@@ -112,11 +117,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
 
       final remoteProjects =
           rawRemoteProjects
-              .where(
-                (p) =>
-                    !deletedIds.contains(p.id) &&
-                    !deletedIds.contains(p.projectId),
-              )
+              .where((p) => !_isProjectDeleted(p, deletedIds))
               .toList();
 
       final remoteIds = remoteProjects.map((p) => p.id).toSet();
@@ -171,10 +172,14 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
               .where(
                 (p) =>
                     p.id.startsWith('proj_') &&
-                    !deletedIds.contains(p.id) &&
-                    !deletedIds.contains(p.projectId) &&
+                    !_isProjectDeleted(p, deletedIds) &&
                     !remoteIds.contains(p.id) &&
-                    !remoteCodes.contains(p.projectId),
+                    !remoteCodes.contains(p.projectId) &&
+                    !remoteProjects.any(
+                      (r) =>
+                          r.name.trim().toLowerCase() ==
+                          p.name.trim().toLowerCase(),
+                    ),
               )
               .toList();
 
@@ -564,25 +569,34 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
 
   /// Deletes a project from local state and remote backend database.
   Future<void> deleteProject(String projectId) async {
-    final candidateIds = <String>{projectId};
+    final candidateIds = <String>{
+      projectId.trim(),
+      projectId.trim().toLowerCase(),
+    };
 
     for (final p in state) {
-      if (p.id == projectId || p.projectId == projectId) {
-        if (p.id.isNotEmpty) candidateIds.add(p.id);
-        if (p.projectId.isNotEmpty) candidateIds.add(p.projectId);
+      if (p.id == projectId ||
+          p.projectId == projectId ||
+          p.id.toLowerCase() == projectId.toLowerCase() ||
+          p.projectId.toLowerCase() == projectId.toLowerCase() ||
+          p.name.trim().toLowerCase() == projectId.trim().toLowerCase()) {
+        if (p.id.isNotEmpty) {
+          candidateIds.add(p.id);
+          candidateIds.add(p.id.toLowerCase());
+        }
+        if (p.projectId.isNotEmpty) {
+          candidateIds.add(p.projectId);
+          candidateIds.add(p.projectId.toLowerCase());
+        }
+        if (p.name.isNotEmpty) {
+          candidateIds.add(p.name.trim().toLowerCase());
+        }
       }
     }
 
     await _recordDeletedProjectIds(candidateIds);
 
-    state =
-        state
-            .where(
-              (p) =>
-                  !candidateIds.contains(p.id) &&
-                  !candidateIds.contains(p.projectId),
-            )
-            .toList();
+    state = state.where((p) => !_isProjectDeleted(p, candidateIds)).toList();
     await _persistProjects();
     invalidateCache();
 

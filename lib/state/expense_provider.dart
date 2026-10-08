@@ -9,6 +9,7 @@ import '../models/expense_model.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/expense_repository.dart';
+import 'notification_provider.dart';
 
 const String _kCustomExpensesKey = 'gw_custom_expenses_cache';
 
@@ -461,6 +462,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
   }
 
   Future<void> approveExpense(String id) async {
+    final matches = state.where((e) => e.id == id);
+    final exp = matches.isNotEmpty ? matches.first : null;
+
     state = [
       for (final exp in state)
         if (exp.id == id)
@@ -470,6 +474,16 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     ];
     await _persistExpenses();
     invalidateCache();
+
+    // Trigger instant OS-level push notification
+    if (exp != null) {
+      PushNotificationService.instance.showExpenseAlert(
+        title: 'Expense Approved ✅',
+        body: 'Expense report for ${exp.categoryName} (${exp.currency} ${exp.amount.toStringAsFixed(0)}) has been approved.',
+        expenseId: id,
+      );
+    }
+    ref.read(notificationProvider.notifier).fetchNotifications();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
@@ -524,6 +538,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
   }
 
   Future<void> rejectExpense(String id, String reason) async {
+    final matches = state.where((e) => e.id == id);
+    final exp = matches.isNotEmpty ? matches.first : null;
+
     state = [
       for (final exp in state)
         if (exp.id == id)
@@ -533,6 +550,16 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     ];
     await _persistExpenses();
     invalidateCache();
+
+    // Trigger instant OS-level push notification
+    if (exp != null) {
+      PushNotificationService.instance.showExpenseAlert(
+        title: 'Expense Rejected ❌',
+        body: 'Expense report for ${exp.categoryName} was rejected: $reason',
+        expenseId: id,
+      );
+    }
+    ref.read(notificationProvider.notifier).fetchNotifications();
 
     try {
       final repo = ref.read(expenseRepositoryProvider);

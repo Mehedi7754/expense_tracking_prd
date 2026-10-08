@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_endpoints.dart';
@@ -90,6 +89,7 @@ class AttendanceRepository {
       if (response is List && response.isNotEmpty) {
         return response
             .map((item) => AttendanceRecordModel.fromJson(item as Map<String, dynamic>))
+            .where((r) => !AttendanceSalaryMockStore.instance.isRecordDeleted(r))
             .toList();
       }
     } catch (_) {}

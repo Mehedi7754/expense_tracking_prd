@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../core/network/api_exceptions.dart';
 import '../core/services/attendance_salary_mock_store.dart';
 import '../core/services/location_service.dart';
+import '../core/services/push_notification_service.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/attendance_model.dart';
 import '../repositories/attendance_repository.dart';
@@ -232,6 +233,13 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       await fetchDailyOverview(force: true);
       await fetchAttendanceRecords(force: true);
 
+      // Fire OS status bar push notification immediately
+      PushNotificationService.instance.showAttendanceReminder(
+        title: 'Attendance Recorded 📍',
+        body: 'Your check-in for the $explicitSession session was recorded successfully.',
+        notificationId: 'checkin_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
       // Refresh notifications from backend so the server-generated attendance notification is loaded
       ref.read(notificationProvider.notifier).fetchNotifications();
 
@@ -259,16 +267,11 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
   }
 
   /// Returns null when check-in is allowed; otherwise a reason.
-  /// Evaluates specific shift timings and weekly off-days if userId is provided.
+  /// Evaluates specific shift timings. Weekend/off-day check-in is always permitted.
   static String? checkInWindowError(String session, AttendanceSettingsState? s, {String? userId}) {
     if (s != null && userId != null) {
       final shift = s.getShiftForUser(userId);
       final h = DateTime.now().hour;
-      final weekday = DateTime.now().weekday; // 1=Mon..7=Sun
-
-      if (shift.weekendDays.contains(weekday)) {
-        return 'Today is a weekly off-day for your shift (${shift.name}). Check-in is not required.';
-      }
 
       if (session == 'morning') {
         if (h < shift.morningStartHour) return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';

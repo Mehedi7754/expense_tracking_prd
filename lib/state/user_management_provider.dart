@@ -2,64 +2,74 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
+import '../core/services/attendance_salary_mock_store.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
-import 'auth_provider.dart';
 
 const String _kCustomUsersKey = 'gw_custom_users_cache';
 const String _kCustomUserPasswordsKey = 'gw_custom_user_passwords_cache';
+const String _kDeletedUserIdsKey = 'gw_deleted_user_ids_cache';
 
 /// Authentic database users seeded in PostgreSQL
 const List<UserModel> kAuthenticDatabaseUsers = [
   UserModel(
     id: 'a0000000-0000-0000-0000-000000000001',
-    name: 'Eleanor Vance',
-    email: 'admin@pfis.com',
+    name: 'Arif',
+    email: 'admin@gw.com',
     role: UserRole.mainAdmin,
     department: 'Corporate Governance',
     designation: 'Managing Director / Admin',
     phone: '+880 1711-000001',
-    assignedProjectIds: ['d0000000-0000-0000-0000-000000000001'],
+    assignedProjectIds: ['6a836552-904a-4cc3-b063-cce4481fe3a5', 'e29e4218-d7e1-4f28-a34d-0acea710239a'],
   ),
 ];
-
 
 class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMixin {
   @override
   List<UserModel> build() {
     _loadCachedUsers();
-    return kAuthenticDatabaseUsers;
+    return const [];
+  }
+
+  bool _isForbiddenUser(UserModel u, Set<String> deletedSet) {
+    final lowerName = u.name.trim().toLowerCase();
+    final lowerEmail = u.email.trim().toLowerCase();
+    final lowerId = u.id.trim().toLowerCase();
+    return !u.isActive ||
+        deletedSet.contains(lowerId) ||
+        deletedSet.contains(lowerEmail) ||
+        deletedSet.contains(lowerName) ||
+        lowerName.contains('eleanor') ||
+        lowerEmail.contains('eleanor') ||
+        lowerEmail == 'admin@pfis.com';
   }
 
   Future<void> _loadCachedUsers() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList(_kDeletedUserIdsKey) ?? [];
+      final deletedSet = deletedList.map((e) => e.trim().toLowerCase()).toSet();
+      deletedSet.addAll(['cd673242-0a2b-46b4-873f-55f4ca3b8deb', 'admin@pfis.com', 'eleanor vance', 'eleanor']);
+
       final jsonStr = prefs.getString(_kCustomUsersKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
         final customUsers = decoded
             .whereType<Map<String, dynamic>>()
             .map(UserModel.fromJson)
+            .where((u) => !_isForbiddenUser(u, deletedSet))
             .toList();
 
-        if (customUsers.isNotEmpty) {
-          final mergedMap = <String, UserModel>{};
-          for (final u in kAuthenticDatabaseUsers) {
-            _addOrUpdateUser(mergedMap, u);
-          }
-          for (final u in customUsers) {
-            _addOrUpdateUser(mergedMap, u);
-          }
-          state = mergedMap.values.toList();
-        } else {
-          state = kAuthenticDatabaseUsers;
-        }
+        state = customUsers;
       } else {
-        state = kAuthenticDatabaseUsers;
+        state = kAuthenticDatabaseUsers
+            .where((u) => !_isForbiddenUser(u, deletedSet))
+            .toList();
       }
+      fetchUsers(force: true);
     } catch (_) {
-      state = kAuthenticDatabaseUsers;
+      state = const [];
     }
   }
 
@@ -120,8 +130,13 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
 
     markFetchStarted();
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList(_kDeletedUserIdsKey) ?? [];
+      final deletedSet = deletedList.map((e) => e.trim().toLowerCase()).toSet();
+      deletedSet.addAll(['cd673242-0a2b-46b4-873f-55f4ca3b8deb', 'admin@pfis.com', 'eleanor vance', 'eleanor']);
+
       List<UserModel>? fetched;
-      // 1. Try querying backend /users endpoint
+      // 1. Query backend /users endpoint
       try {
         final client = ref.read(apiClientProvider);
         final response = await client.get('/users');
@@ -129,50 +144,37 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
           fetched = response
               .whereType<Map<String, dynamic>>()
               .map(UserModel.fromJson)
-              .where((u) => u.isActive)
+              .where((u) => !_isForbiddenUser(u, deletedSet))
               .toList();
         } else if (response is Map<String, dynamic> && response['data'] is List) {
           fetched = (response['data'] as List)
               .whereType<Map<String, dynamic>>()
               .map(UserModel.fromJson)
-              .where((u) => u.isActive)
+              .where((u) => !_isForbiddenUser(u, deletedSet))
               .toList();
         }
       } catch (_) {
-        // Backend /users may be unavailable or offline
+        // Backend /users offline fallback
       }
 
       final mergedMap = <String, UserModel>{};
       if (fetched != null) {
         for (final u in fetched) {
-          _addOrUpdateUser(mergedMap, u);
-        }
-        // Retain all locally created or existing users so they never disappear on sync/logout
-        for (final u in state) {
-          final isAlreadyFetched = fetched.any((f) =>
-              (f.id.isNotEmpty && f.id == u.id) ||
-              (f.email.isNotEmpty && f.email.trim().toLowerCase() == u.email.trim().toLowerCase()));
-          if (!isAlreadyFetched) {
+          if (!_isForbiddenUser(u, deletedSet)) {
             _addOrUpdateUser(mergedMap, u);
           }
         }
       } else {
-        // Offline: preserve existing state
         for (final u in state) {
-          _addOrUpdateUser(mergedMap, u);
+          if (!_isForbiddenUser(u, deletedSet)) {
+            _addOrUpdateUser(mergedMap, u);
+          }
         }
       }
 
-      // 2. Synchronize current logged-in user
-      try {
-        final curUser = ref.read(authProvider).currentUser;
-        if (curUser != null && curUser.isActive) {
-          _addOrUpdateUser(mergedMap, curUser);
-        }
-      } catch (_) {}
-
-      state = mergedMap.values.toList();
+      state = mergedMap.values.where((u) => !_isForbiddenUser(u, deletedSet)).toList();
       await _persistUsers();
+      AttendanceSalaryMockStore.instance.syncUsers(state);
       markFetchCompleted();
     } catch (_) {
       markFetchFailed();
@@ -255,6 +257,7 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
   void setUsers(List<UserModel> users) {
     state = users;
     _persistUsers();
+    AttendanceSalaryMockStore.instance.syncUsers(users);
   }
 
   Future<UserModel> addUser({
@@ -270,6 +273,14 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     final cleanEmail = email.trim().toLowerCase();
     final pwd = (password != null && password.trim().isNotEmpty) ? password.trim() : 'password123';
     await _saveLocalPassword(cleanEmail, pwd);
+
+    // Remove from deleted list if present
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deletedList = prefs.getStringList(_kDeletedUserIdsKey) ?? [];
+      final updated = deletedList.where((id) => id.toLowerCase() != cleanEmail).toList();
+      await prefs.setStringList(_kDeletedUserIdsKey, updated);
+    } catch (_) {}
 
     var newUser = UserModel(
       id: 'usr_${DateTime.now().microsecondsSinceEpoch}',
@@ -308,6 +319,8 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
       // Offline fallback
     }
 
+    AttendanceSalaryMockStore.instance.syncUser(newUser);
+
     return newUser;
   }
 
@@ -332,6 +345,8 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     } catch (_) {
       // Offline fallback
     }
+
+    AttendanceSalaryMockStore.instance.syncUser(updated);
   }
 
   Future<void> assignUserToProject(String userId, String projectId) async {
@@ -389,6 +404,12 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     ];
     await _persistUsers();
 
+    if (!updated.isActive) {
+      AttendanceSalaryMockStore.instance.removeUser(userId);
+    } else {
+      AttendanceSalaryMockStore.instance.syncUser(updated);
+    }
+
     try {
       final client = ref.read(apiClientProvider);
       await client.patch('/users/$userId/status', body: {'is_active': updated.isActive});
@@ -418,12 +439,45 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
   }
 
   Future<void> deleteUser(String userId) async {
-    state = state.where((u) => u.id != userId).toList();
+    final cleanId = userId.trim();
+    final matching = state.where((u) =>
+        u.id == cleanId ||
+        u.id.toLowerCase() == cleanId.toLowerCase() ||
+        u.email.trim().toLowerCase() == cleanId.toLowerCase() ||
+        u.name.trim().toLowerCase() == cleanId.toLowerCase()).toList();
+
+    final deletedIds = <String>{
+      cleanId,
+      cleanId.toLowerCase(),
+      for (final u in matching) ...[
+        u.id,
+        u.id.toLowerCase(),
+        u.email.trim().toLowerCase(),
+        u.name.trim().toLowerCase(),
+      ],
+    };
+
+    state = state.where((u) =>
+        !deletedIds.contains(u.id) &&
+        !deletedIds.contains(u.id.toLowerCase()) &&
+        !deletedIds.contains(u.email.trim().toLowerCase()) &&
+        !deletedIds.contains(u.name.trim().toLowerCase())).toList();
     await _persistUsers();
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentDeleted = prefs.getStringList(_kDeletedUserIdsKey) ?? [];
+      final newDeleted = {...currentDeleted, ...deletedIds}.toList();
+      await prefs.setStringList(_kDeletedUserIdsKey, newDeleted);
+    } catch (_) {}
+
+    for (final id in deletedIds) {
+      AttendanceSalaryMockStore.instance.removeUser(id);
+    }
+
+    try {
       final client = ref.read(apiClientProvider);
-      await client.delete('/users/$userId');
+      await client.delete('/users/$cleanId');
     } catch (_) {
       // Offline fallback
     }
