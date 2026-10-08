@@ -1,10 +1,15 @@
 import {
   Controller,
   Post,
+  Get,
+  Param,
+  Res,
   Body,
   UseGuards,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
+import { FastifyReply } from 'fastify';
 import { UploadsService, UploadCategory } from './uploads.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -24,11 +29,11 @@ class UploadFileDto {
   entityId?: string;   // Optional: expense ID, user ID, or project ID
 }
 
-@UseGuards(JwtAuthGuard)
 @Controller('uploads')
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   async uploadFile(@Body() dto: UploadFileDto) {
     if (!dto.file || dto.file.trim().length === 0) {
@@ -55,5 +60,22 @@ export class UploadsController {
       filename: result.filename,
       sizeBytes: result.sizeBytes,
     };
+  }
+
+  @Get(':category/:filename')
+  async getUploadedFile(
+    @Param('category') category: string,
+    @Param('filename') filename: string,
+    @Res() reply: FastifyReply,
+  ) {
+    const file = await this.uploadsService.getFile(category, filename);
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    reply
+      .header('Content-Type', file.mimeType)
+      .header('Cache-Control', 'public, max-age=31536000, immutable')
+      .send(file.buffer);
   }
 }

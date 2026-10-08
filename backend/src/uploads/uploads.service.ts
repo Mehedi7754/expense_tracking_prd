@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { DatabaseService } from '../database/database.service';
 
 export type UploadCategory = 'receipts' | 'avatars' | 'projects';
 
@@ -25,7 +26,7 @@ export class UploadsService {
     'image/gif',
   ]);
 
-  constructor() {
+  constructor(private readonly db: DatabaseService) {
     this.uploadsRoot = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
     this.ensureDirectories();
 
@@ -128,6 +129,18 @@ export class UploadsService {
       this.logger.warn(`Could not write local copy of upload: ${e.message}`);
     }
 
+    // Persist to PostgreSQL database for zero-loss redeployment durability
+    try {
+      await this.db.query(
+        `INSERT INTO app_uploaded_files (id, category, filename, mime_type, data_base64)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (filename) DO UPDATE SET data_base64 = EXCLUDED.data_base64`,
+        [filename, category, filename, mimeType, base64Data],
+      );
+    } catch (dbErr: any) {
+      this.logger.warn(`Could not write database copy of upload: ${dbErr.message}`);
+    }
+
     // 6. If S3 / MinIO is configured, stream to object bucket
     if (this.s3Client && this.s3Bucket) {
       try {
@@ -164,6 +177,52 @@ export class UploadsService {
       filename,
       sizeBytes: buffer.length,
     };
+  }
+
+  /**
+   * Retrieves an uploaded file from disk cache or PostgreSQL persistent storage.
+   */
+  async getFile(category: string, filename: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    const safeFilename = path.basename(filename);
+    const diskPath = path.join(this.uploadsRoot, category, safeFilename);
+
+    // 1. Check disk first
+    if (fs.existsSync(diskPath)) {
+      try {
+        const buffer = await fs.promises.readFile(diskPath);
+        const ext = path.extname(safeFilename).toLowerCase().replace('.', '');
+        const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        return { buffer, mimeType };
+      } catch (_) {}
+    }
+
+    // 2. Fall back to PostgreSQL database
+    try {
+      const res = await this.db.query(
+        `SELECT mime_type, data_base64 FROM app_uploaded_files WHERE filename = $1 OR id = $1 LIMIT 1`,
+        [safeFilename],
+      );
+      if (res.rows.length > 0) {
+        const row = res.rows[0];
+        let base64 = row.data_base64 as string;
+        if (base64.startsWith('data:')) {
+          const commaIdx = base64.indexOf(',');
+          if (commaIdx !== -1) base64 = base64.substring(commaIdx + 1);
+        }
+        const buffer = Buffer.from(base64, 'base64');
+        // Restore to disk cache
+        try {
+          const dir = path.join(this.uploadsRoot, category);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          await fs.promises.writeFile(diskPath, buffer);
+        } catch (_) {}
+        return { buffer, mimeType: row.mime_type || 'image/jpeg' };
+      }
+    } catch (e: any) {
+      this.logger.warn(`Could not fetch file from database: ${e.message}`);
+    }
+
+    return null;
   }
 
   /**

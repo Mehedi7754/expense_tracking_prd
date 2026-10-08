@@ -380,6 +380,94 @@ export class AttendanceService {
     return res.rows;
   }
 
+  async getDailyOverview(dateStr?: string) {
+    await this.getTimingSettings();
+    const targetDate = dateStr || new Date().toISOString().split('T')[0];
+    const targetDateObj = new Date(targetDate);
+    const dayOfWeek = targetDateObj.getDay() === 0 ? 7 : targetDateObj.getDay();
+
+    // Query all active non-exempt users
+    const usersRes = await this.db.query(
+      `SELECT id, full_name as "userName", email as "userEmail", role,
+              COALESCE(department, '') as department, COALESCE(designation, '') as designation,
+              avatar_url as "avatarUrl"
+       FROM users
+       WHERE is_active = TRUE AND role NOT IN ('main_admin', 'finance')
+       ORDER BY full_name ASC`,
+    );
+
+    const recordsRes = await this.db.query(
+      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
+              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
+              a.login_time::text as "loginTime", a.latitude, a.longitude,
+              a.address_text as "addressText", a.device_info as "deviceInfo",
+              a.status, a.notes, a.created_at::text as "createdAt"
+       FROM attendance_records a
+       JOIN users u ON a.user_id = u.id
+       WHERE a.date = $1 AND u.is_active = TRUE`,
+      [targetDate],
+    );
+
+    const byUser: Record<string, { morning?: any; afternoon?: any; confirmedAbsent?: boolean }> = {};
+    for (const r of recordsRes.rows) {
+      if (!byUser[r.userId]) byUser[r.userId] = {};
+      if (r.sessionType === 'morning') byUser[r.userId].morning = r;
+      if (r.sessionType === 'afternoon') byUser[r.userId].afternoon = r;
+      if (r.status === 'confirmed_absent') byUser[r.userId].confirmedAbsent = true;
+    }
+
+    let presentCount = 0;
+    let halfDayCount = 0;
+    let missingCount = 0;
+
+    const employees = usersRes.rows.map((user: any) => {
+      const shift = this.getShiftForUser(user.id);
+      const isWeekend = (shift.weekendDays || [5, 6]).includes(dayOfWeek);
+      const rec = byUser[user.id];
+
+      let status = 'missing';
+      if (isWeekend) {
+        status = 'weekend';
+      } else if (rec?.morning && rec?.afternoon) {
+        status = 'present';
+        presentCount++;
+      } else if (rec?.morning || rec?.afternoon) {
+        status = 'half_day';
+        halfDayCount++;
+      } else if (rec?.confirmedAbsent) {
+        status = 'confirmed_absent';
+        missingCount++;
+      } else {
+        status = 'missing';
+        missingCount++;
+      }
+
+      return {
+        userId: user.id,
+        userName: user.userName,
+        userEmail: user.userEmail,
+        department: user.department,
+        designation: user.designation,
+        role: user.role,
+        avatarUrl: user.avatarUrl || '',
+        date: targetDate,
+        status,
+        morning: rec?.morning || null,
+        afternoon: rec?.afternoon || null,
+      };
+    });
+
+    return {
+      date: targetDate,
+      totalEmployees: employees.length,
+      presentCount,
+      halfDayCount,
+      missingCount,
+      employees,
+    };
+  }
+
   async getSummary(userId?: string) {
     let whereClause = `WHERE date = CURRENT_DATE`;
     const params: any[] = [];

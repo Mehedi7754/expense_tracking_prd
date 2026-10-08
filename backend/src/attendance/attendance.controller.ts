@@ -49,6 +49,13 @@ export class AttendanceController {
     }
   }
 
+  @Get('overview')
+  async getDailyOverview(
+    @Query('date') date: string,
+  ) {
+    return this.attendanceService.getDailyOverview(date);
+  }
+
   @Get('summary')
   async getSummary(
     @Query('userId') userId: string,

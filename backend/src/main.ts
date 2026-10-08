@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { UploadsService } from './uploads/uploads.service';
 import * as path from 'path';
 
 async function bootstrap() {
@@ -41,6 +42,23 @@ async function bootstrap() {
     prefix: '/uploads/',
     decorateReply: false,
   });
+
+  // Direct fastify route for /uploads/* with PostgreSQL fallback
+  try {
+    const fastify = app.getHttpAdapter().getInstance();
+    fastify.get('/uploads/:category/:filename', async (req: any, reply: any) => {
+      const { category, filename } = req.params;
+      const uploadsService = app.get(UploadsService);
+      const file = await uploadsService.getFile(category, filename);
+      if (!file) {
+        return reply.code(404).send({ message: 'File not found', statusCode: 404 });
+      }
+      return reply
+        .type(file.mimeType)
+        .header('Cache-Control', 'public, max-age=31536000, immutable')
+        .send(file.buffer);
+    });
+  } catch (_) {}
 
   const port = Number(process.env.PORT) || 8080;
   const host = process.env.HOST || '0.0.0.0';

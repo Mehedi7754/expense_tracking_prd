@@ -32,6 +32,19 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_url TEXT;');
       await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;');
 
+      // Persistent file storage for uploads
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS app_uploaded_files (
+            id VARCHAR(255) PRIMARY KEY,
+            category VARCHAR(50) NOT NULL,
+            filename VARCHAR(255) NOT NULL UNIQUE,
+            mime_type VARCHAR(100) NOT NULL,
+            data_base64 TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+        );
+        CREATE INDEX IF NOT EXISTS idx_uploaded_files_filename ON app_uploaded_files(filename);
+      `);
+
       // Auto-migrate Attendance & Geo-Location Tracking Tables
       await this.pool.query(`
         CREATE TABLE IF NOT EXISTS attendance_records (
