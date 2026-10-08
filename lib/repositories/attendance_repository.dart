@@ -188,6 +188,7 @@ class AttendanceRepository {
   Future<bool> updateAttendanceSettings({
     int? morningStartHour,
     required int morningEndHour,
+    int? afternoonStartHour,
     int? afternoonEndHour,
     List<int>? weekendDays,
     String? deductionType,
@@ -200,6 +201,7 @@ class AttendanceRepository {
       final body = <String, dynamic>{
         if (morningStartHour != null) 'morningStartHour': morningStartHour,
         'morningEndHour': morningEndHour,
+        'afternoonStartHour': afternoonStartHour ?? morningEndHour,
         if (afternoonEndHour != null) 'afternoonEndHour': afternoonEndHour,
         if (weekendDays != null) 'weekendDays': weekendDays,
         if (deductionType != null) 'deductionType': deductionType,

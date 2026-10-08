@@ -73,10 +73,10 @@ export class AttendanceController {
     return this.attendanceService.getTimingSettings();
   }
 
-  @Roles('main_admin')
+  @Roles('main_admin', 'project_manager', 'finance')
   @Post('settings')
   async updateTimingSettings(
-    @Body() body: { morningStartHour?: number; morningEndHour: number; afternoonStartHour?: number; afternoonEndHour?: number },
+    @Body() body: Record<string, any>,
   ) {
     return this.attendanceService.updateTimingSettings(body);
   }

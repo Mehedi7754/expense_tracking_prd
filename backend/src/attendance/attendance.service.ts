@@ -109,6 +109,25 @@ export class AttendanceService {
       ...this.officeTimingSettings,
       ...settings,
     };
+
+    // Ensure default shift and top-level timings remain tightly synchronized
+    if (this.officeTimingSettings.shifts && this.officeTimingSettings.shifts.length > 0) {
+      const defaultShift =
+        this.officeTimingSettings.shifts.find((s) => s.isDefault) || this.officeTimingSettings.shifts[0];
+      if (settings.morningEndHour !== undefined && !settings.shifts) {
+        defaultShift.morningEndHour = settings.morningEndHour;
+        defaultShift.afternoonStartHour = settings.morningEndHour;
+      } else if (settings.shifts && defaultShift) {
+        this.officeTimingSettings.morningStartHour = defaultShift.morningStartHour;
+        this.officeTimingSettings.morningEndHour = defaultShift.morningEndHour;
+        this.officeTimingSettings.afternoonStartHour = defaultShift.afternoonStartHour;
+        this.officeTimingSettings.afternoonEndHour = defaultShift.afternoonEndHour;
+        if (defaultShift.weekendDays) {
+          this.officeTimingSettings.weekendDays = defaultShift.weekendDays;
+        }
+      }
+    }
+
     try {
       await this.db.query(
         `CREATE TABLE IF NOT EXISTS app_settings (key VARCHAR(255) PRIMARY KEY, value TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`,

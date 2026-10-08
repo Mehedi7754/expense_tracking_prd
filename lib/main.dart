@@ -44,7 +44,12 @@ class GWProjectApp extends ConsumerWidget {
       _lastRole = role;
       final isEmployee = role == UserRole.projectMember || role == UserRole.projectManager;
       NotificationRouter.canManageAttendance = role?.canManageAttendanceAndSalary ?? false;
-      PushNotificationService.instance.syncAttendanceReminders(isEmployee: isEmployee);
+      final attSettings = ref.read(attendanceSettingsProvider).value;
+      PushNotificationService.instance.syncAttendanceReminders(
+        isEmployee: isEmployee,
+        morningHour: attSettings?.morningStartHour ?? 9,
+        cutoffHour: attSettings?.morningEndHour ?? 13,
+      );
     }
 
     return MaterialApp.router(

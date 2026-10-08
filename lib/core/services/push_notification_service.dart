@@ -63,25 +63,30 @@ class PushNotificationService {
   }
 
   /// Attendance reminders are for employees ONLY. Admin/finance/viewer never get them.
-  Future<void> syncAttendanceReminders({required bool isEmployee}) async {
+  Future<void> syncAttendanceReminders({
+    required bool isEmployee,
+    int morningHour = 9,
+    int cutoffHour = 13,
+  }) async {
     if (!_initialized || kIsWeb) return;
     if (!isEmployee) {
       await _plugin.cancel(1);
       await _plugin.cancel(2);
       return;
     }
+    String fmtH(int h) => '${(h % 12 == 0 ? 12 : h % 12).toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
     await scheduleDailyAttendanceReminder(
       id: 1,
       title: '📍 Morning Check-in',
-      body: 'Morning check-in is open (after 9:00 AM).',
-      hour: 9,
+      body: 'Morning check-in is open (after ${fmtH(morningHour)}).',
+      hour: morningHour,
       minute: 0,
     );
     await scheduleDailyAttendanceReminder(
       id: 2,
       title: '📍 Afternoon Check-in',
-      body: 'Afternoon check-in is open (after 1:00 PM).',
-      hour: 13,
+      body: 'Afternoon check-in is open (after ${fmtH(cutoffHour)}).',
+      hour: cutoffHour,
       minute: 0,
     );
   }

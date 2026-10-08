@@ -242,11 +242,29 @@ class AttendanceSettingsState {
       });
     }
 
+    int morningStart = (json['morningStartHour'] as num?)?.toInt() ?? 9;
+    int morningEnd = (json['morningEndHour'] as num?)?.toInt() ?? 13;
+    int afternoonStart = (json['afternoonStartHour'] as num?)?.toInt() ?? morningEnd;
+    int afternoonEnd = (json['afternoonEndHour'] as num?)?.toInt() ?? 18;
+
+    final defaultShiftIdx = shiftList.indexWhere((s) => s.isDefault || s.id == 'shift_default');
+    if (defaultShiftIdx >= 0) {
+      final def = shiftList[defaultShiftIdx];
+      // Keep them strictly aligned
+      shiftList[defaultShiftIdx] = def.copyWith(
+        morningStartHour: morningStart,
+        morningEndHour: morningEnd,
+        afternoonStartHour: morningEnd,
+        afternoonEndHour: afternoonEnd,
+        weekendDays: weekend,
+      );
+    }
+
     return AttendanceSettingsState(
-      morningStartHour: (json['morningStartHour'] as num?)?.toInt() ?? 9,
-      morningEndHour: (json['morningEndHour'] as num?)?.toInt() ?? 13,
-      afternoonStartHour: (json['afternoonStartHour'] as num?)?.toInt() ?? 13,
-      afternoonEndHour: (json['afternoonEndHour'] as num?)?.toInt() ?? 18,
+      morningStartHour: morningStart,
+      morningEndHour: morningEnd,
+      afternoonStartHour: afternoonStart,
+      afternoonEndHour: afternoonEnd,
       weekendDays: weekend,
       deductionType: json['deductionType'] as String? ?? 'rate_based',
       isDeductionEnabled: isDeductionEnabled,
@@ -306,6 +324,7 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
       await repo.updateAttendanceSettings(
         morningStartHour: newSettings.morningStartHour,
         morningEndHour: newSettings.morningEndHour,
+        afternoonStartHour: newSettings.afternoonStartHour,
         afternoonEndHour: newSettings.afternoonEndHour,
         weekendDays: newSettings.weekendDays,
         deductionType: newSettings.deductionType,
@@ -319,13 +338,63 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
 
   Future<void> setMorningEndHour(int hour) async {
     final current = state.value ?? const AttendanceSettingsState();
-    final updated = current.copyWith(morningEndHour: hour, afternoonStartHour: hour);
+    final updatedShifts = current.shifts.map((s) {
+      if (s.isDefault || s.id == 'shift_default') {
+        return s.copyWith(morningEndHour: hour, afternoonStartHour: hour);
+      }
+      return s;
+    }).toList();
+    final updated = current.copyWith(
+      morningEndHour: hour,
+      afternoonStartHour: hour,
+      shifts: updatedShifts,
+    );
+    await updateSettings(updated);
+  }
+
+  Future<void> setOfficeHours({
+    required int morningStartHour,
+    required int cutoffHour,
+    required int afternoonEndHour,
+    List<int>? weekendDays,
+  }) async {
+    final current = state.value ?? const AttendanceSettingsState();
+    final effectiveWeekends = weekendDays ?? current.weekendDays;
+    final updatedShifts = current.shifts.map((s) {
+      if (s.isDefault || s.id == 'shift_default') {
+        return s.copyWith(
+          morningStartHour: morningStartHour,
+          morningEndHour: cutoffHour,
+          afternoonStartHour: cutoffHour,
+          afternoonEndHour: afternoonEndHour,
+          weekendDays: effectiveWeekends,
+        );
+      }
+      return s;
+    }).toList();
+    final updated = current.copyWith(
+      morningStartHour: morningStartHour,
+      morningEndHour: cutoffHour,
+      afternoonStartHour: cutoffHour,
+      afternoonEndHour: afternoonEndHour,
+      weekendDays: effectiveWeekends,
+      shifts: updatedShifts,
+    );
     await updateSettings(updated);
   }
 
   Future<void> setWeekendDays(List<int> weekendDays) async {
     final current = state.value ?? const AttendanceSettingsState();
-    final updated = current.copyWith(weekendDays: weekendDays);
+    final updatedShifts = current.shifts.map((s) {
+      if (s.isDefault || s.id == 'shift_default') {
+        return s.copyWith(weekendDays: weekendDays);
+      }
+      return s;
+    }).toList();
+    final updated = current.copyWith(
+      weekendDays: weekendDays,
+      shifts: updatedShifts,
+    );
     await updateSettings(updated);
   }
 
@@ -352,7 +421,18 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
     } else {
       list.add(shift);
     }
-    await updateSettings(current.copyWith(shifts: list));
+    var updated = current.copyWith(shifts: list);
+    // If updating default shift or single shift, keep top-level timing synchronized
+    if (shift.isDefault || shift.id == 'shift_default' || list.length == 1) {
+      updated = updated.copyWith(
+        morningStartHour: shift.morningStartHour,
+        morningEndHour: shift.morningEndHour,
+        afternoonStartHour: shift.afternoonStartHour,
+        afternoonEndHour: shift.afternoonEndHour,
+        weekendDays: shift.weekendDays,
+      );
+    }
+    await updateSettings(updated);
   }
 
   Future<void> deleteShift(String shiftId) async {

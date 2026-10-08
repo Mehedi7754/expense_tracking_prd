@@ -101,7 +101,7 @@ class _AttendanceSettingsScreenState
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Salary Deduction & Payroll Rules Saved!'),
+          content: Text('Attendance & Payroll Settings Saved Successfully!'),
           backgroundColor: Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
         ),
@@ -635,10 +635,293 @@ class _AttendanceSettingsScreenState
 
                 const SizedBox(height: 20),
 
-                // SECTION 1: Configured Shifts
+                // SECTION 1: Primary Office Timing & Session Cutoff
                 _buildCardContainer(
                   isDark: isDark,
-                  title: '1. Configured Shifts (${settings.shifts.length})',
+                  title: '1. Office Timing & Session Cutoff',
+                  subtitle: 'Set global office hours and the midday cutoff time that splits morning check-in and evening check-out.',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Prominent Session Cutoff Selector Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isDark
+                                ? [const Color(0xFF312E81).withValues(alpha: 0.5), const Color(0xFF1E1B4B).withValues(alpha: 0.5)]
+                                : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.4),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4F46E5),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.splitscreen_rounded, color: Colors.white, size: 18),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Session Cutoff Time',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Morning punches end & Afternoon punches begin at this hour',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFF4F46E5).withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      value: settings.morningEndHour,
+                                      icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF4F46E5)),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF4F46E5),
+                                        fontSize: 14.5,
+                                      ),
+                                      items: List.generate(24, (h) => h).map((h) {
+                                        return DropdownMenuItem<int>(
+                                          value: h,
+                                          child: Text(_hourLabel(h)),
+                                        );
+                                      }).toList(),
+                                      onChanged: (newHour) async {
+                                        if (newHour != null) {
+                                          await ref.read(attendanceSettingsProvider.notifier).setMorningEndHour(newHour);
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Session cutoff time updated to ${_hourLabel(newHour)}!'),
+                                                backgroundColor: const Color(0xFF10B981),
+                                                behavior: SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            // Visual session slots representation
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: (isDark ? Colors.black : Colors.white).withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Row(
+                                          children: [
+                                            Icon(Icons.wb_sunny_rounded, size: 13, color: Color(0xFFF59E0B)),
+                                            SizedBox(width: 5),
+                                            Text(
+                                              'Morning Punch',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${_hourLabel(settings.morningStartHour)} → ${_hourLabel(settings.morningEndHour)}',
+                                          style: const TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF2563EB),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: (isDark ? Colors.black : Colors.white).withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Row(
+                                          children: [
+                                            Icon(Icons.nightlight_round, size: 13, color: Color(0xFF6366F1)),
+                                            SizedBox(width: 5),
+                                            Text(
+                                              'Afternoon Punch',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${_hourLabel(settings.morningEndHour)} → ${_hourLabel(settings.afternoonEndHour)}',
+                                          style: const TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color(0xFF0D9488),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Shift Start & Shift End pickers
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Work Starts (From)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5))),
+                                  const SizedBox(height: 2),
+                                  DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      value: settings.morningStartHour,
+                                      isExpanded: true,
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                      items: List.generate(24, (h) => h).map((h) {
+                                        return DropdownMenuItem<int>(
+                                          value: h,
+                                          child: Text(_hourLabel(h)),
+                                        );
+                                      }).toList(),
+                                      onChanged: (newStart) async {
+                                        if (newStart != null) {
+                                          await ref.read(attendanceSettingsProvider.notifier).setOfficeHours(
+                                            morningStartHour: newStart,
+                                            cutoffHour: settings.morningEndHour,
+                                            afternoonEndHour: settings.afternoonEndHour,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Work Ends (To)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                                  const SizedBox(height: 2),
+                                  DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      value: settings.afternoonEndHour,
+                                      isExpanded: true,
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
+                                      items: List.generate(24, (h) => h).map((h) {
+                                        return DropdownMenuItem<int>(
+                                          value: h,
+                                          child: Text(_hourLabel(h)),
+                                        );
+                                      }).toList(),
+                                      onChanged: (newEnd) async {
+                                        if (newEnd != null) {
+                                          await ref.read(attendanceSettingsProvider.notifier).setOfficeHours(
+                                            morningStartHour: settings.morningStartHour,
+                                            cutoffHour: settings.morningEndHour,
+                                            afternoonEndHour: newEnd,
+                                          );
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // SECTION 2: Configured Shifts
+                _buildCardContainer(
+                  isDark: isDark,
+                  title: '2. Configured Shifts (${settings.shifts.length})',
                   subtitle: 'Manage working hours, session cutoff times, and weekly rest days per shift.',
                   child: Column(
                     children: [
@@ -876,10 +1159,10 @@ class _AttendanceSettingsScreenState
 
                 const SizedBox(height: 20),
 
-                // SECTION 2: Salary Deduction Options (Moved to Section 2)
+                // SECTION 3: Salary Deduction Options
                 _buildCardContainer(
                   isDark: isDark,
-                  title: '2. Salary Deduction Rules',
+                  title: '3. Salary Deduction Rules',
                   subtitle: 'Configure automatic payroll cuts for missed sign-outs and unexcused absences.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1204,10 +1487,10 @@ class _AttendanceSettingsScreenState
 
                 const SizedBox(height: 20),
 
-                // SECTION 3: Employee Shift Assignments (Moved to Section 3)
+                // SECTION 4: Employee Shift Assignments
                 _buildCardContainer(
                   isDark: isDark,
-                  title: '3. Employee Shift Assignment',
+                  title: '4. Employee Shift Assignment',
                   subtitle: 'Assign specific shifts to team members. Each employee follows their assigned shift schedule.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

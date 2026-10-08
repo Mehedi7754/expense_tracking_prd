@@ -23,7 +23,14 @@ void main() {
       final store = AttendanceSalaryMockStore.instance;
       await store.ensureInitialized();
 
-      const memberId = 'a0000000-0000-0000-0000-000000000001';
+      const memberId = 'b0000000-0000-0000-0000-000000000001';
+      store.syncUser(const UserModel(
+        id: memberId,
+        name: 'Arif Ahmed',
+        email: 'arif@gw.com',
+        role: UserRole.projectMember,
+        department: 'Engineering',
+      ));
       final today = DateTime.now().toIso8601String().substring(0, 10);
 
       // Verify clean initial state without dummy data

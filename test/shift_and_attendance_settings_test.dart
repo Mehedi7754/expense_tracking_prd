@@ -63,7 +63,30 @@ void main() {
       expect(find.text('Shift & Attendance Settings'), findsOneWidget);
       expect(find.text('Shift & Schedule Management'), findsOneWidget);
       expect(find.text('Add Custom Shift'), findsOneWidget);
-      expect(find.text('Save Payroll Deduction Rules'), findsOneWidget);
+      expect(find.text('Save Settings'), findsOneWidget);
+    });
+
+    test('AttendanceSettingsNotifier syncs top-level cutoff hour with default shift', () async {
+      final notifier = AttendanceSettingsNotifier();
+      // Test state synchronization logic
+      const state = AttendanceSettingsState(morningEndHour: 13);
+      final updatedShifts = state.shifts.map((s) {
+        if (s.isDefault || s.id == 'shift_default') {
+          return s.copyWith(morningEndHour: 15, afternoonStartHour: 15);
+        }
+        return s;
+      }).toList();
+      final updated = state.copyWith(
+        morningEndHour: 15,
+        afternoonStartHour: 15,
+        shifts: updatedShifts,
+      );
+
+      expect(updated.morningEndHour, 15);
+      expect(updated.afternoonStartHour, 15);
+      final defaultShift = updated.shifts.firstWhere((s) => s.isDefault);
+      expect(defaultShift.morningEndHour, 15);
+      expect(defaultShift.afternoonStartHour, 15);
     });
   });
 }

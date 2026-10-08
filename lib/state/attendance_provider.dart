@@ -146,8 +146,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     String? explicitSession,
     String? notes,
   }) async {
-    // Super Admin & non-attendance roles do not check in
     final currentUser = ref.read(authProvider).currentUser;
+    // Super Admin & non-attendance roles do not check in
     if (currentUser != null && !currentUser.role.requiresAttendanceCheckIn) {
       state = state.copyWith(
         isSubmitting: false,
@@ -156,10 +156,12 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       return false;
     }
 
+    final userId = currentUser?.id ?? 'a0000000-0000-0000-0000-000000000003';
+
     // 0. Enforce session window: morning locks at the divider, afternoon opens at the divider
     final settings = ref.read(attendanceSettingsProvider).value;
-    final session = explicitSession ?? resolveSession(settings);
-    final windowError = checkInWindowError(session, settings);
+    final session = explicitSession ?? resolveSession(settings, userId: userId);
+    final windowError = checkInWindowError(session, settings, userId: userId);
     if (windowError != null) {
       state = state.copyWith(isSubmitting: false, errorMessage: windowError);
       return false;

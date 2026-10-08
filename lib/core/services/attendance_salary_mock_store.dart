@@ -224,7 +224,7 @@ class AttendanceSalaryMockStore {
     // sessionType provided by caller (who reads attendanceSettingsProvider); fallback to 13 as default boundary
     final session = (sessionType != null && sessionType.isNotEmpty)
         ? sessionType.toLowerCase()
-        : (now.hour < 13 ? 'morning' : 'afternoon');
+        : (now.hour < _settings.getShiftForUser(userId).morningEndHour ? 'morning' : 'afternoon');
 
     if (currentUser != null) {
       syncUser(currentUser);
