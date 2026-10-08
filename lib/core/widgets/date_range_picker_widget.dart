@@ -79,15 +79,19 @@ class DateRangePickerWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final String rangeText = selectedRange != null
         ? '${DateFormatter.formatShort(selectedRange!.start)} - ${DateFormatter.formatShort(selectedRange!.end)}'
         : 'All Time (No date filter)';
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.getSurface(context),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.getBorder(context)),
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -103,7 +107,7 @@ class DateRangePickerWidget extends StatelessWidget {
                   Text(
                     rangeText,
                     style: AppTextStyles.labelMedium.copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.getTextPrimary(context),
                     ),
                   ),
@@ -165,21 +169,30 @@ class _PresetChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isCustom ? AppColors.getSurfaceSubtle(context) : AppColors.getBackground(context),
+          color: isCustom
+              ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF))
+              : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.getBorder(context), width: 1),
+          border: Border.all(
+            color: isCustom
+                ? (isDark ? const Color(0xFF4F46E5) : const Color(0xFFC7D2FE))
+                : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+            width: 1,
+          ),
         ),
         child: Text(
           label,
           style: AppTextStyles.labelSmall.copyWith(
             color: isCustom ? AppColors.getPrimary(context) : AppColors.getTextSecondary(context),
-            fontWeight: isCustom ? FontWeight.w600 : FontWeight.w500,
+            fontWeight: isCustom ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),

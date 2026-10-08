@@ -114,7 +114,6 @@ class CategoryManagementScreen extends ConsumerWidget {
                                   style: AppTextStyles.titleSmall.copyWith(
                                     decoration: cat.isActive ? null : TextDecoration.lineThrough,
                                   ),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               if (cat.isDefault) ...[

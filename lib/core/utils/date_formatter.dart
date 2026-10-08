@@ -25,7 +25,15 @@ class DateFormatter {
 
   static String formatRelative(DateTime date) {
     final now = DateTime.now();
-    final difference = now.difference(date);
+    final localDate = date.toLocal();
+    final difference = now.difference(localDate);
+
+    if (difference.isNegative) {
+      if (difference.inSeconds.abs() < 120) {
+        return 'Just now';
+      }
+      return formatShort(localDate);
+    }
 
     if (difference.inSeconds < 60) {
       return 'Just now';
@@ -38,7 +46,7 @@ class DateFormatter {
     } else if (difference.inDays < 7) {
       return '${difference.inDays}d ago';
     } else {
-      return formatShort(date);
+      return formatShort(localDate);
     }
   }
 }

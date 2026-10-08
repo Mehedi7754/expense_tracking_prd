@@ -247,7 +247,7 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
                       constraints: const BoxConstraints(maxWidth: 1000),
                       child: isTablet
                           ? GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 12,
@@ -264,7 +264,7 @@ class _MyExpensesScreenState extends ConsumerState<MyExpensesScreen>
                               },
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                               itemCount: filtered.length,
                               itemBuilder: (ctx, i) {
                                 final exp = filtered[i];

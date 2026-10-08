@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz;
+import 'notification_router.dart';
 
 /// Service for OS-level push notifications (Android status bar + iOS tray).
 /// Works without Firebase — uses flutter_local_notifications for local triggers.
@@ -20,11 +21,13 @@ class PushNotificationService {
   static const String _channelAttendance = 'attendance_channel';
   static const String _channelGeneral = 'general_channel';
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool isBackground = false}) async {
     // Only supported on mobile — web uses browser notification API (not implemented here)
     if (kIsWeb) return;
 
-    tz.initializeTimeZones();
+    try {
+      tz.initializeTimeZones();
+    } catch (_) {}
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
@@ -43,18 +46,58 @@ class PushNotificationService {
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
-    // Create Android notification channels
-    await _createAndroidChannels();
+    // Create Android notification channels (skip permission dialog in background service)
+    await _createAndroidChannels(requestPermission: !isBackground);
 
     _initialized = true;
+
+    // App cold-started by tapping a local notification -> route to its page
+    if (!isBackground) {
+      try {
+        final launch = await _plugin.getNotificationAppLaunchDetails();
+        if (launch?.didNotificationLaunchApp == true) {
+          NotificationRouter.handlePayload(launch!.notificationResponse?.payload);
+        }
+      } catch (_) {}
+    }
   }
 
-  Future<void> _createAndroidChannels() async {
+  /// Attendance reminders are for employees ONLY. Admin/finance/viewer never get them.
+  Future<void> syncAttendanceReminders({required bool isEmployee}) async {
+    if (!_initialized || kIsWeb) return;
+    if (!isEmployee) {
+      await _plugin.cancel(1);
+      await _plugin.cancel(2);
+      return;
+    }
+    await scheduleDailyAttendanceReminder(
+      id: 1,
+      title: '📍 Morning Check-in',
+      body: 'Morning check-in is open (after 9:00 AM).',
+      hour: 9,
+      minute: 0,
+    );
+    await scheduleDailyAttendanceReminder(
+      id: 2,
+      title: '📍 Afternoon Check-in',
+      body: 'Afternoon check-in is open (after 1:00 PM).',
+      hour: 13,
+      minute: 0,
+    );
+  }
+
+  Future<void> _createAndroidChannels({bool requestPermission = true}) async {
     final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin == null) return;
 
-    await androidPlugin.requestNotificationsPermission();
+    if (requestPermission) {
+      try {
+        await androidPlugin.requestNotificationsPermission();
+      } catch (e) {
+        debugPrint('[PushNotificationService] requestNotificationsPermission: $e');
+      }
+    }
 
     await androidPlugin.createNotificationChannel(
       const AndroidNotificationChannel(
@@ -88,9 +131,10 @@ class PushNotificationService {
   }
 
   void _onNotificationTapped(NotificationResponse response) {
-    // Deep link routing could be handled here if needed
-    debugPrint('[Push] Notification tapped: ${response.payload}');
+    NotificationRouter.handlePayload(response.payload);
   }
+
+  final Set<String> _deliveredNotificationIds = <String>{};
 
   /// Show an immediate notification in the OS status bar / notification tray.
   Future<void> showImmediate({
@@ -98,10 +142,24 @@ class PushNotificationService {
     required String body,
     String channel = _channelGeneral,
     String? payload,
+    String? notificationId,
   }) async {
     if (!_initialized || kIsWeb) return;
 
-    final id = DateTime.now().millisecondsSinceEpoch % 100000;
+    if (notificationId != null && notificationId.isNotEmpty) {
+      if (_deliveredNotificationIds.contains(notificationId)) {
+        return; // Already notified the user
+      }
+      _deliveredNotificationIds.add(notificationId);
+      // Keep set bounded to last 200 items
+      if (_deliveredNotificationIds.length > 200) {
+        _deliveredNotificationIds.remove(_deliveredNotificationIds.first);
+      }
+    }
+
+    final id = notificationId != null && notificationId.hashCode != 0
+        ? notificationId.hashCode.abs() % 100000
+        : DateTime.now().millisecondsSinceEpoch % 100000;
 
     await _plugin.show(
       id,
@@ -111,9 +169,12 @@ class PushNotificationService {
         android: AndroidNotificationDetails(
           channel,
           _channelName(channel),
-          importance: Importance.high,
+          importance: Importance.max,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
+          enableVibration: true,
+          playSound: true,
+          tag: notificationId,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -130,12 +191,31 @@ class PushNotificationService {
     required String title,
     required String body,
     String? expenseId,
+    String? notificationId,
+    String? payload,
   }) async {
     await showImmediate(
       title: title,
       body: body,
       channel: _channelExpenses,
-      payload: expenseId != null ? 'expense:$expenseId' : null,
+      payload: payload ?? (expenseId != null ? 'expense:$expenseId' : null),
+      notificationId: notificationId,
+    );
+  }
+
+  /// Show attendance-specific notification (high importance channel).
+  Future<void> showAttendanceReminder({
+    required String title,
+    required String body,
+    String? notificationId,
+    String? payload,
+  }) async {
+    await showImmediate(
+      title: title,
+      body: body,
+      channel: _channelAttendance,
+      notificationId: notificationId,
+      payload: payload ?? 'type=attendance',
     );
   }
 
@@ -168,6 +248,7 @@ class PushNotificationService {
             presentSound: true,
           ),
         ),
+        payload: 'type=attendance',
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,

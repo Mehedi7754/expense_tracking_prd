@@ -1,6 +1,7 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../models/user_role.dart';
-import '../constants/app_colors.dart';
+import 'curved_dock_bar.dart';
 
 class NavItemData {
   final String label;
@@ -34,250 +35,178 @@ class AppBottomNavBar extends StatelessWidget {
     this.unreadNotificationsCount = 0,
   });
 
-  List<NavItemData> _getLeftItems() {
+  List<NavItemData> _getAllItems() {
     if (role == UserRole.projectMember) {
       return [
-        const NavItemData(
-          label: 'Home',
-          icon: Icons.home_outlined,
-          activeIcon: Icons.home_rounded,
-        ),
         const NavItemData(
           label: 'Expenses',
-          icon: Icons.receipt_long_outlined,
-          activeIcon: Icons.receipt_long_rounded,
+          icon: CupertinoIcons.doc_plaintext,
+          activeIcon: CupertinoIcons.doc_text_fill,
         ),
-      ];
-    }
-    return [
-      const NavItemData(
-        label: 'Home',
-        icon: Icons.home_outlined,
-        activeIcon: Icons.home_rounded,
-      ),
-      const NavItemData(
-        label: 'Projects',
-        icon: Icons.business_center_outlined,
-        activeIcon: Icons.business_center_rounded,
-      ),
-    ];
-  }
-
-  List<NavItemData> _getRightItems() {
-    if (role == UserRole.projectMember) {
-      return [
         const NavItemData(
           label: 'Attendance',
-          icon: Icons.access_time_rounded,
-          activeIcon: Icons.access_time_filled_rounded,
+          icon: CupertinoIcons.clock,
+          activeIcon: CupertinoIcons.clock_fill,
+        ),
+        const NavItemData(
+          label: 'Home',
+          icon: CupertinoIcons.house,
+          activeIcon: CupertinoIcons.house_fill,
+        ),
+        const NavItemData(
+          label: 'Add',
+          icon: CupertinoIcons.plus_circle,
+          activeIcon: CupertinoIcons.plus_circle_fill,
         ),
         const NavItemData(
           label: 'Profile',
-          icon: Icons.person_outline_rounded,
-          activeIcon: Icons.person_rounded,
+          icon: CupertinoIcons.person,
+          activeIcon: CupertinoIcons.person_fill,
         ),
       ];
     }
     if (role == UserRole.viewer) {
       return [
         const NavItemData(
+          label: 'Projects',
+          icon: CupertinoIcons.briefcase,
+          activeIcon: CupertinoIcons.briefcase_fill,
+        ),
+        const NavItemData(
           label: 'Reports',
-          icon: Icons.bar_chart_outlined,
-          activeIcon: Icons.bar_chart_rounded,
+          icon: CupertinoIcons.chart_pie,
+          activeIcon: CupertinoIcons.chart_pie_fill,
+        ),
+        const NavItemData(
+          label: 'Home',
+          icon: CupertinoIcons.house,
+          activeIcon: CupertinoIcons.house_fill,
+        ),
+        const NavItemData(
+          label: 'Add',
+          icon: CupertinoIcons.plus_circle,
+          activeIcon: CupertinoIcons.plus_circle_fill,
         ),
         const NavItemData(
           label: 'Profile',
-          icon: Icons.person_outline_rounded,
-          activeIcon: Icons.person_rounded,
+          icon: CupertinoIcons.person,
+          activeIcon: CupertinoIcons.person_fill,
         ),
       ];
     }
     return [
+      const NavItemData(
+        label: 'Projects',
+        icon: CupertinoIcons.briefcase,
+        activeIcon: CupertinoIcons.briefcase_fill,
+      ),
       NavItemData(
         label: 'Approvals',
-        icon: Icons.fact_check_outlined,
-        activeIcon: Icons.fact_check_rounded,
+        icon: CupertinoIcons.checkmark_seal,
+        activeIcon: CupertinoIcons.checkmark_seal_fill,
         badgeCount: pendingApprovalsCount,
       ),
       const NavItemData(
+        label: 'Home',
+        icon: CupertinoIcons.house,
+        activeIcon: CupertinoIcons.house_fill,
+      ),
+      const NavItemData(
+        label: 'Add',
+        icon: CupertinoIcons.plus_circle,
+        activeIcon: CupertinoIcons.plus_circle_fill,
+      ),
+      const NavItemData(
         label: 'Attendance',
-        icon: Icons.access_time_rounded,
-        activeIcon: Icons.access_time_filled_rounded,
+        icon: CupertinoIcons.clock,
+        activeIcon: CupertinoIcons.clock_fill,
       ),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final leftItems = _getLeftItems();
-    final rightItems = _getRightItems();
+    final items = _getAllItems();
 
-    const activeColor = Color(0xFF4F46E5);
-    final inactiveColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+    // Vibrant Electric Blue & Indigo dock bar (matching reference image #1, #2, #5)
+    final dockColor = const Color(0xFF2563EB); // Vibrant Electric Royal Blue
+    final buttonBg = const Color(0xFF1D4ED8); // Deep vibrant blue floating hub
+    final activeIconColor = Colors.white;
+    final inactiveIconColor = const Color(0xFFBFDBFE); // Soft pastel blue
 
-    return Container(
-      height: 72,
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        border: Border(
-          top: BorderSide(
-            color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9),
-            width: 1,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(isDark ? 30 : 8),
-            blurRadius: 18,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Row(
-              children: [
-                // Left Items
-                for (int i = 0; i < leftItems.length; i++)
-                  Expanded(
-                    child: _buildNavItem(
-                      item: leftItems[i],
-                      isSelected: currentIndex == i,
-                      onTap: () => onTap(i),
-                      activeColor: activeColor,
-                      inactiveColor: inactiveColor,
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CurvedDockBar(
+          index: currentIndex.clamp(0, items.length - 1),
+          height: 60.0,
+          color: dockColor,
+          buttonBackgroundColor: buttonBg,
+          backgroundColor: Colors.transparent,
+            animationDuration: const Duration(milliseconds: 320),
+            animationCurve: Curves.easeInOutCubic,
+            letIndexChange: (index) {
+              if (index == 3) {
+                if (onAddTap != null) {
+                  onAddTap!();
+                }
+                return false;
+              }
+              return true;
+            },
+            onTap: onTap,
+            items: items.asMap().entries.map((entry) {
+              final idx = entry.key;
+              final item = entry.value;
+              final isSelected = idx == currentIndex;
+
+              return Tooltip(
+                message: item.label,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      isSelected ? item.activeIcon : item.icon,
+                      color: isSelected ? activeIconColor : inactiveIconColor,
+                      size: isSelected ? 22 : 20,
                     ),
-                  ),
-
-                // Center Floating Circular Add Button (Image 2 style)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: Transform.translate(
-                    offset: const Offset(0, -10), // Float slightly above dock
-                    child: GestureDetector(
-                      onTap: onAddTap,
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                    if (item.badgeCount > 0)
+                      Positioned(
+                        top: isSelected ? -2 : -4,
+                        right: isSelected ? -5 : -7,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(25),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
+                          constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+                          child: Text(
+                            item.badgeCount > 99 ? '99+' : '${item.badgeCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8.5,
+                              fontWeight: FontWeight.w800,
                             ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.add_rounded,
-                            color: Colors.white,
-                            size: 26,
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
-                    ),
-                  ),
+                  ],
                 ),
-
-                // Right Items
-                for (int j = 0; j < rightItems.length; j++)
-                  Expanded(
-                    child: _buildNavItem(
-                      item: rightItems[j],
-                      isSelected: currentIndex == (leftItems.length + j),
-                      onTap: () => onTap(leftItems.length + j),
-                      activeColor: activeColor,
-                      inactiveColor: inactiveColor,
-                    ),
-                  ),
-              ],
-            ),
+              );
+            }).toList(),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required NavItemData item,
-    required bool isSelected,
-    required VoidCallback onTap,
-    required Color activeColor,
-    required Color inactiveColor,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Icon(
-                isSelected ? item.activeIcon : item.icon,
-                color: isSelected ? activeColor : inactiveColor,
-                size: 22,
-              ),
-              if (item.badgeCount > 0)
-                Positioned(
-                  top: -4,
-                  right: -8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                    child: Text(
-                      item.badgeCount > 99 ? '99+' : '${item.badgeCount}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(
-            item.label,
-            style: TextStyle(
-              color: isSelected ? activeColor : inactiveColor,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-              fontSize: 10,
-              letterSpacing: -0.2,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
+          if (bottomInset > 0)
           Container(
-            width: 4,
-            height: 4,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isSelected ? activeColor : Colors.transparent,
-            ),
+            height: bottomInset,
+            width: double.infinity,
+            color: dockColor,
           ),
-        ],
-      ),
+      ],
     );
   }
 }

@@ -46,6 +46,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   final _foodBudgetController = TextEditingController();
   final _accommBudgetController = TextEditingController();
   final _officeBudgetController = TextEditingController();
+  final Map<String, TextEditingController> _customCategoryControllers = {};
 
   ClientType _clientType = ClientType.government;
   AssignmentType _assignmentType = AssignmentType.directConsultancy;
@@ -106,6 +107,16 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     _accommBudgetController.text = (project.categoryBudgets['accommodation'] ?? 0).toStringAsFixed(0);
     _officeBudgetController.text = (project.categoryBudgets['officecost'] ?? 0).toStringAsFixed(0);
 
+    // Load any custom categories
+    final standardKeys = {'equipment', 'transportation', 'food', 'accommodation', 'officecost', 'officebenefit'};
+    project.categoryBudgets.forEach((key, val) {
+      if (!standardKeys.contains(key.toLowerCase()) && !key.startsWith('_meta_')) {
+        final ctrl = TextEditingController(text: val.toStringAsFixed(0));
+        ctrl.addListener(() => setState(() {}));
+        _customCategoryControllers[key] = ctrl;
+      }
+    });
+
     _startDate = project.startDate;
     _endDate = project.endDate;
     _selectedTeamMemberIds.addAll(project.teamMemberIds);
@@ -125,6 +136,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     _foodBudgetController.dispose();
     _accommBudgetController.dispose();
     _officeBudgetController.dispose();
+    for (final c in _customCategoryControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -158,7 +172,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     final fd = double.tryParse(_foodBudgetController.text.trim()) ?? 0.0;
     final ac = double.tryParse(_accommBudgetController.text.trim()) ?? 0.0;
     final of = double.tryParse(_officeBudgetController.text.trim()) ?? 0.0;
-    return eq + tr + fd + ac + of;
+    double custom = 0.0;
+    for (final c in _customCategoryControllers.values) {
+      custom += double.tryParse(c.text.trim()) ?? 0.0;
+    }
+    return eq + tr + fd + ac + of + custom;
   }
 
   double get _calculatedOfficeBenefit {
@@ -181,20 +199,31 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
 
-    final gross = double.tryParse(_grossValueController.text.trim()) ?? 0.0;
-    final advance = double.tryParse(_advanceReceivedController.text.trim()) ?? 0.0;
-    final received = double.tryParse(_amountReceivedController.text.trim()) ?? 0.0;
+    final rawGross = double.tryParse(_grossValueController.text.trim()) ?? 0.0;
+    final gross = rawGross < 0 ? 0.0 : rawGross;
+    final rawAdvance = double.tryParse(_advanceReceivedController.text.trim()) ?? 0.0;
+    final advance = rawAdvance < 0 ? 0.0 : rawAdvance;
+    final rawReceived = double.tryParse(_amountReceivedController.text.trim()) ?? 0.0;
+    final received = rawReceived < 0 ? 0.0 : rawReceived;
 
-    final categoryBudgets = {
-      'equipment': double.tryParse(_equipBudgetController.text.trim()) ?? 0.0,
-      'transportation': double.tryParse(_transportBudgetController.text.trim()) ?? 0.0,
-      'food': double.tryParse(_foodBudgetController.text.trim()) ?? 0.0,
-      'accommodation': double.tryParse(_accommBudgetController.text.trim()) ?? 0.0,
-      'officecost': double.tryParse(_officeBudgetController.text.trim()) ?? 0.0,
-      'officebenefit': _calculatedOfficeBenefit,
+    double safeBudget(String text) {
+      final v = double.tryParse(text.trim()) ?? 0.0;
+      return v < 0 ? 0.0 : v;
+    }
+
+    final categoryBudgets = <String, double>{
+      'equipment': safeBudget(_equipBudgetController.text),
+      'transportation': safeBudget(_transportBudgetController.text),
+      'food': safeBudget(_foodBudgetController.text),
+      'accommodation': safeBudget(_accommBudgetController.text),
+      'officecost': safeBudget(_officeBudgetController.text),
+      'officebenefit': _calculatedOfficeBenefit < 0 ? 0.0 : _calculatedOfficeBenefit,
     };
+    for (final entry in _customCategoryControllers.entries) {
+      categoryBudgets[entry.key] = safeBudget(entry.value.text);
+    }
 
-    final totalBudget = _calculatedTotalBudget;
+    final totalBudget = _calculatedTotalBudget < 0 ? 0.0 : _calculatedTotalBudget;
 
     if (isEditing) {
       final existing = ref.read(projectProvider).firstWhere((p) => p.id == widget.projectId);
@@ -476,7 +505,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                         isDark: isDark,
                       ),
                       onChanged: (_) => setState(() {}),
-                      validator: (v) => (v == null || double.tryParse(v.trim()) == null) ? 'Enter valid amount' : null,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Enter contract value';
+                        final val = double.tryParse(v.trim());
+                        if (val == null) return 'Enter valid amount';
+                        if (val <= 0) return 'Contract value must be greater than zero';
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -558,6 +593,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   prefixText: '৳ ',
                                   isDark: isDark,
                                 ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return null;
+                                  final val = double.tryParse(v.trim());
+                                  if (val == null) return 'Enter valid amount';
+                                  if (val < 0) return 'Cannot be negative';
+                                  return null;
+                                },
                               ),
                               const SizedBox(height: 12),
                               TextFormField(
@@ -568,6 +610,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   prefixText: '৳ ',
                                   isDark: isDark,
                                 ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return null;
+                                  final val = double.tryParse(v.trim());
+                                  if (val == null) return 'Enter valid amount';
+                                  if (val < 0) return 'Cannot be negative';
+                                  return null;
+                                },
                               ),
                             ],
                           );
@@ -583,6 +632,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   prefixText: '৳ ',
                                   isDark: isDark,
                                 ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return null;
+                                  final val = double.tryParse(v.trim());
+                                  if (val == null) return 'Enter valid amount';
+                                  if (val < 0) return 'Cannot be negative';
+                                  return null;
+                                },
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -595,6 +651,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   prefixText: '৳ ',
                                   isDark: isDark,
                                 ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return null;
+                                  final val = double.tryParse(v.trim());
+                                  if (val == null) return 'Enter valid amount';
+                                  if (val < 0) return 'Cannot be negative';
+                                  return null;
+                                },
                               ),
                             ),
                           ],
@@ -624,6 +687,75 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                     _buildCompactBudgetRow('Accommodation', Icons.hotel_rounded, _accommBudgetController, isDark),
                     const SizedBox(height: 8),
                     _buildCompactBudgetRow('Office Cost', Icons.work_outline_rounded, _officeBudgetController, isDark),
+                    const SizedBox(height: 8),
+
+                    // Custom Categories List
+                    if (_customCategoryControllers.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.tune_rounded, size: 13, color: AppColors.getPrimary(context)),
+                          const SizedBox(width: 6),
+                          Text(
+                            'CUSTOM CATEGORIES',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                              color: AppColors.getPrimary(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ..._customCategoryControllers.entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _buildCustomBudgetRow(
+                            entry.key,
+                            entry.value,
+                            isDark,
+                            onDelete: () {
+                              setState(() {
+                                final ctrl = _customCategoryControllers.remove(entry.key);
+                                ctrl?.dispose();
+                              });
+                            },
+                          ),
+                        );
+                      }),
+                    ],
+
+                    // + Add Category Button
+                    InkWell(
+                      onTap: _showAddCategoryDialog,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD97706).withAlpha(isDark ? 25 : 12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFD97706).withAlpha(60),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.add_circle_outline_rounded, size: 16, color: Color(0xFFD97706)),
+                            SizedBox(width: 8),
+                            Text(
+                              'Add Category',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 14),
 
                     // Office Benefit (30%) Calculation Summary Card
@@ -1297,6 +1429,225 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomBudgetRow(
+    String label,
+    TextEditingController controller,
+    bool isDark, {
+    required VoidCallback onDelete,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.category_rounded, size: 16, color: Color(0xFFD97706)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 95,
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                hintText: '0',
+                prefixText: '৳ ',
+                prefixStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onDelete,
+            borderRadius: BorderRadius.circular(8),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close_rounded, size: 16, color: Colors.redAccent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddCategoryDialog() {
+    final nameController = TextEditingController();
+    final amountController = TextEditingController();
+    final suggestions = [
+      'Consultancy',
+      'Labor & Staff',
+      'Permits & Licenses',
+      'Subcontractor',
+      'Site Logistics',
+      'Utilities & Power',
+      'Contingency',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.add_circle_rounded, color: Color(0xFFD97706), size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Add Budget Category',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Quick Suggestions:',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: suggestions.map((sug) {
+                      final isSelected = nameController.text.trim().toLowerCase() == sug.toLowerCase();
+                      return ChoiceChip(
+                        label: Text(
+                          sug,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected
+                                ? Colors.white
+                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                          ),
+                        ),
+                        selected: isSelected,
+                        selectedColor: const Color(0xFFD97706),
+                        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        visualDensity: VisualDensity.compact,
+                        showCheckmark: false,
+                        onSelected: (val) {
+                          setDialogState(() {
+                            nameController.text = val ? sug : '';
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameController,
+                    autofocus: false,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: InputDecoration(
+                      labelText: 'Category Name',
+                      hintText: 'e.g. Survey Equipment, Consultant Fee',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: amountController,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Allocated Budget (৳)',
+                      hintText: '0',
+                      prefixText: '৳ ',
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF64748B))),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                ),
+                onPressed: () {
+                  final name = nameController.text.trim();
+                  if (name.isEmpty) return;
+
+                  final standardNames = {'equipment', 'transportation', 'food', 'accommodation', 'officecost', 'officebenefit'};
+                  if (standardNames.contains(name.toLowerCase()) ||
+                      _customCategoryControllers.keys.any((k) => k.toLowerCase() == name.toLowerCase())) {
+                    NotificationBanner.showError(context, 'Category "$name" already exists');
+                    return;
+                  }
+
+                  final amt = amountController.text.trim();
+                  setState(() {
+                    final ctrl = TextEditingController(text: amt.isEmpty ? '0' : amt);
+                    ctrl.addListener(() => setState(() {}));
+                    _customCategoryControllers[name] = ctrl;
+                  });
+                  Navigator.pop(ctx);
+                  NotificationBanner.showSuccess(context, 'Added category "$name"');
+                },
+                child: const Text('Add Category', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

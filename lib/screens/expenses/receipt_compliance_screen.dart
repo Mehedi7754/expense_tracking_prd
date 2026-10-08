@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../core/routing/route_paths.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/widgets/empty_state_widget.dart';
@@ -128,73 +130,77 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
           )
         else
           ...unreceipted.map((e) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(e.categoryName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                      Text(
-                        CurrencyFormatter.format(e.amount),
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.error),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text('${e.projectName} • ${e.note}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: (e.justificationStatus == JustificationStatus.approved
+            return InkWell(
+              onTap: () => context.push(RoutePaths.expenseDetail(e.id)),
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(e.categoryName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                        Text(
+                          CurrencyFormatter.format(e.amount),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.error),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text('${e.projectName} • ${e.note}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: (e.justificationStatus == JustificationStatus.approved
+                                    ? AppColors.success
+                                    : Colors.orange)
+                                .withAlpha(20),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            e.justificationStatus.displayName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: e.justificationStatus == JustificationStatus.approved
                                   ? AppColors.success
-                                  : Colors.orange)
-                              .withAlpha(20),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          e.justificationStatus.displayName,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: e.justificationStatus == JustificationStatus.approved
-                                ? AppColors.success
-                                : Colors.orange,
+                                  : Colors.orange,
+                            ),
                           ),
                         ),
-                      ),
-                      if (e.justificationStatus == JustificationStatus.required ||
-                          e.justificationStatus == JustificationStatus.clarificationRequested)
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            visualDensity: VisualDensity.compact,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        if (e.justificationStatus == JustificationStatus.required ||
+                            e.justificationStatus == JustificationStatus.clarificationRequested)
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.error,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            icon: const Icon(Icons.rate_review_rounded, size: 14),
+                            label: const Text('Submit Justification', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                            onPressed: () => _showSubmitJustificationDialog(context, e),
                           ),
-                          icon: const Icon(Icons.rate_review_rounded, size: 14),
-                          label: const Text('Submit Justification', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                          onPressed: () => _showSubmitJustificationDialog(context, e),
-                        ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             );
           }),
@@ -360,45 +366,49 @@ class _ReceiptComplianceScreenState extends ConsumerState<ReceiptComplianceScree
       itemCount: pending.length,
       itemBuilder: (ctx, i) {
         final exp = pending[i];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.orange.withAlpha(80)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('${exp.employeeName} — ${exp.projectName}',
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                  Text(
-                    CurrencyFormatter.format(exp.amount),
-                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.error),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text('Reason: ${exp.justificationReason ?? "Unstated"}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.orange)),
-              const SizedBox(height: 4),
-              Text('Comment: ${exp.justificationComment ?? "None"}',
-                  style: const TextStyle(fontSize: 12)),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton(
-                    onPressed: () => _showAdminReviewDialog(context, exp),
-                    child: const Text('Review Justification'),
-                  ),
-                ],
-              ),
-            ],
+        return InkWell(
+          onTap: () => context.push(RoutePaths.expenseDetail(exp.id)),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.orange.withAlpha(80)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('${exp.employeeName} — ${exp.projectName}',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    Text(
+                      CurrencyFormatter.format(exp.amount),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: AppColors.error),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text('Reason: ${exp.justificationReason ?? "Unstated"}',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.orange)),
+                const SizedBox(height: 4),
+                Text('Comment: ${exp.justificationComment ?? "None"}',
+                    style: const TextStyle(fontSize: 12)),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => _showAdminReviewDialog(context, exp),
+                      child: const Text('Review Justification'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },

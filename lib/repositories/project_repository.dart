@@ -81,6 +81,10 @@ class ProjectRepository {
         : response as Map<String, dynamic>;
     return ProjectModel.fromJson(data);
   }
+
+  Future<void> deleteProject(String projectId) async {
+    await _client.delete(ApiEndpoints.projectById(projectId));
+  }
 }
 
 final projectRepositoryProvider = Provider<ProjectRepository>((ref) {

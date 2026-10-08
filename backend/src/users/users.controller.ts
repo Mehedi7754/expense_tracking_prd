@@ -10,6 +10,7 @@ import {
   Query,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -46,9 +47,16 @@ export class UsersController {
     return this.usersService.create(body, req.user);
   }
 
-  @Roles('main_admin', 'project_manager')
   @Put(':id')
   async updateUser(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    // Allow if user is admin/manager OR if they are updating their own profile
+    const isSelf = req.user.id === id || req.user.email?.toLowerCase() === id.toLowerCase();
+    const isManagerOrAdmin = req.user.role === 'main_admin' || req.user.role === 'project_manager';
+    
+    if (!isSelf && !isManagerOrAdmin) {
+      throw new ForbiddenException('You can only update your own profile.');
+    }
+    
     return this.usersService.update(id, body, req.user);
   }
 
@@ -68,5 +76,13 @@ export class UsersController {
   @Delete(':id')
   async deleteUser(@Param('id') id: string) {
     return this.usersService.delete(id);
+  }
+
+  @Post('fcm-token')
+  async registerFcmToken(
+    @Request() req: any,
+    @Body() body: { token: string; deviceInfo?: string },
+  ) {
+    return this.usersService.saveFcmToken(req.user.id, body.token, body.deviceInfo);
   }
 }

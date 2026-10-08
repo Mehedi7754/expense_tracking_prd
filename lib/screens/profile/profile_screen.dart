@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/utils/image_utils.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/user_model.dart';
 import '../../models/user_role.dart';
@@ -211,7 +212,7 @@ class ProfileScreen extends ConsumerWidget {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
             child: Column(
               children: [
                 // 1. MINIMALIST PROFILE CARD
@@ -244,15 +245,15 @@ class ProfileScreen extends ConsumerWidget {
                               width: 76,
                               height: 76,
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF4338CA), Color(0xFF4F46E5)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                                 borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                                  width: 1.0,
+                                ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withAlpha(15),
+                                    color: Colors.black.withAlpha(isDark ? 20 : 6),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
@@ -260,7 +261,7 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(24),
-                                child: _buildAvatarContent(user.avatarUrl, user.name),
+                                child: _buildAvatarContent(user.avatarUrl, user.name, isDark),
                               ),
                             ),
                             Positioned(
@@ -270,7 +271,7 @@ class ProfileScreen extends ConsumerWidget {
                                 width: 26,
                                 height: 26,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF4F46E5),
+                                  color: const Color(0xFF0F172A),
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: isDark ? AppColors.darkSurface : Colors.white,
@@ -304,7 +305,6 @@ class ProfileScreen extends ConsumerWidget {
                             child: Text(
                               user.name,
                               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -419,8 +419,6 @@ class ProfileScreen extends ConsumerWidget {
                                     fontSize: 11,
                                     color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
@@ -517,10 +515,21 @@ class ProfileScreen extends ConsumerWidget {
                     children: [
                       if (user.role == UserRole.mainAdmin || user.role == UserRole.projectManager) ...[
                         _buildSettingsTile(
-                          icon: Icons.admin_panel_settings_outlined,
+                          icon: Icons.person_add_alt_1_rounded,
+                          iconColor: const Color(0xFF0D9488),
+                          title: 'Add Employee',
+                          subtitle: user.role == UserRole.mainAdmin
+                              ? 'Provision Admin, Manager, or Employee accounts'
+                              : 'Provision Manager or Employee accounts',
+                          onTap: () => context.push(RoutePaths.addUser),
+                          isDark: isDark,
+                        ),
+                        _buildDivider(isDark),
+                        _buildSettingsTile(
+                          icon: Icons.people_alt_outlined,
                           iconColor: const Color(0xFF6366F1),
-                          title: 'Company Hub & Governance',
-                          subtitle: 'Users, roles, company setup, categories & audit logs',
+                          title: 'Employee Management & Governance',
+                          subtitle: 'View employees, assign roles, company setup & audit logs',
                           onTap: () => context.push(RoutePaths.userManagement),
                           isDark: isDark,
                         ),
@@ -531,7 +540,7 @@ class ProfileScreen extends ConsumerWidget {
                           icon: Icons.location_on_outlined,
                           iconColor: const Color(0xFF4F46E5),
                           title: 'Attendance & Geo-Tracking',
-                          subtitle: 'Live staff pins, morning/afternoon records & audit',
+                          subtitle: 'Live staff pins, morning/afternoon records & office timing settings',
                           onTap: () => context.push(RoutePaths.attendanceDashboard),
                           isDark: isDark,
                         ),
@@ -565,15 +574,17 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                         _buildDivider(isDark),
                       ],
-                      _buildSettingsTile(
-                        icon: Icons.analytics_outlined,
-                        iconColor: const Color(0xFF4F46E5),
-                        title: 'Financial Reports & Audits',
-                        subtitle: 'Export portfolio CSVs and category summaries',
-                        onTap: () => context.push(RoutePaths.reports),
-                        isDark: isDark,
-                      ),
-                      _buildDivider(isDark),
+                      if (user.role != UserRole.projectMember) ...[
+                        _buildSettingsTile(
+                          icon: Icons.analytics_outlined,
+                          iconColor: const Color(0xFF4F46E5),
+                          title: 'Financial Reports & Audits',
+                          subtitle: 'Export portfolio CSVs and category summaries',
+                          onTap: () => context.push(RoutePaths.reports),
+                          isDark: isDark,
+                        ),
+                        _buildDivider(isDark),
+                      ],
                       _buildSettingsTile(
                         icon: Icons.settings_outlined,
                         iconColor: const Color(0xFF0284C7),
@@ -623,24 +634,15 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAvatarContent(String? avatarUrl, String name) {
-    return AppImageHelper.buildImage(
-      path: avatarUrl,
-      width: 84,
-      height: 84,
-      placeholder: () => _buildInitialsFallback(name),
-    );
-  }
-
-  Widget _buildInitialsFallback(String name) {
-    return Center(
-      child: Text(
-        _getInitials(name),
-        style: const TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.w900,
-          color: Colors.white,
-        ),
+  Widget _buildAvatarContent(String? avatarUrl, String name, bool isDark) {
+    return AppAvatar(
+      imageUrl: avatarUrl,
+      name: name,
+      size: 84,
+      textStyle: const TextStyle(
+        fontSize: 26,
+        fontWeight: FontWeight.w900,
+        color: Colors.white,
       ),
     );
   }
@@ -675,8 +677,6 @@ class ProfileScreen extends ConsumerWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -735,14 +735,6 @@ class ProfileScreen extends ConsumerWidget {
       indent: 68,
       color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9),
     );
-  }
-
-  String _getInitials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.isNotEmpty ? name[0].toUpperCase() : 'U';
   }
 }
 

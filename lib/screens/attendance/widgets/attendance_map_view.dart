@@ -66,8 +66,8 @@ class _AttendanceMapViewState extends State<AttendanceMapView> {
 
       return Marker(
         point: LatLng(record.latitude!, record.longitude!),
-        width: 96,
-        height: 74,
+        width: 100,
+        height: 90,
         alignment: Alignment.topCenter,
         child: GestureDetector(
           onTap: () {
@@ -116,8 +116,6 @@ class _AttendanceMapViewState extends State<AttendanceMapView> {
                           fontWeight: FontWeight.w800,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -282,31 +280,34 @@ class _AttendanceMapViewState extends State<AttendanceMapView> {
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF4F46E5),
-                      shape: BoxShape.circle,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF4F46E5),
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text('Morning Session', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                  const SizedBox(width: 12),
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF10B981),
-                      shape: BoxShape.circle,
+                    const SizedBox(width: 6),
+                    const Text('Morning Session', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text('Afternoon Session', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                ],
+                    const SizedBox(width: 6),
+                    const Text('Afternoon Session', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  ],
+                ),
               ),
             ),
           ),

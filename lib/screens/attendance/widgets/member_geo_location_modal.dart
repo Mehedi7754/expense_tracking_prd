@@ -92,8 +92,6 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                   child: Text(
                     'Set Salary • ${widget.employee.userName}',
                     style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -427,7 +425,6 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                               child: Text(
                                 DateFormat('EEE, MMM d, yyyy').format(DateTime.tryParse(_currentDate) ?? DateTime.now()),
                                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -449,8 +446,6 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                         child: Text(
                           '2-Time Daily Geo-Location Records',
                           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -559,8 +554,6 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                               child: Text(
                                 'Salary & Daily Cut',
                                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -769,8 +762,6 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                     fontWeight: FontWeight.w800,
                     color: hasRecord ? (isDark ? Colors.white : Colors.black87) : Colors.grey,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
@@ -847,8 +838,6 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                     child: Text(
                       record.deviceInfo,
                       style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

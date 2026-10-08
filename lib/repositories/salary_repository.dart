@@ -19,9 +19,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return EmployeeSalaryProfile.fromJson(response);
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API getEmployeeSalary failed ($e), using local fallback store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.getEmployeeSalary(userId);
   }
@@ -51,9 +49,7 @@ class SalaryRepository {
         );
         return profile;
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API setEmployeeSalary failed ($e), saving to local store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.setEmployeeSalary(
       userId,
@@ -70,9 +66,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return SalaryCalculationModel.fromJson(response);
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API calculateSalary failed ($e), calculating via local store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.calculateSalary(userId, month, year);
   }
@@ -91,9 +85,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return response['success'] == true;
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API saveCalculation failed ($e), saved locally');
-    }
+    } catch (_) {}
     return true;
   }
 
@@ -107,9 +99,7 @@ class SalaryRepository {
           return report;
         }
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API getOrgSalaryReport failed ($e), using local fallback store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.getOrgSalaryReport(month, year, explicitUsers);
   }
@@ -123,9 +113,7 @@ class SalaryRepository {
       if (response is List && response.isNotEmpty) {
         return response.map((e) => HolidayModel.fromJson(e as Map<String, dynamic>)).toList();
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API getHolidays failed ($e), using local fallback store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.getHolidays(year);
   }
@@ -147,9 +135,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return HolidayModel.fromJson(response);
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API addHoliday failed: $e');
-    }
+    } catch (_) {}
 
     return HolidayModel(
       id: 'hol-${DateTime.now().millisecondsSinceEpoch}',
@@ -165,9 +151,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return response['success'] == true;
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API deleteHoliday failed: $e');
-    }
+    } catch (_) {}
     return true;
   }
 
@@ -189,9 +173,7 @@ class SalaryRepository {
       if (response is List) {
         return response.map((e) => LeaveRecordModel.fromJson(e as Map<String, dynamic>)).toList();
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API getLeaves failed: $e');
-    }
+    } catch (_) {}
     return [];
   }
 
@@ -218,9 +200,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return LeaveRecordModel.fromJson(response);
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API addLeave failed: $e');
-    }
+    } catch (_) {}
 
     return LeaveRecordModel(
       id: 'leave-${DateTime.now().millisecondsSinceEpoch}',
@@ -240,9 +220,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return response['success'] == true;
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API deleteLeave failed: $e');
-    }
+    } catch (_) {}
     return true;
   }
 
@@ -261,9 +239,7 @@ class SalaryRepository {
       if (response is List) {
         return response.map((e) => SalaryAdjustmentModel.fromJson(e as Map<String, dynamic>)).toList();
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API getAdjustments failed: $e');
-    }
+    } catch (_) {}
     return [];
   }
 
@@ -290,9 +266,7 @@ class SalaryRepository {
       if (response is Map<String, dynamic>) {
         return SalaryAdjustmentModel.fromJson(response);
       }
-    } catch (e) {
-      debugPrint('[SalaryRepository] API addAdjustment failed: $e');
-    }
+    } catch (_) {}
 
     return SalaryAdjustmentModel(
       id: 'adj-${DateTime.now().millisecondsSinceEpoch}',

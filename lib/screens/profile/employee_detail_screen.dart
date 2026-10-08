@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../core/widgets/chart_widget.dart';
 import '../../core/widgets/expense_list_row.dart';
 import '../../core/widgets/role_badge.dart';
@@ -82,16 +83,10 @@ class EmployeeDetailScreen extends ConsumerWidget {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
-                    child: Text(
-                      employee.name.isNotEmpty ? employee.name[0] : 'U',
-                      style: AppTextStyles.displayMedium.copyWith(
-                        fontSize: 24,
-                        color: AppColors.getTextPrimary(context),
-                      ),
-                    ),
+                  AppAvatar(
+                    imageUrl: employee.avatarUrl,
+                    name: employee.name,
+                    size: 56,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -104,6 +99,8 @@ class EmployeeDetailScreen extends ConsumerWidget {
                               child: Text(
                                 employee.name,
                                 style: AppTextStyles.titleMedium.copyWith(color: AppColors.getTextPrimary(context)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -114,10 +111,14 @@ class EmployeeDetailScreen extends ConsumerWidget {
                         Text(
                           employee.email,
                           style: AppTextStyles.bodyMedium.copyWith(color: AppColors.getTextSecondary(context)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           employee.department,
                           style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextMuted(context)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -136,7 +137,7 @@ class EmployeeDetailScreen extends ConsumerWidget {
               physics: const NeverScrollableScrollPhysics(),
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 0.95,
+              childAspectRatio: 0.72,
               children: [
                 StatCard(
                   label: 'Approved Spend',

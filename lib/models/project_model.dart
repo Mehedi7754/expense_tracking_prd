@@ -56,6 +56,56 @@ class RevenueEntry {
   }
 }
 
+class ProjectProgressNote {
+  final String id;
+  final String projectId;
+  final double progressPercentage;
+  final String note;
+  final String authorId;
+  final String authorName;
+  final String authorRole;
+  final DateTime createdAt;
+
+  const ProjectProgressNote({
+    required this.id,
+    required this.projectId,
+    required this.progressPercentage,
+    required this.note,
+    required this.authorId,
+    required this.authorName,
+    this.authorRole = 'Project Member',
+    required this.createdAt,
+  });
+
+  factory ProjectProgressNote.fromJson(Map<String, dynamic> json) {
+    return ProjectProgressNote(
+      id: (json['id'] ?? '').toString(),
+      projectId: (json['project_id'] ?? json['projectId'] ?? '').toString(),
+      progressPercentage: _asDouble(json['progress_percentage'] ?? json['progressPercentage']),
+      note: (json['note'] ?? '').toString(),
+      authorId: (json['author_id'] ?? json['authorId'] ?? '').toString(),
+      authorName: (json['author_name'] ?? json['authorName'] ?? 'Member').toString(),
+      authorRole: (json['author_role'] ?? json['authorRole'] ?? 'Project Member').toString(),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'project_id': projectId,
+      'progress_percentage': progressPercentage,
+      'note': note,
+      'author_id': authorId,
+      'author_name': authorName,
+      'author_role': authorRole,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+}
+
 enum ProjectStatus {
   proposal,
   approved,
@@ -334,6 +384,7 @@ class ProjectModel {
   final String? progressUpdatedById;
   final String? createdById;
   final String? imageUrl; // Project Cover Image / Banner
+  final List<ProjectProgressNote> progressNotes;
 
   const ProjectModel({
     required this.id,
@@ -368,6 +419,7 @@ class ProjectModel {
     this.progressUpdatedById,
     this.createdById,
     this.imageUrl,
+    this.progressNotes = const [],
   });
 
   // Visual status indicators based on progress:
@@ -416,6 +468,7 @@ class ProjectModel {
     String? createdById,
     String? imageUrl,
     bool clearImageUrl = false,
+    List<ProjectProgressNote>? progressNotes,
   }) {
     return ProjectModel(
       id: id ?? this.id,
@@ -450,6 +503,7 @@ class ProjectModel {
       progressUpdatedById: progressUpdatedById ?? this.progressUpdatedById,
       createdById: createdById ?? this.createdById,
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
+      progressNotes: progressNotes ?? this.progressNotes,
     );
   }
 
@@ -510,6 +564,16 @@ class ProjectModel {
       return const [];
     }
 
+    List<ProjectProgressNote> parseNotes(dynamic raw) {
+      if (raw is List) {
+        return raw
+            .whereType<Map<String, dynamic>>()
+            .map(ProjectProgressNote.fromJson)
+            .toList();
+      }
+      return const [];
+    }
+
     final pCode = (json['project_id'] ?? json['projectId'] ?? json['project_code'] ?? '').toString();
     final pName = (json['name'] ?? json['project_name'] ?? '').toString();
     final pClient = (json['client'] ?? json['client_name'] ?? '').toString();
@@ -549,17 +613,17 @@ class ProjectModel {
       clientId: json['client_id']?.toString() ?? json['clientId']?.toString(),
       clientType: ClientType.fromString(clientTypeStr),
       assignmentType: AssignmentType.fromString(assignmentTypeStr),
-      grossProjectValue: _asDouble(json['gross_project_value'] ?? json['grossProjectValue']),
+      grossProjectValue: (_asDouble(json['gross_project_value'] ?? json['grossProjectValue'])).clamp(0.0, double.infinity),
       taxStatus: TaxStatus.fromString(taxStatusStr),
-      taxRate: _asDouble(json['tax_rate'] ?? json['taxRate'], 0.10),
-      expectedNetRevenue: _asDouble(json['expected_net_revenue'] ?? json['expectedNetRevenue']),
-      advanceReceived: _asDouble(json['advance_received'] ?? json['advanceReceived']),
-      amountReceived: _asDouble(json['amount_received'] ?? json['amountReceived']),
-      amountReceivable: _asDouble(json['amount_receivable'] ?? json['amountReceivable']),
-      budget: _asDouble(json['budget']),
+      taxRate: (_asDouble(json['tax_rate'] ?? json['taxRate'], 0.10)).clamp(0.0, 1.0),
+      expectedNetRevenue: (_asDouble(json['expected_net_revenue'] ?? json['expectedNetRevenue'])).clamp(0.0, double.infinity),
+      advanceReceived: (_asDouble(json['advance_received'] ?? json['advanceReceived'])).clamp(0.0, double.infinity),
+      amountReceived: (_asDouble(json['amount_received'] ?? json['amountReceived'])).clamp(0.0, double.infinity),
+      amountReceivable: (_asDouble(json['amount_receivable'] ?? json['amountReceivable'])).clamp(0.0, double.infinity),
+      budget: (_asDouble(json['budget'])).clamp(0.0, double.infinity),
       categoryBudgets: categoryBudgetsMap,
-      estimatedRemainingCost: _asDouble(json['estimated_remaining_cost'] ?? json['estimatedRemainingCost']),
-      officeBenefitRate: _asDouble(json['office_benefit_rate'] ?? json['officeBenefitRate'], 0.30),
+      estimatedRemainingCost: (_asDouble(json['estimated_remaining_cost'] ?? json['estimatedRemainingCost'])).clamp(0.0, double.infinity),
+      officeBenefitRate: (_asDouble(json['office_benefit_rate'] ?? json['officeBenefitRate'], 0.30)).clamp(0.0, 1.0),
       startDate: json['start_date'] != null
           ? DateTime.tryParse(json['start_date'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -581,6 +645,7 @@ class ProjectModel {
       progressUpdatedById: json['progress_updated_by_id']?.toString(),
       createdById: json['created_by_id']?.toString() ?? json['createdById']?.toString() ?? json['created_by']?.toString(),
       imageUrl: (json['image_url'] ?? json['imageUrl'])?.toString(),
+      progressNotes: parseNotes(json['progress_notes'] ?? json['progressNotes']),
     );
   }
 
@@ -645,6 +710,8 @@ class ProjectModel {
       if (createdById != null && createdById!.isNotEmpty) 'created_by_id': demoToUuid[createdById] ?? createdById,
       'image_url': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
       'imageUrl': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
+      'progress_notes': progressNotes.map((n) => n.toJson()).toList(),
+      'progressNotes': progressNotes.map((n) => n.toJson()).toList(),
     };
   }
 

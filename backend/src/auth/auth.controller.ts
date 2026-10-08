@@ -48,4 +48,24 @@ export class AuthController {
     const newPass = body.newPassword || body.new_password || '';
     return this.authService.changePassword(req.user.id, currentPass, newPass);
   }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: { email: string }) {
+    return this.authService.forgotPassword(body.email);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('reset-password')
+  async resetPassword(@Body() body: { email: string; otp?: string; token?: string; newPassword?: string; password?: string }) {
+    const newPass = body.newPassword || body.password || '';
+    const token = body.otp || body.token || '';
+    return this.authService.resetPassword(body.email, token, newPass);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('logout')
+  async logout() {
+    return { success: true, message: 'Logged out successfully' };
+  }
 }

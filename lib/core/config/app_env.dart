@@ -20,9 +20,8 @@ class AppEnv {
       await dotenv.load(fileName: fileName);
       _initialized = true;
       _validate();
-    } catch (e) {
+    } catch (_) {
       // In automated widget testing, assets may not be loaded from bundle.
-      debugPrint('[AppEnv] Notice: .env file loading handled: $e');
       _initialized = true;
     }
   }
@@ -38,9 +37,6 @@ class AppEnv {
 
   /// Internal validator to ensure environment variables are present and secure.
   static void _validate() {
-    if (!kReleaseMode) {
-      debugPrint('[AppEnv] Initialized successfully. Environment: $environment | Base URL: $apiBaseUrl');
-    }
 
     if (apiBaseUrl.isNotEmpty) {
       final uri = Uri.tryParse(apiBaseUrl);

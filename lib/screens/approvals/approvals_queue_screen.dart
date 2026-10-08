@@ -9,7 +9,10 @@ import '../../core/widgets/custom_search_bar.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
+import '../../models/user_model.dart';
 import '../../state/expense_provider.dart';
+import '../../state/user_management_provider.dart';
+import '../../core/utils/image_utils.dart';
 
 class ApprovalsQueueScreen extends ConsumerStatefulWidget {
   const ApprovalsQueueScreen({super.key});
@@ -47,14 +50,14 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
     );
 
     if (confirm && mounted) {
-      for (final id in _selectedExpenseIds) {
-        ref.read(expenseProvider.notifier).approveExpense(id);
+      await ref.read(expenseProvider.notifier).batchApprove(_selectedExpenseIds.toList());
+      if (mounted) {
+        NotificationBanner.showSuccess(context, 'Successfully batch approved $count claims.');
+        setState(() {
+          _selectedExpenseIds.clear();
+          _isBatchMode = false;
+        });
       }
-      NotificationBanner.showSuccess(context, 'Successfully batch approved $count claims.');
-      setState(() {
-        _selectedExpenseIds.clear();
-        _isBatchMode = false;
-      });
     }
   }
 
@@ -64,6 +67,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
     final isDark = theme.brightness == Brightness.dark;
 
     final allExpenses = ref.watch(expenseProvider);
+    final allUsers = ref.watch(userManagementProvider);
     final pendingExpenses = allExpenses.where((e) => e.status == ExpenseStatus.pending).toList();
 
     // Filter logic
@@ -186,7 +190,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (ctx, i) {
                       final exp = filtered[i];
-                      return _buildApprovalCard(context, exp, isDark);
+                      return _buildApprovalCard(context, exp, isDark, allUsers);
                     },
                   ),
           ),
@@ -197,7 +201,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
 );
   }
 
-  Widget _buildApprovalCard(BuildContext context, ExpenseModel exp, bool isDark) {
+  Widget _buildApprovalCard(BuildContext context, ExpenseModel exp, bool isDark, List<UserModel> allUsers) {
     Color iconColor;
     Color iconBg;
     IconData icon;
@@ -293,15 +297,37 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                   ),
                   const SizedBox(width: 4),
                 ],
-                // Left squircle icon with soft tinted pastel background matching project cards
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Center(child: Icon(icon, color: iconColor, size: 24)),
+                // Left squircle profile image
+                Builder(
+                  builder: (ctx) {
+                    final user = allUsers.cast<UserModel?>().firstWhere((u) => u?.id == exp.employeeId, orElse: () => null);
+                    
+                    return Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: iconBg,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                          ? AppImageHelper.buildImage(
+                              path: user.avatarUrl,
+                              fit: BoxFit.cover,
+                              placeholder: () => Center(child: Icon(Icons.person, color: iconColor, size: 28)),
+                            )
+                          : Center(
+                              child: Text(
+                                user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'U',
+                                style: TextStyle(
+                                  color: iconColor,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                    );
+                  },
                 ),
                 const SizedBox(width: 12),
                 // Middle column: Claimant Name, Project & Relative Time, and Receipt Status
@@ -318,8 +344,6 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                           letterSpacing: -0.3,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -329,8 +353,6 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                           fontWeight: FontWeight.w500,
                           color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 5),
                       Row(
@@ -353,8 +375,6 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                                 fontWeight: FontWeight.w600,
                                 color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],

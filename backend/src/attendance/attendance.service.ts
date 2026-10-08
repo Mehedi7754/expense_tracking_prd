@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CheckInDto } from './dto/check-in.dto';
 
 export interface AttendanceRecord {
@@ -22,11 +23,25 @@ export interface AttendanceRecord {
   createdAt: string;
 }
 
+export interface ShiftDefinition {
+  id: string;
+  name: string;
+  morningStartHour: number;
+  morningEndHour: number;
+  afternoonStartHour: number;
+  afternoonEndHour: number;
+  weekendDays?: number[];
+  isDefault?: boolean;
+}
+
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private officeTimingSettings = {
     morningStartHour: 9,
@@ -45,6 +60,7 @@ export class AttendanceService {
         morningEndHour: 13,
         afternoonStartHour: 13,
         afternoonEndHour: 18,
+        weekendDays: [5, 6],
         isDefault: true,
       },
       {
@@ -54,6 +70,7 @@ export class AttendanceService {
         morningEndHour: 11,
         afternoonStartHour: 11,
         afternoonEndHour: 15,
+        weekendDays: [5, 6],
         isDefault: false,
       },
       {
@@ -63,9 +80,10 @@ export class AttendanceService {
         morningEndHour: 18,
         afternoonStartHour: 18,
         afternoonEndHour: 22,
+        weekendDays: [7],
         isDefault: false,
       },
-    ],
+    ] as ShiftDefinition[],
     userShifts: {} as Record<string, string>,
   };
 
@@ -86,7 +104,6 @@ export class AttendanceService {
     this.officeTimingSettings = {
       ...this.officeTimingSettings,
       ...settings,
-      afternoonStartHour: settings.morningEndHour !== undefined ? settings.morningEndHour : this.officeTimingSettings.afternoonStartHour,
     };
     try {
       await this.db.query(
@@ -104,21 +121,75 @@ export class AttendanceService {
     return this.officeTimingSettings;
   }
 
-  /**
-   * Determine session based on configured office timing if not provided:
-   * Morning: 00:00 - morningEndHour
-   * Afternoon: morningEndHour - 23:59
-   */
-  private resolveSessionType(explicitSession?: 'morning' | 'afternoon'): 'morning' | 'afternoon' {
-    if (explicitSession === 'morning' || explicitSession === 'afternoon') {
-      return explicitSession;
+  private getShiftForUser(userId: string): ShiftDefinition {
+    const shiftId = this.officeTimingSettings.userShifts?.[userId];
+    if (shiftId && this.officeTimingSettings.shifts) {
+      const found = this.officeTimingSettings.shifts.find((s) => s.id === shiftId);
+      if (found) return found;
     }
-    const currentHour = new Date().getHours();
-    return currentHour < this.officeTimingSettings.morningEndHour ? 'morning' : 'afternoon';
+    const defaultShift = this.officeTimingSettings.shifts?.find((s) => s.isDefault);
+    return defaultShift || {
+      id: 'shift_default',
+      name: 'General Office Shift',
+      morningStartHour: 9,
+      morningEndHour: 13,
+      afternoonStartHour: 13,
+      afternoonEndHour: 18,
+      weekendDays: [5, 6],
+      isDefault: true,
+    };
   }
 
   async checkIn(userId: string, dto: CheckInDto): Promise<AttendanceRecord> {
-    const session = this.resolveSessionType(dto.sessionType || dto.session_type);
+    await this.getTimingSettings();
+
+    // 1. Check user role — Super Admin & Finance are exempt from attendance check-in
+    const userRoleRes = await this.db.query('SELECT role, full_name, email FROM users WHERE id = $1', [userId]);
+    const user = userRoleRes.rows[0];
+    if (user?.role === 'main_admin' || user?.role === 'finance') {
+      throw new BadRequestException('Attendance check-in is strictly for employees, not required for administrators.');
+    }
+
+    // 2. Resolve local office hour (Bangladesh Standard Time: UTC+6) and assigned user shift
+    const dhakaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
+    const currentHour = dhakaNow.getHours();
+    const userShift = this.getShiftForUser(userId);
+
+    const morningStart = userShift.morningStartHour ?? 9;
+    const morningEnd = userShift.morningEndHour ?? 13;
+    const afternoonStart = userShift.afternoonStartHour ?? userShift.morningEndHour ?? 13;
+    const afternoonEnd = userShift.afternoonEndHour ?? 18;
+
+    let session: 'morning' | 'afternoon';
+    const explicit = (dto.sessionType || dto.session_type || '').toLowerCase();
+    if (explicit === 'morning') {
+      session = 'morning';
+    } else if (explicit === 'afternoon') {
+      session = 'afternoon';
+    } else {
+      if (currentHour >= morningStart && currentHour < morningEnd) {
+        session = 'morning';
+      } else if (currentHour >= afternoonStart && currentHour < afternoonEnd) {
+        session = 'afternoon';
+      } else {
+        throw new BadRequestException(
+          `Check-in is only available during your shift (${userShift.name}) sessions: Morning (${morningStart}:00) and Afternoon (${afternoonStart}:00 - ${afternoonEnd}:00).`
+        );
+      }
+    }
+
+    // Validate window
+    if (session === 'morning' && (currentHour < morningStart || currentHour >= morningEnd)) {
+      throw new BadRequestException(
+        `Morning check-in for ${userShift.name} is open between ${morningStart}:00 and ${morningEnd}:00.`
+      );
+    }
+    if (session === 'afternoon' && (currentHour < afternoonStart || currentHour >= afternoonEnd)) {
+      throw new BadRequestException(
+        `Afternoon check-in for ${userShift.name} is open between ${afternoonStart}:00 and ${afternoonEnd}:00.`
+      );
+    }
+
     const address = dto.addressText || dto.address_text || '';
     const deviceInfo = dto.deviceInfo || '';
     const notes = dto.notes || '';
@@ -163,272 +234,230 @@ export class AttendanceService {
     if (!fetched) {
       throw new BadRequestException('Failed to retrieve recorded attendance');
     }
+
+    try {
+      const userRes = await this.db.query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
+      const empName = userRes.rows[0]?.full_name || 'Team member';
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      // Notify employee with attendance confirmation
+      await this.notificationsService.create({
+        userId,
+        title: 'Attendance Recorded 📍',
+        message: `Your check-in for the ${session} session was successfully recorded at ${timeStr}.`,
+        fullExplanation: `Attendance check-in verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: Present.`,
+        type: 'attendance_reminder',
+      });
+
+      // Notify Super Admin & Managers about the employee check-in
+      const adminsRes = await this.db.query(
+        `SELECT id FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
+        [userId],
+      );
+      for (const admin of adminsRes.rows) {
+        await this.notificationsService.create({
+          userId: admin.id,
+          title: 'Employee Checked In 📍',
+          message: `${empName} recorded attendance for ${session} session at ${timeStr}.`,
+          fullExplanation: `${empName} logged in for the ${session} session on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
+          type: 'attendance_reminder',
+        });
+      }
+    } catch (e) {
+      this.logger.warn(`Could not create attendance notifications: ${e}`);
+    }
+
     return fetched;
   }
 
   async getRecordById(id: string): Promise<AttendanceRecord | null> {
     const res = await this.db.query(
-      `SELECT a.id, a.user_id, a.date::text, a.session_type, a.login_time,
-              a.latitude, a.longitude, a.address_text, a.device_info, a.status,
-              a.notes, a.created_at,
-              u.full_name, u.email, u.department, u.designation, u.avatar_url
+      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
+              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
+              a.login_time::text as "loginTime", a.latitude, a.longitude,
+              a.address_text as "addressText", a.device_info as "deviceInfo",
+              a.status, a.notes, a.created_at::text as "createdAt"
        FROM attendance_records a
-       JOIN users u ON u.id = a.user_id
+       JOIN users u ON a.user_id = u.id
        WHERE a.id = $1`,
       [id],
     );
-    if (!res.rows.length) return null;
-    return this.mapRow(res.rows[0]);
+    return res.rows[0] || null;
   }
 
-  async getAttendanceRecords(params: {
-    userId?: string;
-    date?: string;
-    month?: number;
-    year?: number;
-    sessionType?: string;
-    currentUserRole: string;
-    currentUserId: string;
-  }): Promise<AttendanceRecord[]> {
-    const { userId, date, month, year, sessionType, currentUserRole, currentUserId } = params;
-
-    const normalizedRole = (currentUserRole || '').toLowerCase().replace(/_/g, '');
-    const isPrivileged = [
-      'mainadmin',
-      'admin',
-      'projectmanager',
-      'manager',
-      'financemanager',
-      'finance',
-    ].includes(normalizedRole);
-
-    const conditions: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-
-    // RBAC: Non-admin/manager can only see their own attendance
-    if (!isPrivileged) {
-      conditions.push(`a.user_id = $${idx++}`);
-      values.push(currentUserId);
-    } else if (userId) {
-      conditions.push(`a.user_id = $${idx++}`);
-      values.push(userId);
-    }
-
-    if (date) {
-      conditions.push(`a.date = $${idx++}`);
-      values.push(date);
-    }
-
-    if (month && year) {
-      conditions.push(`EXTRACT(MONTH FROM a.date) = $${idx++}`);
-      values.push(month);
-      conditions.push(`EXTRACT(YEAR FROM a.date) = $${idx++}`);
-      values.push(year);
-    } else if (year) {
-      conditions.push(`EXTRACT(YEAR FROM a.date) = $${idx++}`);
-      values.push(year);
-    }
-
-    if (sessionType) {
-      conditions.push(`a.session_type = $${idx++}`);
-      values.push(sessionType);
-    }
-
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const sql = `
-      SELECT a.id, a.user_id, a.date::text, a.session_type, a.login_time,
-             a.latitude, a.longitude, a.address_text, a.device_info, a.status,
-             a.notes, a.created_at,
-             u.full_name, u.email, u.department, u.designation, u.avatar_url
-      FROM attendance_records a
-      JOIN users u ON u.id = a.user_id
-      ${whereClause}
-      ORDER BY a.date DESC, a.login_time DESC
-    `;
-
-    const res = await this.db.query(sql, values);
-    return res.rows.map((row) => this.mapRow(row));
-  }
-
-  async getAttendanceSummary(userId: string, month: number, year: number) {
+  async getTodayRecords(): Promise<AttendanceRecord[]> {
     const res = await this.db.query(
-      `SELECT a.date::text, a.session_type, a.status, a.login_time, a.latitude, a.longitude, a.address_text
+      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
+              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
+              a.login_time::text as "loginTime", a.latitude, a.longitude,
+              a.address_text as "addressText", a.device_info as "deviceInfo",
+              a.status, a.notes, a.created_at::text as "createdAt"
        FROM attendance_records a
-       WHERE a.user_id = $1
-         AND EXTRACT(MONTH FROM a.date) = $2
-         AND EXTRACT(YEAR FROM a.date) = $3
+       JOIN users u ON a.user_id = u.id
+       WHERE a.date = CURRENT_DATE
+       ORDER BY a.login_time DESC`,
+    );
+    return res.rows;
+  }
+
+  async getMonthlyRecords(userId: string, year: number, month: number): Promise<AttendanceRecord[]> {
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const nextMonthYear = month === 12 ? year + 1 : year;
+    const nextMonthVal = month === 12 ? 1 : month + 1;
+    const endDate = `${nextMonthYear}-${String(nextMonthVal).padStart(2, '0')}-01`;
+
+    const res = await this.db.query(
+      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
+              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
+              a.login_time::text as "loginTime", a.latitude, a.longitude,
+              a.address_text as "addressText", a.device_info as "deviceInfo",
+              a.status, a.notes, a.created_at::text as "createdAt"
+       FROM attendance_records a
+       JOIN users u ON a.user_id = u.id
+       WHERE a.user_id = $1 AND a.date >= $2 AND a.date < $3
        ORDER BY a.date ASC, a.session_type ASC`,
-      [userId, month, year],
+      [userId, startDate, endDate],
+    );
+    return res.rows;
+  }
+
+  async getAllMonthlyRecords(year: number, month: number): Promise<AttendanceRecord[]> {
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const nextMonthYear = month === 12 ? year + 1 : year;
+    const nextMonthVal = month === 12 ? 1 : month + 1;
+    const endDate = `${nextMonthYear}-${String(nextMonthVal).padStart(2, '0')}-01`;
+
+    const res = await this.db.query(
+      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
+              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
+              a.login_time::text as "loginTime", a.latitude, a.longitude,
+              a.address_text as "addressText", a.device_info as "deviceInfo",
+              a.status, a.notes, a.created_at::text as "createdAt"
+       FROM attendance_records a
+       JOIN users u ON a.user_id = u.id
+       WHERE a.date >= $1 AND a.date < $2
+       ORDER BY a.date ASC, a.session_type ASC`,
+      [startDate, endDate],
+    );
+    return res.rows;
+  }
+
+  async getSummary(userId?: string) {
+    let whereClause = `WHERE date = CURRENT_DATE`;
+    const params: any[] = [];
+
+    if (userId) {
+      params.push(userId);
+      whereClause += ` AND user_id = $1`;
+    }
+
+    const res = await this.db.query(
+      `SELECT
+         COUNT(DISTINCT user_id) FILTER (WHERE session_type = 'morning' AND status = 'present') as "morningPresent",
+         COUNT(DISTINCT user_id) FILTER (WHERE session_type = 'afternoon' AND status = 'present') as "afternoonPresent",
+         COUNT(DISTINCT user_id) FILTER (WHERE status = 'present') as "totalPresent"
+       FROM attendance_records
+       ${whereClause}`,
+      params,
     );
 
-    const dailySessionsMap: { [date: string]: { morning?: any; afternoon?: any } } = {};
-    for (const row of res.rows) {
-      if (!dailySessionsMap[row.date]) {
-        dailySessionsMap[row.date] = {};
-      }
-      if (row.session_type === 'morning') {
-        dailySessionsMap[row.date].morning = row;
-      } else {
-        dailySessionsMap[row.date].afternoon = row;
-      }
+    const totalUsersRes = await this.db.query(`SELECT COUNT(*) as total FROM users WHERE role NOT IN ('main_admin', 'finance') AND is_active = TRUE`);
+    const totalEmployees = parseInt(totalUsersRes.rows[0]?.total || '0', 10);
+
+    const morningPresent = parseInt(res.rows[0]?.morningPresent || '0', 10);
+    const afternoonPresent = parseInt(res.rows[0]?.afternoonPresent || '0', 10);
+    const totalPresent = parseInt(res.rows[0]?.totalPresent || '0', 10);
+
+    return {
+      date: new Date().toISOString().split('T')[0],
+      totalEmployees,
+      morningPresent,
+      afternoonPresent,
+      totalPresent,
+      absentEmployees: Math.max(0, totalEmployees - totalPresent),
+    };
+  }
+
+  async getEmployeeAttendanceStats(userId: string, monthStr?: string) {
+    await this.getTimingSettings();
+    const userShift = this.getShiftForUser(userId);
+    const weekendDays = userShift.weekendDays || [5, 6];
+
+    const targetDate = monthStr ? new Date(`${monthStr}-01`) : new Date();
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth() + 1;
+
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const records = await this.getMonthlyRecords(userId, year, month);
+
+    const byDate: Record<string, { morning?: AttendanceRecord; afternoon?: AttendanceRecord }> = {};
+    for (const rec of records) {
+      const d = rec.date.split('T')[0];
+      if (!byDate[d]) byDate[d] = {};
+      if (rec.sessionType === 'morning') byDate[d].morning = rec;
+      if (rec.sessionType === 'afternoon') byDate[d].afternoon = rec;
     }
 
-    let fullPresentDays = 0;
+    let fullDays = 0;
     let halfDays = 0;
+    let weekendOffDays = 0;
+    let absences = 0;
 
-    for (const date in dailySessionsMap) {
-      const entry = dailySessionsMap[date];
-      if (entry.morning && entry.afternoon) {
-        fullPresentDays++;
-      } else if (entry.morning || entry.afternoon) {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateObj = new Date(year, month - 1, day);
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const dayOfWeek = dateObj.getDay() === 0 ? 7 : dateObj.getDay();
+
+      if (dateStr > todayStr) {
+        continue;
+      }
+
+      if (weekendDays.includes(dayOfWeek)) {
+        weekendOffDays++;
+        continue;
+      }
+
+      const rec = byDate[dateStr];
+      if (!rec) {
+        absences++;
+      } else if (rec.morning && rec.afternoon) {
+        fullDays++;
+      } else if (rec.morning || rec.afternoon) {
         halfDays++;
+      } else {
+        absences++;
       }
     }
 
-    const totalPresentEquivalent = fullPresentDays + halfDays * 0.5;
+    const deductionType = this.officeTimingSettings.deductionType || 'rate_based';
+    const fullRate = this.officeTimingSettings.fullDayDeductionAmount ?? 1.0;
+    const halfRate = this.officeTimingSettings.halfDayDeductionAmount ?? 0.5;
+
+    let totalDeductionUnits = 0;
+    if (deductionType === 'rate_based') {
+      totalDeductionUnits = (absences * fullRate) + (halfDays * halfRate);
+    } else {
+      totalDeductionUnits = (absences * fullRate) + (halfDays * halfRate);
+    }
 
     return {
       userId,
-      month,
+      shiftName: userShift.name,
       year,
-      totalRecords: res.rows.length,
-      fullPresentDays,
+      month,
+      daysInMonth,
+      fullDays,
       halfDays,
-      totalPresentEquivalent,
-      dailySessions: dailySessionsMap,
-    };
-  }
-
-  async getDailyOverview(date: string) {
-    const targetDate = date || new Date().toISOString().split('T')[0];
-
-    // Fetch all active employees
-    const usersRes = await this.db.query(
-      `SELECT id, full_name, email, department, designation, avatar_url, role
-       FROM users
-       WHERE is_active = TRUE
-       ORDER BY department ASC, full_name ASC`,
-    );
-
-    // Fetch all attendance records for targetDate
-    const attRes = await this.db.query(
-      `SELECT a.id, a.user_id, a.session_type, a.login_time, a.latitude, a.longitude,
-              a.address_text, a.status, a.notes
-       FROM attendance_records a
-       WHERE a.date = $1`,
-      [targetDate],
-    );
-
-    const attMap: { [userId: string]: { morning?: any; afternoon?: any } } = {};
-    for (const att of attRes.rows) {
-      if (!attMap[att.user_id]) attMap[att.user_id] = {};
-      if (att.session_type === 'morning') {
-        attMap[att.user_id].morning = att;
-      } else {
-        attMap[att.user_id].afternoon = att;
-      }
-    }
-
-    // Query holidays covering targetDate
-    const holidayRes = await this.db.query(
-      `SELECT name FROM holidays WHERE date = $1 LIMIT 1`,
-      [targetDate],
-    );
-    const holidayName = holidayRes.rows.length ? holidayRes.rows[0].name : null;
-
-    // Check weekend against configured off-days (1=Mon, 2=Tue, ... 5=Fri, 6=Sat, 7=Sun)
-    const targetDateObj = new Date(targetDate + 'T00:00:00Z');
-    const dayOfWeek = targetDateObj.getUTCDay();
-    const dartWeekday = dayOfWeek === 0 ? 7 : dayOfWeek;
-    const configuredWeekendDays = this.officeTimingSettings.weekendDays || [5, 6];
-    const isWeekend = configuredWeekendDays.includes(dartWeekday);
-
-    const employees = usersRes.rows.map((user) => {
-      const userAtt = attMap[user.id] || {};
-      let status = 'missing';
-      if (userAtt.morning && userAtt.afternoon) {
-        status = 'present';
-      } else if (userAtt.morning || userAtt.afternoon) {
-        status = 'half_day';
-      } else if (holidayName) {
-        status = 'holiday';
-      } else if (isWeekend) {
-        status = 'weekend';
-      }
-
-      return {
-        userId: user.id,
-        userName: user.full_name,
-        userEmail: user.email,
-        department: user.department,
-        designation: user.designation,
-        role: user.role,
-        avatarUrl: user.avatar_url,
-        date: targetDate,
-        status,
-        morning: userAtt.morning || null,
-        afternoon: userAtt.afternoon || null,
-      };
-    });
-
-    const presentCount = employees.filter((e) => e.status === 'present').length;
-    const halfDayCount = employees.filter((e) => e.status === 'half_day').length;
-    const missingCount = employees.filter((e) => e.status === 'missing').length;
-
-    return {
-      date: targetDate,
-      isWeekend,
-      holidayName,
-      totalEmployees: employees.length,
-      presentCount,
-      halfDayCount,
-      missingCount,
-      employees,
-    };
-  }
-
-  async confirmAbsence(userId: string, date: string, notes?: string, adminUserId?: string) {
-    // Inserts or marks record as confirmed_absent for morning and afternoon
-    await this.db.query(
-      `INSERT INTO attendance_records (user_id, date, session_type, status, notes, login_time)
-       VALUES ($1, $2, 'morning', 'confirmed_absent', $3, clock_timestamp())
-       ON CONFLICT (user_id, date, session_type)
-       DO UPDATE SET status = 'confirmed_absent', notes = EXCLUDED.notes, updated_at = clock_timestamp()`,
-      [userId, date, notes || 'Confirmed absent by administrator'],
-    );
-
-    await this.db.query(
-      `INSERT INTO attendance_records (user_id, date, session_type, status, notes, login_time)
-       VALUES ($1, $2, 'afternoon', 'confirmed_absent', $3, clock_timestamp())
-       ON CONFLICT (user_id, date, session_type)
-       DO UPDATE SET status = 'confirmed_absent', notes = EXCLUDED.notes, updated_at = clock_timestamp()`,
-      [userId, date, notes || 'Confirmed absent by administrator'],
-    );
-
-    return { success: true, message: `Absence confirmed for user on ${date}` };
-  }
-
-  private mapRow(row: any): AttendanceRecord {
-    return {
-      id: row.id,
-      userId: row.user_id,
-      userName: row.full_name || '',
-      userEmail: row.email || '',
-      department: row.department || '',
-      designation: row.designation || '',
-      avatarUrl: row.avatar_url || '',
-      date: row.date,
-      sessionType: row.session_type,
-      loginTime: row.login_time ? new Date(row.login_time).toISOString() : '',
-      latitude: row.latitude ? parseFloat(row.latitude) : null,
-      longitude: row.longitude ? parseFloat(row.longitude) : null,
-      addressText: row.address_text || '',
-      deviceInfo: row.device_info || '',
-      status: row.status || 'present',
-      notes: row.notes || '',
-      createdAt: row.created_at ? new Date(row.created_at).toISOString() : '',
+      weekendOffDays,
+      absences,
+      deductionType,
+      totalDeductionUnits,
     };
   }
 }

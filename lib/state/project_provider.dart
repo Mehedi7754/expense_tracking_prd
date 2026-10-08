@@ -1,19 +1,21 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/utils/environment_utils.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/client_model.dart';
+import '../models/notification_model.dart';
 import '../models/project_model.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../repositories/project_repository.dart';
+import 'notification_provider.dart';
 
 const String _kCustomProjectsKey = 'gw_custom_projects_cache';
 const String _kDeletedProjectIdsKey = 'gw_deleted_project_ids_cache';
 
-class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin {
+class ProjectNotifier extends Notifier<List<ProjectModel>>
+    with FetchCacheMixin {
   @override
   List<ProjectModel> build() {
     _loadCachedProjects();
@@ -35,12 +37,11 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
     if (EnvironmentUtils.isTestEnvironment) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final current = (prefs.getStringList(_kDeletedProjectIdsKey) ?? []).toSet();
+      final current =
+          (prefs.getStringList(_kDeletedProjectIdsKey) ?? []).toSet();
       current.addAll(ids.where((id) => id.isNotEmpty));
       await prefs.setStringList(_kDeletedProjectIdsKey, current.toList());
-    } catch (e) {
-      debugPrint('[ProjectNotifier] Error recording deleted project ids: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadCachedProjects() async {
@@ -51,19 +52,22 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
       final jsonStr = prefs.getString(_kCustomProjectsKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
-        final customProjects = decoded
-            .whereType<Map<String, dynamic>>()
-            .map(ProjectModel.fromJson)
-            .where((p) => !deletedIds.contains(p.id) && !deletedIds.contains(p.projectId))
-            .toList();
+        final customProjects =
+            decoded
+                .whereType<Map<String, dynamic>>()
+                .map(ProjectModel.fromJson)
+                .where(
+                  (p) =>
+                      !deletedIds.contains(p.id) &&
+                      !deletedIds.contains(p.projectId),
+                )
+                .toList();
 
         state = customProjects;
-        debugPrint('[ProjectNotifier] Restored ${customProjects.length} projects from local storage');
       } else {
         state = const [];
       }
-    } catch (e) {
-      debugPrint('[ProjectNotifier] Error loading cached projects: $e');
+    } catch (_) {
       state = const [];
     }
   }
@@ -74,9 +78,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
       final prefs = await SharedPreferences.getInstance();
       final jsonList = state.map((p) => p.toJson()).toList();
       await prefs.setString(_kCustomProjectsKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('[ProjectNotifier] Error persisting projects: $e');
-    }
+    } catch (_) {}
   }
 
   /// The most important rule: PRD Section 1
@@ -102,12 +104,20 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
 
     markFetchStarted();
     try {
-      final deletedIds = await _getDeletedProjectIds();
       final repo = ref.read(projectRepositoryProvider);
       final rawRemoteProjects = await repo.getProjects();
-      final remoteProjects = rawRemoteProjects
-          .where((p) => !deletedIds.contains(p.id) && !deletedIds.contains(p.projectId))
-          .toList();
+
+      // Fetch deletedIds AFTER API call to prevent race condition if deletion happens during fetch
+      final deletedIds = await _getDeletedProjectIds();
+
+      final remoteProjects =
+          rawRemoteProjects
+              .where(
+                (p) =>
+                    !deletedIds.contains(p.id) &&
+                    !deletedIds.contains(p.projectId),
+              )
+              .toList();
 
       final remoteIds = remoteProjects.map((p) => p.id).toSet();
       final remoteCodes = remoteProjects.map((p) => p.projectId).toSet();
@@ -119,15 +129,19 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
         final local = localMap[remote.id];
         if (local != null) {
           // Merge team members: combine so no assigned member is dropped
-          final combinedMembers = {...remote.teamMemberIds, ...local.teamMemberIds}.toList();
-          
+          final combinedMembers =
+              {...remote.teamMemberIds, ...local.teamMemberIds}.toList();
+
           double progress = remote.progressPercentage;
           DateTime? progressUpdatedAt = remote.progressUpdatedAt;
           String? progressUpdatedByName = remote.progressUpdatedByName;
           String? progressUpdatedById = remote.progressUpdatedById;
 
           if (local.progressUpdatedAt != null &&
-              (remote.progressUpdatedAt == null || local.progressUpdatedAt!.isAfter(remote.progressUpdatedAt!))) {
+              (remote.progressUpdatedAt == null ||
+                  local.progressUpdatedAt!.isAfter(
+                    remote.progressUpdatedAt!,
+                  ))) {
             progress = local.progressPercentage;
             progressUpdatedAt = local.progressUpdatedAt;
             progressUpdatedByName = local.progressUpdatedByName;
@@ -152,22 +166,23 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
       }
 
       // Preserve locally created projects that have not yet reached the backend
-      final localOnly = state
-          .where((p) =>
-              p.id.startsWith('proj_') &&
-              !deletedIds.contains(p.id) &&
-              !deletedIds.contains(p.projectId) &&
-              !remoteIds.contains(p.id) &&
-              !remoteCodes.contains(p.projectId))
-          .toList();
+      final localOnly =
+          state
+              .where(
+                (p) =>
+                    p.id.startsWith('proj_') &&
+                    !deletedIds.contains(p.id) &&
+                    !deletedIds.contains(p.projectId) &&
+                    !remoteIds.contains(p.id) &&
+                    !remoteCodes.contains(p.projectId),
+              )
+              .toList();
 
       state = [...mergedProjects, ...localOnly];
       await _persistProjects();
       markFetchCompleted();
-      debugPrint('[ProjectNotifier] Synchronized ${remoteProjects.length} projects from backend with progress & team persistence');
-    } catch (e) {
+    } catch (_) {
       markFetchFailed();
-      debugPrint('[ProjectNotifier] Backend fetch failed, using offline projects: $e');
     }
   }
 
@@ -199,16 +214,19 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
     String? imageUrl,
   }) async {
     final uniqueMicro = DateTime.now().microsecondsSinceEpoch % 1000000;
-    final generatedId = 'PRJ-${DateTime.now().year}-${uniqueMicro.toString().padLeft(6, '0')}';
-    final netRevenue = taxStatus == TaxStatus.included
-        ? grossProjectValue * (1 - taxRate)
-        : grossProjectValue;
+    final generatedId =
+        'PRJ-${DateTime.now().year}-${uniqueMicro.toString().padLeft(6, '0')}';
+    final netRevenue =
+        taxStatus == TaxStatus.included
+            ? grossProjectValue * (1 - taxRate)
+            : grossProjectValue;
     final receivable = grossProjectValue - amountReceived;
 
-    final effectiveTeamMembers = <String>{
-      ...teamMemberIds,
-      if (createdById != null && createdById.isNotEmpty) createdById,
-    }.toList();
+    final effectiveTeamMembers =
+        <String>{
+          ...teamMemberIds,
+          if (createdById != null && createdById.isNotEmpty) createdById,
+        }.toList();
 
     final newProj = ProjectModel(
       id: 'proj_${DateTime.now().microsecondsSinceEpoch}',
@@ -242,19 +260,35 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
     state = [newProj, ...state];
     await _persistProjects();
 
+    // Add project assignment record to state for local reference
+    for (final memberId in effectiveTeamMembers) {
+      ref
+          .read(notificationProvider.notifier)
+          .addNotification(
+            userId: memberId,
+            title: 'Assigned to Project 📁',
+            message: 'You have been assigned to project "$name".',
+            fullExplanation:
+                'You are now assigned as a team member on project "$name". You can track budget, submit claims, and view project details.',
+            type: NotificationType.projectAssigned,
+            relatedProjectId: newProj.id,
+          );
+    }
+
     try {
       final repo = ref.read(projectRepositoryProvider);
       final saved = await repo.createProject(newProj);
       state = [
         for (final p in state)
-          if (p.id == newProj.id || p.projectId == newProj.projectId) saved else p,
+          if (p.id == newProj.id || p.projectId == newProj.projectId)
+            saved
+          else
+            p,
       ];
       await _persistProjects();
       invalidateCache(); // Force next navigation fetch to sync
-      debugPrint('[ProjectNotifier] Successfully created project on backend: ${saved.projectId}');
       return saved;
-    } catch (e) {
-      debugPrint('[ProjectNotifier] Error saving project to backend: $e. Retained in local storage.');
+    } catch (_) {
       // Local state preserved for offline resiliency
       return newProj;
     }
@@ -309,7 +343,9 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
           p.copyWith(
             revenueEntries: [...p.revenueEntries, entry],
             amountReceived: p.amountReceived + amount,
-            amountReceivable: (p.grossProjectValue - (p.amountReceived + amount)).clamp(0.0, double.infinity),
+            amountReceivable: (p.grossProjectValue -
+                    (p.amountReceived + amount))
+                .clamp(0.0, double.infinity),
           )
         else
           p,
@@ -357,6 +393,8 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
     required double progressPercentage,
     required String updatedById,
     required String updatedByName,
+    String? authorRole,
+    String? note,
   }) async {
     final clamped = progressPercentage.clamp(0.0, 100.0);
     final now = DateTime.now();
@@ -366,11 +404,28 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
       for (final p in state)
         if (p.id == projectId)
           () {
+            final newNotes = [...p.progressNotes];
+            if (note != null && note.trim().isNotEmpty) {
+              newNotes.insert(
+                0,
+                ProjectProgressNote(
+                  id: 'note_${DateTime.now().millisecondsSinceEpoch}',
+                  projectId: projectId,
+                  progressPercentage: clamped,
+                  note: note.trim(),
+                  authorId: updatedById,
+                  authorName: updatedByName,
+                  authorRole: authorRole ?? 'Staff',
+                  createdAt: now,
+                ),
+              );
+            }
             final u = p.copyWith(
               progressPercentage: clamped,
               progressUpdatedAt: now,
               progressUpdatedById: updatedById,
               progressUpdatedByName: updatedByName,
+              progressNotes: newNotes,
             );
             updatedProj = u;
             return u;
@@ -385,10 +440,55 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
       try {
         final repo = ref.read(projectRepositoryProvider);
         await repo.updateProject(updatedProj!);
-        debugPrint('[ProjectNotifier] Project progress uploaded to backend successfully: $clamped%');
-      } catch (e) {
-        debugPrint('[ProjectNotifier] Error uploading project progress to backend: $e');
-      }
+      } catch (_) {}
+    }
+  }
+
+  /// Adds a standalone progress note / activity log for a project
+  Future<void> addProgressNote({
+    required String projectId,
+    required String note,
+    required String authorId,
+    required String authorName,
+    String authorRole = 'Project Member',
+  }) async {
+    final now = DateTime.now();
+    ProjectModel? updatedProj;
+
+    state = [
+      for (final p in state)
+        if (p.id == projectId)
+          () {
+            final newNotes = [
+              ProjectProgressNote(
+                id: 'note_${DateTime.now().millisecondsSinceEpoch}',
+                projectId: projectId,
+                progressPercentage: p.progressPercentage,
+                note: note.trim(),
+                authorId: authorId,
+                authorName: authorName,
+                authorRole: authorRole,
+                createdAt: now,
+              ),
+              ...p.progressNotes,
+            ];
+            final u = p.copyWith(
+              progressNotes: newNotes,
+            );
+            updatedProj = u;
+            return u;
+          }()
+        else
+          p,
+    ];
+    await _persistProjects();
+    invalidateCache();
+
+    if (updatedProj != null) {
+      try {
+        final repo = ref.read(projectRepositoryProvider);
+        await repo.updateProject(updatedProj!);
+      } catch (_) {}
     }
   }
 
@@ -412,24 +512,38 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
     invalidateCache();
 
     if (updatedProj != null) {
+      ref
+          .read(notificationProvider.notifier)
+          .addNotification(
+            userId: memberId,
+            title: 'Assigned to Project 📁',
+            message:
+                'You have been assigned to project "${updatedProj!.name}".',
+            fullExplanation:
+                'You are now assigned as a team member on project "${updatedProj!.name}". You can track budget, submit claims, and view project details.',
+            type: NotificationType.projectAssigned,
+            relatedProjectId: updatedProj!.id,
+          );
+
       try {
         final repo = ref.read(projectRepositoryProvider);
         await repo.updateProject(updatedProj!);
-        debugPrint('[ProjectNotifier] Assigned member uploaded to backend: $memberId');
-      } catch (e) {
-        debugPrint('[ProjectNotifier] Error uploading assigned member to backend: $e');
-      }
+      } catch (_) {}
     }
   }
 
   /// Unassigns a member from project and uploads to backend PostgreSQL server.
-  Future<void> unassignMemberFromProject(String projectId, String memberId) async {
+  Future<void> unassignMemberFromProject(
+    String projectId,
+    String memberId,
+  ) async {
     ProjectModel? updatedProj;
     state = [
       for (final p in state)
         if (p.id == projectId)
           () {
-            final updatedTeam = p.teamMemberIds.where((id) => id != memberId).toList();
+            final updatedTeam =
+                p.teamMemberIds.where((id) => id != memberId).toList();
             final u = p.copyWith(teamMemberIds: updatedTeam);
             updatedProj = u;
             return u;
@@ -444,21 +558,16 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
       try {
         final repo = ref.read(projectRepositoryProvider);
         await repo.updateProject(updatedProj!);
-        debugPrint('[ProjectNotifier] Unassigned member uploaded to backend: $memberId');
-      } catch (e) {
-        debugPrint('[ProjectNotifier] Error uploading unassigned member to backend: $e');
-      }
+      } catch (_) {}
     }
   }
 
   /// Deletes a project from local state and remote backend database.
   Future<void> deleteProject(String projectId) async {
     final candidateIds = <String>{projectId};
-    ProjectModel? target;
 
     for (final p in state) {
       if (p.id == projectId || p.projectId == projectId) {
-        target = p;
         if (p.id.isNotEmpty) candidateIds.add(p.id);
         if (p.projectId.isNotEmpty) candidateIds.add(p.projectId);
       }
@@ -466,11 +575,14 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
 
     await _recordDeletedProjectIds(candidateIds);
 
-    state = state
-        .where((p) =>
-            !candidateIds.contains(p.id) &&
-            !candidateIds.contains(p.projectId))
-        .toList();
+    state =
+        state
+            .where(
+              (p) =>
+                  !candidateIds.contains(p.id) &&
+                  !candidateIds.contains(p.projectId),
+            )
+            .toList();
     await _persistProjects();
     invalidateCache();
 
@@ -481,12 +593,10 @@ class ProjectNotifier extends Notifier<List<ProjectModel>> with FetchCacheMixin 
           await repo.deleteProject(id);
         } catch (_) {}
       }
-      debugPrint('[ProjectNotifier] Successfully deleted project $projectId on backend');
-    } catch (e) {
-      debugPrint('[ProjectNotifier] Error deleting project on backend: $e. Retained local deletion.');
-    }
+    } catch (_) {}
   }
 }
 
-final projectProvider =
-    NotifierProvider<ProjectNotifier, List<ProjectModel>>(ProjectNotifier.new);
+final projectProvider = NotifierProvider<ProjectNotifier, List<ProjectModel>>(
+  ProjectNotifier.new,
+);

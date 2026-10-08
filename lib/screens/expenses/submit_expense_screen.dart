@@ -8,7 +8,7 @@ import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
-import '../../repositories/file_upload_repository.dart';
+import '../../core/services/background_receipt_uploader.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
@@ -211,6 +211,18 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       return;
     }
 
+    final localReceiptPath = _receiptPath ?? _receiptFileName;
+
+    if (_hasReceipt && (localReceiptPath == null || localReceiptPath.isEmpty)) {
+      NotificationBanner.showError(context, 'Please attach a receipt image or turn off the receipt toggle.');
+      return;
+    }
+
+    if (!_hasReceipt && _noteController.text.trim().isEmpty) {
+      NotificationBanner.showError(context, 'A justification is required in the Note field when submitting without a receipt.');
+      return;
+    }
+
     setState(() => _isSubmitting = true);
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
@@ -262,20 +274,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       officeDetails = OfficeCostDetails(subCategory: _officeSubCategory);
     }
 
-    // Bug 8 fix: Upload receipt to server so managers can view it on any device.
-    // Falls back to local path if upload fails (offline-ready).
-    String? uploadedReceiptUrl = _receiptPath ?? _receiptFileName;
-    if (uploadedReceiptUrl != null && uploadedReceiptUrl.isNotEmpty && !uploadedReceiptUrl.startsWith('http')) {
-      try {
-        final uploadResult = await ref.read(fileUploadRepositoryProvider).upload(
-          filePathOrDataUri: uploadedReceiptUrl,
-          category: UploadCategory.receipts,
-        );
-        uploadedReceiptUrl = uploadResult.url;
-      } catch (_) {
-        // Offline: keep the local path as fallback
-      }
-    }
 
     final created = await ref.read(expenseProvider.notifier).submitExpense(
           employeeId: user.id,
@@ -294,7 +292,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           note: _noteController.text.trim(),
           date: _selectedDate,
           hasReceipt: _hasReceipt,
-          receiptPhotoUrl: uploadedReceiptUrl,
+          receiptPhotoUrl: localReceiptPath,
           equipmentDetails: equipDetails,
           transportationDetails: transDetails,
           foodDetails: foodDetails,
@@ -302,19 +300,20 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           officeCostDetails: officeDetails,
         );
 
+    // If a local receipt photo was chosen, enqueue background upload without blocking UI
+    if (localReceiptPath != null && localReceiptPath.isNotEmpty && !localReceiptPath.startsWith('http')) {
+      BackgroundReceiptUploader.instance.enqueue(
+        expenseId: created.id,
+        localFilePath: localReceiptPath,
+        ref: ref,
+      );
+    }
+
     if (mounted) {
-      final isUploadedToServer = !created.id.startsWith('exp_');
-      if (isUploadedToServer) {
-        NotificationBanner.showSuccess(
-          context,
-          _hasReceipt ? 'Expense submitted and uploaded to server!' : 'Expense submitted & uploaded (Flagged: No Receipt)',
-        );
-      } else {
-        NotificationBanner.showWarning(
-          context,
-          'Saved locally (Server unreachable: Check network / phone). Will sync when connected.',
-        );
-      }
+      NotificationBanner.showSuccess(
+        context,
+        _hasReceipt ? 'Expense submitted! Receipt uploading in background...' : 'Expense claim submitted for approval',
+      );
       context.pop();
     }
   }
@@ -681,7 +680,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                       if (picked != null) setState(() => _selectedDate = picked);
                     },
                     child: InputDecorator(
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Expense Date',
                         suffixIcon: Icon(Icons.calendar_month_rounded, size: 18),
                       ),
@@ -698,8 +697,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
             TextFormField(
               controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: 'Purpose / Description *',
+              decoration: InputDecoration(
+                labelText: _hasReceipt ? 'Purpose / Description *' : 'Purpose / Non-Receipt Justification *',
                 hintText: 'Describe business purpose, field location, attendees...',
               ),
               maxLines: 2,
@@ -933,6 +932,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                               onPressed: () => setState(() {
                                 _receiptFileName = null;
                                 _receiptPath = null;
+                                _hasReceipt = false; // Turn off the toggle automatically when receipt is removed
                               }),
                             ),
                           ],
@@ -1025,7 +1025,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       children: [
         TextFormField(
           controller: _equipTypeController,
-          decoration: const InputDecoration(labelText: 'Equipment Type *', hintText: 'e.g. GPS Device, Soil Tester, Drone'),
+          decoration: InputDecoration(labelText: 'Equipment Type *', hintText: 'e.g. GPS Device, Soil Tester, Drone'),
         ),
         const SizedBox(height: 10),
         Row(
@@ -1041,7 +1041,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               child: TextFormField(
                 controller: _equipQtyController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Quantity'),
+                decoration: InputDecoration(labelText: 'Quantity'),
               ),
             ),
           ],
@@ -1054,14 +1054,14 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 child: TextFormField(
                   controller: _rentalAmountController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Rental Rate (৳)'),
+                  decoration: InputDecoration(labelText: 'Rental Rate (৳)'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: TextFormField(
                   controller: _rentalPeriodController,
-                  decoration: const InputDecoration(labelText: 'Period', hintText: 'e.g. 7 Days'),
+                  decoration: InputDecoration(labelText: 'Period', hintText: 'e.g. 7 Days'),
                 ),
               ),
             ],
@@ -1077,7 +1077,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
         DropdownButtonFormField<TransportationType>(
           value: _transportType,
           isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Transportation Type'),
+          decoration: InputDecoration(labelText: 'Transportation Type'),
           items: TransportationType.values.map((t) {
             return DropdownMenuItem(value: t, child: Text(t.displayName, overflow: TextOverflow.ellipsis));
           }).toList(),
@@ -1089,14 +1089,14 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             Expanded(
               child: TextFormField(
                 controller: _fromController,
-                decoration: const InputDecoration(labelText: 'From Location', hintText: 'e.g. Dhaka'),
+                decoration: InputDecoration(labelText: 'From Location', hintText: 'e.g. Dhaka'),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: TextFormField(
                 controller: _toController,
-                decoration: const InputDecoration(labelText: 'To Location', hintText: 'e.g. Sylhet'),
+                decoration: InputDecoration(labelText: 'To Location', hintText: 'e.g. Sylhet'),
               ),
             ),
           ],
@@ -1106,7 +1106,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           const SizedBox(height: 10),
           TextFormField(
             controller: _vehicleController,
-            decoration: const InputDecoration(labelText: 'Vehicle Model / Reg Number', hintText: 'e.g. Toyota HiAce (Dhaka Metro-Ch-12-3456)'),
+            decoration: InputDecoration(labelText: 'Vehicle Model / Reg Number', hintText: 'e.g. Toyota HiAce (Dhaka Metro-Ch-12-3456)'),
           ),
           const SizedBox(height: 10),
           Row(
@@ -1115,7 +1115,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 child: TextFormField(
                   controller: _distanceController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Distance (KM)'),
+                  decoration: InputDecoration(labelText: 'Distance (KM)'),
                   onChanged: (_) => setState(() {}),
                 ),
               ),
@@ -1124,7 +1124,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 child: TextFormField(
                   controller: _fuelCostController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Fuel Cost (৳)'),
+                  decoration: InputDecoration(labelText: 'Fuel Cost (৳)'),
                   onChanged: (v) {
                     _amountController.text = v;
                     setState(() {});
@@ -1146,7 +1146,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             Expanded(
               child: TextFormField(
                 controller: _foodLocationController,
-                decoration: const InputDecoration(labelText: 'Meal Location', hintText: 'e.g. Sunamganj Field Camp'),
+                decoration: InputDecoration(labelText: 'Meal Location', hintText: 'e.g. Sunamganj Field Camp'),
               ),
             ),
             const SizedBox(width: 10),
@@ -1154,7 +1154,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               child: TextFormField(
                 controller: _foodPeopleCountController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Number of People'),
+                decoration: InputDecoration(labelText: 'Number of People'),
                 onChanged: (_) => setState(() {}),
               ),
             ),
@@ -1167,7 +1167,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               child: DropdownButtonFormField<String>(
                 value: _mealType,
                 isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Meal Type'),
+                decoration: InputDecoration(labelText: 'Meal Type'),
                 items: ['Breakfast', 'Lunch', 'Dinner', 'Refreshments / Tea'].map((m) {
                   return DropdownMenuItem(value: m, child: Text(m, overflow: TextOverflow.ellipsis));
                 }).toList(),
@@ -1178,7 +1178,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             Expanded(
               child: TextFormField(
                 controller: _foodAttendeesController,
-                decoration: const InputDecoration(labelText: 'Attendees', hintText: 'Names of staff'),
+                decoration: InputDecoration(labelText: 'Attendees', hintText: 'Names of staff'),
               ),
             ),
           ],
@@ -1195,14 +1195,14 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             Expanded(
               child: TextFormField(
                 controller: _hotelNameController,
-                decoration: const InputDecoration(labelText: 'Hotel / Accommodation', hintText: 'e.g. Hotel Noorjahan'),
+                decoration: InputDecoration(labelText: 'Hotel / Accommodation', hintText: 'e.g. Hotel Noorjahan'),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: TextFormField(
                 controller: _hotelLocationController,
-                decoration: const InputDecoration(labelText: 'Location', hintText: 'e.g. Sylhet Sadar'),
+                decoration: InputDecoration(labelText: 'Location', hintText: 'e.g. Sylhet Sadar'),
               ),
             ),
           ],
@@ -1214,7 +1214,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               child: TextFormField(
                 controller: _hotelNightsController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Nights'),
+                decoration: InputDecoration(labelText: 'Nights'),
                 onChanged: (_) => _calcAccommodationTotal(),
               ),
             ),
@@ -1223,7 +1223,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               child: TextFormField(
                 controller: _hotelRateController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Rate / Night (৳)'),
+                decoration: InputDecoration(labelText: 'Rate / Night (৳)'),
                 onChanged: (_) => _calcAccommodationTotal(),
               ),
             ),
@@ -1232,7 +1232,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
         const SizedBox(height: 10),
         TextFormField(
           controller: _hotelGuestsController,
-          decoration: const InputDecoration(labelText: 'Person / Guests', hintText: 'Names of accommodated members'),
+          decoration: InputDecoration(labelText: 'Person / Guests', hintText: 'Names of accommodated members'),
         ),
       ],
     );
@@ -1251,7 +1251,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     return DropdownButtonFormField<String>(
       value: _officeSubCategory,
       isExpanded: true,
-      decoration: const InputDecoration(labelText: 'Office Cost Category'),
+      decoration: InputDecoration(labelText: 'Office Cost Category'),
       items: [
         'Printing',
         'Photocopy',
@@ -1272,7 +1272,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       children: [
         TextFormField(
           controller: _otherCategoryNameController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Custom Category Name *',
             hintText: 'e.g. Legal & Professional, Stationery, Cloud Hosting',
             prefixIcon: Icon(Icons.edit_note_rounded),

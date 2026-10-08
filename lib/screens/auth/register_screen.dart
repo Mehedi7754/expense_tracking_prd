@@ -24,7 +24,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  UserRole _selectedRole = UserRole.projectMember;
+  final UserRole _selectedRole = UserRole.projectMember;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
 
@@ -128,8 +128,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                             const Text(
                               'User Account Registration',
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey),
                             ),
                           ],
@@ -201,50 +199,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           ),
                           const SizedBox(height: 14),
 
-                          // Role Selection Label
-                          Text(
-                            'Role *',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Role Selector Dropdown (Restricted: Exclude Main Admin & Finance from public registration)
+                          // Role Notice (Public signups are registered as Project Member subject to Admin verification)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
-                              color: isDark ? AppColors.darkBackground : Colors.grey.shade50,
+                              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                             ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<UserRole>(
-                                value: _selectedRole,
-                                isExpanded: true,
-                                icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                                items: UserRole.registrationRoles.map((role) {
-                                  return DropdownMenuItem<UserRole>(
-                                    value: role,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        _buildRoleIndicatorDot(role),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                          role.displayName,
-                                          style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) setState(() => _selectedRole = val);
-                                },
-                              ),
+                            child: Row(
+                              children: [
+                                _buildRoleIndicatorDot(UserRole.projectMember),
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Role: Project Member',
+                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                                      ),
+                                      SizedBox(height: 2),
+                                      Text(
+                                        'New accounts require Super Admin approval before elevated access is granted.',
+                                        style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 14),

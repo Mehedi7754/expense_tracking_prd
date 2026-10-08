@@ -18,6 +18,8 @@ class ErrorStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
@@ -25,23 +27,33 @@ class ErrorStateWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
-                color: AppColors.crimsonLight,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.crimsonBorder, width: 1),
+                color: isDark
+                    ? const Color(0xFFE11D48).withAlpha(35)
+                    : const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFFE11D48).withAlpha(70)
+                      : const Color(0xFFFECDD3),
+                  width: 1.0,
+                ),
               ),
               child: Icon(
                 isOffline ? Icons.wifi_off_rounded : Icons.cloud_off_rounded,
-                size: 28,
+                size: 26,
                 color: AppColors.crimson,
               ),
             ),
             const SizedBox(height: 16),
             Text(
               isOffline ? 'No Internet Connection' : title,
-              style: AppTextStyles.titleMedium,
+              style: AppTextStyles.titleMedium.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
@@ -49,16 +61,23 @@ class ErrorStateWidget extends StatelessWidget {
               isOffline
                   ? 'Your device appears to be offline. Please connect to Wi-Fi or mobile data to access the latest financial records.'
                   : message,
-              style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.getTextMuted(context),
+                height: 1.35,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded, size: 18),
-              label: const Text('Try Again'),
+              label: const Text(
+                'Try Again',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
           ],

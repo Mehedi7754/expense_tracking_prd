@@ -124,6 +124,8 @@ class ReceiptComplianceBadge extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color: statusColor.withAlpha(220),
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

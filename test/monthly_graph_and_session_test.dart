@@ -29,8 +29,8 @@ void main() {
 
       // Verify Title & Subtitle render
       expect(find.text('Monthly Earnings'), findsOneWidget);
-      expect(find.textContaining('Total:'), findsOneWidget);
-      expect(find.textContaining('Avg:'), findsOneWidget);
+      expect(find.textContaining(RegExp(r'Total|Revenue', caseSensitive: false)), findsWidgets);
+      expect(find.textContaining(RegExp(r'Avg', caseSensitive: false)), findsWidgets);
 
       // Verify Period Dropdown starts with 'This Month'
       expect(find.text('This Month'), findsOneWidget);

@@ -2,12 +2,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../core/network/api_exceptions.dart';
 import '../core/services/attendance_salary_mock_store.dart';
 import '../core/services/location_service.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/attendance_model.dart';
 import '../repositories/attendance_repository.dart';
+import 'attendance_settings_provider.dart';
 import 'auth_provider.dart';
+import 'notification_provider.dart';
 import 'user_management_provider.dart';
 
 class AttendanceState {
@@ -93,9 +96,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       final overview = await repo.getDailyOverview(targetDate, users);
       markFetchCompleted();
       state = state.copyWith(dailyOverview: overview, isLoading: false, clearError: true);
-    } catch (e) {
+    } catch (_) {
       markFetchCompleted();
-      debugPrint('[AttendanceNotifier] Overview network note, using fallback: $e');
       final fallback = await AttendanceSalaryMockStore.instance.getDailyOverview(targetDate, users);
       state = state.copyWith(dailyOverview: fallback, isLoading: false, clearError: true);
     }
@@ -125,9 +127,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       );
       markFetchCompleted();
       state = state.copyWith(records: records, isLoading: false, clearError: true);
-    } catch (e) {
+    } catch (_) {
       markFetchCompleted();
-      debugPrint('[AttendanceNotifier] Records network note, using fallback: $e');
       final fallback = await AttendanceSalaryMockStore.instance.getAttendanceRecords(
         userId: targetUser,
         date: date ?? (month == null ? targetDate : null),
@@ -144,24 +145,45 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     String? explicitSession,
     String? notes,
   }) async {
+    // Super Admin & non-attendance roles do not check in
+    final currentUser = ref.read(authProvider).currentUser;
+    if (currentUser != null && !currentUser.role.requiresAttendanceCheckIn) {
+      state = state.copyWith(
+        isSubmitting: false,
+        errorMessage: '${currentUser.role.displayName} is exempt from attendance check-in.',
+      );
+      return false;
+    }
+
+    // 0. Enforce session window: morning locks at the divider, afternoon opens at the divider
+    final settings = ref.read(attendanceSettingsProvider).value;
+    final session = explicitSession ?? resolveSession(settings);
+    final windowError = checkInWindowError(session, settings);
+    if (windowError != null) {
+      state = state.copyWith(isSubmitting: false, errorMessage: windowError);
+      return false;
+    }
+    explicitSession = session;
+
     state = state.copyWith(isSubmitting: true, clearError: true);
 
     try {
       // 1. Get GPS coordinates with permission checking and timeout
       final locResult = await LocationService.getCurrentCoordinates();
 
-      double lat = 23.8103; // Corporate centroid fallback
-      double lng = 90.4125;
-      String address = 'Verified Office Centroid';
-      String resolvedNotes = notes ?? '';
-
-      if (locResult.isSuccess && locResult.latitude != null && locResult.longitude != null) {
-        lat = locResult.latitude!;
-        lng = locResult.longitude!;
-        address = locResult.addressText;
-      } else {
-        resolvedNotes = locResult.errorMessage ?? 'GPS unavailable';
+      if (!locResult.isSuccess || locResult.latitude == null || locResult.longitude == null) {
+        final errMsg = locResult.errorMessage ?? 'Unable to acquire verified GPS coordinates. Please enable device location.';
+        state = state.copyWith(
+          isSubmitting: false,
+          errorMessage: errMsg,
+        );
+        return false;
       }
+
+      final lat = locResult.latitude!;
+      final lng = locResult.longitude!;
+      final address = locResult.addressText;
+      final resolvedNotes = notes ?? '';
 
       final currentUser = ref.read(authProvider).currentUser;
       final userId = currentUser?.id ?? 'a0000000-0000-0000-0000-000000000003';
@@ -179,8 +201,14 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
           notes: resolvedNotes,
           userId: userId,
         );
-      } catch (networkError) {
-        debugPrint('[AttendanceNotifier] Network check-in error, saving to offline store: $networkError');
+      } on ApiException catch (apiErr) {
+        final code = apiErr.statusCode ?? 0;
+        if (code >= 400 && code < 500) {
+          state = state.copyWith(isSubmitting: false, errorMessage: apiErr.message);
+          return false;
+        }
+        rethrow;
+      } catch (_) {
         await AttendanceSalaryMockStore.instance.checkIn(
           userId: userId,
           latitude: lat,
@@ -195,7 +223,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
           userId: userId,
           latitude: lat,
           longitude: lng,
-          sessionType: explicitSession ?? (DateTime.now().hour < 13 ? 'morning' : 'afternoon'),
+          sessionType: explicitSession,
           addressText: address,
         );
       }
@@ -203,13 +231,41 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       invalidateCache();
       await fetchDailyOverview(force: true);
       await fetchAttendanceRecords(force: true);
+
+      // Refresh notifications from backend so the server-generated attendance notification is loaded
+      ref.read(notificationProvider.notifier).fetchNotifications();
+
       state = state.copyWith(isSubmitting: false, clearError: true);
       return true;
-    } catch (e) {
-      debugPrint('[AttendanceNotifier] Check-in error: $e');
+    } catch (_) {
       state = state.copyWith(isSubmitting: false, clearError: true);
       return false;
     }
+  }
+
+  static String _fmt(int h) {
+    final hh = h % 12 == 0 ? 12 : h % 12;
+    return '${hh.toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
+  }
+
+  /// Session for "now" based on the divider (morningEndHour).
+  static String resolveSession(AttendanceSettingsState? s) {
+    final divider = s?.morningEndHour ?? 13;
+    return DateTime.now().hour < divider ? 'morning' : 'afternoon';
+  }
+
+  /// Returns null when check-in is allowed; otherwise a reason.
+  /// Morning: locks at divider. Afternoon: requires after divider.
+  static String? checkInWindowError(String session, AttendanceSettingsState? s) {
+    final divider = s?.morningEndHour ?? 13;
+    final h = DateTime.now().hour;
+    
+    if (session == 'morning') {
+      if (h >= divider) return 'Morning check-in is locked after ${_fmt(divider)}.';
+    } else {
+      if (h < divider) return 'Afternoon check-in opens at ${_fmt(divider)}.';
+    }
+    return null;
   }
 
   /// Syncs any pending offline check-ins saved locally
@@ -250,9 +306,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
         invalidateCache();
         await fetchDailyOverview(force: true);
       }
-    } catch (e) {
-      debugPrint('[AttendanceNotifier] Error syncing offline queue: $e');
-    }
+    } catch (_) {}
   }
 
   Future<bool> confirmAbsence({
@@ -271,8 +325,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       }
       state = state.copyWith(isSubmitting: false, clearError: true);
       return success;
-    } catch (e) {
-      debugPrint('[AttendanceNotifier] Error confirming absence: $e');
+    } catch (_) {
       await AttendanceSalaryMockStore.instance.confirmAbsence(userId: userId, date: date, notes: notes);
       invalidateCache();
       await fetchDailyOverview(force: true);

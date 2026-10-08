@@ -61,7 +61,7 @@ class _MySalaryScreenState extends ConsumerState<MySalaryScreen> {
           : calc == null
               ? const Center(child: Text('Unable to load salary statement'))
               : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -90,8 +90,6 @@ class _MySalaryScreenState extends ConsumerState<MySalaryScreen> {
                                 child: Text(
                                   monthName,
                                   style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ),
@@ -210,15 +208,11 @@ class _MySalaryScreenState extends ConsumerState<MySalaryScreen> {
         Text(
           label,
           style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w600),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
         Text(
           value,
           style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -230,15 +224,11 @@ class _MySalaryScreenState extends ConsumerState<MySalaryScreen> {
         Text(
           label,
           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
         Text(
           value,
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
       ],
     );
@@ -316,8 +306,6 @@ class _MySalaryScreenState extends ConsumerState<MySalaryScreen> {
                 child: Text(
                   badgeText,
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: badgeColor),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),

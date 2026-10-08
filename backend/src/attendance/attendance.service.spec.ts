@@ -3,15 +3,30 @@ import { AttendanceService } from './attendance.service';
 describe('AttendanceService Unit & Session Logic', () => {
   let service: AttendanceService;
   let mockDb: any;
+  let mockNotifications: any;
 
   beforeEach(() => {
     mockDb = {
       query: jest.fn().mockResolvedValue({ rows: [] }),
     };
-    service = new AttendanceService(mockDb);
+    mockNotifications = {
+      create: jest.fn().mockResolvedValue({}),
+    };
+    service = new AttendanceService(mockDb, mockNotifications);
   });
 
   describe('checkIn', () => {
+    beforeEach(() => {
+      // Mock user role query as employee ('employee')
+      // and mock Date to 10:00 AM Dhaka time (UTC 04:00 AM)
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-10-02T04:00:00.000Z')); // 10:00 AM in UTC+6
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
     it('creates attendance record for a valid check-in', async () => {
       const userId = 'user-emp-1';
       const checkInDto = {
@@ -22,10 +37,12 @@ describe('AttendanceService Unit & Session Logic', () => {
         deviceInfo: 'Flutter Mobile App',
       };
 
-      // Query 1: Check existing check-in -> none
+      // Query 1: User role check
       mockDb.query
+        .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 2: Check existing check-in -> none
         .mockResolvedValueOnce({ rows: [] })
-        // Query 2: Insert returning id
+        // Query 3: Insert returning id
         .mockResolvedValueOnce({
           rows: [{ id: 'att-rec-1' }],
         })
@@ -66,8 +83,10 @@ describe('AttendanceService Unit & Session Logic', () => {
         addressText: 'Updated Location, Dhaka',
       };
 
-      // Query 1: Check existing -> found
+      // Query 1: User role check
       mockDb.query
+        .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 2: Check existing -> found
         .mockResolvedValueOnce({
           rows: [{ id: 'existing-rec' }],
         })

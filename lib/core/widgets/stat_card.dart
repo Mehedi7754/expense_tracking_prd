@@ -65,17 +65,30 @@ class StatCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
           color: AppColors.getSurface(context),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.getBorder(context), width: 1),
-          boxShadow: isDark ? AppColors.darkCardShadow(iconColor) : AppColors.cardShadow,
+          border: Border.all(color: AppColors.getBorder(context), width: 1.0),
+          boxShadow: isDark
+              ? AppColors.darkCardShadow(iconColor)
+              : [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: 130,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -85,7 +98,11 @@ class StatCard extends StatelessWidget {
                     height: 32,
                     decoration: BoxDecoration(
                       color: effectiveIconBg,
-                      borderRadius: BorderRadius.circular(9),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: effectiveIconColor.withValues(alpha: 0.15),
+                        width: 0.8,
+                      ),
                     ),
                     child: Icon(
                       icon,
@@ -119,7 +136,6 @@ class StatCard extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                                 color: trendTextColor,
                               ),
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -150,17 +166,19 @@ class StatCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.labelSmall.copyWith(
                     fontSize: 11,
                     color: AppColors.getTextMuted(context),
                     fontWeight: FontWeight.w500,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ],
+            ),
+          ),
         ),
       ),
     );

@@ -149,6 +149,13 @@ class AuthRepository {
       },
     );
   }
+
+  Future<void> requestForgotPassword(String email) async {
+    await _client.post(
+      ApiEndpoints.forgotPassword,
+      body: {'email': email.trim()},
+    );
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

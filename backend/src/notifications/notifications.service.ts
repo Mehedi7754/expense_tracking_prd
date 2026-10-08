@@ -1,16 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { FcmService } from './fcm.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly db: DatabaseService) {}
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly fcm: FcmService,
+  ) {}
 
   async findAll(userId: string) {
-    const res = await this.db.query(
-      `SELECT * FROM notifications
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
+    const userRes = await this.db.query(
+      `SELECT role FROM users WHERE id = $1`,
       [userId],
+    );
+    const role = userRes.rows[0]?.role;
+    const isPrivileged = role === 'main_admin' || role === 'finance';
+
+    const res = await this.db.query(
+      isPrivileged
+        ? `SELECT * FROM notifications ORDER BY created_at DESC LIMIT 100`
+        : `SELECT * FROM notifications WHERE (user_id = $1 OR user_id IS NULL) ORDER BY created_at DESC LIMIT 100`,
+      isPrivileged ? [] : [userId],
     );
     return res.rows.map((r) => ({
       id: r.id,
@@ -49,6 +62,26 @@ export class NotificationsService {
         data.relatedExpenseId || null,
       ],
     );
+
+    // Dispatch real-time FCM Push Notification (arrives even if app is closed)
+    try {
+      const payloadData: Record<string, string> = {
+        type: data.type || 'general',
+        notificationId: res.rows[0]?.id || '',
+      };
+      if (data.relatedExpenseId) payloadData.expenseId = data.relatedExpenseId;
+      if (data.relatedProjectId) payloadData.projectId = data.relatedProjectId;
+
+      if (data.userId) {
+        await this.fcm.sendPushToUser(data.userId, data.title, data.message, payloadData);
+      } else {
+        // Broadcast / system notification with no specific recipient: send to admins & finance
+        await this.fcm.sendPushToAdmins(data.title, data.message, payloadData);
+      }
+    } catch (err) {
+      this.logger.error('Error dispatching FCM push from NotificationsService', err);
+    }
+
     return res.rows[0];
   }
 

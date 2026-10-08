@@ -46,9 +46,12 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.getSurface(context),
+        color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.getBorder(context), width: 1),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -62,8 +65,6 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
                 child: Text(
                   'Clarification Thread',
                   style: AppTextStyles.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
@@ -105,13 +106,13 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isReviewer
-                        ? (isDark ? AppColors.indigo.withValues(alpha: 0.2) : AppColors.indigoLight.withValues(alpha: 0.3))
-                        : (isDark ? AppColors.darkSurfaceElevated : AppColors.surfaceSubtle),
-                    borderRadius: BorderRadius.circular(12),
+                        ? (isDark ? const Color(0xFF1E1B4B).withAlpha(120) : const Color(0xFFEEF2FF))
+                        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: isReviewer
-                          ? (isDark ? AppColors.indigo.withValues(alpha: 0.4) : AppColors.indigoBorder.withValues(alpha: 0.5))
-                          : AppColors.getBorder(context),
+                          ? (isDark ? const Color(0xFF4F46E5).withAlpha(80) : const Color(0xFFC7D2FE))
+                          : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       width: 1,
                     ),
                   ),

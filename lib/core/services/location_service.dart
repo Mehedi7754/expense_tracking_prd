@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,6 +10,7 @@ class LocationResult {
   final String addressText;
   final String? errorMessage;
   final bool isPermissionDenied;
+  final bool isPermanentlyDenied;
   final bool isServiceDisabled;
 
   const LocationResult({
@@ -20,6 +20,7 @@ class LocationResult {
     this.addressText = '',
     this.errorMessage,
     this.isPermissionDenied = false,
+    this.isPermanentlyDenied = false,
     this.isServiceDisabled = false,
   });
 
@@ -45,12 +46,14 @@ class LocationResult {
   factory LocationResult.failure({
     required String message,
     bool isPermissionDenied = false,
+    bool isPermanentlyDenied = false,
     bool isServiceDisabled = false,
   }) {
     return LocationResult(
       isSuccess: false,
       errorMessage: message,
       isPermissionDenied: isPermissionDenied,
+      isPermanentlyDenied: isPermanentlyDenied,
       isServiceDisabled: isServiceDisabled,
     );
   }
@@ -61,28 +64,48 @@ class LocationService {
 
   static const String _kOfflineQueueKey = 'gw_offline_attendance_queue';
 
-  /// Requests location permissions if needed and retrieves current GPS coordinates.
-  /// Handles permission denied, GPS service disabled, and timeout safely.
+  /// Proactively checks and requests location permission from the OS.
+  static Future<LocationPermission> requestLocationPermission() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      return permission;
+    } catch (_) {
+      return LocationPermission.denied;
+    }
+  }
+
+  /// Opens the device's system Location Services settings.
+  static Future<bool> openLocationSettings() async {
+    try {
+      return await Geolocator.openLocationSettings();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Opens the device's App Details settings page for permission grants.
+  static Future<bool> openAppSettings() async {
+    try {
+      return await Geolocator.openAppSettings();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Requests location permissions if needed and retrieves verified GPS coordinates.
+  /// Strictly requires genuine hardware GPS fix; never returns fake or placeholder coordinates.
   static Future<LocationResult> getCurrentCoordinates({
-    Duration timeout = const Duration(seconds: 8),
+    Duration timeout = const Duration(seconds: 10),
   }) async {
     try {
-      // 1. Check if location services (GPS) are enabled
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        debugPrint('[LocationService] Location services (GPS) are disabled');
-        return LocationResult.failure(
-          message: 'GPS / Location services are turned off on your device. Please enable location to record verified attendance.',
-          isServiceDisabled: true,
-        );
-      }
-
-      // 2. Check and request permission
+      // 1. Check and request location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          debugPrint('[LocationService] Location permission denied by employee');
           return LocationResult.failure(
             message: 'Location permission was denied. Geo-location is required for employee attendance tracking.',
             isPermissionDenied: true,
@@ -91,25 +114,36 @@ class LocationService {
       }
 
       if (permission == LocationPermission.deniedForever) {
-        debugPrint('[LocationService] Location permission permanently denied');
         return LocationResult.failure(
-          message: 'Location permissions are permanently denied in device settings. Please allow location access in App Settings.',
+          message: 'Location permissions are permanently denied. Please allow location access in App Settings.',
           isPermissionDenied: true,
+          isPermanentlyDenied: true,
         );
       }
 
-      // 3. Acquire position with fallback and timeout
+      // 2. Check if device location services (GPS) are turned on
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        return LocationResult.failure(
+          message: 'GPS / Location services are turned off on your device. Please turn on location to record verified attendance.',
+          isServiceDisabled: true,
+        );
+      }
+
+      // 3. Obtain real GPS position
       Position? position;
       try {
         position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
+          locationSettings: LocationSettings(
             accuracy: LocationAccuracy.high,
-            timeLimit: Duration(seconds: 8),
+            timeLimit: timeout,
           ),
         );
-      } catch (e) {
-        debugPrint('[LocationService] High accuracy position timed out or failed ($e), falling back to last known position');
-        position = await Geolocator.getLastKnownPosition();
+      } catch (_) {
+        // In case of timeout with getCurrentPosition, attempt last known hardware position
+        try {
+          position = await Geolocator.getLastKnownPosition();
+        } catch (_) {}
       }
 
       if (position != null) {
@@ -119,11 +153,10 @@ class LocationService {
         );
       } else {
         return LocationResult.failure(
-          message: 'Unable to acquire satellite GPS fix. Please ensure you are not indoors without GPS reception.',
+          message: 'Unable to acquire accurate GPS position fix. Please verify device GPS is active with clear sky view.',
         );
       }
     } catch (e) {
-      debugPrint('[LocationService] Error fetching GPS position: $e');
       return LocationResult.failure(message: 'Location acquisition failed: $e');
     }
   }
@@ -149,10 +182,7 @@ class LocationService {
       };
       list.add(jsonEncode(item));
       await prefs.setStringList(_kOfflineQueueKey, list);
-      debugPrint('[LocationService] Queued offline attendance item (Total: ${list.length})');
-    } catch (e) {
-      debugPrint('[LocationService] Failed to queue offline check-in: $e');
-    }
+    } catch (_) {}
   }
 
   /// Retrieves all queued offline attendance check-ins without removing them
@@ -172,8 +202,7 @@ class LocationService {
           })
           .whereType<Map<String, dynamic>>()
           .toList();
-    } catch (e) {
-      debugPrint('[LocationService] Error reading offline queue: $e');
+    } catch (_) {
       return [];
     }
   }
@@ -183,9 +212,7 @@ class LocationService {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kOfflineQueueKey);
-    } catch (e) {
-      debugPrint('[LocationService] Error clearing offline queue: $e');
-    }
+    } catch (_) {}
   }
 
   /// Retrieves and clears all queued offline attendance check-ins
@@ -208,8 +235,7 @@ class LocationService {
 
       await prefs.remove(_kOfflineQueueKey);
       return parsed;
-    } catch (e) {
-      debugPrint('[LocationService] Error reading offline queue: $e');
+    } catch (_) {
       return [];
     }
   }

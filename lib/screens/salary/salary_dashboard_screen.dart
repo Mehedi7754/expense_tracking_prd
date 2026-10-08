@@ -154,7 +154,7 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
       body: salaryState.isLoading && report == null
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -195,8 +195,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                                 child: Text(
                                   monthName,
                                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
                                 ),
                               ),
                             ],
@@ -251,8 +249,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                         child: const Text(
                           'Employee Payroll Breakdown',
                           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: -0.2),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -325,8 +321,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                 fontWeight: FontWeight.w700,
                 color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 6),
             Text(
@@ -337,8 +331,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                 color: color,
                 letterSpacing: -0.5,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -398,8 +390,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                         fontSize: 11,
                         color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -437,8 +427,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                         fontWeight: FontWeight.w500,
                         color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -447,8 +435,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -465,8 +451,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                           fontWeight: FontWeight.w500,
                           color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
@@ -476,8 +460,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                           fontWeight: FontWeight.w700,
                           color: Color(0xFFEF4444),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -493,8 +475,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                         fontWeight: FontWeight.w500,
                         color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -504,8 +484,6 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                         fontWeight: FontWeight.w800,
                         color: Color(0xFF10B981),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),

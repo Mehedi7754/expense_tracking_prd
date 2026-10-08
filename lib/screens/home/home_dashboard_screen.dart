@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../core/widgets/expense_list_row.dart';
 import '../../core/widgets/minimal_area_chart.dart';
 import '../../core/widgets/project_cost_card.dart';
@@ -17,6 +18,7 @@ import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/notification_provider.dart';
 import '../../state/project_provider.dart';
+import '../../state/settings_provider.dart';
 import '../../state/user_management_provider.dart';
 
 class HomeDashboardScreen extends ConsumerStatefulWidget {
@@ -28,20 +30,6 @@ class HomeDashboardScreen extends ConsumerStatefulWidget {
 
 class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
   String _activeFilter = 'all'; // all, profitable, approaching, overbudget
-
-  Widget _buildAvatarInitials(String name) {
-    final initials = name.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join('').toUpperCase();
-    return Center(
-      child: Text(
-        initials.isEmpty ? 'U' : initials,
-        style: const TextStyle(
-          color: Color(0xFF4F46E5),
-          fontWeight: FontWeight.w800,
-          fontSize: 12,
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,70 +66,58 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        titleSpacing: 16,
-        title: Row(
-          children: [
-            // App Logo in Header
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(15),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset(
-                  'assets/images/app_logo.png',
-                  width: 36,
-                  height: 36,
-                  fit: BoxFit.contain,
-                ),
-              ),
+        titleSpacing: 8,
+        leadingWidth: 56,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+          child: GestureDetector(
+            onTap: () => context.push(RoutePaths.profile),
+            child: AppAvatar(
+              imageUrl: user?.avatarUrl,
+              name: user?.name ?? 'User',
+              size: 38,
+              showBorder: true,
+              borderColor: const Color(0xFF4F46E5),
+              borderWidth: 1.5,
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'GW Project Financials',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        letterSpacing: -0.3,
-                      ),
-                      maxLines: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    'Expense & Budget Tracking',
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'GW Project Financials',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                fontSize: 15.5,
+                letterSpacing: -0.3,
               ),
+              maxLines: 1,
+            ),
+            const SizedBox(height: 1),
+            Text(
+              'Expense & Budget Tracking',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
             ),
           ],
         ),
         actions: [
+          // Theme Toggle (Light / Dark Mode)
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              color: isDark ? const Color(0xFFFBBF24) : const Color(0xFF4338CA),
+              size: 22,
+            ),
+            tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            onPressed: () => ref.read(settingsProvider.notifier).toggleTheme(!isDark),
+          ),
           // Notification Bell
           IconButton(
             icon: Stack(
@@ -150,7 +126,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                 Icon(
                   Icons.notifications_outlined,
                   color: isDark ? Colors.white : const Color(0xFF4338CA),
-                  size: 22,
+                  size: 23,
                 ),
                 if (unreadNotifsCount > 0)
                   Positioned(
@@ -169,34 +145,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             ),
             onPressed: () => context.push(RoutePaths.notifications),
           ),
-          // User Profile Avatar in Top Right Corner
-          GestureDetector(
-            onTap: () => context.push(RoutePaths.profile),
-            child: Padding(
-              padding: const EdgeInsets.only(right: 14, left: 4),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF4F46E5),
-                    width: 1.5,
-                  ),
-                  color: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
-                ),
-                child: ClipOval(
-                  child: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                      ? Image.network(
-                          user.avatarUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _buildAvatarInitials(user.name),
-                        )
-                      : _buildAvatarInitials(user?.name ?? 'U'),
-                ),
-              ),
-            ),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: RefreshIndicator(
@@ -204,7 +153,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         color: const Color(0xFF4F46E5),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(top: 8, bottom: 24),
+          padding: const EdgeInsets.only(top: 8, bottom: 140),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1000),

@@ -23,10 +23,15 @@ class ApproveRejectDialog {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: isDark ? AppColors.crimsonDark.withValues(alpha: 0.3) : AppColors.crimsonLight,
-                shape: BoxShape.circle,
+                color: isDark ? AppColors.crimson.withAlpha(35) : const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.crimson.withAlpha(70) : const Color(0xFFFECDD3),
+                  width: 1.0,
+                ),
               ),
               child: const Icon(Icons.close_rounded, color: AppColors.crimson, size: 20),
             ),
@@ -101,12 +106,17 @@ class ApproveRejectDialog {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight,
-                shape: BoxShape.circle,
+                color: isDark ? AppColors.emeraldAccent.withAlpha(35) : const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.emeraldAccent.withAlpha(70) : const Color(0xFFA7F3D0),
+                  width: 1.0,
+                ),
               ),
-              child: const Icon(Icons.check_rounded, color: AppColors.emerald, size: 20),
+              child: const Icon(Icons.check_rounded, color: AppColors.emeraldAccent, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(child: Text(title, style: AppTextStyles.titleMedium)),

@@ -21,6 +21,7 @@ class RoutePaths {
 
   // PFIS Specialized Routes
   static const String receiptCompliance = '/receipt-compliance';
+  static const String monthlyEarningsDetail = '/earnings-detail';
   static const String clientAnalysis = '/admin/client-analysis';
   static const String costEstimator = '/admin/cost-estimator';
 
@@ -32,6 +33,7 @@ class RoutePaths {
   static const String editProjectPattern = '/projects/:id/edit';
   static const String addRevenuePattern = '/projects/:id/revenues/new';
   static const String projectTeamPattern = '/projects/:id/team';
+  static const String projectNotesPattern = '/projects/:id/notes';
   static const String taskDetail = '/tasks/:id';
   static const String addTask = '/tasks/new';
   static const String companyDashboard = '/company-dashboard';
@@ -47,6 +49,7 @@ class RoutePaths {
   // Attendance & Geo-Location Tracking
   static const String attendanceDashboard = '/attendance';
   static const String myAttendance = '/attendance/my';
+  static const String attendanceSettings = '/admin/attendance-settings';
 
   // Salary & Attendance Deductions
   static const String salaryDashboard = '/salary';
@@ -60,6 +63,8 @@ class RoutePaths {
   static String editProject(String id) => '/projects/$id/edit';
   static String addRevenue(String id) => '/projects/$id/revenues/new';
   static String projectTeam(String id) => '/projects/$id/team';
+  static String projectNotes(String id) => '/projects/$id/notes';
   static String expenseDetail(String id) => '/expenses/$id';
   static String editExpense(String id) => '/expenses/$id/edit';
+  static String employeeDetailPath(String id) => '/employees/$id';
 }

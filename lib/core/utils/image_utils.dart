@@ -29,12 +29,13 @@ class AppImageHelper {
     if (path == null || path.trim().isEmpty) return placeholder();
     final trimmed = path.trim();
 
-    // 1. Base64 Data URI
+    // 1. Base64 Data URI or Raw Base64
     if (trimmed.startsWith('data:image/') || trimmed.startsWith('data:')) {
       try {
         final commaIdx = trimmed.indexOf(',');
         final b64 = commaIdx != -1 ? trimmed.substring(commaIdx + 1) : trimmed;
         final bytes = base64Decode(b64);
+        if (bytes.isEmpty || bytes.lengthInBytes < 12) return placeholder();
         return Image.memory(
           bytes,
           fit: fit,
@@ -45,9 +46,23 @@ class AppImageHelper {
       } catch (_) {
         return placeholder();
       }
+    } else if (trimmed.length > 60 && !trimmed.contains(' ') && !trimmed.contains('/') && !trimmed.contains(':') ||
+               (trimmed.length > 60 && (trimmed.startsWith('iVBOR') || trimmed.startsWith('/9j/') || trimmed.startsWith('UklGR') || trimmed.startsWith('R0lGOD')))) {
+      try {
+        final bytes = base64Decode(trimmed);
+        if (bytes.isNotEmpty && bytes.lengthInBytes >= 12) {
+          return Image.memory(
+            bytes,
+            fit: fit,
+            width: width,
+            height: height,
+            errorBuilder: (_, __, ___) => placeholder(),
+          );
+        }
+      } catch (_) {}
     }
 
-    // 2. HTTP/HTTPS Network URL or Relative Backend URL
+    // 2. HTTP/HTTPS Network URL
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return Image.network(
         trimmed,
@@ -58,8 +73,10 @@ class AppImageHelper {
       );
     }
 
-    if (trimmed.startsWith('/uploads/') || (trimmed.startsWith('/') && !trimmed.contains('/data/user/'))) {
-      final resolved = AppEnv.resolveUrl(trimmed);
+    // 3. Relative Backend Uploads Path (e.g., /uploads/... or uploads/...)
+    if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/') || (trimmed.startsWith('/') && !trimmed.contains('/data/user/'))) {
+      final normalized = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+      final resolved = AppEnv.resolveUrl(normalized);
       if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
         return Image.network(
           resolved,
@@ -71,7 +88,7 @@ class AppImageHelper {
       }
     }
 
-    // 3. Local File
+    // 4. Local File
     if (!kIsWeb) {
       try {
         final file = File(trimmed);

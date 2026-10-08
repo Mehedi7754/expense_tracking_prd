@@ -29,95 +29,88 @@ class CategoryDonutChart extends StatelessWidget {
   Widget build(BuildContext context) {
     if (categoryCosts.isEmpty || total <= 0) {
       return Container(
-        height: 180,
+        height: 100,
         alignment: Alignment.center,
         child: Text(
-          'No expense data to display chart',
+          'No expense data to display',
           style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextMuted(context)),
         ),
       );
     }
 
-    final entries = categoryCosts.entries.toList();
+    // Sort categories by cost descending
+    final entries = categoryCosts.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: 190,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              PieChart(
-                PieChartData(
-                  sectionsSpace: 3,
-                  centerSpaceRadius: 55,
-                  sections: List.generate(entries.length, (i) {
-                    final e = entries[i];
-                    final color = _palette[i % _palette.length];
-                    final double val = e.value;
-                    return PieChartSectionData(
-                      color: color,
-                      value: val,
-                      title: '',
-                      radius: 20,
-                    );
-                  }),
-                ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'Total Spent',
+              style: AppTextStyles.labelSmall.copyWith(
+                fontSize: 12,
+                color: AppColors.getTextMuted(context),
+                fontWeight: FontWeight.w600,
               ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Total Spent',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      fontSize: 10,
-                      color: AppColors.getTextMuted(context),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    CurrencyFormatter.format(total, compact: true),
-                    style: AppTextStyles.currencySmall.copyWith(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.getTextPrimary(context),
-                    ),
-                  ),
-                ],
+            ),
+            Text(
+              CurrencyFormatter.format(total, compact: true),
+              style: AppTextStyles.currencySmall.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.getTextPrimary(context),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: List.generate(entries.length, (i) {
-            final e = entries[i];
-            final color = _palette[i % _palette.length];
-            final double percent = total > 0 ? (e.value / total * 100) : 0;
-            return Row(
-              mainAxisSize: MainAxisSize.min,
+        ...List.generate(entries.length, (i) {
+          final e = entries[i];
+          final color = _palette[i % _palette.length];
+          final double percent = total > 0 ? (e.value / total) : 0.0;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      e.key,
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.getTextPrimary(context),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    Text(
+                      '${(percent * 100).toStringAsFixed(0)}% • ${CurrencyFormatter.format(e.value, compact: true)}',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        color: AppColors.getTextMuted(context),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  '${e.key} (${percent.toStringAsFixed(0)}%)',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: AppColors.getTextPrimary(context),
-                    fontWeight: FontWeight.w500,
-                    fontSize: 11.5,
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: percent,
+                    backgroundColor: color.withValues(alpha: 0.12),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                    minHeight: 6,
                   ),
                 ),
               ],
-            );
-          }),
-        ),
+            ),
+          );
+        }),
       ],
     );
   }

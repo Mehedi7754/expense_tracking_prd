@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
@@ -9,6 +8,7 @@ import '../models/user_role.dart';
 import 'auth_provider.dart';
 
 const String _kCustomUsersKey = 'gw_custom_users_cache';
+const String _kCustomUserPasswordsKey = 'gw_custom_user_passwords_cache';
 
 /// Authentic database users seeded in PostgreSQL
 const List<UserModel> kAuthenticDatabaseUsers = [
@@ -58,8 +58,7 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
       } else {
         state = kAuthenticDatabaseUsers;
       }
-    } catch (e) {
-      debugPrint('[UserManagementNotifier] Error loading cached users: $e');
+    } catch (_) {
       state = kAuthenticDatabaseUsers;
     }
   }
@@ -69,9 +68,32 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
       final prefs = await SharedPreferences.getInstance();
       final jsonList = state.map((u) => u.toJson()).toList();
       await prefs.setString(_kCustomUsersKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('[UserManagementNotifier] Error persisting users: $e');
-    }
+    } catch (_) {}
+  }
+
+  static Future<void> _saveLocalPassword(String email, String password) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kCustomUserPasswordsKey);
+      Map<String, dynamic> map = {};
+      if (raw != null && raw.isNotEmpty) {
+        map = jsonDecode(raw) as Map<String, dynamic>;
+      }
+      map[email.trim().toLowerCase()] = password;
+      await prefs.setString(_kCustomUserPasswordsKey, jsonEncode(map));
+    } catch (_) {}
+  }
+
+  static Future<String?> getLocalPassword(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kCustomUserPasswordsKey);
+      if (raw != null && raw.isNotEmpty) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        return map[email.trim().toLowerCase()] as String?;
+      }
+    } catch (_) {}
+    return null;
   }
 
   static void _addOrUpdateUser(Map<String, UserModel> map, UserModel user) {
@@ -125,9 +147,12 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
         for (final u in fetched) {
           _addOrUpdateUser(mergedMap, u);
         }
-        // Retain only local offline creations that haven't synced
+        // Retain all locally created or existing users so they never disappear on sync/logout
         for (final u in state) {
-          if (u.id.startsWith('user_')) {
+          final isAlreadyFetched = fetched.any((f) =>
+              (f.id.isNotEmpty && f.id == u.id) ||
+              (f.email.isNotEmpty && f.email.trim().toLowerCase() == u.email.trim().toLowerCase()));
+          if (!isAlreadyFetched) {
             _addOrUpdateUser(mergedMap, u);
           }
         }
@@ -149,9 +174,8 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
       state = mergedMap.values.toList();
       await _persistUsers();
       markFetchCompleted();
-    } catch (e) {
+    } catch (_) {
       markFetchFailed();
-      debugPrint('[UserManagementNotifier] Error fetching users: $e');
     }
   }
 
@@ -233,22 +257,27 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     _persistUsers();
   }
 
-  Future<void> addUser({
+  Future<UserModel> addUser({
     required String name,
     required String email,
     required UserRole role,
     required String department,
     String? designation,
+    String? password,
     List<String> assignedProjectIds = const [],
     bool isApproved = true,
   }) async {
-    final newUser = UserModel(
+    final cleanEmail = email.trim().toLowerCase();
+    final pwd = (password != null && password.trim().isNotEmpty) ? password.trim() : 'password123';
+    await _saveLocalPassword(cleanEmail, pwd);
+
+    var newUser = UserModel(
       id: 'usr_${DateTime.now().microsecondsSinceEpoch}',
-      name: name,
-      email: email,
+      name: name.trim(),
+      email: cleanEmail,
       role: role,
-      department: department,
-      designation: designation,
+      department: department.trim(),
+      designation: designation?.trim(),
       isActive: true,
       isApproved: isApproved,
       assignedProjectIds: assignedProjectIds,
@@ -259,22 +288,47 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
 
     try {
       final client = ref.read(apiClientProvider);
-      await client.post('/users', body: newUser.toJson());
+      final body = {
+        ...newUser.toJson(),
+        'password': pwd,
+      };
+      final res = await client.post('/users', body: body);
+      if (res is Map<String, dynamic>) {
+        final serverUser = UserModel.fromJson(res);
+        if (serverUser.id.isNotEmpty) {
+          newUser = serverUser;
+          state = [
+            for (final u in state)
+              if (u.email.trim().toLowerCase() == cleanEmail || u.id == newUser.id) newUser else u,
+          ];
+          await _persistUsers();
+        }
+      }
     } catch (_) {
       // Offline fallback
     }
+
+    return newUser;
   }
 
-  Future<void> updateUser(UserModel updated) async {
+  Future<void> updateUser(UserModel updated, {String? password}) async {
     state = [
       for (final u in state)
-        if (u.id == updated.id) updated else u,
+        if (u.id == updated.id || (u.email.isNotEmpty && u.email.trim().toLowerCase() == updated.email.trim().toLowerCase())) updated else u,
     ];
     await _persistUsers();
 
+    if (password != null && password.trim().isNotEmpty) {
+      await _saveLocalPassword(updated.email, password.trim());
+    }
+
     try {
       final client = ref.read(apiClientProvider);
-      await client.put('/users/${updated.id}', body: updated.toJson());
+      final body = {
+        ...updated.toJson(),
+        if (password != null && password.trim().isNotEmpty) 'password': password.trim(),
+      };
+      await client.put('/users/${updated.id}', body: body);
     } catch (_) {
       // Offline fallback
     }
@@ -358,6 +412,18 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     try {
       final client = ref.read(apiClientProvider);
       await client.patch('/users/$userId/status', body: {'is_active': true, 'is_approved': true});
+    } catch (_) {
+      // Offline fallback
+    }
+  }
+
+  Future<void> deleteUser(String userId) async {
+    state = state.where((u) => u.id != userId).toList();
+    await _persistUsers();
+
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.delete('/users/$userId');
     } catch (_) {
       // Offline fallback
     }

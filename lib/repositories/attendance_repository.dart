@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_endpoints.dart';
+import '../core/network/api_exceptions.dart';
 import '../core/services/attendance_salary_mock_store.dart';
 import '../models/attendance_model.dart';
 import '../models/user_model.dart';
@@ -47,9 +48,10 @@ class AttendanceRepository {
         );
         return record;
       }
-    } catch (e) {
-      debugPrint('[AttendanceRepository] API checkIn failed ($e), using local fallback store');
-    }
+    } on ApiException catch (e) {
+      final code = e.statusCode ?? 0;
+      if (code >= 400 && code < 500) rethrow; // server rejected (e.g. window closed) — never fake it locally
+    } catch (_) {}
 
     // Local fallback store
     return await AttendanceSalaryMockStore.instance.checkIn(
@@ -90,9 +92,7 @@ class AttendanceRepository {
             .map((item) => AttendanceRecordModel.fromJson(item as Map<String, dynamic>))
             .toList();
       }
-    } catch (e) {
-      debugPrint('[AttendanceRepository] API getAttendanceRecords failed ($e), using local fallback store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.getAttendanceRecords(
       userId: userId,
@@ -117,9 +117,7 @@ class AttendanceRepository {
           return overview;
         }
       }
-    } catch (e) {
-      debugPrint('[AttendanceRepository] API getDailyOverview failed ($e), using local fallback store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.getDailyOverview(date, explicitUsers);
   }
@@ -135,9 +133,7 @@ class AttendanceRepository {
       if (response is Map<String, dynamic>) {
         return AttendanceSummaryModel.fromJson(response);
       }
-    } catch (e) {
-      debugPrint('[AttendanceRepository] API getAttendanceSummary failed ($e), using local fallback store');
-    }
+    } catch (_) {}
 
     final calc = await AttendanceSalaryMockStore.instance.calculateSalary(userId, month, year);
     final records = await AttendanceSalaryMockStore.instance.getAttendanceRecords(userId: userId, month: month, year: year);
@@ -170,15 +166,56 @@ class AttendanceRepository {
         await AttendanceSalaryMockStore.instance.confirmAbsence(userId: userId, date: date, notes: notes);
         return true;
       }
-    } catch (e) {
-      debugPrint('[AttendanceRepository] API confirmAbsence failed ($e), using local fallback store');
-    }
+    } catch (_) {}
 
     return await AttendanceSalaryMockStore.instance.confirmAbsence(
       userId: userId,
       date: date,
       notes: notes,
     );
+  }
+
+  Future<Map<String, dynamic>?> getAttendanceSettings() async {
+    try {
+      final response = await _client.get('/attendance/settings');
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<bool> updateAttendanceSettings({
+    int? morningStartHour,
+    required int morningEndHour,
+    int? afternoonEndHour,
+    List<int>? weekendDays,
+    String? deductionType,
+    double? fullDayDeductionAmount,
+    double? halfDayDeductionAmount,
+    List<Map<String, dynamic>>? shifts,
+    Map<String, String>? userShifts,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        if (morningStartHour != null) 'morningStartHour': morningStartHour,
+        'morningEndHour': morningEndHour,
+        if (afternoonEndHour != null) 'afternoonEndHour': afternoonEndHour,
+        if (weekendDays != null) 'weekendDays': weekendDays,
+        if (deductionType != null) 'deductionType': deductionType,
+        if (fullDayDeductionAmount != null) 'fullDayDeductionAmount': fullDayDeductionAmount,
+        if (halfDayDeductionAmount != null) 'halfDayDeductionAmount': halfDayDeductionAmount,
+        if (shifts != null) 'shifts': shifts,
+        if (userShifts != null) 'userShifts': userShifts,
+      };
+      final response = await _client.post(
+        '/attendance/settings',
+        body: body,
+      );
+      return response != null;
+    } catch (_) {
+      return false;
+    }
   }
 }
 

@@ -5,33 +5,19 @@ import 'core/constants/app_constants.dart';
 import 'core/constants/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/services/fcm_service.dart';
 import 'state/settings_provider.dart';
+import 'state/auth_provider.dart';
+import 'models/user_role.dart';
+import 'core/services/notification_router.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppEnv.initialize();
 
-  // Initialize OS-level push notification service safely
-  try {
-    await PushNotificationService.instance.initialize();
-    // Fire schedule in background
-    PushNotificationService.instance.scheduleDailyAttendanceReminder(
-      id: 1,
-      title: '📍 Morning Check-in Reminder',
-      body: "Don't forget to mark your attendance for today!",
-      hour: 9,
-      minute: 0,
-    );
-    PushNotificationService.instance.scheduleDailyAttendanceReminder(
-      id: 2,
-      title: '📍 End-of-Day Check-out',
-      body: 'Please mark your check-out before leaving.',
-      hour: 17,
-      minute: 0,
-    );
-  } catch (e) {
-    debugPrint('[Main] PushNotificationService init: $e');
-  }
+  // Initialize OS-level push notification & FCM service asynchronously without blocking startup
+  PushNotificationService.instance.initialize().catchError((_) {});
+  FcmService.instance.initialize().catchError((_) {});
 
   runApp(
     const ProviderScope(
@@ -41,6 +27,8 @@ Future<void> main() async {
 }
 
 
+UserRole? _lastRole;
+
 class GWProjectApp extends ConsumerWidget {
   const GWProjectApp({super.key});
 
@@ -48,6 +36,16 @@ class GWProjectApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final settings = ref.watch(settingsProvider);
+    NotificationRouter.attach(router);
+
+    // Employees only get check-in reminders; Super Admin / Finance / Viewer never do
+    final role = ref.watch(authProvider.select((s) => s.currentUser?.role));
+    if (role != _lastRole) {
+      _lastRole = role;
+      final isEmployee = role == UserRole.projectMember || role == UserRole.projectManager;
+      NotificationRouter.canManageAttendance = role?.canManageAttendanceAndSalary ?? false;
+      PushNotificationService.instance.syncAttendanceReminders(isEmployee: isEmployee);
+    }
 
     return MaterialApp.router(
       title: AppConstants.appName,

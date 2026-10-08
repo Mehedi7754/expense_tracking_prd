@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/routing/route_paths.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/attendance_model.dart';
+import '../../models/user_role.dart';
 import '../../state/attendance_provider.dart';
+import '../../state/attendance_settings_provider.dart';
 import '../../state/auth_provider.dart';
 import '../../state/user_management_provider.dart';
 import 'my_attendance_screen.dart';
@@ -94,13 +99,10 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
             const SizedBox(height: 16),
             Row(
               children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: const Color(0xFF4F46E5),
-                  child: Text(
-                    record.userName.isNotEmpty ? record.userName[0].toUpperCase() : 'U',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-                  ),
+                AppAvatar(
+                  imageUrl: record.avatarUrl,
+                  name: record.userName,
+                  size: 44,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -275,6 +277,12 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
         elevation: 0,
         backgroundColor: Colors.transparent,
         actions: [
+          if (currentUser?.role == UserRole.mainAdmin)
+            IconButton(
+              icon: const Icon(Icons.access_time_rounded),
+              tooltip: 'Office Timing Settings',
+              onPressed: () => context.push(RoutePaths.attendanceSettings),
+            ),
           IconButton(
             icon: Icon(_showMap ? Icons.map : Icons.map_outlined),
             tooltip: _showMap ? 'Hide Map' : 'Show Map',
@@ -295,10 +303,83 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
       body: attendanceState.isLoading && overview == null
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Office Timing Configuration Banner (Super Admin)
+                  if (currentUser?.role == UserRole.mainAdmin) ...[
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSurface : Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withAlpha(isDark ? 20 : 6),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              Icons.access_time_rounded,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Office Hours & Shift Timing',
+                                  style: TextStyle(
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  'Morning Cutoff: ${ref.watch(attendanceSettingsProvider).value?.morningEndHour ?? 13}:00 • Afternoon begins immediately',
+                                  style: TextStyle(
+                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F172A),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              minimumSize: const Size(0, 30),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                            onPressed: () => context.push(RoutePaths.attendanceSettings),
+                            child: const Text('Configure', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   // 1. DATE NAVIGATOR BAR
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -488,45 +569,7 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
                     const SizedBox(height: 16),
                   ],
 
-                  // 4. EMPLOYEE FILTER & STATUS CHIPS
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: isDark ? AppColors.darkSurface : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
-                            ),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String?>(
-                              value: attendanceState.selectedUserId,
-                              isExpanded: true,
-                              hint: const Text('Filter by Employee', style: TextStyle(fontSize: 13)),
-                              items: [
-                                const DropdownMenuItem<String?>(
-                                  value: null,
-                                  child: Text('All Employees', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                                ),
-                                ...allUsers.map((u) => DropdownMenuItem<String?>(
-                                      value: u.id,
-                                      child: Text(u.name, style: const TextStyle(fontSize: 13)),
-                                    )),
-                              ],
-                              onChanged: (val) {
-                                ref.read(attendanceProvider.notifier).setSelectedUser(val);
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 10),
+                  // 4. STATUS CHIPS FILTER
 
                   // Filter Chips
                   SingleChildScrollView(
@@ -636,11 +679,12 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
 
   Widget _buildFilterChip(String label, String value) {
     final isSelected = _statusFilter == value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return ChoiceChip(
       label: Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600)),
       selected: isSelected,
-      selectedColor: const Color(0xFF4F46E5),
-      labelStyle: TextStyle(color: isSelected ? Colors.white : null),
+      selectedColor: isDark ? const Color(0xFF38BDF8) : const Color(0xFF0F172A),
+      labelStyle: TextStyle(color: isSelected ? (isDark ? const Color(0xFF0F172A) : Colors.white) : null),
       onSelected: (_) => setState(() => _statusFilter = value),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     );
@@ -702,13 +746,10 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: const Color(0xFF4F46E5),
-                  child: Text(
-                    emp.userName.isNotEmpty ? emp.userName[0].toUpperCase() : 'U',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
-                  ),
+                AppAvatar(
+                  imageUrl: emp.avatarUrl,
+                  name: emp.userName,
+                  size: 40,
                 ),
                 const SizedBox(width: 12),
                 Expanded(

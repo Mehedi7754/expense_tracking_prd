@@ -125,8 +125,6 @@ class ProjectProgressBadge extends StatelessWidget {
           Flexible(
             child: Text(
               displayText,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: compact ? 10 : 12,
                 fontWeight: FontWeight.w700,

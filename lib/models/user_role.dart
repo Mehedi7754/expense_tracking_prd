@@ -34,6 +34,10 @@ enum UserRole {
   }
 
   bool get canViewAllProjects => this == UserRole.mainAdmin || this == UserRole.finance;
+  /// Only Manager (projectManager) and Employee (projectMember) are required to check in.
+  /// Super Admin (mainAdmin), Finance, and Viewer do NOT check in.
+  bool get requiresAttendanceCheckIn =>
+      this == UserRole.projectManager || this == UserRole.projectMember;
   bool get canManageAttendanceAndSalary =>
       this == UserRole.mainAdmin ||
       this == UserRole.projectManager ||

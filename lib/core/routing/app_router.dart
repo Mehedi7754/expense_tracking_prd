@@ -11,6 +11,7 @@ import '../../screens/admin/cost_estimator_screen.dart';
 import '../../screens/admin/user_management_screen.dart';
 import '../../screens/approvals/approvals_queue_screen.dart';
 import '../../screens/attendance/attendance_dashboard_screen.dart';
+import '../../screens/attendance/attendance_settings_screen.dart';
 import '../../screens/attendance/my_attendance_screen.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/login_screen.dart';
@@ -21,6 +22,7 @@ import '../../screens/expenses/expense_detail_screen.dart';
 import '../../screens/expenses/my_expenses_screen.dart';
 import '../../screens/expenses/receipt_compliance_screen.dart';
 import '../../screens/expenses/submit_expense_screen.dart';
+import '../../screens/home/monthly_earnings_detail_screen.dart';
 import '../../screens/main_shell_screen.dart';
 import '../../screens/notifications/notification_detail_screen.dart';
 import '../../screens/notifications/notifications_screen.dart';
@@ -30,6 +32,7 @@ import '../../screens/profile/settings_screen.dart';
 import '../../screens/projects/add_edit_project_screen.dart';
 import '../../screens/projects/add_revenue_screen.dart';
 import '../../screens/projects/project_detail_screen.dart';
+import '../../screens/projects/project_notes_history_screen.dart';
 import '../../screens/projects/project_team_screen.dart';
 import '../../screens/projects/projects_list_screen.dart';
 import '../../screens/reports/company_dashboard_screen.dart';
@@ -163,6 +166,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: RoutePaths.receiptCompliance,
         builder: (context, state) => const ReceiptComplianceScreen(),
       ),
+      GoRoute(
+        path: RoutePaths.monthlyEarningsDetail,
+        builder: (context, state) => const MonthlyEarningsDetailScreen(),
+      ),
       // Bug 4 Fix: /expenses/new must be registered BEFORE /expenses/:id
       // so GoRouter doesn't treat 'new' as an expense ID.
       GoRoute(
@@ -233,6 +240,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return ProjectTeamScreen(projectId: id);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.projectNotesPattern,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ProjectNotesHistoryScreen(projectId: id);
         },
       ),
 
@@ -331,6 +345,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           return EmployeeDetailScreen(employeeId: id);
         },
       ),
+      GoRoute(
+        path: '/profile/employee/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return EmployeeDetailScreen(employeeId: id);
+        },
+      ),
 
       // Attendance & Geo-Location Tracking
       GoRoute(
@@ -340,6 +361,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.myAttendance,
         builder: (context, state) => const MyAttendanceScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.attendanceSettings,
+        builder: (context, state) => const AttendanceSettingsScreen(),
       ),
 
       // Salary & Attendance Deductions

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/routing/route_paths.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../core/widgets/custom_search_bar.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/role_badge.dart';
@@ -28,13 +29,19 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   String _searchQuery = '';
 
   void _showChangeRoleDialog(UserModel user) {
+    final currentUser = ref.read(authProvider).currentUser;
+    final isSuperAdmin = currentUser?.role == UserRole.mainAdmin;
+    final allowedRoles = isSuperAdmin
+        ? UserRole.activeRoles
+        : [UserRole.projectManager, UserRole.projectMember];
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Change Role: ${user.name}', style: AppTextStyles.titleMedium),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: UserRole.activeRoles.map((role) {
+          children: allowedRoles.map((role) {
             final isCurrent = user.role == role;
             return ListTile(
               title: Text(role.displayName, style: AppTextStyles.labelMedium),
@@ -52,6 +59,40 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteUserDialog(UserModel user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete Employee: ${user.name}', style: AppTextStyles.titleMedium),
+        content: Text(
+          'Are you sure you want to permanently delete ${user.name} (${user.email})? This action cannot be undone.',
+          style: AppTextStyles.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.crimson,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(userManagementProvider.notifier).deleteUser(user.id);
+              NotificationBanner.showWarning(
+                context,
+                'Employee ${user.name} permanently deleted.',
+              );
+            },
+            child: const Text('Delete Permanently'),
+          ),
         ],
       ),
     );
@@ -78,11 +119,11 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
       appBar: widget.isEmbedded
           ? null
           : AppBar(
-              title: const Text('User Management'),
+              title: const Text('Employee Management'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.person_add_alt_1_rounded),
-                  tooltip: 'Invite / Add User',
+                  tooltip: 'Add / Invite Employee',
                   onPressed: () => context.push(RoutePaths.addUser),
                 ),
                 const SizedBox(width: 8),
@@ -94,7 +135,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
         backgroundColor: AppColors.getPrimary(context),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add_rounded),
-        label: const Text('Add User'),
+        label: const Text('Add Employee'),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       body: Center(
@@ -105,7 +146,7 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: CustomSearchBar(
-              hintText: 'Search user by name, email, or department...',
+              hintText: 'Search employee by name, email, or department...',
               initialValue: _searchQuery,
               onChanged: (q) => setState(() => _searchQuery = q),
             ),
@@ -131,39 +172,37 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       InkWell(
-                        onTap: () => context.push('/profile/employee/${user.id}'),
+                        onTap: () => context.push(RoutePaths.employeeDetailPath(user.id)),
                         borderRadius: BorderRadius.circular(12),
                         child: Row(
                           children: [
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundColor: user.isActive ? AppColors.getSurfaceSubtle(context) : AppColors.getBorder(context),
-                              child: Text(
-                                user.name.isNotEmpty ? user.name[0] : 'U',
-                                style: AppTextStyles.labelLarge.copyWith(
-                                  color: user.isActive ? AppColors.getTextPrimary(context) : AppColors.getTextMuted(context),
-                                ),
-                              ),
+                            AppAvatar(
+                              imageUrl: user.avatarUrl,
+                              name: user.name,
+                              size: 40,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Row(
+                                  Text(
+                                    user.name,
+                                    style: AppTextStyles.titleSmall.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15,
+                                      decoration: user.isActive ? null : TextDecoration.lineThrough,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 5),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
                                     children: [
-                                      Flexible(
-                                        child: Text(
-                                          user.name,
-                                          style: AppTextStyles.titleSmall.copyWith(
-                                            decoration: user.isActive ? null : TextDecoration.lineThrough,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
                                       RoleBadge(role: user.role, compact: true),
-                                      const SizedBox(width: 6),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                                         decoration: BoxDecoration(
@@ -253,24 +292,51 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                       const Divider(),
                       const SizedBox(height: 6),
                       // Actions: Change Role, Activity & Activate/Deactivate Toggle
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 6,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 2,
+                            runSpacing: 2,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               TextButton.icon(
-                                icon: const Icon(Icons.swap_horiz_rounded, size: 16),
-                                label: const Text('Role'),
+                                icon: const Icon(Icons.swap_horiz_rounded, size: 15),
+                                label: const Text('Role', style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  minimumSize: Size.zero,
+                                ),
                                 onPressed: () => _showChangeRoleDialog(user),
                               ),
                               TextButton.icon(
-                                icon: const Icon(Icons.insights_rounded, size: 16),
-                                label: const Text('Activity'),
-                                onPressed: () => context.push('/profile/employee/${user.id}'),
+                                icon: const Icon(Icons.insights_rounded, size: 15),
+                                label: const Text('Activity', style: TextStyle(fontSize: 12)),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  minimumSize: Size.zero,
+                                ),
+                                onPressed: () => context.push(RoutePaths.employeeDetailPath(user.id)),
+                              ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.delete_outline_rounded, size: 15, color: AppColors.crimson),
+                                label: const Text('Delete', style: TextStyle(color: AppColors.crimson, fontSize: 12)),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  minimumSize: Size.zero,
+                                ),
+                                onPressed: () => _showDeleteUserDialog(user),
                               ),
                             ],
                           ),
                           Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
                                 user.isActive ? 'Active' : 'Deactivated',
@@ -279,18 +345,21 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              Switch(
-                                value: user.isActive,
-                                activeTrackColor: AppColors.emerald,
-                                onChanged: (_) {
-                                  ref.read(userManagementProvider.notifier).toggleActive(user.id);
-                                  NotificationBanner.showWarning(
-                                    context,
-                                    user.isActive
-                                        ? '${user.name} account deactivated.'
-                                        : '${user.name} account activated.',
-                                  );
-                                },
+                              Transform.scale(
+                                scale: 0.8,
+                                child: Switch(
+                                  value: user.isActive,
+                                  activeTrackColor: AppColors.emerald,
+                                  onChanged: (_) {
+                                    ref.read(userManagementProvider.notifier).toggleActive(user.id);
+                                    NotificationBanner.showWarning(
+                                      context,
+                                      user.isActive
+                                          ? '${user.name} account deactivated.'
+                                          : '${user.name} account activated.',
+                                    );
+                                  },
+                                ),
                               ),
                             ],
                           ),

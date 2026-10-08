@@ -5,6 +5,41 @@ import '../constants/app_text_styles.dart';
 class NotificationBanner {
   NotificationBanner._();
 
+  /// Sanitizes any notification message so URLs, IPs, ports, and internal details
+  /// are never displayed on screen.
+  static String sanitizeMessage(String rawMessage) {
+    if (rawMessage.isEmpty) return rawMessage;
+    var msg = rawMessage;
+
+    // Remove raw Exception prefixes
+    msg = msg.replaceAll(RegExp(r'^(Exception|ApiException|ClientException|SocketException|HttpException):\s*', caseSensitive: false), '');
+
+    // Strip http/https URLs
+    msg = msg.replaceAll(RegExp(r'https?://[^\s/$.?#].[^\s]*', caseSensitive: false), 'server');
+
+    // Strip IP addresses with optional port
+    msg = msg.replaceAll(RegExp(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?\b'), 'server');
+
+    // Strip domain names/hostnames if any
+    msg = msg.replaceAll(RegExp(r'[\w.-]*sslip\.io[^\s]*', caseSensitive: false), 'server');
+
+    // Convert raw network/socket error text into clean user-friendly phrasing
+    final lower = msg.toLowerCase();
+    if (lower.contains('socketexception') ||
+        lower.contains('clientexception') ||
+        lower.contains('connection refused') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network error') ||
+        lower.contains('connection error') ||
+        lower.contains('network connection failed') ||
+        lower.contains('connection reset') ||
+        lower.contains('broken pipe')) {
+      return 'Unable to connect to server. Please check your internet connection.';
+    }
+
+    return msg.trim();
+  }
+
   static void showSuccess(BuildContext context, String message) {
     _showSnackBar(
       context,
@@ -61,6 +96,7 @@ class NotificationBanner {
     required Color textColor,
     Color? borderColor,
   }) {
+    final cleanMessage = sanitizeMessage(message);
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -80,7 +116,7 @@ class NotificationBanner {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                message,
+                cleanMessage,
                 style: AppTextStyles.labelMedium.copyWith(color: textColor),
               ),
             ),

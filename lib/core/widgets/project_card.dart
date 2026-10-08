@@ -122,7 +122,7 @@ class ProjectCard extends StatelessWidget {
         color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
           width: 1.0,
         ),
         boxShadow: isDark
@@ -146,13 +146,16 @@ class ProjectCard extends StatelessWidget {
             child: Row(
               children: [
                 // 1. Left squircle icon with soft tinted pastel background
-                // 1. Left squircle icon with soft tinted pastel background
                 Container(
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
                     color: iconBg,
                     borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: accentColor.withAlpha(isDark ? 50 : 35),
+                      width: 1.0,
+                    ),
                   ),
                   child: Center(
                     child: Icon(
@@ -179,8 +182,6 @@ class ProjectCard extends StatelessWidget {
                           letterSpacing: -0.2,
                           height: 1.25,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text.rich(
@@ -204,8 +205,6 @@ class ProjectCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 5),
                       ProjectProgressBadge.fromProject(project, compact: true, showPercentage: false),

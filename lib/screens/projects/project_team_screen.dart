@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/widgets/app_avatar.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
@@ -119,13 +120,10 @@ class ProjectTeamScreen extends ConsumerWidget {
                     children: [
                       Row(
                         children: [
-                          CircleAvatar(
-                            radius: 22,
-                            backgroundColor: AppColors.getSurfaceSubtle(context),
-                            child: Text(
-                              member.name.isNotEmpty ? member.name[0] : 'U',
-                              style: AppTextStyles.labelLarge.copyWith(color: AppColors.getTextPrimary(context)),
-                            ),
+                          AppAvatar(
+                            imageUrl: member.avatarUrl,
+                            name: member.name,
+                            size: 44,
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -138,8 +136,6 @@ class ProjectTeamScreen extends ConsumerWidget {
                                       child: Text(
                                         member.name,
                                         style: AppTextStyles.titleSmall,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
@@ -176,12 +172,10 @@ class ProjectTeamScreen extends ConsumerWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 2),
-                                Text('${member.department} • ${member.role.displayName}', style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                Text('${member.department} • ${member.role.displayName}', style: AppTextStyles.bodySmall),
                                 Text(
                                   member.email,
                                   style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: AppColors.getTextMuted(context)),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ],
                             ),
@@ -325,8 +319,6 @@ class ProjectTeamScreen extends ConsumerWidget {
                                   fontSize: 12,
                                   color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
@@ -386,18 +378,10 @@ class ProjectTeamScreen extends ConsumerWidget {
 
                               return ListTile(
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                leading: CircleAvatar(
-                                  radius: 20,
-                                  backgroundColor: isAssigned
-                                      ? AppColors.getPrimary(context)
-                                      : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                                  child: Text(
-                                    u.name.isNotEmpty ? u.name[0].toUpperCase() : 'U',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      color: isAssigned ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
-                                    ),
-                                  ),
+                                leading: AppAvatar(
+                                  imageUrl: u.avatarUrl,
+                                  name: u.name,
+                                  size: 40,
                                 ),
                                 title: Row(
                                   children: [
@@ -409,8 +393,6 @@ class ProjectTeamScreen extends ConsumerWidget {
                                           fontSize: 14,
                                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
@@ -442,8 +424,6 @@ class ProjectTeamScreen extends ConsumerWidget {
                                         fontSize: 11,
                                         color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                                     Text(
                                       u.email,
@@ -451,8 +431,6 @@ class ProjectTeamScreen extends ConsumerWidget {
                                         fontSize: 10.5,
                                         color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),

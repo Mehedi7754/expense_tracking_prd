@@ -19,8 +19,8 @@ class BudgetProgressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = AppColors.isDark(context);
-    final double percentage = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : 0.0;
-    final double rawPercent = budget > 0 ? (spent / budget) : 0.0;
+    final double percentage = budget > 0 ? (spent / budget).clamp(0.0, 1.0) : (spent > 0 ? 1.0 : 0.0);
+    final double rawPercent = budget > 0 ? (spent / budget) : (spent > 0 ? 1.0 : 0.0);
     final bool isOverBudget = spent > budget;
     final bool isAtRisk = rawPercent >= 0.80 && !isOverBudget;
 
@@ -49,32 +49,45 @@ class BudgetProgressBar extends StatelessWidget {
                 'Budget Consumed',
                 style: AppTextStyles.labelSmall.copyWith(
                   color: AppColors.getTextMuted(context),
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11.5,
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (isAtRisk || isOverBudget) ...[
-                    Icon(
-                      isOverBudget ? Icons.warning_rounded : Icons.info_outline_rounded,
-                      size: 13,
-                      color: statusColor,
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  Text(
-                    '${(rawPercent * 100).toStringAsFixed(1)}%',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: statusColor,
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                decoration: BoxDecoration(
+                  color: statusColor.withAlpha(isDark ? 30 : 20),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: statusColor.withAlpha(isDark ? 70 : 45),
+                    width: 0.8,
                   ),
-                ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isAtRisk || isOverBudget) ...[
+                      Icon(
+                        isOverBudget ? Icons.warning_rounded : Icons.info_outline_rounded,
+                        size: 11,
+                        color: statusColor,
+                      ),
+                      const SizedBox(width: 3.5),
+                    ],
+                    Text(
+                      '${(rawPercent * 100).toStringAsFixed(1)}%',
+                      style: AppTextStyles.labelSmall.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: statusColor,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 7),
         ],
         ClipRRect(
           borderRadius: BorderRadius.circular(height / 2),
@@ -83,7 +96,7 @@ class BudgetProgressBar extends StatelessWidget {
               Container(
                 height: height,
                 width: double.infinity,
-                color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
               ),
               LayoutBuilder(
                 builder: (context, constraints) {

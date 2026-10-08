@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/holiday_model.dart';
@@ -114,12 +113,13 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
     try {
       final repo = ref.read(salaryRepositoryProvider);
       final report = await repo.getOrgSalaryReport(m, y, users);
+      if (!ref.mounted) return;
       markFetchCompleted();
       state = state.copyWith(orgReport: report, isLoading: false);
-    } catch (e) {
-      markFetchCompleted();
-      debugPrint('[SalaryNotifier] Org report network note, using fallback: $e');
+    } catch (_) {
       final fallback = await AttendanceSalaryMockStore.instance.getOrgSalaryReport(m, y, users);
+      if (!ref.mounted) return;
+      markFetchCompleted();
       state = state.copyWith(orgReport: fallback, isLoading: false, clearError: true);
     }
   }
@@ -135,12 +135,13 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
     try {
       final repo = ref.read(salaryRepositoryProvider);
       final calc = await repo.calculateSalary(userId, m, y);
+      if (!ref.mounted) return;
       markFetchCompleted();
       state = state.copyWith(currentCalculation: calc, isLoading: false, clearError: true);
-    } catch (e) {
-      markFetchCompleted();
-      debugPrint('[SalaryNotifier] Salary calculation network note, using fallback: $e');
+    } catch (_) {
       final fallback = await AttendanceSalaryMockStore.instance.calculateSalary(userId, m, y);
+      if (!ref.mounted) return;
+      markFetchCompleted();
       state = state.copyWith(currentCalculation: fallback, isLoading: false, clearError: true);
     }
   }
@@ -149,10 +150,9 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
     try {
       final repo = ref.read(salaryRepositoryProvider);
       final profile = await repo.getEmployeeSalary(userId);
+      if (!ref.mounted) return;
       state = state.copyWith(currentEmployeeSalary: profile);
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error fetching employee salary profile: $e');
-    }
+    } catch (_) {}
   }
 
   Future<bool> setEmployeeSalary(
@@ -176,9 +176,8 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
       await fetchCalculation(userId, month: state.selectedMonth, year: state.selectedYear, force: true);
       await fetchOrgSalaryReport(month: state.selectedMonth, year: state.selectedYear, force: true);
       return true;
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error setting employee salary: $e');
-      state = state.copyWith(isSubmitting: false, errorMessage: 'Failed to update employee salary: $e');
+    } catch (_) {
+      state = state.copyWith(isSubmitting: false, errorMessage: 'Failed to update employee salary');
       return false;
     }
   }
@@ -199,9 +198,8 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
         await fetchCalculation(userId, month: state.selectedMonth, year: state.selectedYear, force: true);
       }
       return success;
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error saving calculation: $e');
-      state = state.copyWith(isSubmitting: false, errorMessage: 'Failed to save salary calculation: $e');
+    } catch (_) {
+      state = state.copyWith(isSubmitting: false, errorMessage: 'Failed to save salary calculation');
       return false;
     }
   }
@@ -211,9 +209,7 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
       final repo = ref.read(salaryRepositoryProvider);
       final list = await repo.getHolidays(year ?? state.selectedYear);
       state = state.copyWith(holidays: list);
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error fetching holidays: $e');
-    }
+    } catch (_) {}
   }
 
   Future<bool> addHoliday(String date, String name, {bool isRecurring = false}) async {
@@ -223,8 +219,7 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
       await fetchHolidays();
       invalidateCache();
       return true;
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error adding holiday: $e');
+    } catch (_) {
       return false;
     }
   }
@@ -236,8 +231,7 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
       await fetchHolidays();
       invalidateCache();
       return true;
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error deleting holiday: $e');
+    } catch (_) {
       return false;
     }
   }
@@ -251,9 +245,7 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
         year: year ?? state.selectedYear,
       );
       state = state.copyWith(leaves: list);
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error fetching leaves: $e');
-    }
+    } catch (_) {}
   }
 
   Future<bool> addLeave({
@@ -275,8 +267,7 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
       await fetchLeaves(userId: userId);
       invalidateCache();
       return true;
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error adding leave: $e');
+    } catch (_) {
       return false;
     }
   }
@@ -300,8 +291,7 @@ class SalaryNotifier extends Notifier<SalaryState> with FetchCacheMixin {
       invalidateCache();
       await fetchCalculation(userId, month: state.selectedMonth, year: state.selectedYear, force: true);
       return true;
-    } catch (e) {
-      debugPrint('[SalaryNotifier] Error adding adjustment: $e');
+    } catch (_) {
       return false;
     }
   }

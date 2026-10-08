@@ -7,6 +7,7 @@ import '../../models/holiday_model.dart';
 import '../../models/salary_model.dart';
 import '../../models/user_model.dart';
 import '../../models/user_role.dart';
+import '../../state/attendance_settings_provider.dart';
 import '../../state/user_management_provider.dart';
 import '../utils/environment_utils.dart';
 
@@ -24,6 +25,11 @@ class AttendanceSalaryMockStore {
   final Map<String, EmployeeSalaryProfile> _salaries = {};
   final List<HolidayModel> _holidays = [];
   final Map<String, UserModel> _knownUsers = {};
+  AttendanceSettingsState _settings = const AttendanceSettingsState();
+
+  void syncSettings(AttendanceSettingsState s) {
+    _settings = s;
+  }
 
   Future<void> ensureInitialized() async {
     if (_initialized) return;
@@ -109,8 +115,7 @@ class AttendanceSalaryMockStore {
       }
       _seedDefaultHolidaysIfEmpty();
       _seedDefaultRecordsIfEmpty();
-    } catch (e) {
-      debugPrint('[AttendanceSalaryMockStore] Error initializing store: $e');
+    } catch (_) {
       _seedDefaultSalariesIfEmpty();
       _seedDefaultHolidaysIfEmpty();
       _seedDefaultRecordsIfEmpty();
@@ -223,9 +228,7 @@ class AttendanceSalaryMockStore {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = _records.map((r) => r.toJson()).toList();
       await prefs.setString(_kRecordsPrefKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('[AttendanceSalaryMockStore] Error persisting records: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _saveSalaries() async {
@@ -248,9 +251,7 @@ class AttendanceSalaryMockStore {
         };
       });
       await prefs.setString(_kSalariesPrefKey, jsonEncode(map));
-    } catch (e) {
-      debugPrint('[AttendanceSalaryMockStore] Error persisting salaries: $e');
-    }
+    } catch (_) {}
   }
 
   // ==================== ATTENDANCE METHODS ====================
@@ -269,6 +270,7 @@ class AttendanceSalaryMockStore {
 
     final now = DateTime.now();
     final today = DateFormat('yyyy-MM-dd').format(now);
+    // sessionType provided by caller (who reads attendanceSettingsProvider); fallback to 13 as default boundary
     final session = (sessionType != null && sessionType.isNotEmpty)
         ? sessionType.toLowerCase()
         : (now.hour < 13 ? 'morning' : 'afternoon');
@@ -345,7 +347,11 @@ class AttendanceSalaryMockStore {
     }).toList();
   }
 
-  Future<DailyAttendanceOverview> getDailyOverview([String? date, List<UserModel>? explicitUsers]) async {
+  Future<DailyAttendanceOverview> getDailyOverview([
+    String? date,
+    List<UserModel>? explicitUsers,
+    List<int>? explicitWeekendDays,
+  ]) async {
     await ensureInitialized();
     if (explicitUsers != null && explicitUsers.isNotEmpty) {
       syncUsers(explicitUsers);
@@ -364,8 +370,10 @@ class AttendanceSalaryMockStore {
     final seenUserIds = <String>{};
 
     for (final u in _knownUsers.values) {
-      if (seenUserIds.add(u.id)) {
-        usersToProcess.add(u);
+      if (u.role.requiresAttendanceCheckIn) {
+        if (seenUserIds.add(u.id)) {
+          usersToProcess.add(u);
+        }
       }
     }
 
@@ -388,7 +396,21 @@ class AttendanceSalaryMockStore {
 
     if (usersToProcess.isEmpty) {
       for (final u in kAuthenticDatabaseUsers) {
-        if (seenUserIds.add(u.id)) usersToProcess.add(u);
+        if (u.role.requiresAttendanceCheckIn) {
+          if (seenUserIds.add(u.id)) usersToProcess.add(u);
+        }
+      }
+      if (usersToProcess.isEmpty) {
+        final fallback = UserModel(
+          id: 'e0000000-0000-0000-0000-000000000002',
+          name: 'Tariq Ahmed',
+          email: 'tariq@pfis.com',
+          role: UserRole.projectMember,
+          department: 'Field Operations',
+          designation: 'Field Engineer',
+        );
+        syncUser(fallback);
+        usersToProcess.add(fallback);
       }
     }
 
@@ -396,8 +418,7 @@ class AttendanceSalaryMockStore {
     // (weekend = Fri/Sat in Bangladesh, or an official holiday)
     final targetDateObj = DateTime.tryParse(targetDate);
     final isWeekendDay = targetDateObj != null &&
-        (targetDateObj.weekday == DateTime.friday ||
-            targetDateObj.weekday == DateTime.saturday);
+        ((explicitWeekendDays ?? const [5, 6]).contains(targetDateObj.weekday));
     final isHolidayDay = _holidays.any((h) =>
         h.date == targetDate ||
         (h.isRecurring &&
@@ -417,8 +438,13 @@ class AttendanceSalaryMockStore {
         if (rec.isAfternoon) afternoon = rec;
       }
 
+      // Determine user-specific weekend off-days from assigned shift
+      final userShift = _settings.getShiftForUser(user.id);
+      final effectiveWeekendDays = explicitWeekendDays ?? userShift.weekendDays;
+      final isUserWeekendDay = targetDateObj != null && effectiveWeekendDays.contains(targetDateObj.weekday);
+
       String status;
-      if (isWeekendDay) {
+      if (isUserWeekendDay) {
         // Bug 1 Fix: Never penalise employees for being absent on a weekend
         status = 'weekend';
       } else if (isHolidayDay) {
@@ -606,6 +632,10 @@ class AttendanceSalaryMockStore {
     int weekendCount = 0;
     int holidayCount = 0;
 
+    final resolvedUser = _knownUsers[userId] ??
+        kAuthenticDatabaseUsers.cast<UserModel?>().firstWhere((u) => u?.id == userId, orElse: () => null);
+    final isExemptRole = resolvedUser != null && !resolvedUser.role.requiresAttendanceCheckIn;
+
     for (int day = 1; day <= daysInMonth; day++) {
       final dateObj = DateTime(year, month, day);
       final dateStr = DateFormat('yyyy-MM-dd').format(dateObj);
@@ -656,6 +686,10 @@ class AttendanceSalaryMockStore {
         status = 'holiday';
       } else if (isFuture) {
         status = 'upcoming';
+      } else if (isExemptRole) {
+        status = 'exempt';
+        presentWeight = 1.0;
+        presentDaysCount++;
       } else if (hasMorning && hasAfternoon) {
         status = 'present';
         presentWeight = 1.0;
@@ -702,7 +736,20 @@ class AttendanceSalaryMockStore {
       ));
     }
 
-    final totalDeductionAmount = totalDeductionsUnits * dailyRate;
+    double totalDeductionAmount = 0.0;
+    if (_settings.isDeductionEnabled && !isExemptRole) {
+      if (_settings.deductionType == 'fixed_amount') {
+        totalDeductionAmount = (halfDaysCount * _settings.halfDayDeductionAmount) +
+            ((confirmedAbsentDaysCount + missingLoginDaysCount) * _settings.fullDayDeductionAmount);
+      } else {
+        final effectiveUnits = (halfDaysCount * _settings.halfDayDeductionAmount) +
+            ((confirmedAbsentDaysCount + missingLoginDaysCount) * _settings.fullDayDeductionAmount);
+        totalDeductionAmount = effectiveUnits * dailyRate;
+      }
+    } else {
+      totalDeductionAmount = 0.0;
+    }
+
     final finalPayable = (monthlyBase - totalDeductionAmount).clamp(0.0, double.infinity);
 
     return SalaryCalculationModel(

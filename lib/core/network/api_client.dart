@@ -191,38 +191,34 @@ class ApiClient {
     try {
       final response = await requestFn(effectiveBaseUrl).timeout(timeout);
       return _processResponse(response);
-    } on SocketException catch (e) {
+    } on SocketException {
       if (effectiveBaseUrl.contains('sslip.io') && !effectiveBaseUrl.contains('163.227.239.97')) {
-        debugPrint('[ApiClient] DNS failure on sslip.io ($e). Retrying via direct IP: http://163.227.239.97/api/v1');
         _effectiveBaseUrl = 'http://163.227.239.97/api/v1';
         try {
           final fallbackResponse = await requestFn(_effectiveBaseUrl!).timeout(timeout);
-          debugPrint('[ApiClient] Direct IP failover succeeded.');
           return _processResponse(fallbackResponse);
         } catch (_) {
           // Fall through to throw original exception
         }
       }
-      throw NetworkException('Network error: ${e.message}');
-    } on http.ClientException catch (e) {
+      throw const NetworkException('Unable to connect to server. Please check your internet connection.');
+    } on http.ClientException {
       if (effectiveBaseUrl.contains('sslip.io') && !effectiveBaseUrl.contains('163.227.239.97')) {
-        debugPrint('[ApiClient] Client error on sslip.io ($e). Retrying via direct IP: http://163.227.239.97/api/v1');
         _effectiveBaseUrl = 'http://163.227.239.97/api/v1';
         try {
           final fallbackResponse = await requestFn(_effectiveBaseUrl!).timeout(timeout);
-          debugPrint('[ApiClient] Direct IP failover succeeded.');
           return _processResponse(fallbackResponse);
         } catch (_) {
           // Fall through to throw original exception
         }
       }
-      throw NetworkException('Connection error: ${e.message}');
+      throw const NetworkException('Unable to connect to server. Please check your internet connection.');
     } on TimeoutException {
       throw const ApiTimeoutException();
     } on ApiException {
       rethrow;
-    } catch (e) {
-      throw ApiException('Unexpected client error: $e');
+    } catch (_) {
+      throw const ApiException('Unable to complete request. Please try again.');
     }
   }
 

@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
@@ -15,6 +14,8 @@ import 'expense_provider.dart';
 import 'project_provider.dart';
 import 'salary_provider.dart';
 import 'user_management_provider.dart';
+import 'notification_provider.dart';
+import '../core/services/fcm_service.dart';
 
 const String _kSessionUserKey = 'gw_session_user_data';
 const String _kSessionTokenKey = 'gw_session_auth_token';
@@ -63,7 +64,6 @@ class AuthNotifier extends Notifier<AuthState> {
   /// Clears local session so the GoRouter redirect guard sends user to login.
   void _handleUnauthorized() {
     if (!state.isAuthenticated) return; // already logged out
-    debugPrint('[AuthNotifier] 401 received — forcing session logout');
     ref.read(apiClientProvider).clearAuthToken();
     _clearSession(); // async but fire-and-forget is fine here
     state = const AuthState(
@@ -94,7 +94,6 @@ class AuthNotifier extends Notifier<AuthState> {
           isLoading: false,
           clearError: true,
         );
-        debugPrint('[AuthNotifier] Restored persistent user session: ${user.email} (${user.role.displayName})');
         AttendanceSalaryMockStore.instance.syncUser(user);
         // Trigger fetches — TTL cache will prevent duplicates
         ref.read(projectProvider.notifier).fetchProjects();
@@ -102,10 +101,9 @@ class AuthNotifier extends Notifier<AuthState> {
         ref.read(userManagementProvider.notifier).fetchUsers();
         ref.read(attendanceProvider.notifier).fetchDailyOverview();
         ref.read(salaryProvider.notifier).fetchOrgSalaryReport();
+        FcmService.instance.syncTokenWithBackend();
       }
-    } catch (e) {
-      debugPrint('[AuthNotifier] Error restoring session: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _persistSession(UserModel user, String? token) async {
@@ -117,9 +115,7 @@ class AuthNotifier extends Notifier<AuthState> {
         await prefs.setString(_kSessionTokenKey, token);
         ref.read(apiClientProvider).setAuthToken(token);
       }
-    } catch (e) {
-      debugPrint('[AuthNotifier] Failed to persist session: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _clearSession() async {
@@ -128,9 +124,7 @@ class AuthNotifier extends Notifier<AuthState> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_kSessionUserKey);
       await prefs.remove(_kSessionTokenKey);
-    } catch (e) {
-      debugPrint('[AuthNotifier] Failed to clear session: $e');
-    }
+    } catch (_) {}
   }
 
   Future<bool> register({
@@ -155,10 +149,13 @@ class AuthNotifier extends Notifier<AuthState> {
       );
 
       // Synchronize newly registered user into user management provider & attendance store
-      ref.read(userManagementProvider.notifier).findOrAddMemberByEmail(user.email, name: user.name);
+      ref
+          .read(userManagementProvider.notifier)
+          .findOrAddMemberByEmail(user.email, name: user.name);
       AttendanceSalaryMockStore.instance.syncUser(user);
 
-      final token = ref.read(apiClientProvider).authToken ?? 'reg_token_${user.id}';
+      final token =
+          ref.read(apiClientProvider).authToken ?? 'reg_token_${user.id}';
       await _persistSession(user, token);
 
       state = state.copyWith(
@@ -177,10 +174,7 @@ class AuthNotifier extends Notifier<AuthState> {
       ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: e.message,
-      );
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
       return false;
     } catch (e) {
       state = state.copyWith(
@@ -208,6 +202,20 @@ class AuthNotifier extends Notifier<AuthState> {
         final registeredUsers = ref.read(userManagementProvider);
         for (final regUser in registeredUsers) {
           if (regUser.email.trim().toLowerCase() == cleanEmail) {
+            // Check password validation locally
+            final savedPwd = await UserManagementNotifier.getLocalPassword(
+              cleanEmail,
+            );
+            if (savedPwd != null && savedPwd.isNotEmpty) {
+              if (password != savedPwd) {
+                throw const ApiException('Invalid email or password.');
+              }
+            } else {
+              // Standard default test passwords
+              if (password != 'password123' && password != 'admin123') {
+                throw const ApiException('Invalid email or password.');
+              }
+            }
             user = regUser;
             token = 'token_${regUser.id}';
             break;
@@ -221,9 +229,14 @@ class AuthNotifier extends Notifier<AuthState> {
 
       final authUser = user;
       final currentUsers = ref.read(userManagementProvider);
-      final existingIndex = currentUsers.indexWhere((u) => u.id == authUser.id || u.email == authUser.email);
+      final existingIndex = currentUsers.indexWhere(
+        (u) => u.id == authUser.id || u.email == authUser.email,
+      );
       if (existingIndex == -1) {
-        ref.read(userManagementProvider.notifier).setUsers([...currentUsers, authUser]);
+        ref.read(userManagementProvider.notifier).setUsers([
+          ...currentUsers,
+          authUser,
+        ]);
       }
 
       await _persistSession(authUser, token);
@@ -244,22 +257,21 @@ class AuthNotifier extends Notifier<AuthState> {
       ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
       ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
 
-      // Trigger employee attendance and geo-location tracking on login
-      ref.read(attendanceProvider.notifier).checkIn();
+      // Fetch fresh notifications from server
+      ref.read(notificationProvider.notifier).fetchNotifications();
+
+      // Sync any pending offline check-ins (do not auto check-in)
       ref.read(attendanceProvider.notifier).syncOfflineCheckIns();
+
+      // Register FCM device token with backend
+      FcmService.instance.syncTokenWithBackend();
 
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: e.message,
-      );
+      state = state.copyWith(isLoading: false, errorMessage: e.message);
       return false;
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Login error: $e',
-      );
+      state = state.copyWith(isLoading: false, errorMessage: 'Login error: $e');
       return false;
     }
   }
@@ -273,32 +285,41 @@ class AuthNotifier extends Notifier<AuthState> {
     }
     await _clearSession();
     ref.read(apiClientProvider).clearAuthToken();
-    state = const AuthState(
-      currentUser: null,
-      isAuthenticated: false,
-    );
+    ref.read(notificationProvider.notifier).clearCache();
+    ref.invalidate(projectProvider);
+    ref.invalidate(expenseProvider);
+    ref.invalidate(attendanceProvider);
+    ref.invalidate(salaryProvider);
+    ref.invalidate(notificationProvider);
+    state = const AuthState(currentUser: null, isAuthenticated: false);
   }
 
   void switchRole(UserRole role) {
     UserModel targetUser;
-    final matching = kAuthenticDatabaseUsers.where((u) => u.role == role).toList();
+    final matching =
+        kAuthenticDatabaseUsers.where((u) => u.role == role).toList();
     if (matching.isNotEmpty) {
       targetUser = matching.first;
     } else {
       final current = state.currentUser;
-      targetUser = current != null
-          ? current.copyWith(role: role)
-          : UserModel(
-              id: 'role_${role.name}',
-              name: role.displayName,
-              email: '${role.name}@pfis.com',
-              role: role,
-              department: 'Operations',
-            );
+      targetUser =
+          current != null
+              ? current.copyWith(role: role)
+              : UserModel(
+                id: 'role_${role.name}',
+                name: role.displayName,
+                email: '${role.name}@pfis.com',
+                role: role,
+                department: 'Operations',
+              );
     }
     AttendanceSalaryMockStore.instance.syncUser(targetUser);
     _persistSession(targetUser, 'session_token_${targetUser.id}');
-    state = state.copyWith(currentUser: targetUser, isAuthenticated: true, clearError: true);
+    state = state.copyWith(
+      currentUser: targetUser,
+      isAuthenticated: true,
+      clearError: true,
+    );
     ref.read(attendanceProvider.notifier).invalidateCache();
     ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
     ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
@@ -343,25 +364,40 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> updateAvatarUrl(String? url) async {
     if (state.currentUser == null) return;
 
-    String? resolvedUrl = url;
+    final isClearing = url == null || url.trim().isEmpty;
+    String? resolvedUrl = isClearing ? null : url;
 
     // Upload to backend if it's a local file or base64
-    if (url != null && url.isNotEmpty && !url.startsWith('http') && !url.startsWith('/uploads/')) {
+    if (!isClearing &&
+        resolvedUrl != null &&
+        !resolvedUrl.startsWith('http') &&
+        !resolvedUrl.startsWith('/uploads/')) {
       try {
         final uploadRepo = ref.read(fileUploadRepositoryProvider);
         final result = await uploadRepo.upload(
-          filePathOrDataUri: url,
+          filePathOrDataUri: resolvedUrl,
           category: UploadCategory.avatars,
           entityId: state.currentUser!.id,
         );
-        resolvedUrl = result.url;
-      } catch (e) {
-        debugPrint('[AuthNotifier] Avatar upload to backend failed: $e');
-        // Fallback: keep local path
+        if (result.url.isNotEmpty) {
+          resolvedUrl = result.url;
+        }
+      } catch (_) {
+        // Fallback: keep local path or data URI so image displays instantly without backend dependency
+        resolvedUrl = url;
       }
     }
 
-    final updated = state.currentUser!.copyWith(avatarUrl: resolvedUrl);
+    // Attempt to notify backend auth profile about new avatar URL
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      await repo.updateAvatar(resolvedUrl);
+    } catch (_) {}
+
+    final updated = state.currentUser!.copyWith(
+      avatarUrl: resolvedUrl,
+      clearAvatarUrl: isClearing,
+    );
     state = state.copyWith(currentUser: updated);
     await _persistSession(updated, ref.read(apiClientProvider).authToken);
 
@@ -418,5 +454,6 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 }
 
-final authProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
-
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(
+  AuthNotifier.new,
+);

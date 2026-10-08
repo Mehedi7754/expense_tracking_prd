@@ -509,6 +509,18 @@ class ExpenseModel {
       return fallback;
     }
 
+    bool parseBool(dynamic val, [bool fallback = true]) {
+      if (val == null) return fallback;
+      if (val is bool) return val;
+      if (val is num) return val != 0;
+      if (val is String) {
+        final s = val.trim().toLowerCase();
+        if (s == 'false' || s == '0' || s == 'no') return false;
+        if (s == 'true' || s == '1' || s == 'yes') return true;
+      }
+      return fallback;
+    }
+
     final statusStr = (json['status'] ?? 'pending').toString();
     final justStatusStr = (json['justification_status'] ?? json['justificationStatus'] ?? 'none').toString();
 
@@ -522,6 +534,12 @@ class ExpenseModel {
     final fdData = json['food_details'] ?? json['foodDetails'] ?? categoryDetails?['food'];
     final acData = json['accommodation_details'] ?? json['accommodationDetails'] ?? categoryDetails?['accommodation'];
     final ofData = json['office_cost_details'] ?? json['officeCostDetails'] ?? categoryDetails?['office'];
+
+    final receiptPhoto = json['receipt_photo_url']?.toString() ?? json['receiptPhotoUrl']?.toString();
+    final rawReceipt = json['has_receipt'] ?? json['hasReceipt'];
+    final bool parsedHasReceipt = rawReceipt != null
+        ? parseBool(rawReceipt, false)
+        : (receiptPhoto != null && receiptPhoto.isNotEmpty);
 
     return ExpenseModel(
       id: (json['id'] ?? '').toString(),
@@ -548,8 +566,8 @@ class ExpenseModel {
       date: json['date'] != null
           ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
           : DateTime.now(),
-      hasReceipt: json['has_receipt'] ?? json['hasReceipt'] ?? true,
-      receiptPhotoUrl: json['receipt_photo_url']?.toString() ?? json['receiptPhotoUrl']?.toString(),
+      hasReceipt: parsedHasReceipt,
+      receiptPhotoUrl: receiptPhoto,
       status: ExpenseStatus.fromString(statusStr),
       rejectionReason: json['rejection_reason']?.toString() ?? json['rejectionReason']?.toString(),
       comments: parseComments(json['comments']),

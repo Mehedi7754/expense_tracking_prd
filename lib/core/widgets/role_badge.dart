@@ -15,47 +15,48 @@ class RoleBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
     Color bg;
     Color text;
     Color border;
 
     switch (role) {
       case UserRole.projectMember:
-        bg = AppColors.surfaceSubtle;
-        text = AppColors.textSecondary;
-        border = AppColors.border;
+        bg = isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle;
+        text = isDark ? AppColors.darkTextSecondary : AppColors.textSecondary;
+        border = isDark ? AppColors.darkBorder : AppColors.border;
         break;
       case UserRole.projectManager:
-        bg = AppColors.indigoLight;
-        text = AppColors.indigo;
-        border = AppColors.indigoBorder;
+        bg = isDark ? AppColors.darkIndigoLight : AppColors.indigoLight;
+        text = isDark ? AppColors.indigoAccent : AppColors.indigo;
+        border = isDark ? AppColors.darkIndigoBorder : AppColors.indigoBorder;
         break;
       case UserRole.finance:
-        bg = AppColors.emeraldLight;
-        text = AppColors.emerald;
-        border = AppColors.emeraldBorder;
+        bg = isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight;
+        text = isDark ? AppColors.emeraldAccent : AppColors.emerald;
+        border = isDark ? AppColors.darkEmeraldBorder : AppColors.emeraldBorder;
         break;
       case UserRole.mainAdmin:
-        bg = AppColors.primarySubtle;
-        text = AppColors.primary;
-        border = AppColors.border;
+        bg = isDark ? AppColors.darkPrimaryLight : AppColors.primarySubtle;
+        text = isDark ? AppColors.darkPrimary : AppColors.primary;
+        border = isDark ? AppColors.darkPrimary.withAlpha(80) : AppColors.primary.withAlpha(40);
         break;
       case UserRole.viewer:
-        bg = Colors.blue.withAlpha(20);
-        text = Colors.blue;
-        border = Colors.blue.withAlpha(60);
+        bg = isDark ? const Color(0xFF1E3A8A).withAlpha(40) : Colors.blue.withAlpha(20);
+        text = isDark ? const Color(0xFF93C5FD) : Colors.blue.shade700;
+        border = isDark ? const Color(0xFF1D4ED8).withAlpha(70) : Colors.blue.withAlpha(60);
         break;
     }
 
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 10,
-        vertical: compact ? 3 : 5,
+        vertical: compact ? 3 : 4.5,
       ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: border, width: 1),
+        border: Border.all(color: border, width: 1.0),
       ),
       child: Text(
         role.displayName,

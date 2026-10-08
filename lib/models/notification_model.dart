@@ -2,7 +2,12 @@ enum NotificationType {
   expenseApproved,
   expenseRejected,
   expenseSubmitted,
+  justificationSubmitted,
+  justificationApproved,
+  justificationRejected,
+  projectAssigned,
   budgetWarning,
+  budgetCritical,
   commentAdded,
   attendanceReminder,
   attendanceLate,
@@ -23,8 +28,18 @@ enum NotificationType {
         return 'Expense Rejected';
       case NotificationType.expenseSubmitted:
         return 'New Submission';
+      case NotificationType.justificationSubmitted:
+        return 'Justification Submitted';
+      case NotificationType.justificationApproved:
+        return 'Justification Approved';
+      case NotificationType.justificationRejected:
+        return 'Justification Rejected';
+      case NotificationType.projectAssigned:
+        return 'Project Assignment';
       case NotificationType.budgetWarning:
         return 'Budget Warning';
+      case NotificationType.budgetCritical:
+        return 'Critical Budget Alert';
       case NotificationType.commentAdded:
         return 'New Comment';
       case NotificationType.attendanceReminder:
@@ -58,8 +73,18 @@ enum NotificationType {
         return NotificationType.expenseRejected;
       case 'expensesubmitted':
         return NotificationType.expenseSubmitted;
+      case 'justificationsubmitted':
+        return NotificationType.justificationSubmitted;
+      case 'justificationapproved':
+        return NotificationType.justificationApproved;
+      case 'justificationrejected':
+        return NotificationType.justificationRejected;
+      case 'projectassigned':
+        return NotificationType.projectAssigned;
       case 'budgetwarning':
         return NotificationType.budgetWarning;
+      case 'budgetcritical':
+        return NotificationType.budgetCritical;
       case 'commentadded':
         return NotificationType.commentAdded;
       case 'attendancereminder':
@@ -151,11 +176,21 @@ class NotificationModel {
       relatedExpenseId: json['related_expense_id']?.toString() ?? json['relatedExpenseId']?.toString(),
       relatedProjectId: json['related_project_id']?.toString() ?? json['relatedProjectId']?.toString(),
       isRead: json['is_read'] ?? json['isRead'] ?? false,
-      timestamp: json['timestamp'] != null
-          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
-          : (json['created_at'] != null
-              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
-              : DateTime.now()),
+      timestamp: () {
+        for (final key in ['createdAt', 'created_at', 'timestamp', 'date']) {
+          final val = json[key];
+          if (val != null) {
+            final str = val.toString().trim();
+            if (str.isNotEmpty && str != 'null') {
+              final parsed = DateTime.tryParse(str);
+              if (parsed != null) {
+                return parsed.toLocal();
+              }
+            }
+          }
+        }
+        return DateTime.now();
+      }(),
     );
   }
 

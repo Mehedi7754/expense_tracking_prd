@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsState {
   final String preferredCurrency;
@@ -96,8 +97,23 @@ class SettingsState {
 }
 
 class SettingsNotifier extends Notifier<SettingsState> {
+  static const _themeKey = 'spendwise_app_is_dark_mode';
+
   @override
-  SettingsState build() => const SettingsState();
+  SettingsState build() {
+    _loadPersistedTheme();
+    return const SettingsState();
+  }
+
+  Future<void> _loadPersistedTheme() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isDark = prefs.getBool(_themeKey);
+      if (isDark != null && isDark != state.isDarkMode) {
+        state = state.copyWith(isDarkMode: isDark);
+      }
+    } catch (_) {}
+  }
 
   void setCurrency(String currency) {
     state = state.copyWith(preferredCurrency: currency, baseCurrency: currency);
@@ -105,6 +121,14 @@ class SettingsNotifier extends Notifier<SettingsState> {
 
   void toggleTheme(bool isDark) {
     state = state.copyWith(isDarkMode: isDark);
+    _persistTheme(isDark);
+  }
+
+  Future<void> _persistTheme(bool isDark) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_themeKey, isDark);
+    } catch (_) {}
   }
 
   void toggleNotifications(bool enabled) {

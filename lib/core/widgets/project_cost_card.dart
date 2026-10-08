@@ -1,5 +1,6 @@
-import 'dart:math' as math;
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:getwidget/getwidget.dart';
 import '../constants/app_colors.dart';
 import '../utils/currency_formatter.dart';
 import '../utils/image_utils.dart';
@@ -23,56 +24,60 @@ class ProjectCostCard extends StatelessWidget {
   final ProjectModel project;
   final List<ExpenseModel> projectExpenses;
   final VoidCallback? onTap;
+  final VoidCallback? onDelete;
   final EdgeInsetsGeometry? margin;
+  final bool showFinancials;
 
   const ProjectCostCard({
     super.key,
     required this.project,
     required this.projectExpenses,
     this.onTap,
+    this.onDelete,
     this.margin,
+    this.showFinancials = true,
   });
 
   static const List<_CardPalette> _curatedPalettes = [
     _CardPalette(
       accent: Color(0xFFF97316), // Peach / Warm Coral
       lightBg: Color(0xFFFFEDD5),
-      icon: Icons.business_center_rounded,
+      icon: CupertinoIcons.briefcase_fill,
     ),
     _CardPalette(
       accent: Color(0xFF8B5CF6), // Soft Violet / Lavender
       lightBg: Color(0xFFF3E8FF),
-      icon: Icons.school_rounded,
+      icon: CupertinoIcons.book_fill,
     ),
     _CardPalette(
       accent: Color(0xFF0284C7), // Sky Blue
       lightBg: Color(0xFFE0F2FE),
-      icon: Icons.domain_rounded,
+      icon: CupertinoIcons.building_2_fill,
     ),
     _CardPalette(
       accent: Color(0xFF10B981), // Fresh Mint Emerald
       lightBg: Color(0xFFDCFCE7),
-      icon: Icons.analytics_rounded,
+      icon: CupertinoIcons.chart_bar_alt_fill,
     ),
     _CardPalette(
       accent: Color(0xFF6366F1), // Royal Indigo
       lightBg: Color(0xFFEEF2FF),
-      icon: Icons.layers_rounded,
+      icon: CupertinoIcons.layers_fill,
     ),
     _CardPalette(
       accent: Color(0xFFEC4899), // Soft Rose Pink
       lightBg: Color(0xFFFCE7F3),
-      icon: Icons.rocket_launch_rounded,
+      icon: CupertinoIcons.rocket_fill,
     ),
     _CardPalette(
       accent: Color(0xFF0D9488), // Ocean Teal
       lightBg: Color(0xFFCCFBF1),
-      icon: Icons.pie_chart_rounded,
+      icon: CupertinoIcons.chart_pie_fill,
     ),
     _CardPalette(
       accent: Color(0xFFD97706), // Warm Amber
       lightBg: Color(0xFFFEF3C7),
-      icon: Icons.folder_special_rounded,
+      icon: CupertinoIcons.folder_fill,
     ),
   ];
 
@@ -123,132 +128,174 @@ class ProjectCostCard extends StatelessWidget {
         : accentColor.withValues(alpha: 0.12);
 
     return Container(
-      margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: margin ?? const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+          color: isDark
+              ? const Color(0xFF334155)
+              : const Color(0xFFE2E8F0),
           width: 1.0,
         ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: isDark ? 0.08 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(18),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 1. Left squircle icon or project image with soft tinted pastel background
+                // 1. Left squircle icon / thumbnail
                 Container(
-                  width: 52,
-                  height: 52,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: iconBg,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(
+                      color: accentColor.withValues(alpha: 0.20),
+                      width: 1.2,
+                    ),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(13),
                     child: (project.imageUrl != null && project.imageUrl!.isNotEmpty)
                         ? _buildProjectThumbnail(project.imageUrl!, iconData, accentColor)
                         : Center(
                             child: Icon(
                               iconData,
-                              size: 26,
+                              size: 22,
                               color: accentColor,
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
 
-                // 2. Middle Column: Project Name, Status Indicator & Financials
+                // 2. Middle Column: Info & Linear Progress
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        project.name,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          letterSpacing: -0.2,
-                          height: 1.25,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: '${CurrencyFormatter.format(costIncurred, compact: true)} ',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF1E293B),
-                                fontSize: 12.5,
-                              ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    project.name,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      letterSpacing: -0.2,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
                             ),
-                            TextSpan(
-                              text: 'of ${CurrencyFormatter.format(totalBudget, compact: true)}',
+                          ),
+                          const SizedBox(width: 8),
+                          if (showFinancials)
+                            Text(
+                              CurrencyFormatter.format(costIncurred, compact: true),
                               style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                fontSize: 11.5,
+                                fontWeight: FontWeight.w900,
+                                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                                fontSize: 14,
+                                letterSpacing: -0.3,
+                              ),
+                            )
+                          else
+                            ProjectProgressBadge.fromProject(project, compact: true, showPercentage: false),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Text(
+                            project.projectId,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: accentColor,
+                            ),
+                          ),
+                          if (project.client.isNotEmpty) ...[
+                            Flexible(
+                              child: Text(
+                                ' • ${project.client}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        ],
                       ),
-                      const SizedBox(height: 5),
-                      ProjectProgressBadge.fromProject(project, compact: true, showPercentage: false),
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: GFProgressBar(
+                              percentage: ((isCompleted || project.progressPercentage >= 100.0)
+                                  ? 1.0
+                                  : (project.progressPercentage.clamp(0.0, 100.0) / 100.0)).clamp(0.0, 1.0),
+                              lineHeight: 5,
+                              backgroundColor: trackColor,
+                              progressBarColor: accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            (isCompleted || project.progressPercentage >= 100.0)
+                                ? '100%'
+                                : '${project.progressPercentage.clamp(0.0, 100.0).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: accentColor,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
 
-                // 3. Right: Sleek Circular Progress Ring with Project Progress Percentage
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _MinimalCircularProgress(
-                      progress: (isCompleted || project.progressPercentage >= 100.0)
-                          ? 1.0
-                          : (project.progressPercentage.clamp(0.0, 100.0) / 100.0),
-                      color: accentColor,
-                      trackColor: trackColor,
-                      label: (isCompleted || project.progressPercentage >= 100.0)
-                          ? '100%'
-                          : '${project.progressPercentage.clamp(0.0, 100.0).toStringAsFixed(0)}%',
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Progress',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
+                // 3. Right: Delete Action (optional)
+                if (onDelete != null) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, size: 19, color: Color(0xFFEF4444)),
+                    tooltip: 'Delete Project',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                    onPressed: onDelete,
+                  ),
+                ],
               ],
             ),
           ),
@@ -260,104 +307,11 @@ class ProjectCostCard extends StatelessWidget {
   Widget _buildProjectThumbnail(String path, IconData fallbackIcon, Color fallbackColor) {
     return AppImageHelper.buildImage(
       path: path,
-      width: 52,
-      height: 52,
-      placeholder: () => Center(child: Icon(fallbackIcon, size: 26, color: fallbackColor)),
+      width: 44,
+      height: 44,
+      placeholder: () => Center(child: Icon(fallbackIcon, size: 22, color: fallbackColor)),
     );
   }
 }
 
-class _MinimalCircularProgress extends StatelessWidget {
-  final double progress;
-  final Color color;
-  final Color trackColor;
-  final String label;
 
-  const _MinimalCircularProgress({
-    required this.progress,
-    required this.color,
-    required this.trackColor,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 52,
-      height: 52,
-      child: CustomPaint(
-        painter: _RingPainter(
-          progress: progress.clamp(0.0, 1.0),
-          color: color,
-          trackColor: trackColor,
-          strokeWidth: 4.5,
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: label.length > 3 ? 11.0 : 13.0,
-              fontWeight: FontWeight.w800,
-              color: color,
-              letterSpacing: -0.4,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RingPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final Color trackColor;
-  final double strokeWidth;
-
-  _RingPainter({
-    required this.progress,
-    required this.color,
-    required this.trackColor,
-    required this.strokeWidth,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - strokeWidth) / 2;
-
-    // Track circle
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, trackPaint);
-
-    // Progress Arc
-    if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round;
-
-      const startAngle = -math.pi / 2; // 12 o'clock
-      final sweepAngle = 2 * math.pi * progress;
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        sweepAngle,
-        false,
-        progressPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.color != color ||
-        oldDelegate.trackColor != trackColor ||
-        oldDelegate.strokeWidth != strokeWidth;
-  }
-}

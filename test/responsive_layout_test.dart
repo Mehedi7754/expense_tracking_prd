@@ -438,15 +438,14 @@ void main() {
     expect(find.text('Cost Usage Breakdown:'), findsWidgets);
     expect(find.text('Transportation: '), findsWidgets);
 
-    // Scroll down to verify Sarah Jenkins as well
-    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    // Collapse Karim Ullah's card to restore list height
+    await tester.tap(find.text('Karim Ullah').first);
     await tester.pumpAndSettle();
     expect(find.text('Sarah Jenkins'), findsWidgets);
 
     // Verify tabs exist and switch to Categories tab
     final categoriesTab = find.textContaining('Categories');
     expect(categoriesTab, findsOneWidget);
-    await tester.ensureVisible(categoriesTab);
     await tester.tap(categoriesTab);
     await tester.pumpAndSettle();
 

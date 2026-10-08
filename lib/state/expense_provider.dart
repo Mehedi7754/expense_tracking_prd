@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/services/push_notification_service.dart';
@@ -57,12 +56,10 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
             .toList();
 
         state = customExpenses;
-        debugPrint('[ExpenseNotifier] Restored ${customExpenses.length} expenses from local cache');
       } else {
         state = const [];
       }
-    } catch (e) {
-      debugPrint('[ExpenseNotifier] Error loading cached expenses: $e');
+    } catch (_) {
       state = const [];
     }
   }
@@ -73,9 +70,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       final prefs = await SharedPreferences.getInstance();
       final jsonList = state.map((e) => e.toJson()).toList();
       await prefs.setString(_kCustomExpensesKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('[ExpenseNotifier] Error persisting expenses: $e');
-    }
+    } catch (_) {}
   }
 
   /// Fetches expenses from backend with cache check.
@@ -101,18 +96,15 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
         final localPending = state.where((e) => e.id.startsWith('exp_')).toList();
         state = [...remoteExpenses, ...localPending];
         await _persistExpenses();
-        debugPrint('[ExpenseNotifier] Synchronized ${remoteExpenses.length} expenses from backend (${localPending.length} offline pending)');
       } else {
         final remoteIds = remoteExpenses.map((e) => e.id).toSet();
         final localOnly = state.where((e) => !remoteIds.contains(e.id)).toList();
         state = [...remoteExpenses, ...localOnly];
         await _persistExpenses();
-        debugPrint('[ExpenseNotifier] Synchronized ${remoteExpenses.length} filtered expenses from backend');
       }
       markFetchCompleted();
-    } catch (e) {
+    } catch (_) {
       markFetchFailed();
-      debugPrint('[ExpenseNotifier] Offline: keeping cached expenses: $e');
     }
   }
 
@@ -274,8 +266,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       );
 
       return saved;
-    } catch (e) {
-      debugPrint('[ExpenseNotifier] Error submitting expense to backend: $e. Retained in local storage.');
+    } catch (_) {
       return newExpense;
     }
   }
@@ -555,6 +546,21 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     state = state.where((exp) => !(exp.id == id && exp.status == ExpenseStatus.pending)).toList();
     _persistExpenses();
     invalidateCache();
+  }
+
+  void updateExpenseReceiptUrl(String expenseId, String remoteUrl) {
+    state = [
+      for (final exp in state)
+        if (exp.id == expenseId)
+          exp.copyWith(
+            receiptPhotoUrl: remoteUrl,
+            hasReceipt: true,
+            justificationStatus: JustificationStatus.none,
+          )
+        else
+          exp,
+    ];
+    _persistExpenses();
   }
 
   Future<void> addComment({

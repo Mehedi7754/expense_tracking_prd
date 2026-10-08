@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,10 @@ import 'package:expense_tracking_prd/state/notification_provider.dart';
 
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Notification Model & Enum Tests', () {
@@ -205,11 +210,10 @@ void main() {
 
       expect(find.text('New Expense Submitted'), findsOneWidget);
       expect(find.text('A claim for Travel was submitted'), findsOneWidget);
-      expect(find.text('Mark All Read'), findsOneWidget);
       expect(find.byTooltip('Delete All'), findsOneWidget);
 
-      // Verify individual delete button works
-      final deleteBtn = find.byTooltip('Delete');
+      // Verify individual delete button works (close_rounded icon)
+      final deleteBtn = find.byIcon(Icons.close_rounded);
       expect(deleteBtn, findsOneWidget);
 
       await tester.tap(deleteBtn);
@@ -220,7 +224,7 @@ void main() {
       expect(find.text('No Notifications'), findsOneWidget);
     });
 
-    testWidgets('Delete All button shows confirmation dialog and cancels or deletes', (tester) async {
+    testWidgets('Delete All button permanently deletes all notifications and shows SnackBar', (tester) async {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -257,24 +261,8 @@ void main() {
       await tester.tap(find.byTooltip('Delete All'));
       await tester.pumpAndSettle();
 
-      // Dialog appears
-      expect(find.text('Delete All Notifications'), findsOneWidget);
-      expect(find.text('Cancel'), findsOneWidget);
-
-      // Cancel first
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Alert 1'), findsOneWidget);
-
-      // Tap Delete All again and confirm
-      await tester.tap(find.byTooltip('Delete All'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.widgetWithText(TextButton, 'Delete All'));
-      await tester.pumpAndSettle();
-
       expect(find.text('No Notifications'), findsOneWidget);
+      expect(find.text('All notifications permanently deleted'), findsOneWidget);
     });
   });
 }

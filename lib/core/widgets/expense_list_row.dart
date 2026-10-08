@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../models/expense_model.dart';
 import '../constants/app_colors.dart';
@@ -31,56 +32,70 @@ class ExpenseListRow extends StatelessWidget {
     switch (iconName.toLowerCase()) {
       case 'travel':
       case 'flight':
+      case 'trips':
         return const _CategoryTheme(
-          Icons.flight_takeoff_rounded,
+          CupertinoIcons.airplane,
           Color(0xFF0284C7), // Sky Blue
           Color(0xFFE0F2FE),
         );
       case 'transport':
       case 'taxi':
         return const _CategoryTheme(
-          Icons.local_taxi_rounded,
+          CupertinoIcons.car_detailed,
           Color(0xFF0D9488), // Teal
           Color(0xFFCCFBF1),
         );
       case 'meal':
       case 'food':
+      case 'food & drink':
         return const _CategoryTheme(
-          Icons.restaurant_rounded,
+          CupertinoIcons.cart_badge_plus,
           Color(0xFFF97316), // Peach / Warm Coral
           Color(0xFFFFEDD5),
+        );
+      case 'shopping':
+        return const _CategoryTheme(
+          CupertinoIcons.bag_fill,
+          Color(0xFF2563EB), // Blue
+          Color(0xFFDBEAFE),
+        );
+      case 'home':
+        return const _CategoryTheme(
+          CupertinoIcons.house_fill,
+          Color(0xFF059669), // Green
+          Color(0xFFD1FAE5),
         );
       case 'lodging':
       case 'hotel':
         return const _CategoryTheme(
-          Icons.hotel_rounded,
+          CupertinoIcons.bed_double_fill,
           Color(0xFF8B5CF6), // Soft Violet
           Color(0xFFF3E8FF),
         );
       case 'hardware':
       case 'tech':
         return const _CategoryTheme(
-          Icons.laptop_mac_rounded,
+          CupertinoIcons.device_laptop,
           Color(0xFF10B981), // Emerald
           Color(0xFFDCFCE7),
         );
       case 'software':
       case 'subscription':
         return const _CategoryTheme(
-          Icons.apps_rounded,
+          CupertinoIcons.app_badge,
           Color(0xFF6366F1), // Indigo
           Color(0xFFEEF2FF),
         );
       case 'office':
       case 'supplies':
         return const _CategoryTheme(
-          Icons.business_center_rounded,
+          CupertinoIcons.briefcase,
           Color(0xFFD97706), // Warm Amber
           Color(0xFFFEF3C7),
         );
       default:
         return const _CategoryTheme(
-          Icons.receipt_long_rounded,
+          CupertinoIcons.doc_text_fill,
           Color(0xFF4F46E5), // Royal Indigo
           Color(0xFFEEF2FF),
         );
@@ -99,16 +114,16 @@ class ExpenseListRow extends StatelessWidget {
         color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-          width: 1,
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 1.0,
         ),
         boxShadow: isDark
             ? []
             : [
                 BoxShadow(
                   color: const Color(0xFF0F172A).withValues(alpha: 0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
       ),
@@ -124,18 +139,22 @@ class ExpenseListRow extends StatelessWidget {
               children: [
                 // Category Squircle Icon with soft tinted pastel background
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: iconBg,
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: catTheme.accent.withValues(alpha: 0.16),
+                      width: 1.0,
+                    ),
                   ),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       Icon(
                         catTheme.icon,
-                        size: 21,
+                        size: 20,
                         color: catTheme.accent,
                       ),
                       if (expense.receiptPhotoUrl != null && expense.receiptPhotoUrl!.isNotEmpty)
@@ -172,38 +191,38 @@ class ExpenseListRow extends StatelessWidget {
                     children: [
                       Text(
                         showEmployeeName ? expense.employeeName : expense.projectName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: isDark ? Colors.white : const Color(0xFF0F172A),
                           letterSpacing: -0.2,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 3),
                       Text(
                         showEmployeeName
                             ? '${expense.projectName} • ${expense.categoryName} • ${DateFormatter.formatShort(expense.date)}${expense.hasTax ? ' • Inc. ${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}% Tax' : ''}'
                             : '${expense.categoryName} • ${DateFormatter.formatShort(expense.date)}${expense.hasTax ? ' • Inc. ${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}% Tax' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w500,
                           color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       if (expense.note.isNotEmpty) ...[
                         const SizedBox(height: 2),
                         Text(
                           expense.note,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 11,
                             color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],

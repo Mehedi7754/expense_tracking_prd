@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/routing/route_paths.dart';
+import '../core/services/realtime_sync_service.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
 import '../models/expense_model.dart';
 import '../models/user_role.dart';
@@ -25,7 +26,7 @@ class MainShellScreen extends ConsumerStatefulWidget {
 }
 
 class _MainShellScreenState extends ConsumerState<MainShellScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 2;
   UserRole? _lastRole;
 
   @override
@@ -48,12 +49,15 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       );
     }
 
+    // Start real-time notification & app data sync loop
+    RealtimeSyncService.instance.initialize(ref);
+
     final role = user.role;
 
-    // Reset tab to 0 if the role was switched
+    // Reset tab to 2 (center notch) if the role was switched
     if (_lastRole != role) {
       _lastRole = role;
-      _currentIndex = 0;
+      _currentIndex = 2;
     }
 
     final expenses = ref.watch(expenseProvider);
@@ -67,6 +71,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final List<Widget> screens = _getScreensForRole(role);
 
     return Scaffold(
+      extendBody: true,
       body: IndexedStack(
         index: _currentIndex.clamp(0, screens.length - 1),
         children: screens,
@@ -183,26 +188,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   context.push(RoutePaths.submitExpense);
                 },
               ),
-              const Divider(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E1B4B) : const Color(0xFFEEF2FF),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.access_time_filled_rounded, color: Color(0xFF6366F1), size: 22),
-                ),
-                title: const Text('Mark Attendance / GPS Check-In', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text('Record morning/afternoon geo-verified attendance', style: TextStyle(fontSize: 12)),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  context.push(RoutePaths.myAttendance);
-                },
-              ),
             ],
           ),
         );
@@ -214,9 +199,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     switch (role) {
       case UserRole.projectMember:
         return const [
-          HomeDashboardScreen(),
           MyExpensesScreen(),
           MyAttendanceScreen(),
+          HomeDashboardScreen(),
+          HomeDashboardScreen(),
           ProfileScreen(),
         ];
 
@@ -224,17 +210,19 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       case UserRole.finance:
       case UserRole.mainAdmin:
         return const [
-          HomeDashboardScreen(),
           ProjectsListScreen(),
           ApprovalsQueueScreen(),
+          HomeDashboardScreen(),
+          HomeDashboardScreen(),
           AttendanceDashboardScreen(),
         ];
 
       case UserRole.viewer:
         return const [
-          HomeDashboardScreen(),
           ProjectsListScreen(),
           ReportsScreen(),
+          HomeDashboardScreen(),
+          HomeDashboardScreen(),
           ProfileScreen(),
         ];
     }

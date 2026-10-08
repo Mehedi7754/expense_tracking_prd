@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { FcmService } from '../notifications/fcm.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly fcmService: FcmService,
+  ) {}
 
   async findAll(query?: string) {
     let sql = `
@@ -198,6 +202,10 @@ export class UsersService {
       fields.push(`is_active = $${idx++}`);
       values.push(data.isActive ?? data.is_active);
     }
+    if (data.avatarUrl !== undefined || data.avatar_url !== undefined) {
+      fields.push(`avatar_url = $${idx++}`);
+      values.push(data.avatarUrl ?? data.avatar_url);
+    }
 
     if (!fields.length) return this.findOne(id);
 
@@ -233,5 +241,9 @@ export class UsersService {
       [id],
     );
     return { success: true };
+  }
+
+  async saveFcmToken(userId: string, token: string, deviceInfo?: string) {
+    return this.fcmService.saveToken(userId, token, deviceInfo);
   }
 }

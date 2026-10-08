@@ -60,6 +60,7 @@ class NotificationDetailScreen extends ConsumerWidget {
       case NotificationType.memberAdded:
       case NotificationType.userRegistration:
       case NotificationType.general:
+      default:
         badgeBg = isDark ? AppColors.brandPrimary.withAlpha(40) : AppColors.brandPrimary.withAlpha(25);
         badgeTextColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
         break;

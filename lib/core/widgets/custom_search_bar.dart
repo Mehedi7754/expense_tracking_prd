@@ -49,24 +49,37 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasText = _controller.text.isNotEmpty;
 
     return Container(
       width: double.infinity,
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: AppColors.getSurface(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.getBorder(context), width: 1),
+        color: isDark ? const Color(0xFF121A2C) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+          width: 1,
+        ),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             Icons.search_rounded,
-            size: 20,
-            color: AppColors.getTextMuted(context),
+            size: 19,
+            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
           ),
           const SizedBox(width: 10),
           Expanded(

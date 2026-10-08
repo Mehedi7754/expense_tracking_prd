@@ -130,18 +130,18 @@ class StatusChip extends StatelessWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8.5, vertical: 3.5),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border, width: 1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: border, width: 1.0),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 6,
-            height: 6,
+            width: 5.5,
+            height: 5.5,
             decoration: BoxDecoration(
               color: dot,
               shape: BoxShape.circle,
@@ -153,6 +153,7 @@ class StatusChip extends StatelessWidget {
             style: AppTextStyles.labelSmall.copyWith(
               color: text,
               fontWeight: FontWeight.w700,
+              fontSize: 11,
               letterSpacing: 0.1,
             ),
           ),

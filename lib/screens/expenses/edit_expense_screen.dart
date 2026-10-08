@@ -140,6 +140,16 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       return;
     }
 
+    if (_exceedsThresholdWithoutReceipt) {
+      NotificationBanner.showError(context, 'Receipt required for expenses above threshold');
+      return;
+    }
+
+    if ((_receiptImagePath == null || _receiptImagePath!.isEmpty) && _noteController.text.trim().isEmpty) {
+      NotificationBanner.showError(context, 'A justification is required in the Note field when saving without a receipt.');
+      return;
+    }
+
     setState(() => _isSaving = true);
     await Future.delayed(const Duration(milliseconds: 500));
 

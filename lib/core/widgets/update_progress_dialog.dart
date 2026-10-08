@@ -32,12 +32,20 @@ class UpdateProgressDialog extends ConsumerStatefulWidget {
 
 class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
   late double _progress;
+  late final TextEditingController _noteController;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     _progress = widget.project.progressPercentage.clamp(0.0, 100.0);
+    _noteController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
   }
 
   Future<void> _saveProgress() async {
@@ -51,6 +59,8 @@ class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
           progressPercentage: _progress,
           updatedById: user.id,
           updatedByName: user.name,
+          authorRole: user.role.displayName,
+          note: _noteController.text.trim(),
         );
 
     if (mounted) {
@@ -81,7 +91,7 @@ class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(22, 20, 22, 22),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -118,8 +128,6 @@ class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
                             fontSize: 12,
                             color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -215,6 +223,27 @@ class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
 
               const SizedBox(height: 16),
 
+              // Progress Update Note / Comment Field
+              TextField(
+                controller: _noteController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Progress Note / Log (Optional)',
+                  hintText: 'e.g. Completed piling work, client approved phase 2 drawings...',
+                  hintStyle: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                  ),
+                  prefixIcon: const Icon(Icons.note_alt_outlined, size: 20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
               // Last update audit info
               if (widget.project.progressUpdatedAt != null) ...[
                 Container(
@@ -238,8 +267,6 @@ class _UpdateProgressDialogState extends ConsumerState<UpdateProgressDialog> {
                             fontSize: 11,
                             color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

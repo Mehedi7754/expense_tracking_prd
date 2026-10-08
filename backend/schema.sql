@@ -97,7 +97,22 @@ BEGIN
             'expense_rejected',
             'budget_warning',
             'comment_added',
-            'general'
+            'general',
+            'expense_submitted',
+            'justification_submitted',
+            'justification_approved',
+            'justification_rejected',
+            'project_assigned',
+            'budget_critical',
+            'attendance_reminder',
+            'attendance_late',
+            'absence_deducted',
+            'salary_ready',
+            'payroll_finalized',
+            'revenue_received',
+            'member_added',
+            'user_registration',
+            'security_alert'
         );
     END IF;
 END $$;

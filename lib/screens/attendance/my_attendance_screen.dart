@@ -1,10 +1,18 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:getwidget/getwidget.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/routing/route_paths.dart';
+import '../../core/services/location_service.dart';
+import '../../core/widgets/location_permission_dialog.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/attendance_model.dart';
+import '../../models/user_role.dart';
 import '../../state/attendance_provider.dart';
+import '../../state/attendance_settings_provider.dart';
 import '../../state/auth_provider.dart';
 import 'widgets/attendance_map_view.dart';
 
@@ -19,20 +27,46 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await LocationService.requestLocationPermission();
+      } catch (_) {}
+      if (!mounted) return;
       final user = ref.read(authProvider).currentUser;
       final effectiveId = user?.id ?? 'a0000000-0000-0000-0000-000000000003';
       ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: effectiveId, force: true);
     });
   }
 
-  Future<void> _handleManualCheckIn([String? session]) async {
+  Future<void> _handleManualCheckIn(String session) async {
+    final windowErr = AttendanceNotifier.checkInWindowError(
+        session, ref.read(attendanceSettingsProvider).value);
+    if (windowErr != null) {
+      NotificationBanner.showWarning(context, windowErr);
+      return;
+    }
+
     final success = await ref.read(attendanceProvider.notifier).checkIn(explicitSession: session);
-    if (mounted) {
-      if (success) {
-        NotificationBanner.showSuccess(context, 'Attendance & GPS coordinates recorded successfully!');
+    if (!mounted) return;
+
+    if (success) {
+      NotificationBanner.showSuccess(context, 'Attendance & GPS coordinates recorded successfully!');
+    } else {
+      final err = ref.read(attendanceProvider).errorMessage ?? 'Check-in failed';
+
+      // Detect GPS/permission errors and show proper dialog
+      final errLower = err.toLowerCase();
+      final isPermanentlyDenied = errLower.contains('permanently denied') || errLower.contains('app settings');
+      final isPermissionDenied = isPermanentlyDenied || errLower.contains('permission');
+      final isServiceDisabled = errLower.contains('gps') || errLower.contains('location services are turned off');
+
+      if (isServiceDisabled || isPermissionDenied) {
+        LocationPermissionDialog.show(
+          context,
+          isServiceDisabled: isServiceDisabled,
+          isPermanentlyDenied: isPermanentlyDenied,
+        );
       } else {
-        final err = ref.read(attendanceProvider).errorMessage ?? 'Check-in failed';
         NotificationBanner.showWarning(context, err);
       }
     }
@@ -62,145 +96,374 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     }
 
     final currentHour = DateTime.now().hour;
-    final isMorningTime = currentHour < 13;
+    final isAdminRole = user?.role == null || !user!.role.requiresAttendanceCheckIn;
+    final timing = ref.watch(attendanceSettingsProvider).value;
+    final startH = timing?.morningStartHour ?? 9;
+    final dividerH = timing?.morningEndHour ?? 13;
+    final endH = timing?.afternoonEndHour ?? 18;
+    String fmtH(int h) => '${(h % 12 == 0 ? 12 : h % 12).toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
+    final isMorningSlot = currentHour >= startH && currentHour < dividerH;
+    final isAfternoonSlot = currentHour >= dividerH;
+
+    String currentSlotBadge;
+    Color currentSlotBadgeColor;
+    if (isAdminRole) {
+      currentSlotBadge = 'Management Exempt';
+      currentSlotBadgeColor = const Color(0xFF6366F1);
+    } else if (isMorningSlot) {
+      currentSlotBadge = 'Morning Shift';
+      currentSlotBadgeColor = const Color(0xFF2563EB);
+    } else if (currentHour >= dividerH && currentHour < endH) {
+      currentSlotBadge = 'Afternoon Shift';
+      currentSlotBadgeColor = const Color(0xFF0D9488);
+    } else if (currentHour >= endH) {
+      currentSlotBadge = 'Evening Departure';
+      currentSlotBadgeColor = const Color(0xFF10B981);
+    } else {
+      currentSlotBadge = 'Outside Hours';
+      currentSlotBadgeColor = const Color(0xFF64748B);
+    }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
+      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('My Attendance & Location', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        title: Text(
+          'Attendance',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 17,
+            letterSpacing: -0.3,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+          ),
+        ),
         elevation: 0,
         backgroundColor: Colors.transparent,
+        scrolledUnderElevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 1. TODAY'S ATTENDANCE STATUS CARD
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            if (isAdminRole) ...[
+              // Leadership / Super Admin Exemption Card
+              Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF1E1B4B), const Color(0xFF0F172A)]
+                        : [const Color(0xFFEEF2FF), Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF6366F1).withValues(alpha: isDark ? 0.4 : 0.25),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.08),
+                      blurRadius: 14,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF4F46E5).withAlpha(40),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "Today's Check-In Status",
-                              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              DateFormat('EEEE, MMM d, yyyy').format(DateTime.now()),
-                              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            CupertinoIcons.shield_lefthalf_fill,
+                            color: Color(0xFF6366F1),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${user?.role.displayName ?? "Executive"} Exemption Active',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Check-in is required exclusively for Managers & Employees',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(30),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          isMorningTime ? 'Morning Slot' : 'Afternoon Slot',
-                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-                        ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: Icon(CupertinoIcons.info_circle_fill, color: Color(0xFF6366F1), size: 16),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'As Super Admin, your presence is pre-authorized. Daily attendance check-ins, late penalties, and payroll deductions apply exclusively to project managers and field employees.',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                height: 1.45,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Session 1: Morning Check-in
-                  _buildSessionPill(
-                    title: 'Morning Session',
-                    record: todayMorning,
-                    onCheckIn: () => _handleManualCheckIn('morning'),
-                    isSubmitting: attendanceState.isSubmitting,
-                    icon: Icons.wb_sunny_rounded,
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Session 2: Afternoon Check-in
-                  _buildSessionPill(
-                    title: 'Afternoon Session',
-                    record: todayAfternoon,
-                    onCheckIn: () => _handleManualCheckIn('afternoon'),
-                    isSubmitting: attendanceState.isSubmitting,
-                    icon: Icons.nights_stay_rounded,
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F46E5),
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(CupertinoIcons.chart_bar_alt_fill, size: 15),
+                            label: const Text(
+                              'Staff Attendance',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                            ),
+                            onPressed: () => context.push(RoutePaths.attendanceDashboard),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF6366F1),
+                              side: BorderSide(
+                                color: const Color(0xFF6366F1).withValues(alpha: 0.5),
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(CupertinoIcons.slider_horizontal_3, size: 15),
+                            label: const Text(
+                              'Deduction Rules',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                            ),
+                            onPressed: () => context.push(RoutePaths.attendanceSettings),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ] else ...[
+              // 1. TODAY'S SESSIONS CARD (Clean, Pure & Minimal for Manager / Employee)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    if (!isDark)
+                      BoxShadow(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.03),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Clean Date Row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            DateFormat('EEEE, MMM d, yyyy').format(DateTime.now()),
+                            style: TextStyle(
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: currentSlotBadgeColor.withValues(alpha: isDark ? 0.25 : 0.10),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            currentSlotBadge,
+                            style: TextStyle(
+                              color: currentSlotBadgeColor,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    // Session 1: Morning Check-in
+                    _buildSessionPill(
+                      isDark: isDark,
+                      title: 'Morning Session',
+                      record: todayMorning,
+                      onCheckIn: () => _handleManualCheckIn('morning'),
+                      isSubmitting: attendanceState.isSubmitting,
+                      icon: CupertinoIcons.sunrise_fill,
+                      iconColor: const Color(0xFFF59E0B),
+                      isCorrectTimeSlot: isMorningSlot,
+                      timingHint: currentHour < startH
+                          ? 'Opens ${fmtH(startH)}'
+                          : (currentHour >= dividerH
+                              ? 'Ended ${fmtH(dividerH)}'
+                              : '${fmtH(startH)} - ${fmtH(dividerH)}'),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    // Session 2: Evening Check-out
+                    _buildSessionPill(
+                      isDark: isDark,
+                      title: 'Evening Session',
+                      record: todayAfternoon,
+                      onCheckIn: () => _handleManualCheckIn('afternoon'),
+                      isSubmitting: attendanceState.isSubmitting,
+                      icon: CupertinoIcons.sunset_fill,
+                      iconColor: const Color(0xFF6366F1),
+                      isCorrectTimeSlot: isAfternoonSlot,
+                      timingHint: currentHour < dividerH
+                          ? 'Opens ${fmtH(dividerH)}'
+                          : (currentHour < endH
+                              ? '${fmtH(dividerH)} - ${fmtH(endH)}'
+                              : 'Evening Departure'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
 
             const SizedBox(height: 20),
 
             // 2. TODAY'S GPS MAP
             if (myRecords.where((r) => r.latitude != null).isNotEmpty) ...[
-              const Text(
-                'My Logged Locations Today',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+              Text(
+                'Today\'s Location',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  letterSpacing: -0.2,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                height: 200,
+              Container(
+                height: 180,
                 width: double.infinity,
-                child: AttendanceMapView(
-                  records: myRecords.where((r) => r.date == todayStr).toList(),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    width: 1.0,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: AttendanceMapView(
+                    records: myRecords.where((r) => r.date == todayStr).toList(),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
             ],
 
             // 3. ATTENDANCE HISTORY LIST
-            const Text(
-              'Attendance History',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+            Text(
+              'History',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                letterSpacing: -0.2,
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+              ),
             ),
             const SizedBox(height: 8),
 
             if (myRecords.isEmpty)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(28),
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                 decoration: BoxDecoration(
                   color: isDark ? AppColors.darkSurface : Colors.white,
                   borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
                 ),
-                child: const Center(
-                  child: Text('No attendance history found yet', style: TextStyle(fontWeight: FontWeight.w600)),
+                child: Center(
+                  child: Text(
+                    'No attendance history recorded yet',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.5,
+                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                    ),
+                  ),
                 ),
               )
             else
               ...myRecords.map((r) => _buildHistoryRow(r, isDark)),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -213,82 +476,25 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     required VoidCallback onCheckIn,
     required bool isSubmitting,
     required IconData icon,
+    required Color iconColor,
+    required bool isCorrectTimeSlot,
+    required String timingHint,
+    bool isDark = false,
   }) {
     final hasLogged = record != null;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(20),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withAlpha(35)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800),
-                ),
-                Text(
-                  hasLogged ? 'Logged at ${record.formattedTime}' : 'Not logged yet',
-                  style: TextStyle(
-                    color: Colors.white.withAlpha(190),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (hasLogged)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check, size: 12, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text('Present', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-                ],
-              ),
-            )
-          else
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF4F46E5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                minimumSize: const Size(0, 32),
-              ),
-              onPressed: isSubmitting ? null : onCheckIn,
-              child: isSubmitting
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Punch In', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800)),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryRow(AttendanceRecordModel r, bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
+        color: isDark
+            ? (hasLogged ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFF1E293B))
+            : (hasLogged ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9),
+          color: isDark
+              ? (hasLogged ? const Color(0xFF059669).withValues(alpha: 0.6) : const Color(0xFF334155))
+              : (hasLogged ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
+          width: 1.0,
         ),
       ),
       child: Row(
@@ -297,13 +503,167 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: (r.isMorning ? const Color(0xFF4F46E5) : const Color(0xFF10B981)).withAlpha(20),
+              color: iconColor.withValues(alpha: isDark ? 0.30 : 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 1.5),
+                Text(
+                  hasLogged
+                      ? 'Logged at ${record.formattedTime}'
+                      : timingHint,
+                  style: TextStyle(
+                    color: hasLogged
+                        ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                        : (isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                    fontSize: 11,
+                    fontWeight: hasLogged ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (hasLogged)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8.5, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.30 : 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.60 : 0.35),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(CupertinoIcons.checkmark_seal_fill, size: 12, color: Color(0xFF10B981)),
+                  const SizedBox(width: 3.5),
+                  Text(
+                    title.toLowerCase().contains('morning') ? 'Present' : 'Checked Out',
+                    style: const TextStyle(
+                      color: Color(0xFF10B981),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (isCorrectTimeSlot)
+            GFButton(
+              onPressed: isSubmitting ? null : onCheckIn,
+              text: title.toLowerCase().contains('morning') ? 'Punch In' : 'Punch Out',
+              icon: const Icon(
+                CupertinoIcons.arrow_right_circle_fill,
+                size: 13,
+                color: Colors.white,
+              ),
+              type: GFButtonType.solid,
+              shape: GFButtonShape.pills,
+              color: title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5),
+              size: GFSize.SMALL,
+              textStyle: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : null,
+            )
+          else
+            // Locked badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8.5, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    CupertinoIcons.lock_fill,
+                    size: 10,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 3.5),
+                  Text(
+                    'Locked',
+                    style: TextStyle(
+                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryRow(AttendanceRecordModel r, bool isDark) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 1.0,
+        ),
+        boxShadow: [
+          if (!isDark)
+            BoxShadow(
+              color: const Color(0xFF0F172A).withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: (r.isMorning ? const Color(0xFF4F46E5) : const Color(0xFF10B981)).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               r.isMorning ? Icons.wb_sunny_rounded : Icons.nights_stay_rounded,
               color: r.isMorning ? const Color(0xFF4F46E5) : const Color(0xFF10B981),
-              size: 18,
+              size: 16,
             ),
           ),
           const SizedBox(width: 10),
@@ -313,12 +673,17 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
               children: [
                 Text(
                   '${r.formattedDate} • ${r.sessionType.toUpperCase()}',
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
                 ),
+                const SizedBox(height: 1),
                 Text(
                   r.formattedCoordinates,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                   ),
                 ),
@@ -330,18 +695,26 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
             children: [
               Text(
                 r.formattedTime,
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 11.5,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
               ),
               const SizedBox(height: 2),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 5.5, vertical: 1.5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withAlpha(20),
-                  borderRadius: BorderRadius.circular(6),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: const Text(
                   'Present',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF10B981)),
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF10B981),
+                  ),
                 ),
               ),
             ],
