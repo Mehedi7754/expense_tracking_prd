@@ -46,7 +46,7 @@ async function bootstrap() {
   // Direct fastify route for /uploads/* with PostgreSQL fallback
   try {
     const fastify = app.getHttpAdapter().getInstance();
-    fastify.get('/uploads/:category/:filename', async (req: any, reply: any) => {
+    const serveUpload = async (req: any, reply: any) => {
       const { category, filename } = req.params;
       const uploadsService = app.get(UploadsService);
       const file = await uploadsService.getFile(category, filename);
@@ -57,7 +57,9 @@ async function bootstrap() {
         .type(file.mimeType)
         .header('Cache-Control', 'public, max-age=31536000, immutable')
         .send(file.buffer);
-    });
+    };
+    fastify.get('/uploads/:category/:filename', serveUpload);
+    fastify.get('/api/v1/uploads/:category/:filename', serveUpload);
   } catch (_) {}
 
   const port = Number(process.env.PORT) || 8080;
