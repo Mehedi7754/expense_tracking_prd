@@ -10,20 +10,6 @@ const String _kCustomUsersKey = 'gw_custom_users_cache';
 const String _kCustomUserPasswordsKey = 'gw_custom_user_passwords_cache';
 const String _kDeletedUserIdsKey = 'gw_deleted_user_ids_cache';
 
-/// Authentic database users seeded in PostgreSQL
-const List<UserModel> kAuthenticDatabaseUsers = [
-  UserModel(
-    id: 'a0000000-0000-0000-0000-000000000001',
-    name: 'Arif',
-    email: 'admin@gw.com',
-    role: UserRole.mainAdmin,
-    department: 'Corporate Governance',
-    designation: 'Managing Director / Admin',
-    phone: '+880 1711-000001',
-    assignedProjectIds: ['6a836552-904a-4cc3-b063-cce4481fe3a5', 'e29e4218-d7e1-4f28-a34d-0acea710239a'],
-  ),
-];
-
 class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMixin {
   @override
   List<UserModel> build() {
@@ -61,10 +47,6 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
             .toList();
 
         state = customUsers;
-      } else {
-        state = kAuthenticDatabaseUsers
-            .where((u) => !_isForbiddenUser(u, deletedSet))
-            .toList();
       }
       fetchUsers(force: true);
     } catch (_) {
