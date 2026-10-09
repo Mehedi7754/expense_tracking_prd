@@ -233,7 +233,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
 
     final Map<String, double> directCostByProjectId = {};
     for (final e in expenses) {
-      directCostByProjectId[e.projectId] = (directCostByProjectId[e.projectId] ?? 0.0) + e.amount;
+      if (e.status == ExpenseStatus.approved) {
+        directCostByProjectId[e.projectId] = (directCostByProjectId[e.projectId] ?? 0.0) + e.amount;
+      }
     }
 
     double totalCostIncurred = 0.0;
@@ -577,7 +579,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     final unreceiptedRatio = metrics['unreceiptedRatio'] ?? 0.0;
     final isHighRisk = unreceiptedRatio >= 50.0;
 
-    final totalSpent = userExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final totalSpent = userExpenses
+        .where((e) => e.status == ExpenseStatus.approved)
+        .fold<double>(0.0, (sum, e) => sum + e.amount);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -121,7 +121,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     double totalCostIncurred = 0;
     for (final p in permittedProjects) {
       totalPortfolioValue += p.grossProjectValue;
-      final pExp = allExpenses.where((e) => e.projectId == p.id && e.status != ExpenseStatus.rejected);
+      final pExp = allExpenses.where((e) => e.projectId == p.id && e.status == ExpenseStatus.approved);
       final direct = pExp.fold<double>(0.0, (s, e) => s + e.amount);
       totalCostIncurred += (direct + (direct * p.officeBenefitRate));
     }
@@ -455,7 +455,7 @@ class _ProjectsListScreenState extends ConsumerState<ProjectsListScreen> {
     // Map top projects by expenditure
     final Map<String, double> projectCosts = {};
     for (final p in projects) {
-      final pExp = allExpenses.where((e) => e.projectId == p.id && e.status != ExpenseStatus.rejected);
+      final pExp = allExpenses.where((e) => e.projectId == p.id && e.status == ExpenseStatus.approved);
       final direct = pExp.fold<double>(0.0, (sum, e) => sum + e.amount);
       final total = direct * (1 + p.officeBenefitRate);
       if (total > 0) {

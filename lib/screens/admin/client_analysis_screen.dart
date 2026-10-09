@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/client_model.dart';
+import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
 import '../../state/client_provider.dart';
 import '../../state/expense_provider.dart';
@@ -45,7 +46,7 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
 
     double totalCostIncurred = 0.0;
     for (final p in clientProjects) {
-      final pExp = expenses.where((e) => e.projectId == p.id);
+      final pExp = expenses.where((e) => e.projectId == p.id && e.status == ExpenseStatus.approved);
       final direct = pExp.fold<double>(0.0, (sum, e) => sum + e.amount);
       totalCostIncurred += (direct * (1 + p.officeBenefitRate));
     }
@@ -320,7 +321,7 @@ class _ClientAnalysisScreenState extends ConsumerState<ClientAnalysisScreen> {
               )
             else
               ...clientProjects.map((p) {
-                final pExp = expenses.where((e) => e.projectId == p.id);
+                final pExp = expenses.where((e) => e.projectId == p.id && e.status == ExpenseStatus.approved);
                 final cost = pExp.fold<double>(0.0, (sum, e) => sum + e.amount) * (1 + p.officeBenefitRate);
                 final profit = p.grossProjectValue - (cost + p.estimatedRemainingCost);
                 final margin = p.grossProjectValue > 0 ? (profit / p.grossProjectValue) * 100 : 0.0;

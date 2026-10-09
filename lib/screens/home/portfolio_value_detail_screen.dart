@@ -98,11 +98,12 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
             ? allProjects
             : allProjects.where((p) => p.hasMember(user.id)).toList());
 
+    final approvedExpenses = allExpenses.where((e) => e.status == ExpenseStatus.approved).toList();
     final visibleExpenses = user == null
         ? <ExpenseModel>[]
         : (role.canViewAllProjects
-            ? allExpenses
-            : allExpenses
+            ? approvedExpenses
+            : approvedExpenses
                 .where((e) =>
                     e.employeeId == user.id ||
                     visibleProjects.any((p) => p.id == e.projectId))

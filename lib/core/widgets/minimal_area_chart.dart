@@ -552,7 +552,7 @@ class _MinimalAreaChartState extends ConsumerState<MinimalAreaChart> {
     );
 
     if (isSpending) {
-      for (final exp in expenses) {
+      for (final exp in expenses.where((e) => e.status == ExpenseStatus.approved)) {
         records.add(_DateAmountRecord(exp.date, exp.amount));
       }
     } else {

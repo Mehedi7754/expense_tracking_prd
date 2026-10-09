@@ -328,7 +328,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     ProjectModel project,
     List<ExpenseModel> expenses,
   ) {
-    final validExpenses = expenses.where((e) => e.status != ExpenseStatus.rejected);
+    final validExpenses = expenses.where((e) => e.status == ExpenseStatus.approved);
     final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     final officeBenefit = directCost * project.officeBenefitRate;
     final totalCost = directCost + officeBenefit;
@@ -772,7 +772,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final validExpenses = expenses.where((e) => e.status != ExpenseStatus.rejected);
+    final validExpenses = expenses.where((e) => e.status == ExpenseStatus.approved);
     final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     final totalTaxIncurred = validExpenses.fold<double>(0.0, (sum, e) => sum + e.taxAmount);
     final costIncurred = directCost;
@@ -2161,7 +2161,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           final budget = project.categoryBudgets[key] ?? 0.0;
           final actual = expenses
               .where((e) =>
-                  e.status != ExpenseStatus.rejected &&
+                  e.status == ExpenseStatus.approved &&
                   e.categoryName.toLowerCase().contains(name.toLowerCase().split(' ').first))
               .fold<double>(0.0, (sum, e) => sum + e.amount);
 

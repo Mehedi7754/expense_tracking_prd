@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/widgets/minimal_area_chart.dart';
 import '../../core/widgets/notification_banner.dart';
+import '../../models/expense_model.dart';
 import '../../state/expense_provider.dart';
 import '../../state/export_service.dart';
 import '../../state/project_provider.dart';
@@ -27,13 +28,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final expenses = ref.watch(expenseProvider);
 
     final totalPortfolioValue = projects.fold<double>(0.0, (sum, p) => sum + p.grossProjectValue);
-    final totalSpent = expenses.fold<double>(0.0, (sum, e) => sum + e.amount);
-    final receiptedCount = expenses.where((e) => e.hasReceipt).length;
-    final complianceRatio = expenses.isNotEmpty ? (receiptedCount / expenses.length) * 100 : 100.0;
+    final approvedExpenses = expenses.where((e) => e.status == ExpenseStatus.approved).toList();
+    final totalSpent = approvedExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final receiptedCount = approvedExpenses.where((e) => e.hasReceipt).length;
+    final complianceRatio = approvedExpenses.isNotEmpty ? (receiptedCount / approvedExpenses.length) * 100 : 100.0;
 
     // Category breakdown
     final Map<String, double> categoryTotals = {};
-    for (final e in expenses) {
+    for (final e in approvedExpenses) {
       categoryTotals[e.categoryName] = (categoryTotals[e.categoryName] ?? 0.0) + e.amount;
     }
 

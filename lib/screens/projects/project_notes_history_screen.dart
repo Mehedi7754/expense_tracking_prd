@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../models/project_model.dart';
-import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 import '../../state/project_provider.dart';
 import '../../core/widgets/notification_banner.dart';

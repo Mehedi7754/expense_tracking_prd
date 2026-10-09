@@ -11,7 +11,7 @@ class ExportService {
     buffer.writeln('Project ID,Project Name,Client,Client Type,Assignment Type,Status,Gross Contract Value (BDT),Cost Incurred (BDT),Projected Remaining (BDT),Projected Final Cost (BDT),Projected Profit (BDT),Projected Margin (%),Amount Received (BDT),Amount Receivable (BDT)');
 
     for (final p in projects) {
-      final projectExpenses = expenses.where((e) => e.projectId == p.id).toList();
+      final projectExpenses = expenses.where((e) => e.projectId == p.id && e.status == ExpenseStatus.approved).toList();
       final directCost = projectExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
       final officeBenefit = directCost * p.officeBenefitRate;
       final totalCostIncurred = directCost + officeBenefit;
@@ -81,7 +81,7 @@ class ExportService {
     for (final cat in categories) {
       final budget = project.categoryBudgets[cat.toLowerCase().replaceAll(' ', '')] ?? 0.0;
       final actual = projectExpenses
-          .where((e) => e.categoryName.toLowerCase().contains(cat.toLowerCase().split(' ').first))
+          .where((e) => e.status == ExpenseStatus.approved && e.categoryName.toLowerCase().contains(cat.toLowerCase().split(' ').first))
           .fold<double>(0.0, (sum, e) => sum + e.amount);
 
       final remaining = budget - actual;
