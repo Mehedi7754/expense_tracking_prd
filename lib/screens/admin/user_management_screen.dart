@@ -87,7 +87,9 @@ class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref.read(userManagementProvider.notifier).deleteUser(user.id);
+              await ref
+                  .read(userManagementProvider.notifier)
+                  .deleteUser(user.id, email: user.email);
               ref.read(attendanceProvider.notifier).invalidateCache();
               ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
               ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);

@@ -157,14 +157,18 @@ class AuthRepository {
     );
   }
 
-  Future<void> verifyOtp(String email, String otp) async {
-    await _client.post(
+  Future<bool> verifyOtp(String email, String otp) async {
+    final res = await _client.post(
       '/auth/verify-otp',
       body: {
         'email': email.trim(),
         'otp': otp.trim(),
       },
     );
+    if (res is Map<String, dynamic>) {
+      return res['valid'] == true || res['success'] == true;
+    }
+    return true;
   }
 
   Future<void> resetPassword({

@@ -139,6 +139,7 @@ export class UsersService {
            department = EXCLUDED.department,
            designation = EXCLUDED.designation,
            phone = EXCLUDED.phone,
+           is_active = TRUE,
            updated_at = NOW()
        RETURNING id, email, full_name, role, department, designation, phone, avatar_url, is_active`,
       [email, passwordHash, fullName, role, department, designation, phone],
@@ -158,6 +159,16 @@ export class UsersService {
   }
 
   async update(id: string, data: any, updater?: any) {
+    const clean = (id || '').trim();
+    const userRes = await this.db.query(
+      `SELECT id FROM users WHERE id::text = $1 OR email ILIKE $1 LIMIT 1`,
+      [clean],
+    );
+    if (!userRes.rows.length) {
+      throw new NotFoundException('User not found');
+    }
+    const targetId = userRes.rows[0].id;
+
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
@@ -221,45 +232,95 @@ export class UsersService {
       values.push(data.avatarUrl ?? data.avatar_url);
     }
 
-    if (!fields.length) return this.findOne(id);
+    if (!fields.length) return this.findOne(targetId);
 
     fields.push(`updated_at = NOW()`);
-    values.push(id);
+    values.push(targetId);
 
     await this.db.query(
       `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx}`,
       values,
     );
-    return this.findOne(id);
+    return this.findOne(targetId);
   }
 
   async updateRole(id: string, role: string) {
+    const userRes = await this.db.query(
+      `SELECT id FROM users WHERE id::text = $1 OR email ILIKE $1 LIMIT 1`,
+      [id.trim()],
+    );
+    if (!userRes.rows.length) return null;
+    const targetId = userRes.rows[0].id;
     await this.db.query(
       `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2`,
-      [role, id],
+      [role, targetId],
     );
-    return this.findOne(id);
+    return this.findOne(targetId);
   }
 
   async updateStatus(id: string, isActive: boolean) {
+    const userRes = await this.db.query(
+      `SELECT id FROM users WHERE id::text = $1 OR email ILIKE $1 LIMIT 1`,
+      [id.trim()],
+    );
+    if (!userRes.rows.length) return null;
+    const targetId = userRes.rows[0].id;
     await this.db.query(
       `UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2`,
-      [isActive, id],
+      [isActive, targetId],
     );
-    return this.findOne(id);
+    return this.findOne(targetId);
   }
 
   async delete(id: string) {
-    try {
-      await this.db.query(`DELETE FROM users WHERE id = $1`, [id]);
-    } catch (_) {
-      // Fallback if foreign keys exist with RESTRICT: set is_active = FALSE
+    const clean = (id || '').trim();
+    if (!clean) return { success: false, message: 'Invalid ID' };
+
+    const userRes = await this.db.query(
+      `SELECT id, email FROM users WHERE id::text = $1 OR email ILIKE $1 LIMIT 1`,
+      [clean],
+    );
+    if (!userRes.rows.length) {
+      return { success: true, message: 'User already deleted or not found' };
+    }
+    const targetId = userRes.rows[0].id;
+
+    // Check if user has historical expenses (accounting ledger integrity)
+    const expRes = await this.db.query(
+      `SELECT 1 FROM expenses WHERE employee_id = $1 LIMIT 1`,
+      [targetId],
+    );
+
+    if (expRes.rows.length > 0) {
+      // Historical financial records exist: deactivate user so they are hidden from all active UI and can never log in
       await this.db.query(
         `UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = $1`,
-        [id],
+        [targetId],
       );
+      await this.db.query(`DELETE FROM project_members WHERE user_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`DELETE FROM fcm_tokens WHERE user_id = $1`, [targetId]).catch(() => {});
+    } else {
+      // No ledger locks: perform complete permanent cascade deletion
+      await this.db.query(`DELETE FROM attendance_records WHERE user_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`DELETE FROM employee_salaries WHERE user_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`DELETE FROM project_members WHERE user_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`DELETE FROM chat_messages WHERE sender_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`DELETE FROM notifications WHERE user_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`DELETE FROM fcm_tokens WHERE user_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`UPDATE tasks SET assignee_id = NULL WHERE assignee_id = $1`, [targetId]).catch(() => {});
+      await this.db.query(`UPDATE projects SET created_by = NULL WHERE created_by = $1`, [targetId]).catch(() => {});
+
+      try {
+        await this.db.query(`DELETE FROM users WHERE id = $1`, [targetId]);
+      } catch (_) {
+        await this.db.query(
+          `UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = $1`,
+          [targetId],
+        );
+      }
     }
-    return { success: true };
+
+    return { success: true, id: targetId };
   }
 
   async saveFcmToken(userId: string, token: string, deviceInfo?: string) {

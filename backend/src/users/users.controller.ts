@@ -66,13 +66,13 @@ export class UsersController {
     return this.usersService.updateRole(id, role);
   }
 
-  @Roles('main_admin')
+  @Roles('main_admin', 'project_manager')
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body('isActive') isActive: boolean) {
     return this.usersService.updateStatus(id, isActive);
   }
 
-  @Roles('main_admin')
+  @Roles('main_admin', 'project_manager')
   @Delete(':id')
   async deleteUser(@Param('id') id: string) {
     return this.usersService.delete(id);

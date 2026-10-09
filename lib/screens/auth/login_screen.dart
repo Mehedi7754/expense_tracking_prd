@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/constants/app_text_styles.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/services/location_service.dart';
 import '../../state/auth_provider.dart';
+import 'widgets/password_reset_modal.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -49,15 +49,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final isDark = AppColors.isDark(context);
-    final primaryColor = AppColors.getPrimary(context);
-    final bgColor = AppColors.getBackground(context);
     final cardBg = AppColors.getSurface(context);
     final cardBorder = AppColors.getBorder(context);
     final inputBg = AppColors.getSurfaceSubtle(context);
     final textPrimary = AppColors.getTextPrimary(context);
     final textSecondary = AppColors.getTextSecondary(context);
     final textMuted = AppColors.getTextMuted(context);
-    final brandAccent = const Color(0xFF0B4FBA);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
@@ -354,7 +351,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   foregroundColor: const Color(0xFF4F46E5),
                                 ),
-                                onPressed: () => context.push(RoutePaths.forgotPassword),
+                                onPressed: () {
+                                  PasswordResetModal.show(
+                                    context,
+                                    initialEmail: _emailController.text.trim(),
+                                    onComplete: () {
+                                      Navigator.of(context).pop();
+                                    },
+                                  );
+                                },
                                 child: const Text(
                                   'Forgot Password?',
                                   style: TextStyle(

@@ -135,9 +135,9 @@ export class AuthService {
       fields.push(`avatar_url = $${idx++}`);
       values.push(data.avatarUrl ?? data.avatar_url);
     }
-    if (data.name !== undefined || data.full_name !== undefined) {
+    if (data.name !== undefined || data.full_name !== undefined || data.fullName !== undefined) {
       fields.push(`full_name = $${idx++}`);
-      values.push(data.name ?? data.full_name);
+      values.push(data.name ?? data.full_name ?? data.fullName);
     }
     if (data.email !== undefined && typeof data.email === 'string' && data.email.trim().length > 0) {
       fields.push(`email = $${idx++}`);
@@ -161,13 +161,13 @@ export class AuthService {
     }
 
     values.push(userId);
-    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, email, full_name, role, department, designation, phone, avatar_url`;
+    const sql = `UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id::text = $${idx} OR email ILIKE $${idx} RETURNING id, email, full_name, role, department, designation, phone, avatar_url`;
     const res = await this.db.query(sql, values);
     if (!res.rows.length) {
       throw new UnauthorizedException('User not found');
     }
     const r = res.rows[0];
-    return {
+    const userObj = {
       id: r.id,
       name: r.full_name,
       email: r.email,
@@ -177,18 +177,22 @@ export class AuthService {
       phone: r.phone,
       avatarUrl: r.avatar_url,
     };
+    return {
+      ...userObj,
+      user: userObj,
+    };
   }
 
   async updateAvatar(userId: string, avatarUrl: string | null) {
     const res = await this.db.query(
-      `UPDATE users SET avatar_url = $1 WHERE id = $2 RETURNING id, email, full_name, role, department, designation, phone, avatar_url`,
+      `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id::text = $2 OR email ILIKE $2 RETURNING id, email, full_name, role, department, designation, phone, avatar_url`,
       [avatarUrl, userId],
     );
     if (!res.rows.length) {
       throw new UnauthorizedException('User not found');
     }
     const r = res.rows[0];
-    return {
+    const userObj = {
       id: r.id,
       name: r.full_name,
       email: r.email,
@@ -197,6 +201,10 @@ export class AuthService {
       designation: r.designation,
       phone: r.phone,
       avatarUrl: r.avatar_url,
+    };
+    return {
+      ...userObj,
+      user: userObj,
     };
   }
 

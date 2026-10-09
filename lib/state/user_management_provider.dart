@@ -6,7 +6,6 @@ import '../core/utils/fetch_cache_mixin.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
 
-const String _kCustomUsersKey = 'gw_custom_users_cache';
 const String _kCustomUserPasswordsKey = 'gw_custom_user_passwords_cache';
 class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMixin {
   @override
@@ -188,7 +187,12 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     try {
       final client = ref.read(apiClientProvider);
       final body = {
-        ...newUser.toJson(),
+        'name': newUser.name,
+        'email': cleanEmail,
+        'role': role.name,
+        'department': newUser.department,
+        if (newUser.designation != null && newUser.designation!.isNotEmpty)
+          'designation': newUser.designation,
         'password': pwd,
       };
       final res = await client.post('/users', body: body);
@@ -316,15 +320,31 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     }
   }
 
-  Future<void> deleteUser(String userId) async {
+  Future<void> deleteUser(String userId, {String? email}) async {
     final cleanId = userId.trim();
-    state = state.where((u) => u.id != cleanId).toList();
+    final cleanEmail = email?.trim().toLowerCase();
+
+    // Optimistically remove from state
+    state = state
+        .where((u) =>
+            u.id != cleanId &&
+            (cleanEmail == null || u.email.trim().toLowerCase() != cleanEmail))
+        .toList();
     await _persistUsers();
 
+    final client = ref.read(apiClientProvider);
     try {
-      final client = ref.read(apiClientProvider);
       await client.delete('/users/$cleanId');
-    } catch (_) {}
+    } catch (_) {
+      if (cleanEmail != null && cleanEmail.isNotEmpty) {
+        try {
+          await client.delete('/users/$cleanEmail');
+        } catch (_) {}
+      }
+    }
+
+    // Force synchronization from PostgreSQL authoritative single source of truth
+    await fetchUsers(force: true);
   }
 }
 

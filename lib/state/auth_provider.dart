@@ -194,7 +194,17 @@ class AuthNotifier extends Notifier<AuthState> {
         user = await repo.login(email, password);
         token = ref.read(apiClientProvider).authToken;
       } catch (apiError) {
-        // High-resilience fallback: check registered/persisted users first
+        // High-resilience fallback: only for network/server connectivity issues or test environments.
+        // If the server actively rejects credentials with 401 Unauthorized, rethrow so the user is informed.
+        final isAuthFailure = apiError is UnauthorizedException ||
+            (apiError is ApiException &&
+                (apiError.statusCode == 401 ||
+                    apiError.message.toLowerCase().contains('invalid email') ||
+                    apiError.message.toLowerCase().contains('unauthorized')));
+        if (isAuthFailure && !EnvironmentUtils.isTestEnvironment) {
+          rethrow;
+        }
+
         final cleanEmail = email.trim().toLowerCase();
         final registeredUsers = ref.read(userManagementProvider);
         for (final regUser in registeredUsers) {
@@ -346,11 +356,21 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
-  void updateProfileName(String newName) {
+  Future<void> updateProfileName(String newName) async {
     if (state.currentUser != null) {
-      final updated = state.currentUser!.copyWith(name: newName);
+      final updated = state.currentUser!.copyWith(name: newName.trim());
       state = state.copyWith(currentUser: updated);
-      _persistSession(updated, ref.read(apiClientProvider).authToken);
+      await _persistSession(updated, ref.read(apiClientProvider).authToken);
+
+      try {
+        final repo = ref.read(authRepositoryProvider);
+        await repo.updateProfile({'name': newName.trim()});
+      } catch (_) {}
+
+      try {
+        final userNotifier = ref.read(userManagementProvider.notifier);
+        await userNotifier.updateUser(updated);
+      } catch (_) {}
     }
   }
 
@@ -416,13 +436,20 @@ class AuthNotifier extends Notifier<AuthState> {
         'email': email.trim().toLowerCase(),
         'phone': phone.trim(),
       });
-    } catch (_) {
-      // Fallback: update locally
-      updated = state.currentUser!.copyWith(
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim(),
-      );
+    } catch (e) {
+      // If primary profile endpoint fails, attempt via user management endpoint
+      try {
+        final userNotifier = ref.read(userManagementProvider.notifier);
+        final localUpdated = state.currentUser!.copyWith(
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          phone: phone.trim(),
+        );
+        await userNotifier.updateUser(localUpdated);
+        updated = localUpdated;
+      } catch (_) {
+        rethrow;
+      }
     }
 
     state = state.copyWith(currentUser: updated);

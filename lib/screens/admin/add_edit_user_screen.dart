@@ -69,20 +69,24 @@ class _AddEditUserScreenState extends ConsumerState<AddEditUserScreen> {
         department: _deptController.text.trim(),
         role: _selectedRole,
       );
-      ref.read(userManagementProvider.notifier).updateUser(
+      await ref.read(userManagementProvider.notifier).updateUser(
             updated,
             password: passwordText.isNotEmpty ? passwordText : null,
           );
-      NotificationBanner.showSuccess(context, 'User profile updated.');
+      if (mounted) {
+        NotificationBanner.showSuccess(context, 'User profile updated.');
+      }
     } else {
-      ref.read(userManagementProvider.notifier).addUser(
+      await ref.read(userManagementProvider.notifier).addUser(
             name: _nameController.text.trim(),
             email: _emailController.text.trim(),
             role: _selectedRole,
             department: _deptController.text.trim(),
             password: passwordText.isNotEmpty ? passwordText : null,
           );
-      NotificationBanner.showSuccess(context, 'Employee account created successfully.');
+      if (mounted) {
+        NotificationBanner.showSuccess(context, 'Employee account created successfully.');
+      }
     }
 
     if (mounted) {
