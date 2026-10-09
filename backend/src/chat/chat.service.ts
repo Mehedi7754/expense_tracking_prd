@@ -12,6 +12,7 @@ export interface ChatChannelSummary {
   projectName?: string;
   projectCode?: string;
   projectStatus?: string;
+  projectImageUrl?: string;
   otherUser?: {
     id: string;
     fullName: string;
@@ -118,6 +119,7 @@ export class ChatService {
         p.name AS project_name,
         p.project_code AS project_code,
         p.status AS project_status,
+        p.image_url AS project_image_url,
         cp.last_read_at,
         (
           SELECT COUNT(*)
@@ -171,6 +173,7 @@ export class ChatService {
         projectName: r.project_name,
         projectCode: r.project_code,
         projectStatus: r.project_status,
+        projectImageUrl: r.project_image_url,
         unreadCount: Number(r.unread_count || 0),
         updatedAt: r.updated_at,
       };
@@ -260,7 +263,7 @@ export class ChatService {
    * Get or create a group channel for a project.
    */
   async getOrCreateProjectChannel(currentUserId: string, projectId: string) {
-    const pRes = await this.db.query(`SELECT id, name, project_code, status, created_by FROM projects WHERE id = $1`, [projectId]);
+    const pRes = await this.db.query(`SELECT id, name, project_code, status, created_by, image_url FROM projects WHERE id = $1`, [projectId]);
     if (pRes.rows.length === 0) {
       throw new NotFoundException('Project not found');
     }
@@ -307,6 +310,7 @@ export class ChatService {
       projectName: project.name,
       projectCode: project.project_code,
       projectStatus: project.status,
+      projectImageUrl: project.image_url,
     };
   }
 
@@ -351,6 +355,7 @@ export class ChatService {
         p.project_code AS project_code,
         p.status AS project_status,
         p.budget AS project_budget,
+        p.image_url AS project_image_url,
         (SELECT COALESCE(SUM(e.amount), 0) FROM expenses e WHERE e.project_id = p.id AND e.status = 'approved') AS project_spent
       FROM chat_messages m
       JOIN users u ON u.id = m.sender_id
@@ -377,6 +382,7 @@ export class ChatService {
       projectStatus: r.project_status,
       projectBudget: r.project_budget ? Number(r.project_budget) : undefined,
       projectSpent: r.project_spent ? Number(r.project_spent) : undefined,
+      projectImageUrl: r.project_image_url,
       replyToId: r.reply_to_id,
       createdAt: r.created_at,
       isMe: r.sender_id === userId,
@@ -443,7 +449,7 @@ export class ChatService {
     let mentionedProj: any = null;
     if (projectId) {
       const pRes = await this.db.query(
-        `SELECT name, project_code, status, budget, (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE project_id = projects.id AND status = 'approved') AS spent FROM projects WHERE id = $1`,
+        `SELECT name, project_code, status, budget, image_url, (SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE project_id = projects.id AND status = 'approved') AS spent FROM projects WHERE id = $1`,
         [projectId],
       );
       if (pRes.rows.length > 0) mentionedProj = pRes.rows[0];
@@ -464,6 +470,7 @@ export class ChatService {
       projectStatus: mentionedProj?.status,
       projectBudget: mentionedProj?.budget ? Number(mentionedProj.budget) : undefined,
       projectSpent: mentionedProj?.spent ? Number(mentionedProj.spent) : undefined,
+      projectImageUrl: mentionedProj?.image_url,
       replyToId: msg.reply_to_id,
       createdAt: msg.created_at,
       isMe: true,
