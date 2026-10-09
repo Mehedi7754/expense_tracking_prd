@@ -16,7 +16,8 @@ import '../../state/project_provider.dart';
 import '../../state/user_management_provider.dart';
 
 class ChatListScreen extends ConsumerStatefulWidget {
-  const ChatListScreen({super.key});
+  final bool? hasBottomDock;
+  const ChatListScreen({super.key, this.hasBottomDock});
 
   @override
   ConsumerState<ChatListScreen> createState() => _ChatListScreenState();
@@ -51,12 +52,22 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final channelsAsync = ref.watch(chatChannelsProvider);
+    final isRootTab = widget.hasBottomDock ?? (!context.canPop());
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final dockOffset = isRootTab ? (72.0 + bottomInset) : 0.0;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
+        automaticallyImplyLeading: !isRootTab,
+        leading: isRootTab
+            ? null
+            : IconButton(
+                icon: const Icon(CupertinoIcons.back),
+                onPressed: () => context.pop(),
+              ),
         title: const Text(
           'Team Messages',
           style: TextStyle(
@@ -233,7 +244,10 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           return RefreshIndicator(
             onRefresh: () => ref.read(chatChannelsProvider.notifier).fetchChannels(),
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: EdgeInsets.only(
+                top: 8,
+                bottom: dockOffset + 80,
+              ),
               itemCount: channels.length,
               separatorBuilder: (_, __) => Divider(
                 height: 1,
@@ -249,13 +263,18 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF2563EB),
-        foregroundColor: Colors.white,
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onPressed: () => _openNewChatSheet(context),
-        child: const Icon(CupertinoIcons.chat_bubble_text_fill, size: 24),
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: dockOffset),
+        child: FloatingActionButton(
+          heroTag: 'chat_list_new_conversation_fab',
+          backgroundColor: const Color(0xFF2563EB),
+          foregroundColor: Colors.white,
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          onPressed: () => _openNewChatSheet(context),
+          tooltip: 'New Conversation',
+          child: const Icon(CupertinoIcons.chat_bubble_text_fill, size: 24),
+        ),
       ),
     );
   }

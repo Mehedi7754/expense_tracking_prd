@@ -227,7 +227,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           MyAttendanceScreen(),
           HomeDashboardScreen(),
           HomeDashboardScreen(),
-          ChatListScreen(),
+          ChatListScreen(hasBottomDock: true),
         ];
 
       case UserRole.projectManager:
@@ -247,7 +247,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ReportsScreen(),
           HomeDashboardScreen(),
           HomeDashboardScreen(),
-          ChatListScreen(),
+          ChatListScreen(hasBottomDock: true),
         ];
     }
   }
