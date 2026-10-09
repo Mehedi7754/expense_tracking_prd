@@ -35,16 +35,24 @@ export class AttendanceController {
     @Query('year') year: string,
     @Request() req: any,
   ) {
+    const isManagerOrAdmin =
+      req.user.role === 'main_admin' ||
+      req.user.role === 'project_manager' ||
+      req.user.role === 'finance_manager' ||
+      req.user.role === 'finance';
+
+    const targetUserId = !isManagerOrAdmin ? req.user.id : (userId || undefined);
+
     if (month && year) {
-      if (userId) {
-        return this.attendanceService.getMonthlyRecords(userId, parseInt(year, 10), parseInt(month, 10));
+      if (targetUserId) {
+        return this.attendanceService.getMonthlyRecords(targetUserId, parseInt(year, 10), parseInt(month, 10));
       } else {
         return this.attendanceService.getAllMonthlyRecords(parseInt(year, 10), parseInt(month, 10));
       }
     }
 
-    // Single date or today
-    return this.attendanceService.getRecordsByDate(date, userId);
+    // Single date or user history
+    return this.attendanceService.getRecordsByDate(date, targetUserId);
   }
 
   @Get('overview')

@@ -363,7 +363,6 @@ export class AttendanceService {
   }
 
   async getRecordsByDate(dateStr?: string, userId?: string): Promise<AttendanceRecord[]> {
-    const targetDate = dateStr || this.getDhakaDateStr();
     let sql = `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
                       COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
                       u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
@@ -372,13 +371,21 @@ export class AttendanceService {
                       a.status, a.notes, a.created_at::text as "createdAt"
                FROM attendance_records a
                JOIN users u ON a.user_id = u.id
-               WHERE a.date = $1 AND u.is_active = TRUE`;
-    const params: any[] = [targetDate];
-    if (userId) {
-      sql += ' AND a.user_id = $2';
-      params.push(userId);
+               WHERE u.is_active = TRUE`;
+    const params: any[] = [];
+    if (dateStr) {
+      params.push(dateStr);
+      sql += ` AND a.date = $${params.length}`;
+    } else if (!userId) {
+      params.push(this.getDhakaDateStr());
+      sql += ` AND a.date = $${params.length}`;
     }
-    sql += ' ORDER BY a.login_time DESC';
+
+    if (userId) {
+      params.push(userId);
+      sql += ` AND a.user_id = $${params.length}`;
+    }
+    sql += ' ORDER BY a.date DESC, a.login_time DESC LIMIT 100';
     const res = await this.db.query(sql, params);
     return res.rows;
   }
