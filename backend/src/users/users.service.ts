@@ -12,18 +12,20 @@ export class UsersService {
 
   async findAll(query?: string) {
     let sql = `
-      SELECT id, email, full_name, role, department, designation, phone, avatar_url, is_active
-      FROM users
-      WHERE is_active = TRUE
+      SELECT u.id, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+             COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
+      FROM users u
+      LEFT JOIN project_members pm ON pm.user_id = u.id
+      WHERE u.is_active = TRUE
     `;
     const params: any[] = [];
 
     if (query && query.trim().length > 0) {
-      sql += ` AND (full_name ILIKE $1 OR email ILIKE $1)`;
+      sql += ` AND (u.full_name ILIKE $1 OR u.email ILIKE $1)`;
       params.push(`%${query.trim()}%`);
     }
 
-    sql += ` ORDER BY full_name ASC`;
+    sql += ` GROUP BY u.id ORDER BY u.full_name ASC`;
 
     const res = await this.db.query(sql, params);
     return res.rows.map((r) => ({
@@ -36,14 +38,19 @@ export class UsersService {
       phone: r.phone || '',
       avatarUrl: r.avatar_url,
       isActive: r.is_active,
+      assignedProjectIds: r.assigned_project_ids || [],
+      assigned_project_ids: r.assigned_project_ids || [],
     }));
   }
 
   async findByEmail(email: string) {
     const res = await this.db.query(
-      `SELECT id, email, full_name, role, department, designation, phone, avatar_url, is_active
-       FROM users
-       WHERE email = $1`,
+      `SELECT u.id, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+              COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
+       FROM users u
+       LEFT JOIN project_members pm ON pm.user_id = u.id
+       WHERE u.email = $1
+       GROUP BY u.id`,
       [email.trim().toLowerCase()],
     );
 
@@ -59,14 +66,19 @@ export class UsersService {
       phone: r.phone || '',
       avatarUrl: r.avatar_url,
       isActive: r.is_active,
+      assignedProjectIds: r.assigned_project_ids || [],
+      assigned_project_ids: r.assigned_project_ids || [],
     };
   }
 
   async findOne(id: string) {
     const res = await this.db.query(
-      `SELECT id, email, full_name, role, department, designation, phone, avatar_url, is_active
-       FROM users
-       WHERE id = $1`,
+      `SELECT u.id, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+              COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
+       FROM users u
+       LEFT JOIN project_members pm ON pm.user_id = u.id
+       WHERE u.id = $1
+       GROUP BY u.id`,
       [id],
     );
     if (!res.rows.length) return null;
@@ -81,6 +93,8 @@ export class UsersService {
       phone: r.phone || '',
       avatarUrl: r.avatar_url,
       isActive: r.is_active,
+      assignedProjectIds: r.assigned_project_ids || [],
+      assigned_project_ids: r.assigned_project_ids || [],
     };
   }
 

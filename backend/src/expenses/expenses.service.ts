@@ -20,6 +20,8 @@ export class ExpensesService {
       id: e.id,
       employeeId: e.employee_id,
       employeeName: e.employee_name || 'Team Member',
+      employeeAvatar: e.employee_avatar || null,
+      employee_avatar: e.employee_avatar || null,
       projectId: e.project_id,
       projectName: e.project_name || 'Project',
       taskId: e.task_id,
