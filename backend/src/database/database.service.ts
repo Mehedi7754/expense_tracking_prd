@@ -210,6 +210,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         );
         CREATE INDEX IF NOT EXISTS idx_chat_messages_channel_created ON chat_messages(channel_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_chat_messages_project ON chat_messages(project_id);
+
+        -- Ensure expenses cascade on project deletion
+        DO $$
+        BEGIN
+            ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_project_id_fkey;
+            ALTER TABLE expenses ADD CONSTRAINT expenses_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+        EXCEPTION
+            WHEN others THEN null;
+        END $$;
       `);
 
 

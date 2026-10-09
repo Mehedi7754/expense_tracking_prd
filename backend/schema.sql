@@ -235,7 +235,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE TABLE IF NOT EXISTS expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
     amount NUMERIC(15, 2) NOT NULL CHECK (amount >= 0),
     office_benefit_amount NUMERIC(15, 2) NOT NULL DEFAULT 0.00 CHECK (office_benefit_amount >= 0),

@@ -479,6 +479,15 @@ export class ProjectsService {
       const idList = Array.from(idsToDelete);
       const codeList = Array.from(codesToDelete);
       const nameList = Array.from(namesToDelete);
+      // 0. Clean up chat messages and project chat channels
+      await client.query(
+        'UPDATE chat_messages SET project_id = NULL WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
+        [idList, codeList],
+      ).catch(() => {});
+      await client.query(
+        'DELETE FROM chat_channels WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
+        [idList, codeList],
+      ).catch(() => {});
 
       // 1. Delete comments on expenses belonging to this project
       await client.query(
