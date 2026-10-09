@@ -108,6 +108,11 @@ class RouterNotifier extends ChangeNotifier {
       if (loc == RoutePaths.receiptCompliance && role == UserRole.viewer) {
         return RoutePaths.home;
       }
+
+      // Total Portfolio Financials guard (Employees restricted)
+      if (loc == RoutePaths.portfolioValueDetail && role == UserRole.projectMember) {
+        return RoutePaths.home;
+      }
     }
 
     return null;

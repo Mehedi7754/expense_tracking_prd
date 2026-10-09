@@ -43,222 +43,74 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
   void _showUpdateBudgetDialog(BuildContext context, ProjectModel project) {
-    final contractController = TextEditingController(text: project.grossProjectValue.toStringAsFixed(0));
-    final taxRateController = TextEditingController(text: project.taxRate.toStringAsFixed(1));
-    final officeBenefitController = TextEditingController(text: (project.officeBenefitRate * 100.0).toStringAsFixed(1));
+    final currentBudget = project.grossProjectValue > 0 ? project.grossProjectValue : project.budget;
+    final budgetController = TextEditingController(text: currentBudget.toStringAsFixed(0));
 
     showDialog(
       context: context,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return StatefulBuilder(
-          builder: (context, setState) {
-            final gross = double.tryParse(contractController.text.trim()) ?? 0.0;
-            final taxPct = double.tryParse(taxRateController.text.trim()) ?? 0.0;
-            final taxAmount = gross * (taxPct / 100.0);
-            final netAfterTax = gross - taxAmount;
-
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-              title: const Row(
-                children: [
-                  Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF4F46E5)),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Update Project Budget',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Set contract value, tax rate, and project profit margin.',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: contractController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        labelText: 'Total Contract Value (Gross ৳)',
-                        prefixText: '৳ ',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: taxRateController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
-                              labelText: 'Tax Rate (%)',
-                              suffixText: '%',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: TextField(
-                            controller: officeBenefitController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(
-                              labelText: 'Margin/Markup (%)',
-                              suffixText: '%',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-
-                    // LIVE AFTER-TAX CALCULATION BREAKDOWN
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF0F172A).withAlpha(80) : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Gross Contract:',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                CurrencyFormatter.format(gross),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Tax (${taxPct.toStringAsFixed(1)}%):',
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '- ${CurrencyFormatter.format(taxAmount)}',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFFEF4444),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 6),
-                            child: Divider(height: 1),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'After-Tax Value:',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF10B981),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                CurrencyFormatter.format(netAfterTax),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF10B981),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF4F46E5)),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Update Project Budget',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4F46E5),
-                    foregroundColor: Colors.white,
-                  ),
-                  onPressed: () {
-                    final newGross = double.tryParse(contractController.text.trim()) ?? project.grossProjectValue;
-                    final newTax = double.tryParse(taxRateController.text.trim()) ?? project.taxRate;
-                    final newBenefit = (double.tryParse(officeBenefitController.text.trim()) ?? (project.officeBenefitRate * 100)) / 100.0;
-                    final newNet = newTax > 0 ? newGross * (1.0 - (newTax / 100.0)) : newGross;
-
-                    final updated = project.copyWith(
-                      grossProjectValue: newGross,
-                      taxRate: newTax,
-                      expectedNetRevenue: newNet,
-                      officeBenefitRate: newBenefit,
-                      budget: newGross,
-                    );
-                    ref.read(projectProvider.notifier).updateProject(updated);
-                    Navigator.pop(ctx);
-                    NotificationBanner.showSuccess(context, 'Project budget updated successfully');
-                  },
-                  child: const Text('Save Changes'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Set the agreed total budget for this project.',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                 ),
-              ],
-            );
-          },
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: budgetController,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Agreed Budget (৳)',
+                  prefixText: '৳ ',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                final newBudget = double.tryParse(budgetController.text.trim()) ?? currentBudget;
+                final updated = project.copyWith(
+                  budget: newBudget,
+                  grossProjectValue: newBudget,
+                  expectedNetRevenue: newBudget,
+                );
+                ref.read(projectProvider.notifier).updateProject(updated);
+                Navigator.pop(ctx);
+                NotificationBanner.showSuccess(context, 'Project budget updated successfully');
+              },
+              child: const Text('Save Changes'),
+            ),
+          ],
         );
       },
     );
@@ -415,6 +267,44 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   );
 }
 
+  void _showReopenProjectDialog(BuildContext context, ProjectModel project) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.lock_open_rounded, color: AppColors.success),
+            SizedBox(width: 8),
+            Text('Reopen Project'),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to reopen this project? It will become active again and team members will be able to submit expense claims.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(projectProvider.notifier).reopenProject(projectId: project.id);
+              if (context.mounted) {
+                NotificationBanner.showSuccess(context, 'Project reopened successfully');
+              }
+            },
+            child: const Text('Confirm Reopen'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showDeleteProjectDialog(BuildContext context, ProjectModel project) {
     showDialog(
       context: context,
@@ -432,7 +322,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           ],
         ),
         content: Text(
-          'Are you sure you want to delete "${project.name}" (${project.projectId})?\n\nThis will permanently purge all budget records, team assignments, and revenue settlements. This action cannot be undone.',
+          'Are you sure you want to delete "${project.name}" (${project.projectId})?\n\nThis will permanently purge this project and all associated expenses. This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -446,11 +336,14 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             ),
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref.read(projectProvider.notifier).deleteProject(project.id);
               if (context.mounted) {
-                context.pop();
-                NotificationBanner.showInfo(context, 'Project "${project.name}" deleted successfully');
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                } else {
+                  context.go(RoutePaths.projects);
+                }
               }
+              await ref.read(projectProvider.notifier).deleteProject(project.id);
             },
             child: const Text('Confirm Delete'),
           ),
@@ -579,9 +472,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     final projectList = allProjects.where((p) => p.id == widget.projectId).toList();
     if (projectList.isEmpty) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Project Record')),
-        body: const Center(child: Text('Project not found.')),
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -800,11 +692,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             context: context,
             project: project,
             costIncurred: costIncurred,
-            expectedRemaining: expectedRemaining,
-            projectedFinalCost: projectedFinalCost,
-            projectedProfit: projectedProfit,
-            projectedMargin: projectedMargin,
-            totalTaxIncurred: totalTaxIncurred,
             expenseCount: validExpenses.length,
             isDark: isDark,
           ),
@@ -1000,26 +887,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     );
   }
 
-  // ==================== FINANCIAL COCKPIT (BENTO MASTERPIECE) ====================
+  // ==================== FINANCIAL COCKPIT (DIRECT & INTUITIVE) ====================
   Widget _buildFinancialCockpitCard({
     required BuildContext context,
     required ProjectModel project,
     required double costIncurred,
-    required double expectedRemaining,
-    required double projectedFinalCost,
-    required double projectedProfit,
-    required double projectedMargin,
-    required double totalTaxIncurred,
     required int expenseCount,
     required bool isDark,
   }) {
-    final grossContract = project.grossProjectValue;
-    final taxRate = project.taxRate;
-    final expectedNet = project.expectedNetRevenue > 0
-        ? project.expectedNetRevenue
-        : (taxRate > 0 ? grossContract * (1.0 - (taxRate / 100.0)) : grossContract);
-    final afterTaxProfit = expectedNet - projectedFinalCost;
-    final afterTaxMargin = expectedNet > 0 ? (afterTaxProfit / expectedNet) * 100.0 : 0.0;
+    final budget = project.grossProjectValue > 0 ? project.grossProjectValue : project.budget;
+    final remainingBalance = budget - costIncurred;
+    final spentRatio = budget > 0 ? (costIncurred / budget) * 100.0 : 0.0;
+    final remainingRatio = (100.0 - spentRatio).clamp(0.0, 100.0);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -1041,16 +920,49 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header Row with Title & Quick Actions (Never truncated)
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 360;
-
-              final budgetButton = InkWell(
+          // Header Row with Title & Quick Budget Action
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4F46E5).withAlpha(18),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.analytics_rounded, color: Color(0xFF4F46E5), size: 19),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Financial Overview',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      'Budget & spending tracking',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
                 onTap: () => _showUpdateBudgetDialog(context, project),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: const Color(0xFF4F46E5).withAlpha(15),
                     borderRadius: BorderRadius.circular(8),
@@ -1072,146 +984,20 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     ],
                   ),
                 ),
-              );
-
-              final neededButton = InkWell(
-                onTap: () => _showUpdateRemainingCostDialog(context, project),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2563EB).withAlpha(15),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF2563EB).withAlpha(50)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.edit_note_rounded, size: 14, color: Color(0xFF2563EB)),
-                      SizedBox(width: 4),
-                      Text(
-                        'Needed',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-
-              if (isCompact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4F46E5).withAlpha(18),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.analytics_rounded, color: Color(0xFF4F46E5), size: 19),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Financial Overview',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: -0.3,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                'Budget & profit forecast',
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        budgetButton,
-                        const SizedBox(width: 8),
-                        neededButton,
-                      ],
-                    ),
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4F46E5).withAlpha(18),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.analytics_rounded, color: Color(0xFF4F46E5), size: 19),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Financial Overview',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                          ),
-                        ),
-                        const SizedBox(height: 1),
-                        Text(
-                          'Budget & profit forecast',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  budgetButton,
-                  const SizedBox(width: 6),
-                  neededButton,
-                ],
-              );
-            },
+              ),
+            ],
           ),
           const SizedBox(height: 16),
 
           // 2x2 Bento Metric Tiles
           Row(
             children: [
-              // Tile 1: Total Budget
+              // Tile 1: BUDGET
               Expanded(
                 child: _buildBentoMetricTile(
-                  title: 'TOTAL BUDGET',
-                  value: CurrencyFormatter.format(project.grossProjectValue),
-                  subtitle: 'Agreed Contract',
+                  title: 'BUDGET',
+                  value: CurrencyFormatter.format(budget),
+                  subtitle: 'Agreed Budget',
                   icon: Icons.account_balance_wallet_outlined,
                   valueColor: isDark ? Colors.white : const Color(0xFF0F172A),
                   iconColor: const Color(0xFF4F46E5),
@@ -1225,7 +1011,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 child: _buildBentoMetricTile(
                   title: 'TOTAL SPENT',
                   value: CurrencyFormatter.format(costIncurred),
-                  subtitle: '$expenseCount recorded',
+                  subtitle: expenseCount == 1 ? '1 claim approved' : '$expenseCount claims approved',
                   icon: Icons.receipt_long_outlined,
                   valueColor: const Color(0xFFD97706),
                   iconColor: const Color(0xFFD97706),
@@ -1238,163 +1024,130 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           const SizedBox(height: 10),
           Row(
             children: [
-              // Tile 3: Needed to Finish
+              // Tile 3: REMAINING
               Expanded(
-                child: InkWell(
-                  onTap: () => _showUpdateRemainingCostDialog(context, project),
-                  borderRadius: BorderRadius.circular(14),
-                  child: _buildBentoMetricTile(
-                    title: 'NEEDED TO FINISH',
-                    value: CurrencyFormatter.format(expectedRemaining),
-                    subtitle: 'Tap to update ✎',
-                    icon: Icons.edit_note_rounded,
-                    valueColor: const Color(0xFF2563EB),
-                    iconColor: const Color(0xFF2563EB),
-                    bgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                    borderColor: isDark ? const Color(0xFF3B82F6).withAlpha(50) : const Color(0xFFBFDBFE),
-                  ),
+                child: _buildBentoMetricTile(
+                  title: 'REMAINING',
+                  value: CurrencyFormatter.format(remainingBalance),
+                  subtitle: remainingBalance >= 0 ? 'Available balance' : 'Over budget!',
+                  icon: remainingBalance >= 0 ? Icons.savings_outlined : Icons.warning_amber_rounded,
+                  valueColor: remainingBalance >= 0
+                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
+                      : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                  iconColor: remainingBalance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                  bgColor: remainingBalance >= 0
+                      ? (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5))
+                      : (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2)),
+                  borderColor: remainingBalance >= 0
+                      ? (isDark ? const Color(0xFF059669).withAlpha(60) : const Color(0xFFA7F3D0))
+                      : (isDark ? const Color(0xFFDC2626).withAlpha(60) : const Color(0xFFFECACA)),
                 ),
               ),
               const SizedBox(width: 10),
-              // Tile 4: After-Tax Profit KPI
+              // Tile 4: BUDGET USED %
               Expanded(
                 child: _buildBentoMetricTile(
-                  title: 'AFTER-TAX PROFIT',
-                  value: CurrencyFormatter.format(afterTaxProfit),
-                  subtitle: '${afterTaxMargin.toStringAsFixed(1)}% Net Margin',
-                  icon: afterTaxProfit >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded,
-                  valueColor: afterTaxProfit >= 0
-                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
-                      : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
-                  iconColor: afterTaxProfit >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                  bgColor: afterTaxProfit >= 0
-                      ? (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5))
-                      : (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2)),
-                  borderColor: afterTaxProfit >= 0
-                      ? (isDark ? const Color(0xFF059669).withAlpha(60) : const Color(0xFFA7F3D0))
-                      : (isDark ? const Color(0xFFDC2626).withAlpha(60) : const Color(0xFFFECACA)),
+                  title: 'BUDGET USED',
+                  value: '${spentRatio.toStringAsFixed(1)}%',
+                  subtitle: '${remainingRatio.toStringAsFixed(1)}% remaining',
+                  icon: Icons.pie_chart_outline_rounded,
+                  valueColor: spentRatio > 100
+                      ? const Color(0xFFEF4444)
+                      : (spentRatio > 80 ? const Color(0xFFF59E0B) : const Color(0xFF2563EB)),
+                  iconColor: spentRatio > 100
+                      ? const Color(0xFFEF4444)
+                      : (spentRatio > 80 ? const Color(0xFFF59E0B) : const Color(0xFF2563EB)),
+                  bgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                  borderColor: isDark ? const Color(0xFF3B82F6).withAlpha(50) : const Color(0xFFBFDBFE),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 14),
 
-          // Bottom summary bar
+          // Bottom summary bar with progress indicator
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF0F172A).withAlpha(60) : const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline_rounded,
-                        size: 14,
-                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Budget Utilization',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerRight,
                         child: Text(
-                          'Expected Total Cost:',
+                          '${CurrencyFormatter.format(costIncurred)} of ${CurrencyFormatter.format(budget)}',
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                             color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  CurrencyFormatter.format(projectedFinalCost),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 6),
-          // Pre-Tax Profit & Net Revenue Row
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0F172A).withAlpha(40) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    'Pre-Tax Profit: ${CurrencyFormatter.format(projectedProfit)} (${projectedMargin.toStringAsFixed(1)}%)',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: (spentRatio / 100.0).clamp(0.0, 1.0),
+                    minHeight: 8,
+                    backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      spentRatio > 100
+                          ? const Color(0xFFEF4444)
+                          : (spentRatio > 80 ? const Color(0xFFF59E0B) : const Color(0xFF10B981)),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'Tax: ${taxRate.toStringAsFixed(1)}%',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF6366F1),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (totalTaxIncurred > 0) ...[
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF0F172A).withAlpha(40) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Tax Incurred on Expenses:',
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Remaining: ${CurrencyFormatter.format(remainingBalance)}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: remainingBalance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${remainingRatio.toStringAsFixed(1)}% Left',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
                         color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    CurrencyFormatter.format(totalTaxIncurred),
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF6366F1),
-                    ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -2534,6 +2287,20 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     icon: const Icon(Icons.archive_rounded),
                     label: const Text('Close Project & Generate Summary', style: TextStyle(fontWeight: FontWeight.w800)),
                     onPressed: () => _showCloseProjectDialog(context, project, expenses),
+                  ),
+                ),
+              if (project.isClosed && canClose)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.lock_open_rounded),
+                    label: const Text('Reopen Project', style: TextStyle(fontWeight: FontWeight.w800)),
+                    onPressed: () => _showReopenProjectDialog(context, project),
                   ),
                 ),
             ],

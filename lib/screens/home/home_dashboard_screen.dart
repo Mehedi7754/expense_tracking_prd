@@ -229,7 +229,10 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
 
     // Financial calculations - Optimized O(N+M) single pass direct cost map
     final activeProjects = projects.where((p) => p.status == ProjectStatus.ongoing).toList();
-    final totalContractValue = projects.fold<double>(0.0, (sum, p) => sum + p.grossProjectValue);
+    final totalContractValue = projects.fold<double>(
+      0.0,
+      (sum, p) => sum + (p.grossProjectValue > 0 ? p.grossProjectValue : p.budget),
+    );
 
     final Map<String, double> directCostByProjectId = {};
     for (final e in expenses) {
@@ -240,35 +243,30 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
 
     double totalCostIncurred = 0.0;
     for (final p in projects) {
-      final directCost = directCostByProjectId[p.id] ?? 0.0;
-      final officeBenefit = directCost * p.officeBenefitRate;
-      totalCostIncurred += (directCost + officeBenefit);
+      totalCostIncurred += (directCostByProjectId[p.id] ?? 0.0);
     }
 
-    final totalExpectedAdditionalCost = projects.fold<double>(0.0, (sum, p) => sum + p.estimatedRemainingCost);
-    final projectedFinalCost = totalCostIncurred + totalExpectedAdditionalCost;
-    final projectedRevenue = projects.fold<double>(0.0, (sum, p) => sum + p.expectedNetRevenue);
-    final projectedProfit = totalContractValue - projectedFinalCost;
-    final projectedProfitMargin = totalContractValue > 0 ? (projectedProfit / totalContractValue) * 100 : 0.0;
+    final remainingBalance = totalContractValue - totalCostIncurred;
+    final spentPercentage = totalContractValue > 0 ? (totalCostIncurred / totalContractValue) * 100 : 0.0;
 
     // Filter projects using O(1) direct cost lookup
     final profitableProjects = projects.where((p) {
       final direct = directCostByProjectId[p.id] ?? 0.0;
-      final cost = direct * (1 + p.officeBenefitRate) + p.estimatedRemainingCost;
-      final profit = p.grossProjectValue - cost;
-      return p.grossProjectValue > 0 && (profit / p.grossProjectValue) >= 0.30;
+      final budget = p.grossProjectValue > 0 ? p.grossProjectValue : p.budget;
+      final remaining = budget - direct;
+      return budget > 0 && (remaining / budget) >= 0.30;
     }).toList();
 
     final approachingProjects = projects.where((p) {
       final direct = directCostByProjectId[p.id] ?? 0.0;
-      final cost = direct * (1 + p.officeBenefitRate);
-      return p.budget > 0 && cost >= (p.budget * 0.80) && cost <= p.budget;
+      final budget = p.grossProjectValue > 0 ? p.grossProjectValue : p.budget;
+      return budget > 0 && direct >= (budget * 0.80) && direct <= budget;
     }).toList();
 
     final overBudgetProjects = projects.where((p) {
       final direct = directCostByProjectId[p.id] ?? 0.0;
-      final cost = direct * (1 + p.officeBenefitRate);
-      return p.budget > 0 && cost > p.budget;
+      final budget = p.grossProjectValue > 0 ? p.grossProjectValue : p.budget;
+      return budget > 0 && direct > budget;
     }).toList();
 
     List<ProjectModel> filteredProjects = projects;
@@ -343,10 +341,16 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.arrow_upward_rounded, color: Color(0xFF4ADE80), size: 13),
+                              Icon(
+                                spentPercentage <= 100 ? Icons.pie_chart_outline_rounded : Icons.warning_amber_rounded,
+                                color: spentPercentage <= 80
+                                    ? const Color(0xFF4ADE80)
+                                    : (spentPercentage <= 100 ? const Color(0xFFFBBF24) : const Color(0xFFF87171)),
+                                size: 13,
+                              ),
                               const SizedBox(width: 3),
                               Text(
-                                '${projectedProfitMargin.toStringAsFixed(1)}% Margin',
+                                '${spentPercentage.toStringAsFixed(1)}% Used',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -381,14 +385,14 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                         children: [
                           _buildFrostedMiniStat(
                             icon: Icons.payments_outlined,
-                            label: 'Incurred',
+                            label: 'Spent',
                             value: CurrencyFormatter.format(totalCostIncurred, compact: true),
                           ),
                           const SizedBox(width: 8),
                           _buildFrostedMiniStat(
-                            icon: Icons.receipt_long_outlined,
-                            label: 'Net Revenue',
-                            value: CurrencyFormatter.format(projectedRevenue, compact: true),
+                            icon: Icons.savings_outlined,
+                            label: 'Remaining',
+                            value: CurrencyFormatter.format(remainingBalance, compact: true),
                           ),
                           const SizedBox(width: 8),
                           _buildFrostedMiniStat(
@@ -611,7 +615,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             borderRadius: BorderRadius.circular(22),
             child: InkWell(
               borderRadius: BorderRadius.circular(22),
-              onTap: () => context.push(RoutePaths.portfolioValueDetail),
+              onTap: () => context.push(RoutePaths.myExpenses),
               child: Padding(
                 padding: const EdgeInsets.all(22),
                 child: Column(
@@ -631,7 +635,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                           ),
                         ),
                         SizedBox(width: 8),
-                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white60, size: 11),
+                        Icon(Icons.receipt_long_rounded, color: Colors.white60, size: 16),
                       ],
                     ),
                     const SizedBox(height: 8),

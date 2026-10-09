@@ -523,6 +523,7 @@ export class ChatService {
       const payload: Record<string, string> = {
         type: 'chat',
         channelId: channel.id,
+        notificationId: message.id,
         messageId: message.id,
         senderId: senderId,
         senderName: sender.full_name,
@@ -532,6 +533,7 @@ export class ChatService {
       if (sender.avatar_url) payload.senderAvatarUrl = sender.avatar_url;
       if (channel.project_id) payload.projectId = channel.project_id;
 
+      this.logger.log(`Dispatching chat FCM push to ${parts.rows.length} participant(s) for channel ${channel.id}`);
       for (const p of parts.rows) {
         await this.fcm.sendPushToUser(p.user_id, title, bodyText, payload);
       }

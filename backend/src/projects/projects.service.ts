@@ -449,6 +449,31 @@ export class ProjectsService {
     return this.findOne(projectId);
   }
 
+  async reopenProject(projectId: string) {
+    const res = await this.db.query(
+      `UPDATE projects
+       SET status = 'ongoing', is_closed = FALSE, closed_at = NULL, closing_summary = NULL
+       WHERE id = $1
+       RETURNING *`,
+      [projectId],
+    );
+
+    if (!res.rows.length) {
+      throw new NotFoundException(`Project not found: ${projectId}`);
+    }
+
+    try {
+      await this.auditLogsService.log({
+        action: 'PROJECT_REOPENED',
+        entityType: 'Project',
+        entityId: projectId,
+        details: {},
+      });
+    } catch (_) {}
+
+    return this.findOne(projectId);
+  }
+
   async delete(id: string, user?: any) {
     const rawTarget = (id || '').trim();
     if (!rawTarget) {

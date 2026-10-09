@@ -9,6 +9,7 @@ import '../models/user_role.dart';
 import '../state/auth_provider.dart';
 import '../state/expense_provider.dart';
 import '../state/notification_provider.dart';
+import '../state/attendance_provider.dart';
 import '../state/chat_provider.dart';
 import 'approvals/approvals_queue_screen.dart';
 import 'attendance/attendance_dashboard_screen.dart';
@@ -91,6 +92,13 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         unreadChatCount: unreadChatCount,
         onTap: (index) {
           setState(() => _currentIndex = index);
+          if (role == UserRole.projectMember && index == 1) {
+            ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: user.id, force: true);
+          } else if (role != UserRole.projectMember && role != UserRole.viewer && index == 1) {
+            ref.read(expenseProvider.notifier).fetchExpenses(force: true);
+          } else if (role != UserRole.projectMember && role != UserRole.viewer && index == 4) {
+            ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+          }
         },
         onAddTap: () => _handleCenterAction(context, role),
       ),

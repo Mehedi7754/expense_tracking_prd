@@ -329,6 +329,8 @@ class PushNotificationService {
         return 'Expense Notifications';
       case _channelAttendance:
         return 'Attendance Reminders';
+      case _channelChat:
+        return 'Chat Messages';
       default:
         return 'General Notifications';
     }

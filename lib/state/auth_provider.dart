@@ -97,7 +97,12 @@ class AuthNotifier extends Notifier<AuthState> {
         ref.read(projectProvider.notifier).fetchProjects();
         ref.read(expenseProvider.notifier).fetchExpenses();
         ref.read(userManagementProvider.notifier).fetchUsers();
-        ref.read(attendanceProvider.notifier).fetchDailyOverview();
+        if (user.role == UserRole.projectMember) {
+          ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: user.id, force: true);
+        } else {
+          ref.read(attendanceProvider.notifier).fetchDailyOverview();
+          ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: user.id);
+        }
         ref.read(salaryProvider.notifier).fetchOrgSalaryReport();
         FcmService.instance.syncTokenWithBackend();
       }
@@ -260,7 +265,12 @@ class AuthNotifier extends Notifier<AuthState> {
 
       // Invalidate attendance & salary cache and fetch fresh real overview
       ref.read(attendanceProvider.notifier).invalidateCache();
-      ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+      if (authUser.role == UserRole.projectMember) {
+        ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: authUser.id, force: true);
+      } else {
+        ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
+        ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: authUser.id, force: true);
+      }
       ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
 
       // Fetch fresh notifications from server

@@ -110,9 +110,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
   double get _taxAmount => _taxRate > 0 ? (_enteredAmount * (_taxRate / 100.0)) : 0.0;
 
-  double get _netCost => _taxRate > 0 ? (_enteredAmount - _taxAmount) : _enteredAmount;
+  double get _netCost => _taxRate > 0 ? (_enteredAmount + _taxAmount) : _enteredAmount;
 
-  double get _baseCost => _netCost;
+  double get _baseCost => _enteredAmount;
 
   double get _currentAmount => _netCost;
   bool get _exceedsThresholdWithoutReceipt =>
@@ -525,7 +525,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Tax / VAT Amount:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
-                          Text('+ ${CurrencyFormatter.format(_taxAmount)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _taxAmount > 0 ? const Color(0xFF0284C7) : null)),
+                          Text('+ ${CurrencyFormatter.format(_taxAmount, includeDecimals: _taxAmount % 1 != 0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _taxAmount > 0 ? const Color(0xFF0284C7) : null)),
                         ],
                       ),
                       Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 16),
@@ -534,7 +534,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                         children: [
                           const Text('Expense Added to Project:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                           Text(
-                            CurrencyFormatter.format(_netCost),
+                            CurrencyFormatter.format(_netCost, includeDecimals: _netCost % 1 != 0 || _taxAmount % 1 != 0),
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                           ),
                         ],

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'push_notification_service.dart';
 import 'notification_router.dart';
+import 'realtime_sync_service.dart';
 import '../network/api_client.dart';
 import '../network/api_endpoints.dart';
 
@@ -130,6 +131,12 @@ class FcmService {
 
         final notifId = message.messageId ?? data['notificationId']?.toString();
 
+        // Immediately trigger reactive sync across all providers
+        RealtimeSyncService.instance.triggerImmediateSync(
+          type: type,
+          payload: data,
+        );
+
         if (type.contains('chat')) {
           await PushNotificationService.instance.showChatAlert(
             title: title,
@@ -164,11 +171,23 @@ class FcmService {
       });
 
       // Tapped a system-tray FCM notification while app was in background
-      FirebaseMessaging.onMessageOpenedApp.listen((m) => NotificationRouter.handleData(m.data));
+      FirebaseMessaging.onMessageOpenedApp.listen((m) {
+        RealtimeSyncService.instance.triggerImmediateSync(
+          type: m.data['type']?.toString(),
+          payload: m.data,
+        );
+        NotificationRouter.handleData(m.data);
+      });
 
       // App was killed and launched by tapping an FCM notification
       final initial = await messaging.getInitialMessage();
-      if (initial != null) NotificationRouter.handleData(initial.data);
+      if (initial != null) {
+        RealtimeSyncService.instance.triggerImmediateSync(
+          type: initial.data['type']?.toString(),
+          payload: initial.data,
+        );
+        NotificationRouter.handleData(initial.data);
+      }
 
       _initialized = true;
     } catch (e, st) {

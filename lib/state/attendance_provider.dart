@@ -5,8 +5,8 @@ import 'package:intl/intl.dart';
 import '../core/network/api_exceptions.dart';
 import '../core/services/location_service.dart';
 import '../core/services/push_notification_service.dart';
-import '../core/utils/fetch_cache_mixin.dart';
 import '../models/attendance_model.dart';
+import '../models/user_role.dart';
 import '../repositories/attendance_repository.dart';
 import 'attendance_settings_provider.dart';
 import 'auth_provider.dart';
@@ -55,7 +55,22 @@ class AttendanceState {
   }
 }
 
-class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin {
+class AttendanceNotifier extends Notifier<AttendanceState> {
+  DateTime? _lastOverviewFetchTime;
+  bool _isFetchingOverview = false;
+
+  DateTime? _lastRecordsFetchTime;
+  bool _isFetchingRecords = false;
+  String? _lastRecordsUserId;
+  String? _lastRecordsDate;
+
+  void invalidateCache() {
+    _lastOverviewFetchTime = null;
+    _lastRecordsFetchTime = null;
+    _lastRecordsUserId = null;
+    _lastRecordsDate = null;
+  }
+
   @override
   AttendanceState build() {
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -79,9 +94,15 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
 
   Future<void> fetchDailyOverview({String? date, bool force = false}) async {
     final targetDate = date ?? state.selectedDate;
-    if (!shouldFetch(force: force, hasData: state.dailyOverview != null)) return;
+    if (_isFetchingOverview) return;
+    if (!force &&
+        _lastOverviewFetchTime != null &&
+        DateTime.now().difference(_lastOverviewFetchTime!) < const Duration(minutes: 2) &&
+        state.dailyOverview != null) {
+      return;
+    }
 
-    markFetchStarted();
+    _isFetchingOverview = true;
     state = state.copyWith(isLoading: true, clearError: true);
 
     var users = ref.read(userManagementProvider);
@@ -95,14 +116,15 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     try {
       final repo = ref.read(attendanceRepositoryProvider);
       final overview = await repo.getDailyOverview(targetDate, users);
-      markFetchCompleted();
+      _lastOverviewFetchTime = DateTime.now();
       state = state.copyWith(dailyOverview: overview, isLoading: false, clearError: true);
     } catch (e) {
-      markFetchCompleted();
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
       );
+    } finally {
+      _isFetchingOverview = false;
     }
   }
 
@@ -113,29 +135,51 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     int? year,
     bool force = false,
   }) async {
-    final targetUser = userId ?? state.selectedUserId;
-    final targetDate = date ?? state.selectedDate;
+    final authUser = ref.read(authProvider).currentUser;
+    final isEmployee = authUser?.role == UserRole.projectMember;
+    final effectiveUserId = userId ?? (isEmployee ? authUser?.id : state.selectedUserId);
 
-    if (!shouldFetch(force: force, hasData: state.records.isNotEmpty)) return;
+    // If fetching for a specific user and date is not explicitly specified,
+    // do not force today's date so that historical records are retrieved.
+    final String? resolvedDate = date ?? (effectiveUserId != null ? null : (month == null ? state.selectedDate : null));
 
-    markFetchStarted();
+    final isParamsChanged = effectiveUserId != _lastRecordsUserId || resolvedDate != _lastRecordsDate;
+
+    if (_isFetchingRecords) return;
+    if (!force &&
+        !isParamsChanged &&
+        _lastRecordsFetchTime != null &&
+        DateTime.now().difference(_lastRecordsFetchTime!) < const Duration(minutes: 1) &&
+        state.records.isNotEmpty) {
+      return;
+    }
+
+    _isFetchingRecords = true;
+    _lastRecordsUserId = effectiveUserId;
+    _lastRecordsDate = resolvedDate;
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final repo = ref.read(attendanceRepositoryProvider);
       final records = await repo.getAttendanceRecords(
-        userId: targetUser,
-        date: date ?? (month == null ? targetDate : null),
+        userId: effectiveUserId,
+        date: resolvedDate,
         month: month,
         year: year,
       );
-      markFetchCompleted();
-      state = state.copyWith(records: records, isLoading: false, clearError: true);
+      _lastRecordsFetchTime = DateTime.now();
+      state = state.copyWith(
+        records: records,
+        selectedUserId: effectiveUserId ?? state.selectedUserId,
+        isLoading: false,
+        clearError: true,
+      );
     } catch (e) {
-      markFetchCompleted();
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
       );
+    } finally {
+      _isFetchingRecords = false;
     }
   }
 
@@ -227,7 +271,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
 
       invalidateCache();
       await fetchDailyOverview(force: true);
-      await fetchAttendanceRecords(force: true);
+      await fetchAttendanceRecords(userId: userId, force: true);
 
       // Fire OS status bar push notification immediately
       PushNotificationService.instance.showAttendanceReminder(

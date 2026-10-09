@@ -68,6 +68,12 @@ export class ProjectsController {
   }
 
   @Roles('main_admin', 'project_manager')
+  @Post(':id/reopen')
+  async reopenProject(@Param('id') id: string) {
+    return this.projectsService.reopenProject(id);
+  }
+
+  @Roles('main_admin', 'project_manager')
   @Delete(':id')
   async deleteProject(@Param('id') id: string, @Request() req: any) {
     return this.projectsService.delete(id, req.user);

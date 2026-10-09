@@ -191,7 +191,12 @@ export class FcmService implements OnModuleInit {
           ? 'chat_messages_channel'
           : 'general_channel';
 
-    const notifTag = stringData.notificationId || stringData.expenseId || stringData.type || undefined;
+    const notifTag =
+      stringData.messageId ||
+      stringData.notificationId ||
+      stringData.expenseId ||
+      stringData.channelId ||
+      undefined;
 
     const message: MulticastMessage = {
       tokens: uniqueTokens,
@@ -210,6 +215,7 @@ export class FcmService implements OnModuleInit {
           defaultVibrateTimings: true,
           defaultSound: true,
           tag: notifTag,
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
         },
       },
     };

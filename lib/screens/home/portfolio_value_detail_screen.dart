@@ -109,11 +109,14 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
                     visibleProjects.any((p) => p.id == e.projectId))
                 .toList());
 
-    final totalContractValue = visibleProjects.fold<double>(0.0, (sum, p) => sum + p.budget);
+    final totalContractValue = visibleProjects.fold<double>(
+      0.0,
+      (sum, p) => sum + (p.grossProjectValue > 0 ? p.grossProjectValue : p.budget),
+    );
     final totalCostIncurred = visibleExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
-    final projectedRevenue = totalContractValue - totalCostIncurred;
-    final projectedProfitMargin = totalContractValue > 0
-        ? (projectedRevenue / totalContractValue) * 100
+    final remainingBalance = totalContractValue - totalCostIncurred;
+    final spentRatio = totalContractValue > 0
+        ? (totalCostIncurred / totalContractValue) * 100
         : 0.0;
 
     final totalUnreceipted = visibleExpenses
@@ -122,6 +125,47 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
     final overallUnreceiptedRatio = totalCostIncurred > 0
         ? (totalUnreceipted / totalCostIncurred) * 100
         : 0.0;
+
+    final currentUser = ref.watch(authProvider).currentUser;
+    if (currentUser?.role == UserRole.projectMember) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
+        appBar: AppBar(
+          title: const Text('Access Restricted'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => context.go(RoutePaths.home),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_rounded, size: 64, color: AppColors.error),
+                const SizedBox(height: 16),
+                const Text(
+                  'Access Restricted',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Company-wide portfolio financials are restricted to executive and finance management.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => context.go(RoutePaths.home),
+                  child: const Text('Return to Home'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
@@ -167,8 +211,8 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
                       currency: currency,
                       totalContractValue: totalContractValue,
                       totalCostIncurred: totalCostIncurred,
-                      projectedRevenue: projectedRevenue,
-                      projectedProfitMargin: projectedProfitMargin,
+                      remainingBalance: remainingBalance,
+                      spentRatio: spentRatio,
                       projectsCount: visibleProjects.length,
                     ),
 
@@ -243,8 +287,8 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
     required String currency,
     required double totalContractValue,
     required double totalCostIncurred,
-    required double projectedRevenue,
-    required double projectedProfitMargin,
+    required double remainingBalance,
+    required double spentRatio,
     required int projectsCount,
   }) {
     return Container(
@@ -305,14 +349,16 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: projectedProfitMargin >= 0
-                      ? const Color(0xFF10B981).withAlpha(45)
-                      : const Color(0xFFEF4444).withAlpha(45),
+                  color: (spentRatio <= 80
+                          ? const Color(0xFF10B981)
+                          : (spentRatio <= 100 ? const Color(0xFFF59E0B) : const Color(0xFFEF4444)))
+                      .withAlpha(45),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: projectedProfitMargin >= 0
-                        ? const Color(0xFF34D399).withAlpha(80)
-                        : const Color(0xFFF87171).withAlpha(80),
+                    color: (spentRatio <= 80
+                            ? const Color(0xFF34D399)
+                            : (spentRatio <= 100 ? const Color(0xFFFBBF24) : const Color(0xFFF87171)))
+                        .withAlpha(80),
                     width: 0.8,
                   ),
                 ),
@@ -320,19 +366,21 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      projectedProfitMargin >= 0
-                          ? Icons.trending_up_rounded
-                          : Icons.trending_down_rounded,
-                      color: projectedProfitMargin >= 0 ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
+                      spentRatio <= 100 ? Icons.pie_chart_outline_rounded : Icons.warning_amber_rounded,
+                      color: spentRatio <= 80
+                          ? const Color(0xFF4ADE80)
+                          : (spentRatio <= 100 ? const Color(0xFFFBBF24) : const Color(0xFFF87171)),
                       size: 13,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${projectedProfitMargin.toStringAsFixed(1)}% Margin',
+                      '${spentRatio.toStringAsFixed(1)}% Used',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: projectedProfitMargin >= 0 ? const Color(0xFF4ADE80) : const Color(0xFFF87171),
+                        color: spentRatio <= 80
+                            ? const Color(0xFF4ADE80)
+                            : (spentRatio <= 100 ? const Color(0xFFFBBF24) : const Color(0xFFF87171)),
                       ),
                     ),
                   ],
@@ -351,14 +399,14 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
             ),
           ),
           const SizedBox(height: 18),
-          // 3 Frosted Mini Stats
+          // 3 Frosted Mini Stats (No text cutoffs)
           IntrinsicHeight(
             child: Row(
               children: [
                 Expanded(
                   child: _buildHeroStatItem(
                     icon: Icons.payments_outlined,
-                    label: 'Total Incurred',
+                    label: 'Spent',
                     value: CurrencyFormatter.format(totalCostIncurred, currency: currency, compact: true),
                     iconColor: const Color(0xFFF87171),
                   ),
@@ -367,8 +415,8 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
                 Expanded(
                   child: _buildHeroStatItem(
                     icon: Icons.savings_outlined,
-                    label: 'Net Revenue',
-                    value: CurrencyFormatter.format(projectedRevenue, currency: currency, compact: true),
+                    label: 'Remaining',
+                    value: CurrencyFormatter.format(remainingBalance, currency: currency, compact: true),
                     iconColor: const Color(0xFF4ADE80),
                   ),
                 ),
@@ -376,7 +424,7 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
                 Expanded(
                   child: _buildHeroStatItem(
                     icon: Icons.folder_special_outlined,
-                    label: 'Projects',
+                    label: 'Active',
                     value: '$projectsCount Active',
                     iconColor: const Color(0xFF60A5FA),
                   ),
@@ -396,7 +444,7 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
     required Color iconColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withAlpha(20),
         borderRadius: BorderRadius.circular(14),
@@ -407,14 +455,17 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
         children: [
           Row(
             children: [
-              Icon(icon, color: iconColor, size: 13),
+              Icon(icon, color: iconColor, size: 12),
               const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70),
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70),
+                  ),
                 ),
               ),
             ],
@@ -422,9 +473,10 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
           const SizedBox(height: 4),
           FittedBox(
             fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
             child: Text(
               value,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white),
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: Colors.white),
             ),
           ),
         ],
@@ -1003,8 +1055,9 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
       itemCount: filtered.length,
       itemBuilder: (ctx, i) {
         final p = filtered[i];
-        final budget = p.project.budget;
+        final budget = p.project.grossProjectValue > 0 ? p.project.grossProjectValue : p.project.budget;
         final incurred = p.totalIncurred;
+        final remaining = budget - incurred;
         final burnRate = budget > 0 ? (incurred / budget) : 0.0;
         final isExpanded = _expandedProjectIds.contains(p.project.id);
 
@@ -1074,6 +1127,16 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
                                 style: TextStyle(
                                   fontSize: 10.5,
                                   color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
+                                ),
+                              ),
+                              Text(
+                                'Remaining: ${CurrencyFormatter.format(remaining, currency: currency, compact: true)}',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: remaining >= 0
+                                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF059669))
+                                      : const Color(0xFFEF4444),
                                 ),
                               ),
                             ],

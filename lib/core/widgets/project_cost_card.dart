@@ -89,9 +89,8 @@ class ProjectCostCard extends StatelessWidget {
     // Financial calculations (Only approved expenses count towards expenditure)
     final validExpenses = projectExpenses.where((e) => e.status == ExpenseStatus.approved);
     final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
-    final officeBenefit = directCost * project.officeBenefitRate;
-    final costIncurred = directCost + officeBenefit;
-    final totalBudget = project.budget > 0 ? project.budget : (project.grossProjectValue * 0.85);
+    final costIncurred = directCost;
+    final totalBudget = project.grossProjectValue > 0 ? project.grossProjectValue : project.budget;
     final budgetRatio = totalBudget > 0 ? (costIncurred / totalBudget) : 0.0;
     final isOverBudget = costIncurred > totalBudget && totalBudget > 0;
     final isApproachingBudget = budgetRatio >= 0.80 && !isOverBudget;

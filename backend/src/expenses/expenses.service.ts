@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -195,6 +195,24 @@ export class ExpensesService {
     const employeeId = (isAdmin && (data.employeeId || data.employee_id)) ? (data.employeeId || data.employee_id) : user.id;
     const initialStatus = (isAdmin && data.status) ? data.status : 'pending';
 
+    const rawProjectId = data.projectId || data.project_id;
+    if (!rawProjectId) {
+      throw new BadRequestException('Project ID is required');
+    }
+
+    const projRes = await this.db.query(
+      `SELECT id, name, is_closed, status FROM projects WHERE id::text = $1 OR project_code = $1 LIMIT 1`,
+      [rawProjectId],
+    );
+    if (!projRes.rows.length) {
+      throw new NotFoundException(`Project not found: ${rawProjectId}`);
+    }
+    const project = projRes.rows[0];
+    if (project.is_closed === true || (project.status && ['closed', 'completed'].includes(project.status.toLowerCase()))) {
+      throw new BadRequestException('Cannot submit expenses for a closed project');
+    }
+    const validProjectId = project.id;
+
     let categoryId = data.categoryId || data.category_id;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!categoryId || !uuidRegex.test(categoryId)) {
@@ -252,7 +270,7 @@ export class ExpensesService {
       ) RETURNING id`,
       [
         employeeId,
-        data.projectId || data.project_id,
+        validProjectId,
         data.taskId || data.task_id || null,
         Number(data.amount),
         data.currency || 'BDT',
@@ -426,6 +444,15 @@ export class ExpensesService {
     const exp = await this.findOne(id);
     if (exp.employeeId === reviewerId) {
       throw new ForbiddenException('Anti-fraud rule: You cannot approve your own expense report');
+    }
+
+    const projRes = await this.db.query('SELECT is_closed, status FROM projects WHERE id = $1', [exp.projectId]);
+    if (
+      projRes.rows.length &&
+      (projRes.rows[0].is_closed === true ||
+        (projRes.rows[0].status && ['closed', 'completed'].includes(projRes.rows[0].status.toLowerCase())))
+    ) {
+      throw new BadRequestException('Cannot approve expenses for a closed project');
     }
 
     await this.db.query(

@@ -82,6 +82,17 @@ class ProjectRepository {
     return ProjectModel.fromJson(data);
   }
 
+  Future<ProjectModel> reopenProject(String projectId) async {
+    final response = await _client.post(
+      ApiEndpoints.reopenProject(projectId),
+    );
+
+    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
+        ? response['data'] as Map<String, dynamic>
+        : response as Map<String, dynamic>;
+    return ProjectModel.fromJson(data);
+  }
+
   Future<void> deleteProject(String projectId) async {
     await _client.delete(ApiEndpoints.projectById(projectId));
   }

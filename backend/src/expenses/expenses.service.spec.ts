@@ -63,6 +63,7 @@ describe('ExpensesService Unit & Business Rules', () => {
       } as any);
 
       mockDb.query
+        .mockResolvedValueOnce({ rows: [{ is_closed: false, status: 'ongoing' }] }) // project query
         .mockResolvedValueOnce({ rows: [] }) // update expenses
         .mockResolvedValueOnce({ rows: [{ full_name: 'Manager Sarah', role: 'project_manager' }] }); // reviewer query
 
@@ -165,6 +166,39 @@ describe('ExpensesService Unit & Business Rules', () => {
       await expect(service.update('exp-1', { amount: 9999 }, user)).rejects.toThrow(
         /Cannot edit an expense that has already been approved/,
       );
+    });
+  });
+
+  describe('Closed Project Business Rules', () => {
+    it('throws BadRequestException when submitting an expense to a closed project', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rows: [{ id: 'p-closed', name: 'Completed Tower', is_closed: true, status: 'completed' }],
+      });
+
+      const user = { id: 'u-1', role: 'project_member' };
+      await expect(
+        service.create(
+          { projectId: 'p-closed', amount: 1500, note: 'Cement' },
+          user,
+        ),
+      ).rejects.toThrow(/Cannot submit expenses for a closed project/);
+    });
+
+    it('throws BadRequestException when approving an expense on a closed project', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'exp-closed',
+        employeeId: 'u-sub',
+        projectId: 'p-closed',
+        status: 'pending',
+      } as any);
+
+      mockDb.query.mockResolvedValueOnce({
+        rows: [{ is_closed: true, status: 'completed' }],
+      });
+
+      await expect(
+        service.approve('exp-closed', 'u-mgr', 'Approve test'),
+      ).rejects.toThrow(/Cannot approve expenses for a closed project/);
     });
   });
 });

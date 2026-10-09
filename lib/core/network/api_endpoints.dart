@@ -38,6 +38,7 @@ class ApiEndpoints {
   static String addProjectRevenue(String id) => resolve('${AppEnv.endpointProjects}/$id/revenue');
   static String projectMembers(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/members');
   static String closeProject(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/close');
+  static String reopenProject(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/reopen');
   static String get projectCostBreakdown => resolve(AppEnv.endpointProjectCostBreakdown);
 
   // Expense Claims & Receipts Endpoints

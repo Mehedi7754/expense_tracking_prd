@@ -287,6 +287,33 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     }
   }
 
+  Future<void> reopenProject({required String projectId}) async {
+    state = [
+      for (final p in state)
+        if (p.id == projectId)
+          p.copyWith(
+            status: ProjectStatus.ongoing,
+            isClosed: false,
+          )
+        else
+          p,
+    ];
+    await _persistProjects();
+    invalidateCache();
+
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      final updated = await repo.reopenProject(projectId);
+      state = [
+        for (final p in state)
+          if (p.id == projectId) updated else p,
+      ];
+      await _persistProjects();
+    } catch (_) {
+      // Offline fallback
+    }
+  }
+
   /// Updates the project progress (0% - 100%) and uploads to backend PostgreSQL server.
   Future<void> updateProjectProgress({
     required String projectId,

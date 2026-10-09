@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,6 +27,29 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
   String _searchQuery = '';
   bool _isBatchMode = false;
   final Set<String> _selectedExpenseIds = {};
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(expenseProvider.notifier).fetchExpenses(force: true);
+      }
+    });
+    // Active fast-poll while on Approvals Queue for instant responsiveness
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) {
+        ref.read(expenseProvider.notifier).fetchExpenses(force: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _handleApprove(ExpenseModel expense) async {
     final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(

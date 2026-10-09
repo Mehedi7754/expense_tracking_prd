@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/api_client.dart';
+import '../core/utils/environment_utils.dart';
 import '../core/utils/fetch_cache_mixin.dart';
 import '../models/user_model.dart';
 import '../models/user_role.dart';
@@ -10,7 +11,9 @@ const String _kCustomUserPasswordsKey = 'gw_custom_user_passwords_cache';
 class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMixin {
   @override
   List<UserModel> build() {
-    fetchUsers(force: true);
+    if (!EnvironmentUtils.isTestEnvironment) {
+      Future.microtask(() => fetchUsers(force: true));
+    }
     return const [];
   }
 
