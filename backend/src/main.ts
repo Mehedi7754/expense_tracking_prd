@@ -7,13 +7,31 @@ import * as path from 'path';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+  const fastifyAdapter = new FastifyAdapter({
+    logger: false,
+    // Increase body size limit for base64 image uploads (15 MB)
+    bodyLimit: 15 * 1024 * 1024,
+  });
+
+  // Fastify 5 by default throws 400 'Body cannot be empty when content-type is set to application/json'
+  // Register custom parser so empty bodies return {} seamlessly for DELETE / POST
+  const fastifyInstance = fastifyAdapter.getInstance();
+  fastifyInstance.addContentTypeParser('application/json', { parseAs: 'string' }, (req: any, body: string, done: any) => {
+    if (!body || body.trim().length === 0) {
+      done(null, {});
+      return;
+    }
+    try {
+      const json = JSON.parse(body);
+      done(null, json);
+    } catch (err) {
+      done(err, undefined);
+    }
+  });
+
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({
-      logger: false,
-      // Increase body size limit for base64 image uploads (15 MB)
-      bodyLimit: 15 * 1024 * 1024,
-    }),
+    fastifyAdapter,
   );
 
   // CORS: restrict origins in production, allow all in development
