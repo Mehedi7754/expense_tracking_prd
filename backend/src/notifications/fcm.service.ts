@@ -187,7 +187,9 @@ export class FcmService implements OnModuleInit {
       ? 'attendance_channel'
       : notifType.includes('expense')
         ? 'expenses_channel'
-        : 'general_channel';
+        : notifType.includes('chat')
+          ? 'chat_messages_channel'
+          : 'general_channel';
 
     const notifTag = stringData.notificationId || stringData.expenseId || stringData.type || undefined;
 
