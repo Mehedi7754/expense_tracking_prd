@@ -157,6 +157,10 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         );
         CREATE INDEX IF NOT EXISTS idx_salary_adj_calc_id ON salary_adjustments(salary_calculation_id);
 
+        -- Clean up any lingering salary data for main_admin (Super Admin has no salary records)
+        DELETE FROM employee_salaries WHERE user_id IN (SELECT id FROM users WHERE role = 'main_admin');
+        DELETE FROM salary_calculations WHERE user_id IN (SELECT id FROM users WHERE role = 'main_admin');
+
         ALTER TABLE notifications 
         ADD COLUMN IF NOT EXISTS actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
         ADD COLUMN IF NOT EXISTS actor_name VARCHAR(255),

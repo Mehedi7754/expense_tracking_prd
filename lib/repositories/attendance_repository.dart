@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_endpoints.dart';
 import '../models/attendance_model.dart';
@@ -18,11 +19,13 @@ class AttendanceRepository {
     String? notes,
     String? userId,
   }) async {
+    final localDateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final response = await _client.post(
       ApiEndpoints.attendanceCheckIn,
       body: {
         'latitude': latitude,
         'longitude': longitude,
+        'date': localDateStr,
         if (addressText != null && addressText.isNotEmpty) 'addressText': addressText,
         if (sessionType != null && sessionType.isNotEmpty) 'sessionType': sessionType,
         if (deviceInfo != null && deviceInfo.isNotEmpty) 'deviceInfo': deviceInfo,

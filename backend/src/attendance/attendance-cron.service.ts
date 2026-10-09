@@ -49,6 +49,8 @@ export class AttendanceCronService {
       const currentMinute = dhakaNow.getMinutes();
       const currentDayOfWeek = dhakaNow.getDay() === 0 ? 7 : dhakaNow.getDay();
 
+      const todayDateStr = `${dhakaNow.getFullYear()}-${String(dhakaNow.getMonth() + 1).padStart(2, '0')}-${String(dhakaNow.getDate()).padStart(2, '0')}`;
+
       for (const emp of employees) {
         const shiftId = userShifts[emp.id];
         const shift = shifts.find((s) => s.id === shiftId) || defaultShift;
@@ -86,8 +88,8 @@ export class AttendanceCronService {
         if (isApproaching && targetSession) {
           // Verify they haven't checked in yet for this session today
           const checkInRes = await this.db.query(
-            `SELECT id FROM attendance_records WHERE user_id = $1 AND date = CURRENT_DATE AND session_type = $2`,
-            [emp.id, targetSession],
+            `SELECT id FROM attendance_records WHERE user_id = $1 AND date = $2 AND session_type = $3`,
+            [emp.id, todayDateStr, targetSession],
           );
 
           if (checkInRes.rows.length === 0) {

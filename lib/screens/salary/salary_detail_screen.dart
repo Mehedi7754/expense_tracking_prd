@@ -461,6 +461,12 @@ class _SalaryDetailScreenState extends ConsumerState<SalaryDetailScreen> {
         badgeText = 'Weekend';
         badgeIcon = Icons.weekend_rounded;
         break;
+      case 'not_employed':
+      case 'pre_employment':
+        badgeColor = const Color(0xFF64748B);
+        badgeText = 'Not Employed';
+        badgeIcon = Icons.person_off_outlined;
+        break;
       case 'confirmed_absent':
         badgeColor = const Color(0xFFEF4444);
         badgeText = 'Absent (-1d)';
@@ -542,7 +548,9 @@ class _SalaryDetailScreenState extends ConsumerState<SalaryDetailScreen> {
                   )
                 else
                   Text(
-                    day.isWeekend ? 'Non-working day' : (day.isHoliday ? 'Official Paid Holiday' : 'No punches recorded'),
+                    day.isPreEmployment
+                        ? 'Prior to employee joining date'
+                        : (day.isWeekend ? 'Non-working day' : (day.isHoliday ? 'Official Paid Holiday' : 'No punches recorded')),
                     style: TextStyle(
                       fontSize: 10,
                       color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),

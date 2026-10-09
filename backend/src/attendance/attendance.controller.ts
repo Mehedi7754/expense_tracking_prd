@@ -30,23 +30,21 @@ export class AttendanceController {
   @Get()
   async getAttendanceRecords(
     @Query('userId') userId: string,
+    @Query('date') date: string,
     @Query('month') month: string,
     @Query('year') year: string,
     @Request() req: any,
   ) {
-    if (userId) {
-      if (month && year) {
+    if (month && year) {
+      if (userId) {
         return this.attendanceService.getMonthlyRecords(userId, parseInt(year, 10), parseInt(month, 10));
       } else {
-        return this.attendanceService.getTodayRecords(); // Simplification
-      }
-    } else {
-      if (month && year) {
         return this.attendanceService.getAllMonthlyRecords(parseInt(year, 10), parseInt(month, 10));
-      } else {
-        return this.attendanceService.getTodayRecords();
       }
     }
+
+    // Single date or today
+    return this.attendanceService.getRecordsByDate(date, userId);
   }
 
   @Get('overview')

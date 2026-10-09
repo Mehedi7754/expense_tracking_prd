@@ -103,6 +103,7 @@ class DailyBreakdownItemModel {
   bool get isHalfDay => status == 'half_day';
   bool get isAbsent => status == 'confirmed_absent';
   bool get isMissing => status == 'missing_record';
+  bool get isPreEmployment => status == 'not_employed' || status == 'pre_employment';
 
   factory DailyBreakdownItemModel.fromJson(Map<String, dynamic> json) {
     double parseDbl(dynamic val) {

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../models/salary_model.dart';
+import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 import '../../state/salary_provider.dart';
 
@@ -20,7 +21,7 @@ class _MySalaryScreenState extends ConsumerState<MySalaryScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(authProvider).currentUser;
-      if (user != null) {
+      if (user != null && user.role != UserRole.mainAdmin) {
         ref.read(salaryProvider.notifier).setSelectedUser(user.id);
       }
     });
@@ -44,6 +45,51 @@ class _MySalaryScreenState extends ConsumerState<MySalaryScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    final currentUser = ref.watch(authProvider).currentUser;
+    if (currentUser?.role == UserRole.mainAdmin) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
+        appBar: AppBar(
+          title: const Text('Salary Statement', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6366F1).withAlpha(25),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.verified_user_rounded, size: 48, color: Color(0xFF6366F1)),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Super Admin Exemption',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Salary statements and deduction records are strictly designed for employees and staff members. Executive leadership is exempt from payroll calculation.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     final salaryState = ref.watch(salaryProvider);
     final calc = salaryState.currentCalculation;

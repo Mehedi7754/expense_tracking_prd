@@ -391,36 +391,47 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
             const SizedBox(height: 20),
 
             // 2. TODAY'S GPS MAP
-            if (myRecords.where((r) => r.latitude != null).isNotEmpty) ...[
-              Text(
-                'Today\'s Location',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                  letterSpacing: -0.2,
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 180,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                    width: 1.0,
+            () {
+              final todayGpsRecords = myRecords.where((r) => r.date == todayStr && r.latitude != null && r.longitude != null).toList();
+              final recentGpsRecords = myRecords.where((r) => r.latitude != null && r.longitude != null).toList();
+              final displayGpsRecords = todayGpsRecords.isNotEmpty ? todayGpsRecords : (recentGpsRecords.isNotEmpty ? [recentGpsRecords.first] : <AttendanceRecordModel>[]);
+
+              if (displayGpsRecords.isEmpty) return const SizedBox.shrink();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    todayGpsRecords.isNotEmpty ? 'Today\'s Location' : 'Latest Recorded Location',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      letterSpacing: -0.2,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                   ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: AttendanceMapView(
-                    records: myRecords.where((r) => r.date == todayStr).toList(),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 180,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        width: 1.0,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: AttendanceMapView(
+                        records: displayGpsRecords,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
+                  const SizedBox(height: 20),
+                ],
+              );
+            }(),
 
             // 3. ATTENDANCE HISTORY LIST
             Text(

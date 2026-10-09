@@ -266,20 +266,31 @@ class _SalaryDashboardScreenState extends ConsumerState<SalaryDashboardScreen> {
                   const SizedBox(height: 10),
 
                   // 5. EMPLOYEE SALARY CARDS
-                  if (report == null || report.employees.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(32),
-                      decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkSurface : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Center(
-                        child: Text('No employee records found for this period', style: TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                    )
-                  else
-                    ...report.employees.map((emp) => _buildEmployeeSalaryCard(emp, isDark)),
+                  () {
+                    final emps = (report?.employees ?? []).where((emp) {
+                      return emp.department.toLowerCase() != 'executive' &&
+                          !emp.designation.toLowerCase().contains('super admin') &&
+                          !emp.userName.toLowerCase().contains('super admin');
+                    }).toList();
+
+                    if (emps.isEmpty) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.darkSurface : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: Text('No employee records found for this period', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      children: emps.map((emp) => _buildEmployeeSalaryCard(emp, isDark)).toList(),
+                    );
+                  }(),
 
                   const SizedBox(height: 32),
                 ],

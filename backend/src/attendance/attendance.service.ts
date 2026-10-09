@@ -46,6 +46,15 @@ export class AttendanceService {
     private readonly emailService: EmailService,
   ) {}
 
+  getDhakaDateStr(date?: Date): string {
+    const d = date || new Date();
+    const dhakaDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
+    const yyyy = dhakaDate.getFullYear();
+    const mm = String(dhakaDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(dhakaDate.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
   private officeTimingSettings = {
     morningStartHour: 9,
     morningEndHour: 13,
@@ -225,26 +234,28 @@ export class AttendanceService {
       notes = notes ? `${notes} [Late check-in]` : '[Late check-in]';
     }
 
+    const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
+
     // Check if record exists for this user, date and session
     const existing = await this.db.query(
       `SELECT id FROM attendance_records
-       WHERE user_id = $1 AND date = CURRENT_DATE AND session_type = $2`,
-      [userId, session],
+       WHERE user_id = $1 AND date = $2 AND session_type = $3`,
+      [userId, targetDate, session],
     );
 
     let recordId: string;
 
     if (existing.rows.length > 0) {
-      throw new ConflictException(`You have already checked in for the ${session} session today.`);
+      throw new ConflictException(`You have already checked in for the ${session} session on ${targetDate}.`);
     } else {
       const res = await this.db.query(
         `INSERT INTO attendance_records (user_id, date, session_type, login_time, latitude, longitude, address_text, device_info, status, notes)
-         VALUES ($1, CURRENT_DATE, $2, clock_timestamp(), $3, $4, $5, $6, 'present', $7)
+         VALUES ($1, $2, $3, clock_timestamp(), $4, $5, $6, $7, 'present', $8)
          RETURNING id`,
-        [userId, session, dto.latitude, dto.longitude, address, deviceInfo, notes],
+        [userId, targetDate, session, dto.latitude, dto.longitude, address, deviceInfo, notes],
       );
       recordId = res.rows[0].id;
-      this.logger.log(`Created new attendance check-in for user ${userId} (${session}) at [${dto.latitude}, ${dto.longitude}]`);
+      this.logger.log(`Created new attendance check-in for user ${userId} (${session}) on ${targetDate} at [${dto.latitude}, ${dto.longitude}]`);
     }
 
     const fetched = await this.getRecordById(recordId);
@@ -348,18 +359,27 @@ export class AttendanceService {
   }
 
   async getTodayRecords(): Promise<AttendanceRecord[]> {
-    const res = await this.db.query(
-      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
-              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
-              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
-              a.login_time::text as "loginTime", a.latitude, a.longitude,
-              a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.created_at::text as "createdAt"
-       FROM attendance_records a
-       JOIN users u ON a.user_id = u.id
-       WHERE a.date = CURRENT_DATE AND u.is_active = TRUE
-       ORDER BY a.login_time DESC`,
-    );
+    return this.getRecordsByDate(this.getDhakaDateStr());
+  }
+
+  async getRecordsByDate(dateStr?: string, userId?: string): Promise<AttendanceRecord[]> {
+    const targetDate = dateStr || this.getDhakaDateStr();
+    let sql = `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
+                      COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
+                      u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
+                      a.login_time::text as "loginTime", a.latitude, a.longitude,
+                      a.address_text as "addressText", a.device_info as "deviceInfo",
+                      a.status, a.notes, a.created_at::text as "createdAt"
+               FROM attendance_records a
+               JOIN users u ON a.user_id = u.id
+               WHERE a.date = $1 AND u.is_active = TRUE`;
+    const params: any[] = [targetDate];
+    if (userId) {
+      sql += ' AND a.user_id = $2';
+      params.push(userId);
+    }
+    sql += ' ORDER BY a.login_time DESC';
+    const res = await this.db.query(sql, params);
     return res.rows;
   }
 
@@ -409,18 +429,21 @@ export class AttendanceService {
 
   async getDailyOverview(dateStr?: string) {
     await this.getTimingSettings();
-    const targetDate = dateStr || new Date().toISOString().split('T')[0];
+    const targetDate = dateStr || this.getDhakaDateStr();
     const targetDateObj = new Date(targetDate.includes('T') ? targetDate : `${targetDate}T00:00:00Z`);
     const dayOfWeek = targetDateObj.getUTCDay() === 0 ? 7 : targetDateObj.getUTCDay();
 
-    // Query all active non-exempt users
+    // Query active non-exempt users who existed on or before target date
     const usersRes = await this.db.query(
       `SELECT id, full_name as "userName", email as "userEmail", role,
               COALESCE(department, '') as department, COALESCE(designation, '') as designation,
               avatar_url as "avatarUrl"
        FROM users
-       WHERE is_active = TRUE AND role NOT IN ('main_admin', 'finance')
+       WHERE is_active = TRUE 
+         AND role NOT IN ('main_admin', 'finance')
+         AND created_at::date <= $1::date
        ORDER BY full_name ASC`,
+      [targetDate],
     );
 
     const recordsRes = await this.db.query(
@@ -497,12 +520,13 @@ export class AttendanceService {
   }
 
   async getSummary(userId?: string) {
-    let whereClause = `WHERE date = CURRENT_DATE`;
-    const params: any[] = [];
+    const todayStr = this.getDhakaDateStr();
+    let whereClause = `WHERE date = $1`;
+    const params: any[] = [todayStr];
 
     if (userId) {
       params.push(userId);
-      whereClause += ` AND user_id = $1`;
+      whereClause += ` AND user_id = $2`;
     }
 
     const res = await this.db.query(
@@ -523,7 +547,7 @@ export class AttendanceService {
     const totalPresent = parseInt(res.rows[0]?.totalPresent || '0', 10);
 
     return {
-      date: new Date().toISOString().split('T')[0],
+      date: todayStr,
       totalEmployees,
       morningPresent,
       afternoonPresent,
@@ -536,6 +560,11 @@ export class AttendanceService {
     await this.getTimingSettings();
     const userShift = this.getShiftForUser(userId);
     const weekendDays = userShift.weekendDays || [5, 6];
+
+    // Fetch employee creation date to ensure calculations start from joining date
+    const userRes = await this.db.query('SELECT created_at FROM users WHERE id = $1', [userId]);
+    const userCreatedAt: Date = userRes.rows[0]?.created_at || new Date(0);
+    const employeeJoinDateStr = this.getDhakaDateStr(userCreatedAt);
 
     const targetDate = monthStr ? new Date(`${monthStr}-01`) : new Date();
     const year = targetDate.getFullYear();
@@ -557,7 +586,7 @@ export class AttendanceService {
     let weekendOffDays = 0;
     let absences = 0;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = this.getDhakaDateStr();
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(year, month - 1, day);
@@ -565,6 +594,11 @@ export class AttendanceService {
       const dayOfWeek = dateObj.getDay() === 0 ? 7 : dateObj.getDay();
 
       if (dateStr > todayStr) {
+        continue;
+      }
+
+      // Calculation starts from employee creation date; skip prior days
+      if (dateStr < employeeJoinDateStr) {
         continue;
       }
 

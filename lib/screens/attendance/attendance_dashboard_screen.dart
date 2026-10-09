@@ -609,35 +609,55 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
                   const SizedBox(height: 16),
 
                   // 3. INTERACTIVE MAP SECTION
-                  if (_showMap) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  () {
+                    final combinedMapRecords = <AttendanceRecordModel>[...records];
+                    if (overview?.employees != null) {
+                      for (final emp in overview!.employees) {
+                        if (emp.morning != null && !combinedMapRecords.any((r) => r.id == emp.morning!.id)) {
+                          combinedMapRecords.add(emp.morning!);
+                        }
+                        if (emp.afternoon != null && !combinedMapRecords.any((r) => r.id == emp.afternoon!.id)) {
+                          combinedMapRecords.add(emp.afternoon!);
+                        }
+                      }
+                    }
+                    final gpsRecords = combinedMapRecords.where((r) => r.latitude != null && r.longitude != null).toList();
+
+                    if (!_showMap && gpsRecords.isEmpty) return const SizedBox.shrink();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Live Geo-Location Pins',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Live Geo-Location Pins',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+                            ),
+                            Text(
+                              '${gpsRecords.length} Verified Locations',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
                         ),
-                        Text(
-                          '${records.where((r) => r.latitude != null).length} Verified Locations',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 240,
+                          width: double.infinity,
+                          child: AttendanceMapView(
+                            records: gpsRecords,
+                            onMarkerTap: _showRecordDetailsModal,
                           ),
                         ),
+                        const SizedBox(height: 16),
                       ],
-                    ),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 240,
-                      width: double.infinity,
-                      child: AttendanceMapView(
-                        records: records,
-                        onMarkerTap: _showRecordDetailsModal,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
+                    );
+                  }(),
 
                   // 4. STATUS CHIPS FILTER
 

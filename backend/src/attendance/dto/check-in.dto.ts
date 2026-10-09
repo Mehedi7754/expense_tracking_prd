@@ -34,4 +34,8 @@ export class CheckInDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  date?: string;
 }

@@ -206,16 +206,14 @@ class _AttendanceMapViewState extends State<AttendanceMapView> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: center,
-              initialZoom: widget.initialZoom,
+              initialZoom: validRecords.isNotEmpty ? 15.0 : widget.initialZoom,
               minZoom: 4,
               maxZoom: 18,
             ),
             children: [
               TileLayer(
-                urlTemplate: isDark
-                    ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-                    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.spendwise.app',
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.gw.project',
               ),
               MarkerLayer(markers: markers),
             ],

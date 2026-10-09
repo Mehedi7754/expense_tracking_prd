@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocationResult {
@@ -98,7 +99,7 @@ class LocationService {
   /// Requests location permissions if needed and retrieves verified GPS coordinates.
   /// Strictly requires genuine hardware GPS fix; never returns fake or placeholder coordinates.
   static Future<LocationResult> getCurrentCoordinates({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 12),
   }) async {
     try {
       // 1. Check and request location permission
@@ -130,7 +131,7 @@ class LocationService {
         );
       }
 
-      // 3. Obtain real GPS position
+      // 3. Obtain real GPS position with multi-tier fallback
       Position? position;
       try {
         position = await Geolocator.getCurrentPosition(
@@ -140,16 +141,43 @@ class LocationService {
           ),
         );
       } catch (_) {
-        // In case of timeout with getCurrentPosition, attempt last known hardware position
+        // Fallback 1: Medium accuracy (cell tower / wifi assisted, much faster indoors)
         try {
-          position = await Geolocator.getLastKnownPosition();
-        } catch (_) {}
+          position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.medium,
+              timeLimit: Duration(seconds: 8),
+            ),
+          );
+        } catch (_) {
+          // Fallback 2: Last known hardware position fix
+          try {
+            position = await Geolocator.getLastKnownPosition();
+          } catch (_) {}
+        }
       }
 
       if (position != null) {
+        // Reverse geocode to human-readable address if network is available
+        String? address;
+        try {
+          final uri = Uri.parse(
+            'https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&zoom=18&addressdetails=1',
+          );
+          final response = await http.get(
+            uri,
+            headers: {'User-Agent': 'GWUniversalApp/1.0.1 (com.gw.project)'},
+          ).timeout(const Duration(seconds: 4));
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            address = data['display_name'] as String?;
+          }
+        } catch (_) {}
+
         return LocationResult.success(
           latitude: position.latitude,
           longitude: position.longitude,
+          addressText: address,
         );
       } else {
         return LocationResult.failure(

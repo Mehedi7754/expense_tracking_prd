@@ -21,7 +21,7 @@ export interface DailyBreakdownItem {
   afternoonAttended: boolean;
   afternoonTime?: string;
   afternoonLocation?: { lat: number; lng: number; address: string };
-  status: 'present' | 'half_day' | 'missing_record' | 'confirmed_absent' | 'paid_leave' | 'unpaid_leave' | 'holiday' | 'weekend' | 'upcoming';
+  status: 'present' | 'half_day' | 'missing_record' | 'confirmed_absent' | 'paid_leave' | 'unpaid_leave' | 'holiday' | 'weekend' | 'upcoming' | 'not_employed';
   presentWeight: number; // 1.0, 0.5, or 0.0
   deductionUnits: number; // 0.0, 0.5, or 1.0
   notes: string;
@@ -66,8 +66,17 @@ export class SalaryService {
 
   /**
    * Fetch employee base salary profile. Creates default if not set yet.
+   * Super Admin (role = 'main_admin') is strictly exempt and has no salary records.
    */
   async getEmployeeSalary(userId: string) {
+    const userRes = await this.db.query('SELECT full_name, email, department, designation, role FROM users WHERE id = $1', [userId]);
+    if (!userRes.rows.length) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    if (userRes.rows[0].role === 'main_admin') {
+      throw new BadRequestException('Super Admin is exempt from employee salary tracking');
+    }
+
     const res = await this.db.query(
       `SELECT s.id, s.user_id, s.monthly_salary, s.currency, s.standard_working_days,
               s.effective_from::text, s.effective_to::text,
@@ -93,12 +102,6 @@ export class SalaryService {
         effectiveFrom: row.effective_from,
         effectiveTo: row.effective_to,
       };
-    }
-
-    // Check if user exists
-    const userRes = await this.db.query('SELECT full_name, email, department, designation FROM users WHERE id = $1', [userId]);
-    if (!userRes.rows.length) {
-      throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
     // Default salary of 50000 BDT, 22 working days
@@ -127,6 +130,14 @@ export class SalaryService {
   }
 
   async setEmployeeSalary(userId: string, dto: SetSalaryDto, adminId?: string) {
+    const userRes = await this.db.query('SELECT role FROM users WHERE id = $1', [userId]);
+    if (!userRes.rows.length) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    if (userRes.rows[0].role === 'main_admin') {
+      throw new BadRequestException('Super Admin cannot have a salary profile');
+    }
+
     const existing = await this.db.query('SELECT id FROM employee_salaries WHERE user_id = $1', [userId]);
 
     const workingDays = dto.standardWorkingDays && dto.standardWorkingDays > 0 ? dto.standardWorkingDays : 22;
@@ -281,15 +292,35 @@ export class SalaryService {
   /**
    * Main calculation engine:
    * Daily Salary Rate = Monthly Salary ÷ Configured Payable Working Days
-   * Final Payable Salary = Monthly Salary − Total Unpaid Absence Deductions (+ additions)
+   * Final Payable Salary = Effective Base Salary − Total Unpaid Absence Deductions (+ additions - penalties)
+   * Super Admin is strictly exempt from salary calculations.
+   * Calculations strictly start from the employee creation date (created_at).
    */
   async calculateSalary(userId: string, month: number, year: number): Promise<SalaryCalculationResult> {
+    const userRes = await this.db.query(
+      'SELECT id, full_name, email, department, designation, role, created_at FROM users WHERE id = $1',
+      [userId],
+    );
+    if (!userRes.rows.length) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    if (userRes.rows[0].role === 'main_admin') {
+      throw new BadRequestException('Super Admin is exempt from salary calculations');
+    }
+
     const salaryProfile = await this.getEmployeeSalary(userId);
+
+    // Employee creation date in Asia/Dhaka (+6 hrs)
+    const userCreatedAt = new Date(userRes.rows[0].created_at || new Date());
+    const dhakaJoinDate = new Date(userCreatedAt.getTime() + 6 * 3600 * 1000);
+    const employeeJoinDateStr = dhakaJoinDate.toISOString().split('T')[0];
 
     // Get all calendar days in given month
     const daysInMonth = new Date(year, month, 0).getDate();
-    const today = new Date();
-    const todayIso = today.toISOString().split('T')[0];
+    // Today in Asia/Dhaka
+    const nowUtc = new Date();
+    const dhakaNow = new Date(nowUtc.getTime() + 6 * 3600 * 1000);
+    const todayIso = dhakaNow.toISOString().split('T')[0];
 
     // Fetch holidays in this month
     const holidays = await this.getHolidays(year);
@@ -343,6 +374,7 @@ export class SalaryService {
     let unpaidLeaveDays = 0;
     let missingLoginDays = 0;
     let confirmedAbsentDays = 0;
+    let eligibleWorkingDaysCount = 0;
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateObj = new Date(year, month - 1, day);
@@ -364,19 +396,6 @@ export class SalaryService {
       const holidayName = holidayMap.get(dateStr);
       if (isHoliday && !isWeekend) holidayCount++;
 
-      // Check Leave
-      let isLeave = false;
-      let leaveType: string | undefined;
-      let isPaidLeave = false;
-      for (const l of leaves) {
-        if (dateStr >= l.startDate && dateStr <= l.endDate && l.isApproved) {
-          isLeave = true;
-          leaveType = l.leaveType;
-          isPaidLeave = l.leaveType !== 'unpaid';
-          break;
-        }
-      }
-
       const isFuture = dateStr > todayIso;
       const isToday = dateStr === todayIso;
 
@@ -391,66 +410,83 @@ export class SalaryService {
       let presentWeight = 0;
       let deductionUnits = 0;
       let notes = '';
+      let isLeave = false;
+      let leaveType: string | undefined;
+      let isPaidLeave = false;
 
-      if (isWeekend) {
+      // Check if day is prior to employment (Employee creation date)
+      if (dateStr < employeeJoinDateStr) {
+        status = 'not_employed';
+        presentWeight = 0.0;
+        deductionUnits = 0.0;
+        notes = `Prior to employment (Joined ${employeeJoinDateStr})`;
+      } else if (isWeekend) {
         status = 'weekend';
         notes = 'Weekend non-working day';
       } else if (isHoliday) {
         status = 'holiday';
         notes = `Official Holiday: ${holidayName}`;
-      } else if (isLeave) {
-        if (isPaidLeave) {
-          status = 'paid_leave';
-          presentWeight = 1.0;
-          paidLeaveDays += 1;
-          notes = `Approved Paid Leave (${leaveType})`;
-        } else {
-          status = 'unpaid_leave';
-          deductionUnits = 1.0;
-          unpaidLeaveDays += 1;
-          notes = `Approved Unpaid Leave (${leaveType})`;
-        }
-      } else if (morningAttended && afternoonAttended) {
-        status = 'present';
-        presentWeight = 1.0;
-        presentDays += 1;
-        notes = 'Full day attendance recorded';
-      } else if (morningAttended || afternoonAttended) {
-        status = 'half_day';
-        presentWeight = 0.5;
-        deductionUnits = isToday ? 0.0 : 0.5;
-        if (!isToday) {
-          halfDays += 1;
-        }
-        notes = morningAttended
-          ? (isToday ? 'Morning session attended (afternoon in progress)' : 'Morning session only (Half Day)')
-          : (isToday ? 'Afternoon session attended' : 'Afternoon session only (Half Day)');
-      } else if (isFuture || isToday) {
-        status = 'upcoming';
-        notes = isToday ? 'Current workday (in progress)' : 'Scheduled working day (Upcoming)';
       } else {
-        // Scheduled working day in the past with no punch
-        const isExplicitlyConfirmedAbsent =
-          (morningRecord && morningRecord.status === 'confirmed_absent') ||
-          (afternoonRecord && afternoonRecord.status === 'confirmed_absent');
+        // Employed and regular weekday
+        eligibleWorkingDaysCount++;
 
-        // Bug 7 Fix: Do NOT deduct salary for today — the workday is still in progress
-        const isToday = dateStr === todayIso;
-        if (isToday) {
+        // Check Leave
+        for (const l of leaves) {
+          if (dateStr >= l.startDate && dateStr <= l.endDate && l.isApproved) {
+            isLeave = true;
+            leaveType = l.leaveType;
+            isPaidLeave = l.leaveType !== 'unpaid';
+            break;
+          }
+        }
+
+        if (isLeave) {
+          if (isPaidLeave) {
+            status = 'paid_leave';
+            presentWeight = 1.0;
+            paidLeaveDays += 1;
+            notes = `Approved Paid Leave (${leaveType})`;
+          } else {
+            status = 'unpaid_leave';
+            deductionUnits = 1.0;
+            unpaidLeaveDays += 1;
+            notes = `Approved Unpaid Leave (${leaveType})`;
+          }
+        } else if (morningAttended && afternoonAttended) {
+          status = 'present';
+          presentWeight = 1.0;
+          presentDays += 1;
+          notes = 'Full day attendance recorded';
+        } else if (morningAttended || afternoonAttended) {
+          status = 'half_day';
+          presentWeight = 0.5;
+          deductionUnits = isToday ? 0.0 : 0.5;
+          if (!isToday) {
+            halfDays += 1;
+          }
+          notes = morningAttended
+            ? (isToday ? 'Morning session attended (afternoon in progress)' : 'Morning session only (Half Day)')
+            : (isToday ? 'Afternoon session attended' : 'Afternoon session only (Half Day)');
+        } else if (isFuture || isToday) {
           status = 'upcoming';
-          notes = 'Workday still in progress (no deduction)';
-        } else if (isExplicitlyConfirmedAbsent) {
-          status = 'confirmed_absent';
-          deductionUnits = 1.0;
-          confirmedAbsentDays += 1;
-          notes = morningRecord?.notes || 'Confirmed Unpaid Absence';
+          notes = isToday ? 'Current workday (in progress)' : 'Scheduled working day (Upcoming)';
         } else {
-          // Missing login record vs confirmed absence
-          status = 'missing_record';
-          // System policy: Unconfirmed missing days count as unpaid absence pending review
-          deductionUnits = 1.0;
-          missingLoginDays += 1;
-          notes = 'Missing login record (Pending HR review)';
+          // Scheduled working day in the past with no punch
+          const isExplicitlyConfirmedAbsent =
+            (morningRecord && morningRecord.status === 'confirmed_absent') ||
+            (afternoonRecord && afternoonRecord.status === 'confirmed_absent');
+
+          if (isExplicitlyConfirmedAbsent) {
+            status = 'confirmed_absent';
+            deductionUnits = 1.0;
+            confirmedAbsentDays += 1;
+            notes = morningRecord?.notes || 'Confirmed Unpaid Absence';
+          } else {
+            status = 'missing_record';
+            deductionUnits = 1.0;
+            missingLoginDays += 1;
+            notes = 'Missing login record (Pending HR review)';
+          }
         }
       }
 
@@ -499,8 +535,23 @@ export class SalaryService {
     const totalDeductionUnits = confirmedAbsentDays + unpaidLeaveDays + missingLoginDays + halfDays * 0.5;
     const totalAbsenceDeductions = Math.round(totalDeductionUnits * dailySalaryRate * 100) / 100;
 
-    // Final Payable Salary = Monthly Salary − Total Unpaid Absence Deductions + Additions - Penalties
-    const grossPayable = salaryProfile.monthlySalary - totalAbsenceDeductions + totalAdditions - totalPenalties;
+    // Base salary proration if employee joined mid-month
+    const firstDayOfMonthStr = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDayOfMonthStr = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+    let effectiveBaseSalary = salaryProfile.monthlySalary;
+
+    if (employeeJoinDateStr > lastDayOfMonthStr) {
+      // Not yet joined this month
+      effectiveBaseSalary = 0;
+    } else if (employeeJoinDateStr > firstDayOfMonthStr) {
+      // Joined mid-month: prorate based on eligible working days in this month
+      effectiveBaseSalary = Math.round(
+        (salaryProfile.monthlySalary * (eligibleWorkingDaysCount / Math.max(1, scheduledWorkingDays))) * 100,
+      ) / 100;
+    }
+
+    // Final Payable Salary = Effective Base Salary − Total Unpaid Absence Deductions + Additions - Penalties
+    const grossPayable = effectiveBaseSalary - totalAbsenceDeductions + totalAdditions - totalPenalties;
     const finalPayableSalary = Math.max(0, Math.round(grossPayable * 100) / 100);
 
     // Check if saved calculation exists in salary_calculations
@@ -545,6 +596,14 @@ export class SalaryService {
    * Save calculation into salary_calculations table for auditing and payroll finalization
    */
   async saveSalaryCalculation(userId: string, month: number, year: number, calculatedBy?: string, notes?: string) {
+    const userRes = await this.db.query('SELECT role FROM users WHERE id = $1', [userId]);
+    if (!userRes.rows.length) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+    if (userRes.rows[0].role === 'main_admin') {
+      throw new BadRequestException('Super Admin cannot have salary calculations saved');
+    }
+
     const calc = await this.calculateSalary(userId, month, year);
 
     await this.db.query(
@@ -601,12 +660,13 @@ export class SalaryService {
   /**
    * Organizational Monthly Salary Report
    * Summarizes all employees for a given month and year
+   * Super Admin is strictly excluded from employee payroll report.
    */
   async getOrgSalaryReport(month: number, year: number) {
     const usersRes = await this.db.query(
       `SELECT id, full_name, email, department, designation, role, avatar_url
        FROM users
-       WHERE is_active = TRUE
+       WHERE is_active = TRUE AND role != 'main_admin'
        ORDER BY department ASC, full_name ASC`,
     );
 
