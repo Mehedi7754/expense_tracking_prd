@@ -21,13 +21,27 @@ export class NotificationsService {
 
     const res = await this.db.query(
       isPrivileged
-        ? `SELECT * FROM notifications ORDER BY created_at DESC LIMIT 100`
-        : `SELECT * FROM notifications WHERE (user_id = $1 OR user_id IS NULL) ORDER BY created_at DESC LIMIT 100`,
+        ? `SELECT n.*, 
+                  COALESCE(u_actor.full_name, n.actor_name) AS resolved_actor_name, 
+                  COALESCE(u_actor.avatar_url, n.actor_avatar_url) AS resolved_actor_avatar_url
+           FROM notifications n
+           LEFT JOIN users u_actor ON n.actor_id = u_actor.id
+           ORDER BY n.created_at DESC LIMIT 100`
+        : `SELECT n.*, 
+                  COALESCE(u_actor.full_name, n.actor_name) AS resolved_actor_name, 
+                  COALESCE(u_actor.avatar_url, n.actor_avatar_url) AS resolved_actor_avatar_url
+           FROM notifications n
+           LEFT JOIN users u_actor ON n.actor_id = u_actor.id
+           WHERE (n.user_id = $1 OR n.user_id IS NULL) 
+           ORDER BY n.created_at DESC LIMIT 100`,
       isPrivileged ? [] : [userId],
     );
     return res.rows.map((r) => ({
       id: r.id,
       userId: r.user_id,
+      actorId: r.actor_id,
+      actorName: r.resolved_actor_name || r.actor_name,
+      actorAvatarUrl: r.resolved_actor_avatar_url || r.actor_avatar_url,
       title: r.title,
       message: r.message,
       fullExplanation: r.full_explanation || r.message,
@@ -47,10 +61,13 @@ export class NotificationsService {
     type?: string;
     relatedProjectId?: string;
     relatedExpenseId?: string;
+    actorId?: string;
+    actorName?: string;
+    actorAvatarUrl?: string;
   }) {
     const res = await this.db.query(
-      `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         data.userId,
@@ -60,6 +77,9 @@ export class NotificationsService {
         data.type || 'general',
         data.relatedProjectId || null,
         data.relatedExpenseId || null,
+        data.actorId || null,
+        data.actorName || null,
+        data.actorAvatarUrl || null,
       ],
     );
 
@@ -71,6 +91,9 @@ export class NotificationsService {
       };
       if (data.relatedExpenseId) payloadData.expenseId = data.relatedExpenseId;
       if (data.relatedProjectId) payloadData.projectId = data.relatedProjectId;
+      if (data.actorId) payloadData.actorId = data.actorId;
+      if (data.actorName) payloadData.actorName = data.actorName;
+      if (data.actorAvatarUrl) payloadData.actorAvatarUrl = data.actorAvatarUrl;
 
       if (data.userId) {
         await this.fcm.sendPushToUser(data.userId, data.title, data.message, payloadData);

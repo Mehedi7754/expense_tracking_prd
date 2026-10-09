@@ -143,6 +143,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
         );
         CREATE INDEX IF NOT EXISTS idx_salary_adj_calc_id ON salary_adjustments(salary_calculation_id);
+
+        ALTER TABLE notifications 
+        ADD COLUMN IF NOT EXISTS actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS actor_name VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS actor_avatar_url TEXT;
       `);
 
 

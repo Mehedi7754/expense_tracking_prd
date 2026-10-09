@@ -289,7 +289,14 @@ export class ExpensesService {
         `SELECT id, email FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
         [employeeId],
       );
-      const submitterName = user?.fullName || user?.full_name || user?.email || 'A team member';
+      const submitterRes = await this.db.query(
+        `SELECT id, full_name, email, avatar_url FROM users WHERE id = $1`,
+        [employeeId],
+      );
+      const submitter = submitterRes.rows[0];
+      const submitterName = submitter?.full_name?.trim() || user?.name || user?.fullName || 'Team member';
+      const submitterAvatar = submitter?.avatar_url || user?.avatarUrl || null;
+
       for (const recipient of recipientsRes.rows) {
         await this.notificationsService.create({
           userId: recipient.id,
@@ -299,6 +306,9 @@ export class ExpensesService {
           type: 'expense_submitted',
           relatedProjectId: created.projectId,
           relatedExpenseId: created.id,
+          actorId: employeeId,
+          actorName: submitterName,
+          actorAvatarUrl: submitterAvatar,
         });
 
         if (recipient.email) {
@@ -428,7 +438,7 @@ export class ExpensesService {
     );
 
     try {
-      const reviewerRes = await this.db.query('SELECT full_name, role FROM users WHERE id = $1', [reviewerId]);
+      const reviewerRes = await this.db.query('SELECT full_name, role, avatar_url FROM users WHERE id = $1', [reviewerId]);
       const reviewer = reviewerRes.rows[0] || { full_name: 'Reviewer', role: 'project_manager' };
 
       await this.auditLogsService.log({
@@ -448,6 +458,9 @@ export class ExpensesService {
         type: 'expense_approved',
         relatedProjectId: exp.projectId,
         relatedExpenseId: id,
+        actorId: reviewerId,
+        actorName: reviewer.full_name,
+        actorAvatarUrl: reviewer.avatar_url || null,
       });
     } catch (e) {
       console.error('Failed to process audit/notification for expense approve:', e);
@@ -471,7 +484,7 @@ export class ExpensesService {
     );
 
     try {
-      const reviewerRes = await this.db.query('SELECT full_name, role FROM users WHERE id = $1', [reviewerId]);
+      const reviewerRes = await this.db.query('SELECT full_name, role, avatar_url FROM users WHERE id = $1', [reviewerId]);
       const reviewer = reviewerRes.rows[0] || { full_name: 'Reviewer', role: 'project_manager' };
 
       await this.auditLogsService.log({
@@ -491,6 +504,9 @@ export class ExpensesService {
         type: 'expense_rejected',
         relatedProjectId: exp.projectId,
         relatedExpenseId: id,
+        actorId: reviewerId,
+        actorName: reviewer.full_name,
+        actorAvatarUrl: reviewer.avatar_url || null,
       });
     } catch (e) {
       console.error('Failed to process audit/notification for expense reject:', e);

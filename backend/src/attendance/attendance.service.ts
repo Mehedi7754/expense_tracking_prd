@@ -233,9 +233,10 @@ export class AttendanceService {
     }
 
     try {
-      const userRes = await this.db.query('SELECT full_name, email FROM users WHERE id = $1', [userId]);
+      const userRes = await this.db.query('SELECT full_name, email, avatar_url FROM users WHERE id = $1', [userId]);
       const empName = userRes.rows[0]?.full_name || 'Team member';
       const empEmail = userRes.rows[0]?.email || '';
+      const empAvatar = userRes.rows[0]?.avatar_url || null;
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       
       // Calculate Late Status based on configurable grace period
@@ -260,7 +261,10 @@ export class AttendanceService {
         title: 'Attendance Recorded 📍',
         message: `Your check-in for the ${session} session was successfully recorded at ${timeStr}.`,
         fullExplanation: `Attendance check-in verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: Present.`,
-        type: 'attendance_reminder',
+        type: isLate ? 'attendance_late' : 'attendance_reminder',
+        actorId: userId,
+        actorName: empName,
+        actorAvatarUrl: empAvatar,
       });
 
       // Send Email to Employee (using dynamic import to avoid circular dep if any, or injected if available. Wait, I should inject EmailService into AttendanceService!)
@@ -287,7 +291,10 @@ export class AttendanceService {
           title: `Employee Checked In: ${statusTag}`,
           message: `${empName} recorded attendance for ${session} session at ${timeStr}.`,
           fullExplanation: `${empName} logged in for the ${session} session on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
-          type: 'attendance_reminder',
+          type: isLate ? 'attendance_late' : 'attendance_reminder',
+          actorId: userId,
+          actorName: empName,
+          actorAvatarUrl: empAvatar,
         });
       }
     } catch (e) {
