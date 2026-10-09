@@ -546,19 +546,31 @@ class _NotificationCard extends StatelessWidget {
   });
 
   UserModel? _findSenderUser() {
+    // 1. If actorId is explicitly present in notification, find direct match
+    if (notif.actorId != null && notif.actorId!.isNotEmpty) {
+      final match = allUsers.where((u) => u.id == notif.actorId);
+      if (match.isNotEmpty) return match.first;
+    }
+
+    // 2. Search message and title for any team member's email or name
+    final lowerMsg = notif.message.toLowerCase();
+    final lowerTitle = notif.title.toLowerCase();
+
+    for (final u in allUsers) {
+      if (u.email.isNotEmpty && (lowerMsg.contains(u.email.toLowerCase()) || lowerTitle.contains(u.email.toLowerCase()))) {
+        return u;
+      }
+    }
+    for (final u in allUsers) {
+      if (u.name.trim().isNotEmpty && (lowerMsg.contains(u.name.toLowerCase()) || lowerTitle.contains(u.name.toLowerCase()))) {
+        return u;
+      }
+    }
+
+    // 3. Fallback: only if it's a personal notification (or no specific actor matched)
     if (notif.userId.isNotEmpty) {
       final match = allUsers.where((u) => u.id == notif.userId);
       if (match.isNotEmpty) return match.first;
-    }
-    // Search in message or title for user name/email
-    final lowerMsg = notif.message.toLowerCase();
-    for (final u in allUsers) {
-      if (u.name.isNotEmpty && lowerMsg.contains(u.name.toLowerCase())) {
-        return u;
-      }
-      if (u.email.isNotEmpty && lowerMsg.contains(u.email.toLowerCase())) {
-        return u;
-      }
     }
     return null;
   }
@@ -566,7 +578,19 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final senderUser = _findSenderUser();
-    final displayName = senderUser?.name ?? notif.title;
+
+    // Resolve avatar URL: prioritize explicit actorAvatarUrl, then matched senderUser avatar
+    final avatarUrl = (notif.actorAvatarUrl != null && notif.actorAvatarUrl!.isNotEmpty)
+        ? notif.actorAvatarUrl
+        : senderUser?.avatarUrl;
+
+    // Resolve display name for avatar initials
+    final displayName = (notif.actorName != null && notif.actorName!.trim().isNotEmpty)
+        ? notif.actorName!.trim()
+        : (senderUser != null && senderUser.name.trim().isNotEmpty
+            ? senderUser.name.trim()
+            : notif.title);
+
     final categoryStyle = _getCategoryStyle(notif.type, isDark);
 
     final borderColor = notif.isRead
@@ -628,15 +652,15 @@ class _NotificationCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // AppAvatar with Category Icon Badge overlay
+                  // AppAvatar showing the profile of the person who submitted/acted
                   AppAvatar(
-                    imageUrl: senderUser?.avatarUrl,
+                    imageUrl: avatarUrl,
                     name: displayName,
-                    size: 46,
+                    size: 44,
                     badge: Container(
                       width: 18,
                       height: 18,
@@ -691,7 +715,7 @@ class _NotificationCard extends StatelessWidget {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 5),
                         Row(
                           children: [
                             Expanded(
@@ -699,26 +723,26 @@ class _NotificationCard extends StatelessWidget {
                                 notif.title,
                                 style: TextStyle(
                                   fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.w700,
-                                  fontSize: 14,
+                                  fontSize: 13.5,
                                   color: AppColors.getTextPrimary(context),
                                 ),
-                                maxLines: 1,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Text(
                           notif.message,
                           style: TextStyle(
-                            fontSize: 12.5,
+                            fontSize: 11.5,
                             height: 1.35,
                             color: notif.isRead
                                 ? AppColors.getTextMuted(context)
                                 : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
                           ),
-                          maxLines: 2,
+                          maxLines: 4,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],

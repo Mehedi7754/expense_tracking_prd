@@ -297,11 +297,41 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                   ),
                   const SizedBox(width: 4),
                 ],
-                // Left squircle profile image
-                AppAvatar(
-                  imageUrl: exp.employeeAvatar,
-                  name: exp.employeeName,
-                  size: 50,
+                // Left profile avatar with category badge
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    AppAvatar(
+                      imageUrl: (exp.employeeAvatar != null && exp.employeeAvatar!.isNotEmpty)
+                          ? exp.employeeAvatar
+                          : allUsers.where((u) => u.id == exp.employeeId || u.name.toLowerCase() == exp.employeeName.toLowerCase()).firstOrNull?.avatarUrl,
+                      name: exp.employeeName,
+                      size: 48,
+                    ),
+                    Positioned(
+                      bottom: -2,
+                      right: -2,
+                      child: Container(
+                        padding: const EdgeInsets.all(2.5),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(2.5),
+                          decoration: BoxDecoration(
+                            color: iconBg,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(icon, size: 10, color: iconColor),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(width: 12),
                 // Middle column: Claimant Name, Project & Relative Time, and Receipt Status

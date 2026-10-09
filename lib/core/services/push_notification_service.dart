@@ -20,6 +20,7 @@ class PushNotificationService {
   static const String _channelExpenses = 'expenses_channel';
   static const String _channelAttendance = 'attendance_channel';
   static const String _channelGeneral = 'general_channel';
+  static const String _channelChat = 'chat_messages_channel';
 
   Future<void> initialize({bool isBackground = false}) async {
     // Only supported on mobile — web uses browser notification API (not implemented here)
@@ -136,6 +137,16 @@ class PushNotificationService {
 
     await androidPlugin.createNotificationChannel(
       const AndroidNotificationChannel(
+        _channelChat,
+        'Chat Messages',
+        description: 'Direct and project team chat messages with preview',
+        importance: Importance.high,
+        playSound: true,
+      ),
+    );
+
+    await androidPlugin.createNotificationChannel(
+      const AndroidNotificationChannel(
         'high_importance_channel',
         'Important Notifications',
         description: 'High priority alerts and push notifications',
@@ -231,6 +242,23 @@ class PushNotificationService {
       channel: _channelAttendance,
       notificationId: notificationId,
       payload: payload ?? 'type=attendance',
+    );
+  }
+
+  /// Show chat message notification with preview on isolated chat channel.
+  Future<void> showChatAlert({
+    required String title,
+    required String body,
+    required String channelId,
+    String? notificationId,
+    String? payload,
+  }) async {
+    await showImmediate(
+      title: title,
+      body: body,
+      channel: _channelChat,
+      notificationId: notificationId,
+      payload: payload ?? 'type=chat&channelId=$channelId',
     );
   }
 

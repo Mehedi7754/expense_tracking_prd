@@ -9,12 +9,13 @@ import '../models/user_role.dart';
 import '../state/auth_provider.dart';
 import '../state/expense_provider.dart';
 import '../state/notification_provider.dart';
+import '../state/chat_provider.dart';
 import 'approvals/approvals_queue_screen.dart';
 import 'attendance/attendance_dashboard_screen.dart';
 import 'attendance/my_attendance_screen.dart';
+import 'chat/chat_list_screen.dart';
 import 'expenses/my_expenses_screen.dart';
 import 'home/home_dashboard_screen.dart';
-import 'profile/profile_screen.dart';
 import 'projects/projects_list_screen.dart';
 import 'reports/reports_screen.dart';
 
@@ -68,6 +69,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
     }).length;
 
+    final unreadChatCount = ref.watch(chatUnreadCountProvider);
+
     final List<Widget> screens = _getScreensForRole(role);
 
     return Scaffold(
@@ -81,6 +84,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         currentIndex: _currentIndex,
         pendingApprovalsCount: pendingCount,
         unreadNotificationsCount: unreadNotifsCount,
+        unreadChatCount: unreadChatCount,
         onTap: (index) {
           setState(() => _currentIndex = index);
         },
@@ -188,6 +192,26 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   context.push(RoutePaths.submitExpense);
                 },
               ),
+              const Divider(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.chat_bubble_rounded, color: Color(0xFF2563EB), size: 22),
+                ),
+                title: const Text('Team Messenger & Chat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                subtitle: const Text('Direct messaging and project team rooms', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(RoutePaths.chatList);
+                },
+              ),
             ],
           ),
         );
@@ -203,7 +227,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           MyAttendanceScreen(),
           HomeDashboardScreen(),
           HomeDashboardScreen(),
-          ProfileScreen(),
+          ChatListScreen(),
         ];
 
       case UserRole.projectManager:
@@ -223,7 +247,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ReportsScreen(),
           HomeDashboardScreen(),
           HomeDashboardScreen(),
-          ProfileScreen(),
+          ChatListScreen(),
         ];
     }
   }

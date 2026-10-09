@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -23,7 +24,9 @@ import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
 import '../../state/settings_provider.dart';
 import '../../state/user_management_provider.dart';
+import '../../state/chat_provider.dart';
 import '../../repositories/file_upload_repository.dart';
+import '../../repositories/chat_repository.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   final String projectId;
@@ -651,6 +654,26 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
               onPressed: () {
                 ref.read(settingsProvider.notifier).toggleTheme(!isDark);
+              },
+            ),
+            IconButton(
+              icon: const Icon(CupertinoIcons.chat_bubble_2_fill, color: Color(0xFF2563EB)),
+              tooltip: 'Project Team Chat',
+              onPressed: () async {
+                try {
+                  final repo = ref.read(chatRepositoryProvider);
+                  final channelId = await repo.getOrCreateProjectChannel(project.id);
+                  if (context.mounted && channelId.isNotEmpty) {
+                    ref.read(chatChannelsProvider.notifier).fetchChannels(silent: true);
+                    context.push(RoutePaths.chatThread(channelId));
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to open project chat: $e')),
+                    );
+                  }
+                }
               },
             ),
             if (canEdit)
@@ -2228,11 +2251,17 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       );
     }
 
+    final allUsers = ref.watch(userManagementProvider);
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: expenses.length,
       itemBuilder: (ctx, i) {
         final exp = expenses[i];
+        final submitterAvatar = (exp.employeeAvatar != null && exp.employeeAvatar!.isNotEmpty)
+            ? exp.employeeAvatar
+            : allUsers.where((u) => u.id == exp.employeeId || u.name.toLowerCase() == exp.employeeName.toLowerCase()).firstOrNull?.avatarUrl;
+
         return InkWell(
           onTap: () => context.push(RoutePaths.expenseDetail(exp.id)),
           borderRadius: BorderRadius.circular(14),
@@ -2255,34 +2284,39 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(exp.categoryName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    AppAvatar(
+                      imageUrl: submitterAvatar,
+                      name: exp.employeeName,
+                      size: 40,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            exp.employeeName,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, letterSpacing: -0.2),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${exp.categoryName} • ${DateFormatter.formatShort(exp.date)}',
+                            style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
                     Text(
                       CurrencyFormatter.format(exp.amount),
                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF4F46E5)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    AppAvatar(
-                      imageUrl: exp.employeeAvatar,
-                      name: exp.employeeName,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'By ${exp.employeeName} • ${DateFormatter.formatShort(exp.date)}',
-                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-              Text(exp.note, style: const TextStyle(fontSize: 13)),
+                if (exp.note.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(exp.note, style: const TextStyle(fontSize: 13)),
+                ],
               const SizedBox(height: 10),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -2926,7 +2960,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                     ],
                                     Switch.adaptive(
                                       value: isAssigned,
-                                      activeColor: AppColors.getPrimary(context),
+                                      activeThumbColor: AppColors.getPrimary(context),
                                       onChanged: (val) async {
                                         if (val) {
                                           await ref.read(projectProvider.notifier).assignMemberToProject(liveProject.id, u.id);

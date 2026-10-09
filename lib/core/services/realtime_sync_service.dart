@@ -7,6 +7,7 @@ import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/notification_provider.dart';
 import '../../state/project_provider.dart';
+import '../../state/chat_provider.dart';
 
 /// Real-time background sync engine with dual event detection:
 ///
@@ -84,6 +85,10 @@ class RealtimeSyncService with WidgetsBindingObserver {
 
       // Authoritatively fetch remote notifications into Riverpod state
       await container.read(notificationProvider.notifier).fetchNotifications();
+
+      // Refresh chat unread counter and active channels
+      await container.read(chatUnreadCountProvider.notifier).refresh();
+      await container.read(chatChannelsProvider.notifier).fetchChannels(silent: true);
 
       if (forceImmediateRefresh) {
         await _syncAppData();

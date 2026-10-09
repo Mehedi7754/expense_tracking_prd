@@ -18,10 +18,13 @@ class RoutePaths {
   static const String reports = '/reports';
   static const String notifications = '/notifications';
   static const String profile = '/profile';
+  static const String chatList = '/chat';
+  static const String chatThreadPattern = '/chat/:id';
 
   // PFIS Specialized Routes
   static const String receiptCompliance = '/receipt-compliance';
   static const String monthlyEarningsDetail = '/earnings-detail';
+  static const String portfolioValueDetail = '/portfolio-value-detail';
   static const String clientAnalysis = '/admin/client-analysis';
   static const String costEstimator = '/admin/cost-estimator';
 
@@ -67,4 +70,5 @@ class RoutePaths {
   static String expenseDetail(String id) => '/expenses/$id';
   static String editExpense(String id) => '/expenses/$id/edit';
   static String employeeDetailPath(String id) => '/employees/$id';
+  static String chatThread(String id) => '/chat/$id';
 }

@@ -265,12 +265,13 @@ class _MonthlyEarningsDetailScreenState extends ConsumerState<MonthlyEarningsDet
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black87, size: 18),
           onPressed: () => context.pop(),
         ),
+        titleSpacing: 0,
         title: Text(
-          'Earnings & Financial Breakdown',
+          'Earnings Breakdown',
           style: TextStyle(
             color: isDark ? Colors.white : const Color(0xFF0F172A),
             fontWeight: FontWeight.w800,
-            fontSize: 17,
+            fontSize: 15,
             letterSpacing: -0.3,
           ),
         ),

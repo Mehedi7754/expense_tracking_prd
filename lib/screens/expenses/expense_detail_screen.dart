@@ -13,6 +13,7 @@ import '../../core/widgets/app_avatar.dart';
 import '../../models/expense_model.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
+import '../../state/user_management_provider.dart';
 
 class ExpenseDetailScreen extends ConsumerWidget {
   final String expenseId;
@@ -80,6 +81,11 @@ class ExpenseDetailScreen extends ConsumerWidget {
 
     final isPending = expense.status == ExpenseStatus.pending;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final allUsers = ref.watch(userManagementProvider);
+    final submitterAvatar = (expense.employeeAvatar != null && expense.employeeAvatar!.isNotEmpty)
+        ? expense.employeeAvatar
+        : allUsers.where((u) => u.id == expense.employeeId || u.name.toLowerCase() == expense.employeeName.toLowerCase()).firstOrNull?.avatarUrl;
 
     final (catColor, catBg, catIcon) = _getCategoryTheme(expense.categoryId, isDark);
 
@@ -280,7 +286,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
                       _DetailRow(
                         label: 'Submitted By',
                         value: expense.employeeName,
-                        avatarUrl: expense.employeeAvatar,
+                        avatarUrl: submitterAvatar,
                         icon: Icons.person_outline_rounded,
                         isDark: isDark,
                       ),
@@ -808,13 +814,13 @@ class _DetailRow extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (avatarUrl != null) ...[
+              if (avatarUrl != null || label == 'Submitted By') ...[
                 AppAvatar(
                   imageUrl: avatarUrl,
                   name: value,
-                  size: 20,
+                  size: 26,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
               ],
               Flexible(
                 child: Text(

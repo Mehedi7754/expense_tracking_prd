@@ -40,7 +40,7 @@ export class UploadsController {
       throw new BadRequestException('Missing required field: file (base64 data)');
     }
 
-    const validCategories: UploadCategory[] = ['receipts', 'avatars', 'projects'];
+    const validCategories: UploadCategory[] = ['receipts', 'avatars', 'projects', 'chat'];
     const category = (dto.category || 'receipts') as UploadCategory;
     if (!validCategories.includes(category)) {
       throw new BadRequestException(

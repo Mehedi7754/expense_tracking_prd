@@ -5,7 +5,7 @@ import * as crypto from 'crypto';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { DatabaseService } from '../database/database.service';
 
-export type UploadCategory = 'receipts' | 'avatars' | 'projects';
+export type UploadCategory = 'receipts' | 'avatars' | 'projects' | 'chat';
 
 @Injectable()
 export class UploadsService {
@@ -58,7 +58,7 @@ export class UploadsService {
    * Creates the uploads directory structure if it doesn't exist.
    */
   private ensureDirectories(): void {
-    const categories: UploadCategory[] = ['receipts', 'avatars', 'projects'];
+    const categories: UploadCategory[] = ['receipts', 'avatars', 'projects', 'chat'];
     for (const cat of categories) {
       try {
         const dir = path.join(this.uploadsRoot, cat);

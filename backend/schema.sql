@@ -743,3 +743,42 @@ CREATE TABLE IF NOT EXISTS salary_adjustments (
 
 CREATE INDEX IF NOT EXISTS idx_salary_adj_calc_id ON salary_adjustments(salary_calculation_id);
 
+-- ----------------------------------------------------------------------------
+-- 13. REAL-TIME CHAT & MESSENGER
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS chat_channels (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    type VARCHAR(20) NOT NULL DEFAULT 'direct', -- 'direct' or 'project'
+    name VARCHAR(255),
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS idx_chat_channels_project ON chat_channels(project_id);
+CREATE INDEX IF NOT EXISTS idx_chat_channels_updated_at ON chat_channels(updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS chat_participants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel_id UUID NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    last_read_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    CONSTRAINT uq_channel_user UNIQUE(channel_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_chat_participants_user ON chat_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_participants_channel ON chat_participants(channel_id);
+
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel_id UUID NOT NULL REFERENCES chat_channels(id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL DEFAULT '',
+    image_url TEXT,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    reply_to_id UUID REFERENCES chat_messages(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_channel_created ON chat_messages(channel_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_project ON chat_messages(project_id);
+

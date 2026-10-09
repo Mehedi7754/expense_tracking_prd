@@ -23,6 +23,7 @@ import '../../screens/expenses/my_expenses_screen.dart';
 import '../../screens/expenses/receipt_compliance_screen.dart';
 import '../../screens/expenses/submit_expense_screen.dart';
 import '../../screens/home/monthly_earnings_detail_screen.dart';
+import '../../screens/home/portfolio_value_detail_screen.dart';
 import '../../screens/main_shell_screen.dart';
 import '../../screens/notifications/notification_detail_screen.dart';
 import '../../screens/notifications/notifications_screen.dart';
@@ -41,6 +42,8 @@ import '../../screens/salary/salary_dashboard_screen.dart';
 import '../../screens/salary/salary_detail_screen.dart';
 import '../../screens/salary/my_salary_screen.dart';
 import '../../screens/salary/holidays_management_screen.dart';
+import '../../screens/chat/chat_list_screen.dart';
+import '../../screens/chat/chat_thread_screen.dart';
 import '../../screens/splash/splash_screen.dart';
 import '../../screens/tasks/add_edit_task_screen.dart';
 import '../../screens/tasks/task_detail_screen.dart';
@@ -169,6 +172,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.monthlyEarningsDetail,
         builder: (context, state) => const MonthlyEarningsDetailScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.portfolioValueDetail,
+        builder: (context, state) => const PortfolioValueDetailScreen(),
       ),
       // Bug 4 Fix: /expenses/new must be registered BEFORE /expenses/:id
       // so GoRouter doesn't treat 'new' as an expense ID.
@@ -386,6 +393,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.holidaysManagement,
         builder: (context, state) => const HolidaysManagementScreen(),
+      ),
+
+      // Real-Time Corporate Chat & Messenger
+      GoRoute(
+        path: RoutePaths.chatList,
+        builder: (context, state) => const ChatListScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.chatThreadPattern,
+        builder: (context, state) {
+          final id = state.pathParameters['id'] ?? '';
+          return ChatThreadScreen(channelId: id);
+        },
       ),
     ],
   );

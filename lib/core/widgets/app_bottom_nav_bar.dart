@@ -24,6 +24,7 @@ class AppBottomNavBar extends StatelessWidget {
   final VoidCallback? onAddTap;
   final int pendingApprovalsCount;
   final int unreadNotificationsCount;
+  final int unreadChatCount;
 
   const AppBottomNavBar({
     super.key,
@@ -33,6 +34,7 @@ class AppBottomNavBar extends StatelessWidget {
     this.onAddTap,
     this.pendingApprovalsCount = 0,
     this.unreadNotificationsCount = 0,
+    this.unreadChatCount = 0,
   });
 
   List<NavItemData> _getAllItems() {
@@ -58,10 +60,11 @@ class AppBottomNavBar extends StatelessWidget {
           icon: CupertinoIcons.plus_circle,
           activeIcon: CupertinoIcons.plus_circle_fill,
         ),
-        const NavItemData(
-          label: 'Profile',
-          icon: CupertinoIcons.person,
-          activeIcon: CupertinoIcons.person_fill,
+        NavItemData(
+          label: 'Chat',
+          icon: CupertinoIcons.chat_bubble_2,
+          activeIcon: CupertinoIcons.chat_bubble_2_fill,
+          badgeCount: unreadChatCount,
         ),
       ];
     }
@@ -87,10 +90,11 @@ class AppBottomNavBar extends StatelessWidget {
           icon: CupertinoIcons.plus_circle,
           activeIcon: CupertinoIcons.plus_circle_fill,
         ),
-        const NavItemData(
-          label: 'Profile',
-          icon: CupertinoIcons.person,
-          activeIcon: CupertinoIcons.person_fill,
+        NavItemData(
+          label: 'Chat',
+          icon: CupertinoIcons.chat_bubble_2,
+          activeIcon: CupertinoIcons.chat_bubble_2_fill,
+          badgeCount: unreadChatCount,
         ),
       ];
     }

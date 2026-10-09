@@ -24,7 +24,7 @@ class NotificationRouter {
   /// Encode FCM data map into a local-notification payload string.
   static String encode(Map<String, dynamic> data) {
     final params = <String, String>{};
-    for (final k in const ['type', 'notificationId', 'expenseId', 'projectId', 'relatedExpenseId', 'relatedProjectId']) {
+    for (final k in const ['type', 'notificationId', 'expenseId', 'projectId', 'relatedExpenseId', 'relatedProjectId', 'channelId', 'chatChannelId']) {
       final v = data[k];
       if (v != null && v.toString().isNotEmpty) params[k] = v.toString();
     }
@@ -56,6 +56,15 @@ class NotificationRouter {
     final expenseId = (data['expenseId'] ?? data['relatedExpenseId'])?.toString();
     final projectId = (data['projectId'] ?? data['relatedProjectId'])?.toString();
     final notifId = data['notificationId']?.toString();
+    final chatChannelId = (data['channelId'] ?? data['chatChannelId'])?.toString();
+
+    // Isolated Chat Notification Deep Linking
+    if (type == 'chat' || type.contains('chat')) {
+      if (chatChannelId != null && chatChannelId.isNotEmpty) {
+        return RoutePaths.chatThread(chatChannelId);
+      }
+      return RoutePaths.chatList;
+    }
 
     if (expenseId != null && expenseId.isNotEmpty) return RoutePaths.expenseDetail(expenseId);
     if (type.contains('attendance')) {

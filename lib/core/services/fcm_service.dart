@@ -31,7 +31,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   try {
     await PushNotificationService.instance.initialize(isBackground: true);
-    if (type.contains('expense')) {
+    if (type.contains('chat')) {
+      await PushNotificationService.instance.showChatAlert(
+        title: title,
+        body: body,
+        channelId: (data['channelId'] ?? '').toString(),
+        notificationId: notifId,
+        payload: NotificationRouter.encode(data),
+      );
+    } else if (type.contains('expense')) {
       await PushNotificationService.instance.showExpenseAlert(
         title: title,
         body: body,
@@ -122,7 +130,15 @@ class FcmService {
 
         final notifId = message.messageId ?? data['notificationId']?.toString();
 
-        if (type.contains('expense')) {
+        if (type.contains('chat')) {
+          await PushNotificationService.instance.showChatAlert(
+            title: title,
+            body: body,
+            channelId: (data['channelId'] ?? '').toString(),
+            notificationId: notifId,
+            payload: NotificationRouter.encode(data),
+          );
+        } else if (type.contains('expense')) {
           await PushNotificationService.instance.showExpenseAlert(
             title: title,
             body: body,

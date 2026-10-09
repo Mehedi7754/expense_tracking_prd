@@ -103,7 +103,6 @@ class _MinimalAreaChartState extends ConsumerState<MinimalAreaChart> {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppColors.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -120,9 +119,17 @@ class _MinimalAreaChartState extends ConsumerState<MinimalAreaChart> {
             ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
           // Tier 1: Title + Trend Chip & Timeframe Dropdown Capsule
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -199,41 +206,45 @@ class _MinimalAreaChartState extends ConsumerState<MinimalAreaChart> {
               ),
               const SizedBox(width: 4),
               // Period Dropdown Capsule
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.0),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFDBEAFE),
-                    width: 1.0,
-                  ),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedPeriod,
-                    isDense: true,
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF2563EB)),
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF2563EB),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {},
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.0),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFDBEAFE),
+                      width: 1.0,
                     ),
-                    dropdownColor: isDark ? AppColors.darkSurface : Colors.white,
-                    items: const [
-                      DropdownMenuItem(value: 'This Month', child: Text('This Month')),
-                      DropdownMenuItem(value: 'Last Month', child: Text('Last Month')),
-                      DropdownMenuItem(value: 'This Quarter', child: Text('This Quarter')),
-                      DropdownMenuItem(value: 'Last 6 Months', child: Text('Last 6 Months')),
-                    ],
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedPeriod = val;
-                          _selectedIndex = null;
-                        });
-                      }
-                    },
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedPeriod,
+                      isDense: true,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: Color(0xFF2563EB)),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2563EB),
+                      ),
+                      dropdownColor: isDark ? AppColors.darkSurface : Colors.white,
+                      items: const [
+                        DropdownMenuItem(value: 'This Month', child: Text('This Month')),
+                        DropdownMenuItem(value: 'Last Month', child: Text('Last Month')),
+                        DropdownMenuItem(value: 'This Quarter', child: Text('This Quarter')),
+                        DropdownMenuItem(value: 'Last 6 Months', child: Text('Last 6 Months')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedPeriod = val;
+                            _selectedIndex = null;
+                          });
+                        }
+                      },
+                    ),
                   ),
                 ),
               ),
@@ -502,8 +513,11 @@ class _MinimalAreaChartState extends ConsumerState<MinimalAreaChart> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  ),
+),
+);
+}
 
   void _handleTouch(Offset localPosition, double width, int pointCount) {
     if (pointCount <= 1 || width <= 0) return;

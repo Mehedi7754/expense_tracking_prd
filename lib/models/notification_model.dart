@@ -116,6 +116,9 @@ enum NotificationType {
 class NotificationModel {
   final String id;
   final String userId;
+  final String? actorId;
+  final String? actorName;
+  final String? actorAvatarUrl;
   final String title;
   final String message;
   final String fullExplanation;
@@ -128,6 +131,9 @@ class NotificationModel {
   const NotificationModel({
     required this.id,
     required this.userId,
+    this.actorId,
+    this.actorName,
+    this.actorAvatarUrl,
     required this.title,
     required this.message,
     required this.fullExplanation,
@@ -141,6 +147,9 @@ class NotificationModel {
   NotificationModel copyWith({
     String? id,
     String? userId,
+    String? actorId,
+    String? actorName,
+    String? actorAvatarUrl,
     String? title,
     String? message,
     String? fullExplanation,
@@ -153,6 +162,9 @@ class NotificationModel {
     return NotificationModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      actorId: actorId ?? this.actorId,
+      actorName: actorName ?? this.actorName,
+      actorAvatarUrl: actorAvatarUrl ?? this.actorAvatarUrl,
       title: title ?? this.title,
       message: message ?? this.message,
       fullExplanation: fullExplanation ?? this.fullExplanation,
@@ -169,6 +181,9 @@ class NotificationModel {
     return NotificationModel(
       id: (json['id'] ?? '').toString(),
       userId: (json['user_id'] ?? json['userId'] ?? '').toString(),
+      actorId: json['actor_id']?.toString() ?? json['actorId']?.toString(),
+      actorName: json['actor_name']?.toString() ?? json['actorName']?.toString(),
+      actorAvatarUrl: json['actor_avatar_url']?.toString() ?? json['actorAvatarUrl']?.toString(),
       title: (json['title'] ?? '').toString(),
       message: (json['message'] ?? '').toString(),
       fullExplanation: (json['full_explanation'] ?? json['fullExplanation'] ?? '').toString(),
@@ -198,6 +213,9 @@ class NotificationModel {
     return {
       'id': id,
       'user_id': userId,
+      if (actorId != null) 'actor_id': actorId,
+      if (actorName != null) 'actor_name': actorName,
+      if (actorAvatarUrl != null) 'actor_avatar_url': actorAvatarUrl,
       'title': title,
       'message': message,
       'full_explanation': fullExplanation,
