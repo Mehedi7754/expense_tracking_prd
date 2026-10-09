@@ -165,7 +165,12 @@ export class ChatService {
       WHERE cp.user_id = $1
         AND (
           c.type = 'project'
-          OR (c.type = 'direct' AND other_u.id IS NOT NULL AND other_u.is_active = TRUE)
+          OR (
+            c.type = 'direct' 
+            AND other_u.id IS NOT NULL 
+            AND other_u.is_active = TRUE
+            AND (SELECT COUNT(*) FROM chat_participants cp_cnt WHERE cp_cnt.channel_id = c.id) >= 2
+          )
         )
       ORDER BY c.updated_at DESC;
     `;

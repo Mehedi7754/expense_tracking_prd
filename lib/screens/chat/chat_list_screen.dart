@@ -160,8 +160,15 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           ),
         ),
         data: (allChannels) {
+          // Auto-exclude any direct channel where other user is deleted/missing
+          var channels = allChannels.where((c) {
+            if (c.isDirect) {
+              return c.otherUser != null && c.otherUser!.id.isNotEmpty;
+            }
+            return true;
+          }).toList();
+
           // Filter by active tab
-          var channels = allChannels;
           if (_activeTab == 'direct') {
             channels = channels.where((c) => c.isDirect).toList();
           } else if (_activeTab == 'project') {

@@ -292,9 +292,12 @@ export class UsersService {
     await this.db.query(`DELETE FROM employee_salaries WHERE user_id = $1`, [targetId]).catch(() => {});
     await this.db.query(`DELETE FROM leave_records WHERE user_id = $1`, [targetId]).catch(() => {});
     await this.db.query(`DELETE FROM salary_calculations WHERE user_id = $1`, [targetId]).catch(() => {});
-    await this.db.query(`DELETE FROM salary_adjustments WHERE user_id = $1`, [targetId]).catch(() => {});
-    await this.db.query(`DELETE FROM project_members WHERE user_id = $1`, [targetId]).catch(() => {});
     await this.db.query(`DELETE FROM chat_messages WHERE sender_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`
+      DELETE FROM chat_channels 
+      WHERE type = 'direct' 
+        AND id IN (SELECT channel_id FROM chat_participants WHERE user_id = $1)
+    `, [targetId]).catch(() => {});
     await this.db.query(`DELETE FROM chat_participants WHERE user_id = $1`, [targetId]).catch(() => {});
     await this.db.query(`DELETE FROM notifications WHERE user_id = $1 OR actor_id = $1`, [targetId]).catch(() => {});
     await this.db.query(`DELETE FROM user_fcm_tokens WHERE user_id = $1`, [targetId]).catch(() => {});

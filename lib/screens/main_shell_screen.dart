@@ -53,6 +53,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     // Start real-time notification & app data sync loop
     RealtimeSyncService.instance.initialize(ref);
 
+    // Pre-warm chat channels in memory so chat list opens in 0ms
+    ref.watch(chatChannelsProvider);
+    ref.watch(chatUnreadCountProvider);
+
     final role = user.role;
 
     // Reset tab to 2 (center notch) if the role was switched
