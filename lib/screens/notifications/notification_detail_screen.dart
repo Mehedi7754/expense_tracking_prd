@@ -49,6 +49,7 @@ class NotificationDetailScreen extends ConsumerWidget {
       case NotificationType.budgetWarning:
       case NotificationType.attendanceReminder:
       case NotificationType.attendanceLate:
+      case NotificationType.attendanceEarly:
         badgeBg = isDark ? AppColors.darkAmberLight : AppColors.amberLight;
         badgeTextColor = isDark ? AppColors.amberAccent : AppColors.amberDark;
         break;

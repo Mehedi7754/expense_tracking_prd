@@ -11,6 +11,7 @@ enum NotificationType {
   commentAdded,
   attendanceReminder,
   attendanceLate,
+  attendanceEarly,
   absenceDeducted,
   salaryReady,
   payrollFinalized,
@@ -46,6 +47,8 @@ enum NotificationType {
         return 'Attendance Reminder';
       case NotificationType.attendanceLate:
         return 'Late Check-in';
+      case NotificationType.attendanceEarly:
+        return 'Early Check-Out';
       case NotificationType.absenceDeducted:
         return 'Absence Deduction';
       case NotificationType.salaryReady:
@@ -91,6 +94,8 @@ enum NotificationType {
         return NotificationType.attendanceReminder;
       case 'attendancelate':
         return NotificationType.attendanceLate;
+      case 'attendanceearly':
+        return NotificationType.attendanceEarly;
       case 'absencededucted':
         return NotificationType.absenceDeducted;
       case 'salaryready':

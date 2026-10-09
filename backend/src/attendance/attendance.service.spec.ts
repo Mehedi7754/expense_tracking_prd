@@ -108,7 +108,10 @@ describe('AttendanceService Unit & Session Logic', () => {
       );
     });
 
-    it('creates attendance check-out record for afternoon session without late penalty', async () => {
+    it('creates attendance check-out record on time when checking out within grace period', async () => {
+      // 17:50 Dhaka time (UTC 11:50) is within 15min grace period before 18:00 end
+      jest.setSystemTime(new Date('2026-10-02T11:50:00.000Z'));
+
       const userId = 'user-emp-1';
       const checkInDto = {
         sessionType: 'afternoon' as const,
@@ -162,6 +165,91 @@ describe('AttendanceService Unit & Session Logic', () => {
         expect.objectContaining({
           title: 'Attendance Check-Out 📍',
           message: expect.stringContaining('check-out was successfully recorded'),
+          type: 'attendance_reminder',
+        }),
+      );
+      expect(mockNotifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Employee Checked Out: Fahim Ahmed (✅ ON TIME)',
+          type: 'attendance_reminder',
+        }),
+      );
+    });
+
+    it('marks check-out as BEFORE TIME when leaving earlier than grace period threshold', async () => {
+      // 16:30 Dhaka time (UTC 10:30) is earlier than (18:00 - 15m = 17:45)
+      jest.setSystemTime(new Date('2026-10-02T10:30:00.000Z'));
+
+      const userId = 'user-emp-1';
+      const checkInDto = {
+        sessionType: 'afternoon' as const,
+        latitude: 23.8103,
+        longitude: 90.4125,
+        addressText: 'Dhaka, Bangladesh',
+        deviceInfo: 'Flutter Mobile App',
+      };
+
+      // Query 0: getTimingSettings
+      mockDb.query
+        .mockResolvedValueOnce({ rows: [] })
+        // Query 1: User role check
+        .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 2: Check existing check-in -> none
+        .mockResolvedValueOnce({ rows: [] })
+        // Query 3: Insert returning id
+        .mockResolvedValueOnce({
+          rows: [{ id: 'att-rec-early' }],
+        })
+        // Query 4: getRecordById
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'att-rec-early',
+              userId: userId,
+              date: '2026-10-02',
+              sessionType: 'afternoon',
+              loginTime: new Date().toISOString(),
+              latitude: 23.8103,
+              longitude: 90.4125,
+              addressText: 'Dhaka, Bangladesh',
+              deviceInfo: 'Flutter Mobile App',
+              status: 'present',
+              notes: '[Checked out before time]',
+              createdAt: new Date().toISOString(),
+              userName: 'Fahim Ahmed',
+              userEmail: 'fahim@pfis.com',
+            },
+          ],
+        })
+        // Query 5: user fullname + email query
+        .mockResolvedValueOnce({ rows: [{ full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 6: get admins for push notification
+        .mockResolvedValueOnce({ rows: [{ id: 'admin1' }] });
+
+      const result = await service.checkIn(userId, checkInDto);
+      expect(result.id).toBe('att-rec-early');
+      expect(result.sessionType).toBe('afternoon');
+
+      // Verify DB insert recorded early checkout note
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO attendance_records'),
+        expect.arrayContaining(['[Checked out before time]']),
+      );
+
+      // Verify employee notification has before-time title and attendance_early type
+      expect(mockNotifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Attendance Check-Out (Before Time) ⚠️',
+          message: expect.stringContaining('check-out was recorded before scheduled shift end'),
+          type: 'attendance_early',
+        }),
+      );
+
+      // Verify admin notification has before-time title and attendance_early type
+      expect(mockNotifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Employee Checked Out: Fahim Ahmed (⚠️ BEFORE TIME)',
+          type: 'attendance_early',
         }),
       );
     });

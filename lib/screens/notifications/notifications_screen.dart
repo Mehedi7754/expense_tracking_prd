@@ -57,6 +57,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       case NotificationCategoryFilter.attendance:
         return notif.type == NotificationType.attendanceReminder ||
             notif.type == NotificationType.attendanceLate ||
+            notif.type == NotificationType.attendanceEarly ||
             notif.type == NotificationType.absenceDeducted;
     }
   }
@@ -514,6 +515,7 @@ _CategoryStyle _getCategoryStyle(NotificationType type, bool isDark) {
   }
   if (type == NotificationType.attendanceReminder ||
       type == NotificationType.attendanceLate ||
+      type == NotificationType.attendanceEarly ||
       type == NotificationType.absenceDeducted) {
     return _CategoryStyle(
       label: 'ATTENDANCE',

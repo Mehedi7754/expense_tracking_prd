@@ -106,6 +106,7 @@ BEGIN
             'budget_critical',
             'attendance_reminder',
             'attendance_late',
+            'attendance_early',
             'absence_deducted',
             'salary_ready',
             'payroll_finalized',

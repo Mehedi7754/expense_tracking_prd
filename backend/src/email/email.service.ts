@@ -16,22 +16,45 @@ export class EmailService {
     }
   }
 
-  async sendCheckInConfirmation(email: string, name: string, session: string, time: string, location: string, isLate: boolean) {
+  async sendCheckInConfirmation(
+    email: string,
+    name: string,
+    session: string,
+    time: string,
+    location: string,
+    isLate: boolean,
+    isEarly: boolean = false,
+  ) {
     if (!this.resend) return;
 
     try {
-      const statusText = isLate ? 'marked as Late' : 'On Time';
-      const statusColor = isLate ? '#e53e3e' : '#38a169'; // Red for late, Green for on time
+      const isCheckOut = session === 'afternoon';
+      let statusText = isLate ? 'marked as Late' : 'On Time';
+      let statusColor = isLate ? '#e53e3e' : '#38a169'; // Red for late, Green for on time
+
+      if (isCheckOut) {
+        if (isEarly) {
+          statusText = 'Early Check-Out (Before Time)';
+          statusColor = '#dd6b20'; // Amber/Orange
+        } else {
+          statusText = 'On Time Check-Out';
+          statusColor = '#38a169'; // Green
+        }
+      }
+
+      const subject = isCheckOut
+        ? `Attendance Check-Out Confirmation${isEarly ? ' (Early Departure)' : ''}`
+        : `Attendance Confirmation: ${session.charAt(0).toUpperCase() + session.slice(1)} Session`;
 
       await this.resend.emails.send({
         from: `Attendance System <${this.fromEmail}>`,
         to: email,
-        subject: `Attendance Confirmation: ${session.charAt(0).toUpperCase() + session.slice(1)} Session`,
+        subject,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-            <h2 style="color: #2d3748; text-align: center;">Attendance Recorded Successfully</h2>
+            <h2 style="color: #2d3748; text-align: center;">${isCheckOut ? 'Attendance Check-Out Recorded' : 'Attendance Recorded Successfully'}</h2>
             <p style="color: #4a5568; font-size: 16px;">Hello <strong>${name}</strong>,</p>
-            <p style="color: #4a5568; font-size: 16px;">Your check-in for the <strong>${session}</strong> session has been successfully recorded.</p>
+            <p style="color: #4a5568; font-size: 16px;">Your ${isCheckOut ? 'check-out' : 'check-in for the <strong>' + session + '</strong> session'} has been successfully recorded.</p>
             
             <div style="background-color: #f7fafc; padding: 15px; border-radius: 6px; margin: 20px 0;">
               <p style="margin: 5px 0; color: #4a5568;"><strong>Time:</strong> ${time}</p>

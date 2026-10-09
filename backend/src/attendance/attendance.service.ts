@@ -201,9 +201,29 @@ export class AttendanceService {
       session = currentHour < divider ? 'morning' : 'afternoon';
     }
 
+    const currentMinute = dhakaNow.getMinutes();
+    const gracePeriod = this.officeTimingSettings.gracePeriodMinutes ?? 15;
+    const isCheckOut = session === 'afternoon';
+
+    let isLate = false;
+    if (session === 'morning') {
+      if (currentHour > morningStart || (currentHour === morningStart && currentMinute > gracePeriod)) {
+        isLate = true;
+      }
+    }
+
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    const afternoonEndMinutes = afternoonEnd * 60;
+    const isEarly = isCheckOut && (currentTotalMinutes < (afternoonEndMinutes - gracePeriod));
+
     const address = dto.addressText || dto.address_text || '';
     const deviceInfo = dto.deviceInfo || '';
-    const notes = dto.notes || '';
+    let notes = dto.notes || '';
+    if (isEarly) {
+      notes = notes ? `${notes} [Checked out before time]` : '[Checked out before time]';
+    } else if (isLate) {
+      notes = notes ? `${notes} [Late check-in]` : '[Late check-in]';
+    }
 
     // Check if record exists for this user, date and session
     const existing = await this.db.query(
@@ -239,33 +259,26 @@ export class AttendanceService {
       const empAvatar = userRes.rows[0]?.avatar_url || null;
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       
-      // Calculate Late Status based on configurable grace period
-      const currentMinute = dhakaNow.getMinutes();
-      const gracePeriod = this.officeTimingSettings.gracePeriodMinutes ?? 15;
-      let isLate = false;
-      if (session === 'morning') {
-        if (currentHour > morningStart || (currentHour === morningStart && currentMinute > gracePeriod)) {
-          isLate = true;
-        }
-      } else {
-        // Evening / afternoon check-out can be done at any time when employee leaves
-        isLate = false;
-      }
-
       const statusTag = isLate ? '⚠️ LATE' : '✅ ON TIME';
-      const isCheckOut = session === 'afternoon';
+      const checkoutTag = isEarly ? '⚠️ BEFORE TIME' : '✅ ON TIME';
 
       // Notify employee with attendance confirmation
       await this.notificationsService.create({
         userId,
-        title: isCheckOut ? 'Attendance Check-Out 📍' : 'Attendance Recorded 📍',
+        title: isCheckOut
+          ? (isEarly ? 'Attendance Check-Out (Before Time) ⚠️' : 'Attendance Check-Out 📍')
+          : (isLate ? 'Attendance Recorded (Late) ⚠️' : 'Attendance Recorded 📍'),
         message: isCheckOut
-          ? `Your check-out was successfully recorded at ${timeStr}.`
+          ? (isEarly
+              ? `Your check-out was recorded before scheduled shift end at ${timeStr}.`
+              : `Your check-out was successfully recorded at ${timeStr}.`)
           : `Your check-in for the ${session} session was successfully recorded at ${timeStr}.`,
         fullExplanation: isCheckOut
-          ? `Attendance check-out verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: Checked Out.`
-          : `Attendance check-in verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: Present.`,
-        type: isLate ? 'attendance_late' : 'attendance_reminder',
+          ? `Attendance check-out verified at ${timeStr}. Shift: ${userShift.name} (Scheduled end: ${afternoonEnd}:00). GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: ${isEarly ? 'Checked Out Before Time' : 'Checked Out'}.`
+          : `Attendance check-in verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: ${isLate ? 'Late' : 'Present'}.`,
+        type: isCheckOut
+          ? (isEarly ? 'attendance_early' : 'attendance_reminder')
+          : (isLate ? 'attendance_late' : 'attendance_reminder'),
         actorId: userId,
         actorName: empName,
         actorAvatarUrl: empAvatar,
@@ -279,7 +292,8 @@ export class AttendanceService {
           session,
           timeStr,
           address || 'Office Premises',
-          isLate
+          isLate,
+          isEarly,
         );
       }
 
@@ -292,15 +306,19 @@ export class AttendanceService {
         await this.notificationsService.create({
           userId: admin.id,
           title: isCheckOut
-            ? `Employee Checked Out: ${empName}`
+            ? `Employee Checked Out: ${empName} (${checkoutTag})`
             : `Employee Checked In: ${statusTag}`,
           message: isCheckOut
-            ? `${empName} checked out at ${timeStr}.`
+            ? (isEarly
+                ? `${empName} checked out early before scheduled time at ${timeStr}.`
+                : `${empName} checked out at ${timeStr}.`)
             : `${empName} recorded attendance for ${session} session at ${timeStr}.`,
           fullExplanation: isCheckOut
-            ? `${empName} checked out on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`
+            ? `${empName} checked out on ${new Date().toLocaleDateString()} at ${timeStr}. Shift: ${userShift.name} (Scheduled end: ${afternoonEnd}:00, ${isEarly ? 'Early departure' : 'On time'}). Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`
             : `${empName} logged in for the ${session} session on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
-          type: isLate ? 'attendance_late' : 'attendance_reminder',
+          type: isCheckOut
+            ? (isEarly ? 'attendance_early' : 'attendance_reminder')
+            : (isLate ? 'attendance_late' : 'attendance_reminder'),
           actorId: userId,
           actorName: empName,
           actorAvatarUrl: empAvatar,

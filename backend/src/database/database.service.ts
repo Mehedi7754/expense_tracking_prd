@@ -149,6 +149,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ADD COLUMN IF NOT EXISTS actor_name VARCHAR(255),
         ADD COLUMN IF NOT EXISTS actor_avatar_url TEXT;
 
+        DO $$
+        BEGIN
+            ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'attendance_early';
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+            WHEN others THEN null;
+        END $$;
+
         -- Auto-migrate Chat & Messenger Tables
         CREATE TABLE IF NOT EXISTS chat_channels (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -292,7 +292,9 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
         notificationId: newNotif.id,
         expenseId: relatedExpenseId,
       );
-    } else if (type == NotificationType.attendanceReminder) {
+    } else if (type == NotificationType.attendanceReminder ||
+        type == NotificationType.attendanceLate ||
+        type == NotificationType.attendanceEarly) {
       PushNotificationService.instance.showAttendanceReminder(
         title: title,
         body: message,
