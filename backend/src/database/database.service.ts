@@ -45,6 +45,19 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         CREATE INDEX IF NOT EXISTS idx_uploaded_files_filename ON app_uploaded_files(filename);
       `);
 
+      // Auto-migrate Password Reset OTPs Table
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            email CITEXT NOT NULL,
+            otp VARCHAR(10) NOT NULL,
+            expires_at TIMESTAMPTZ NOT NULL,
+            is_used BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+        );
+        CREATE INDEX IF NOT EXISTS idx_password_resets_email_otp ON password_resets(email, otp, expires_at);
+      `);
+
       // Auto-migrate Attendance & Geo-Location Tracking Tables
       await this.pool.query(`
         CREATE TABLE IF NOT EXISTS attendance_records (

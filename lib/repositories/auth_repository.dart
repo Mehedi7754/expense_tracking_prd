@@ -156,6 +156,31 @@ class AuthRepository {
       body: {'email': email.trim()},
     );
   }
+
+  Future<void> verifyOtp(String email, String otp) async {
+    await _client.post(
+      '/auth/verify-otp',
+      body: {
+        'email': email.trim(),
+        'otp': otp.trim(),
+      },
+    );
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    await _client.post(
+      ApiEndpoints.resetPassword,
+      body: {
+        'email': email.trim(),
+        'otp': otp.trim(),
+        'newPassword': newPassword,
+      },
+    );
+  }
 }
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {

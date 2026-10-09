@@ -783,3 +783,17 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE INDEX IF NOT EXISTS idx_chat_messages_channel_created ON chat_messages(channel_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_project ON chat_messages(project_id);
 
+-- ----------------------------------------------------------------------------
+-- 14. PASSWORD RESET OTPS
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_resets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email CITEXT NOT NULL,
+    otp VARCHAR(10) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    is_used BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+CREATE INDEX IF NOT EXISTS idx_password_resets_email_otp ON password_resets(email, otp, expires_at);
+
+

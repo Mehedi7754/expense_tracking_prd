@@ -142,7 +142,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RoutePaths.resetPassword,
-        builder: (context, state) => const ResetPasswordScreen(),
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? (state.extra as String?);
+          return ResetPasswordScreen(initialEmail: email);
+        },
       ),
 
       // Main Shell Screen (Adaptive Home + Role Bottom Nav Bar)

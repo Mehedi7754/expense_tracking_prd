@@ -5,7 +5,7 @@ import { Resend } from 'resend';
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private resend: Resend;
-  private readonly fromEmail = process.env.EMAIL_FROM || 'notifications@yourdomain.com';
+  private readonly fromEmail = process.env.EMAIL_FROM || process.env.RESEND_FROM || 'GW Project Security <security@geospatialworks.com.bd>';
 
   constructor() {
     if (process.env.RESEND_API_KEY) {
@@ -120,4 +120,102 @@ export class EmailService {
       this.logger.error(`Failed to send new expense email to ${email}`, error);
     }
   }
+
+  async sendPasswordResetOtp(email: string, name: string, otp: string, expiryMinutes: number = 15) {
+    if (!this.resend) {
+      this.logger.warn(`Resend not initialized. Password reset OTP for ${email}: ${otp}`);
+      return;
+    }
+
+    try {
+      const from = this.fromEmail.includes('<') 
+        ? this.fromEmail 
+        : `GW Project Security <${this.fromEmail}>`;
+
+      await this.resend.emails.send({
+        from,
+        to: email,
+        subject: `Password Reset Verification Code: ${otp}`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #1a365d; font-size: 24px; margin: 0; font-weight: 700; letter-spacing: -0.5px;">Geospatial Works</h1>
+              <p style="color: #718096; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px;">Enterprise Project & Financial Intelligence</p>
+            </div>
+
+            <div style="border-top: 2px solid #3182ce; padding-top: 20px;">
+              <h2 style="color: #2d3748; font-size: 18px; margin-top: 0;">Password Reset Request</h2>
+              <p style="color: #4a5568; font-size: 15px; line-height: 1.6;">Hello <strong>${name}</strong>,</p>
+              <p style="color: #4a5568; font-size: 15px; line-height: 1.6;">We received a request to reset the password for your Geospatial Works account. Please use the following 6-digit verification code to complete your password reset:</p>
+
+              <div style="background-color: #ebf8ff; border: 2px dashed #3182ce; border-radius: 8px; padding: 20px; text-align: center; margin: 24px 0;">
+                <span style="font-size: 34px; font-weight: 800; letter-spacing: 8px; color: #2b6cb0; font-family: monospace;">${otp}</span>
+                <p style="color: #4a5568; font-size: 13px; margin: 8px 0 0 0;">This code will expire in <strong>${expiryMinutes} minutes</strong>.</p>
+              </div>
+
+              <div style="background-color: #fffaf0; border-left: 4px solid #dd6b20; padding: 12px 16px; margin: 20px 0; border-radius: 4px;">
+                <p style="color: #7b341e; font-size: 13px; margin: 0; line-height: 1.5;">
+                  <strong>Security Reminder:</strong> If you did not request this password reset, please ignore this email or contact your IT security administrator immediately. Never share this code with anyone.
+                </p>
+              </div>
+
+              <p style="color: #718096; font-size: 13px; margin-top: 30px; text-align: center; border-top: 1px solid #edf2f7; padding-top: 20px;">
+                This is an automated security transmission from <strong>Geospatial Works Security Systems</strong>.<br/>
+                &copy; ${new Date().getFullYear()} Geospatial Works Ltd. All rights reserved.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+      this.logger.log(`Sent password reset OTP email to ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password reset OTP to ${email}`, error);
+    }
+  }
+
+  async sendPasswordChangedConfirmation(email: string, name: string) {
+    if (!this.resend) return;
+
+    try {
+      const from = this.fromEmail.includes('<') 
+        ? this.fromEmail 
+        : `GW Project Security <${this.fromEmail}>`;
+
+      await this.resend.emails.send({
+        from,
+        to: email,
+        subject: `Security Alert: Your Password Was Changed`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #1a365d; font-size: 24px; margin: 0; font-weight: 700;">Geospatial Works</h1>
+            </div>
+
+            <div style="border-top: 2px solid #38a169; padding-top: 20px;">
+              <h2 style="color: #2d3748; font-size: 18px; margin-top: 0;">Password Changed Successfully</h2>
+              <p style="color: #4a5568; font-size: 15px;">Hello <strong>${name}</strong>,</p>
+              <p style="color: #4a5568; font-size: 15px; line-height: 1.6;">
+                The password for your account associated with <strong>${email}</strong> was successfully updated.
+              </p>
+              <p style="color: #4a5568; font-size: 15px; line-height: 1.6;">
+                You can now log in using your newly configured credentials.
+              </p>
+
+              <div style="background-color: #f7fafc; padding: 14px 18px; border-radius: 6px; margin: 20px 0; color: #718096; font-size: 13px;">
+                <strong>Time:</strong> ${new Date().toUTCString()}
+              </div>
+
+              <p style="color: #e53e3e; font-size: 13px; font-weight: 600;">
+                If you did not make this change, please contact system administration immediately.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+      this.logger.log(`Sent password changed confirmation email to ${email}`);
+    } catch (error) {
+      this.logger.error(`Failed to send password changed confirmation to ${email}`, error);
+    }
+  }
 }
+

@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { EmailService } from '../email/email.service';
 import { DatabaseService } from '../database/database.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -10,6 +11,7 @@ export class AuthService {
   constructor(
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   private mapRole(role: string): string {
@@ -231,27 +233,73 @@ export class AuthService {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const res = await this.db.query('SELECT id, full_name FROM users WHERE email = $1 AND is_active = TRUE', [cleanEmail]);
+    const res = await this.db.query('SELECT id, full_name, email FROM users WHERE email = $1 AND is_active = TRUE', [cleanEmail]);
     
-    // Always return success even if email not found to prevent enumeration
+    // Always return success even if email not found to prevent account enumeration
     if (!res.rows.length) {
-      return { success: true, message: 'If this email is registered, password reset instructions have been sent.' };
+      return { 
+        success: true, 
+        message: 'If this email is registered, a password reset verification code has been dispatched.' 
+      };
     }
 
     const user = res.rows[0];
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Store in audit or update reset token
+    // Invalidate any active unused OTPs for this email
+    await this.db.query(
+      `UPDATE password_resets SET is_used = TRUE WHERE email = $1 AND is_used = FALSE`,
+      [cleanEmail],
+    );
+
+    // Insert new OTP with 15-minute expiration
+    await this.db.query(
+      `INSERT INTO password_resets (id, email, otp, expires_at, is_used, created_at)
+       VALUES (gen_random_uuid(), $1, $2, clock_timestamp() + INTERVAL '15 minutes', FALSE, clock_timestamp())`,
+      [cleanEmail, otp],
+    );
+
+    // Dispatch branded email via Resend
+    await this.emailService.sendPasswordResetOtp(user.email, user.full_name, otp, 15);
+
+    // Store in audit logs
     await this.db.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, changes)
-       VALUES (gen_random_uuid(), $1, 'PASSWORD_RESET_REQUESTED', 'users', $1, $2)`,
-      [user.id, JSON.stringify({ email: cleanEmail, otp, timestamp: new Date().toISOString() })]
+       VALUES (gen_random_uuid(), $1, 'PASSWORD_RESET_OTP_GENERATED', 'users', $1, $2)`,
+      [user.id, JSON.stringify({ email: cleanEmail, expires_in_minutes: 15, timestamp: new Date().toISOString() })]
     );
 
     return {
       success: true,
-      message: `Password reset instructions have been sent to ${cleanEmail}`,
-      otpPreview: otp, // Available for development/testing
+      message: `Password reset verification code has been sent to ${cleanEmail}`,
+    };
+  }
+
+  async verifyOtp(email: string, otp: string) {
+    if (!email || !email.includes('@') || !otp) {
+      throw new BadRequestException('Valid email and OTP code are required');
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = otp.trim();
+
+    const res = await this.db.query(
+      `SELECT id, expires_at 
+       FROM password_resets 
+       WHERE email = $1 AND otp = $2 AND is_used = FALSE AND expires_at > clock_timestamp()
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [cleanEmail, cleanOtp],
+    );
+
+    if (!res.rows.length) {
+      throw new BadRequestException('Invalid or expired verification code. Please request a new code.');
+    }
+
+    return {
+      success: true,
+      valid: true,
+      message: 'Verification code is valid.',
     };
   }
 
@@ -259,20 +307,63 @@ export class AuthService {
     if (!newPass || newPass.length < 6) {
       throw new BadRequestException('New password must be at least 6 characters');
     }
-
-    const cleanEmail = email.trim().toLowerCase();
-    const res = await this.db.query('SELECT id FROM users WHERE email = $1 AND is_active = TRUE', [cleanEmail]);
-    if (!res.rows.length) {
-      throw new BadRequestException('Invalid reset request');
+    if (!email || !email.includes('@') || !tokenOrOtp) {
+      throw new BadRequestException('Email and OTP verification code are required');
     }
 
-    const userId = res.rows[0].id;
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanOtp = tokenOrOtp.trim();
+
+    // Verify OTP record
+    const otpRes = await this.db.query(
+      `SELECT id 
+       FROM password_resets 
+       WHERE email = $1 AND otp = $2 AND is_used = FALSE AND expires_at > clock_timestamp()
+       ORDER BY created_at DESC 
+       LIMIT 1`,
+      [cleanEmail, cleanOtp],
+    );
+
+    if (!otpRes.rows.length) {
+      throw new BadRequestException('Invalid or expired verification code. Please request a new code.');
+    }
+
+    const resetId = otpRes.rows[0].id;
+
+    // Verify user exists and is active
+    const userRes = await this.db.query(
+      'SELECT id, full_name, email FROM users WHERE email = $1 AND is_active = TRUE',
+      [cleanEmail],
+    );
+    if (!userRes.rows.length) {
+      throw new BadRequestException('User account not found or deactivated');
+    }
+
+    const user = userRes.rows[0];
+
+    // Mark OTP as used
+    await this.db.query('UPDATE password_resets SET is_used = TRUE WHERE id = $1', [resetId]);
+
+    // Hash new password and update user record
     const newHash = await bcrypt.hash(newPass, 10);
     await this.db.query(
       'UPDATE users SET password_hash = $1, updated_at = clock_timestamp() WHERE id = $2',
-      [newHash, userId]
+      [newHash, user.id],
     );
 
-    return { success: true, message: 'Password has been successfully reset' };
+    // Dispatch password changed confirmation email via Resend
+    await this.emailService.sendPasswordChangedConfirmation(user.email, user.full_name);
+
+    // Audit log
+    await this.db.query(
+      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, changes)
+       VALUES (gen_random_uuid(), $1, 'PASSWORD_RESET_COMPLETED', 'users', $1, $2)`,
+      [user.id, JSON.stringify({ email: cleanEmail, timestamp: new Date().toISOString() })]
+    );
+
+    return { 
+      success: true, 
+      message: 'Your password has been successfully updated. Please sign in with your new credentials.' 
+    };
   }
 }

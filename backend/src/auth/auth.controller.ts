@@ -56,6 +56,12 @@ export class AuthController {
   }
 
   @HttpCode(HttpStatus.OK)
+  @Post('verify-otp')
+  async verifyOtp(@Body() body: { email: string; otp: string }) {
+    return this.authService.verifyOtp(body.email, body.otp);
+  }
+
+  @HttpCode(HttpStatus.OK)
   @Post('reset-password')
   async resetPassword(@Body() body: { email: string; otp?: string; token?: string; newPassword?: string; password?: string }) {
     const newPass = body.newPassword || body.password || '';

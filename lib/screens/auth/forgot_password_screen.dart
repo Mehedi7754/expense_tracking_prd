@@ -182,14 +182,26 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             child: const Icon(Icons.mark_email_read_rounded, size: 36, color: AppColors.emerald),
           ),
           const SizedBox(height: 20),
-          Text('Reset Link Dispatched', style: AppTextStyles.titleLarge, textAlign: TextAlign.center),
+          Text('Reset Code Dispatched', style: AppTextStyles.titleLarge, textAlign: TextAlign.center),
           const SizedBox(height: 8),
           Text(
-            'We have dispatched instructions and a single-use reset URL to ${_emailController.text}. Please check your inbox.',
+            'We have dispatched a 6-digit verification code to ${_emailController.text}. Please check your email inbox.',
             style: AppTextStyles.bodyMedium,
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.pin_rounded, size: 20),
+              label: const Text('Enter Verification Code (OTP)'),
+              onPressed: () {
+                final email = _emailController.text.trim();
+                context.push('${RoutePaths.resetPassword}?email=${Uri.encodeComponent(email)}', extra: email);
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
           if (_cooldownSeconds > 0)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -202,17 +214,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           else
             TextButton(
               onPressed: () {
-                setState(() => _submitted = false);
+                _handleSubmit();
               },
-              child: const Text('Resend Reset Link'),
+              child: const Text('Resend Verification Code'),
             ),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => context.push(RoutePaths.resetPassword),
-              child: const Text('Simulate Clicking Reset Link'),
-            ),
-          ),
           const SizedBox(height: 10),
           TextButton(
             onPressed: () => context.go(RoutePaths.login),
