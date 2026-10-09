@@ -266,8 +266,8 @@ export class AuthService {
     try {
       await this.db.query(
         `INSERT INTO audit_logs (user_id, user_name, user_role, action, entity_type, entity_id, details)
-         VALUES ($1, $2, 'main_admin', 'PASSWORD_RESET_OTP_GENERATED', 'users', $1, $3)`,
-        [user.id, user.full_name || 'User', JSON.stringify({ email: cleanEmail, expires_in_minutes: 15, timestamp: new Date().toISOString() })]
+         VALUES ($1, $2, 'main_admin', 'PASSWORD_RESET_OTP_GENERATED', 'users', $3, $4)`,
+        [user.id, user.full_name || 'User', String(user.id), JSON.stringify({ email: cleanEmail, expires_in_minutes: 15, timestamp: new Date().toISOString() })]
       );
     } catch (_) {
       // Audit log error should not block password reset delivery
@@ -362,8 +362,8 @@ export class AuthService {
     try {
       await this.db.query(
         `INSERT INTO audit_logs (user_id, user_name, user_role, action, entity_type, entity_id, details)
-         VALUES ($1, $2, 'main_admin', 'PASSWORD_RESET_COMPLETED', 'users', $1, $3)`,
-        [user.id, user.full_name || 'User', JSON.stringify({ email: cleanEmail, timestamp: new Date().toISOString() })]
+         VALUES ($1, $2, 'main_admin', 'PASSWORD_RESET_COMPLETED', 'users', $3, $4)`,
+        [user.id, user.full_name || 'User', String(user.id), JSON.stringify({ email: cleanEmail, timestamp: new Date().toISOString() })]
       );
     } catch (_) {
       // Audit log error should not block password reset completion
