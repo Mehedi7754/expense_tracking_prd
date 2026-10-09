@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import '../core/network/api_client.dart';
 import '../models/chat_models.dart';
 import '../repositories/chat_repository.dart';
 import 'auth_provider.dart';
@@ -11,7 +14,7 @@ class ChatUnreadCountNotifier extends Notifier<int> {
   @override
   int build() {
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 15), (_) => refresh());
+    _timer = Timer.periodic(const Duration(seconds: 10), (_) => refresh());
     ref.onDispose(() => _timer?.cancel());
     refresh();
     return 0;
@@ -41,7 +44,7 @@ class ChatChannelsNotifier extends Notifier<AsyncValue<List<ChatChannelModel>>> 
   @override
   AsyncValue<List<ChatChannelModel>> build() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => fetchChannels(silent: true));
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => fetchChannels(silent: true));
     ref.onDispose(() => _pollTimer?.cancel());
     fetchChannels();
     return const AsyncValue.loading();
@@ -58,6 +61,8 @@ class ChatChannelsNotifier extends Notifier<AsyncValue<List<ChatChannelModel>>> 
     } catch (e, st) {
       if (!silent) {
         state = AsyncValue.error(e, st);
+      } else if (state is AsyncLoading) {
+        state = const AsyncValue.data([]);
       }
     }
   }
@@ -96,16 +101,70 @@ final chatChannelsProvider =
 class ChatMessageNotifier extends Notifier<AsyncValue<List<ChatMessageModel>>> {
   final String channelId;
   Timer? _threadPollTimer;
+  StreamSubscription? _sseSub;
 
   ChatMessageNotifier(this.channelId);
 
   @override
   AsyncValue<List<ChatMessageModel>> build() {
     _threadPollTimer?.cancel();
-    _threadPollTimer = Timer.periodic(const Duration(seconds: 2), (_) => fetchMessages(silent: true));
-    ref.onDispose(() => _threadPollTimer?.cancel());
+    _sseSub?.cancel();
+
+    // Fast 1.2s polling fallback for active messaging thread
+    _threadPollTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) => fetchMessages(silent: true));
+    ref.onDispose(() {
+      _threadPollTimer?.cancel();
+      _sseSub?.cancel();
+    });
+
+    _initRealTimeStream();
     fetchMessages();
     return const AsyncValue.loading();
+  }
+
+  void _initRealTimeStream() {
+    try {
+      final client = ref.read(apiClientProvider);
+      final baseUrl = client.effectiveBaseUrl;
+      final token = client.authToken;
+      final uri = Uri.parse('$baseUrl/chat/channels/$channelId/stream');
+
+      final request = http.Request('GET', uri);
+      if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      request.headers['Accept'] = 'text/event-stream';
+
+      final httpClient = http.Client();
+      httpClient.send(request).then((res) {
+        _sseSub = res.stream
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .listen((line) {
+          if (line.startsWith('data:')) {
+            final jsonStr = line.substring(5).trim();
+            if (jsonStr.isNotEmpty) {
+              try {
+                final json = jsonDecode(jsonStr);
+                final auth = ref.read(authProvider);
+                final incoming = ChatMessageModel.fromJson(
+                  Map<String, dynamic>.from(json),
+                  currentUserId: auth.currentUser?.id,
+                );
+                _handleRealTimeMessage(incoming);
+              } catch (_) {}
+            }
+          }
+        }, onError: (_) {});
+      }).catchError((_) {});
+    } catch (_) {}
+  }
+
+  void _handleRealTimeMessage(ChatMessageModel incoming) {
+    state.whenData((current) {
+      if (!current.any((m) => m.id == incoming.id)) {
+        state = AsyncValue.data([...current, incoming]);
+        ref.read(chatChannelsProvider.notifier).fetchChannels(silent: true);
+      }
+    });
   }
 
   Future<void> fetchMessages({bool silent = false}) async {
