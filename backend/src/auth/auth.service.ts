@@ -263,11 +263,15 @@ export class AuthService {
     await this.emailService.sendPasswordResetOtp(user.email, user.full_name, otp, 15);
 
     // Store in audit logs
-    await this.db.query(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, changes)
-       VALUES (gen_random_uuid(), $1, 'PASSWORD_RESET_OTP_GENERATED', 'users', $1, $2)`,
-      [user.id, JSON.stringify({ email: cleanEmail, expires_in_minutes: 15, timestamp: new Date().toISOString() })]
-    );
+    try {
+      await this.db.query(
+        `INSERT INTO audit_logs (user_id, user_name, user_role, action, entity_type, entity_id, details)
+         VALUES ($1, $2, 'main_admin', 'PASSWORD_RESET_OTP_GENERATED', 'users', $1, $3)`,
+        [user.id, user.full_name || 'User', JSON.stringify({ email: cleanEmail, expires_in_minutes: 15, timestamp: new Date().toISOString() })]
+      );
+    } catch (_) {
+      // Audit log error should not block password reset delivery
+    }
 
     return {
       success: true,
@@ -355,11 +359,15 @@ export class AuthService {
     await this.emailService.sendPasswordChangedConfirmation(user.email, user.full_name);
 
     // Audit log
-    await this.db.query(
-      `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, changes)
-       VALUES (gen_random_uuid(), $1, 'PASSWORD_RESET_COMPLETED', 'users', $1, $2)`,
-      [user.id, JSON.stringify({ email: cleanEmail, timestamp: new Date().toISOString() })]
-    );
+    try {
+      await this.db.query(
+        `INSERT INTO audit_logs (user_id, user_name, user_role, action, entity_type, entity_id, details)
+         VALUES ($1, $2, 'main_admin', 'PASSWORD_RESET_COMPLETED', 'users', $1, $3)`,
+        [user.id, user.full_name || 'User', JSON.stringify({ email: cleanEmail, timestamp: new Date().toISOString() })]
+      );
+    } catch (_) {
+      // Audit log error should not block password reset completion
+    }
 
     return { 
       success: true, 
