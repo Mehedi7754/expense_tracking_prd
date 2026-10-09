@@ -106,9 +106,12 @@ export class ChatService {
 
   /**
    * Get all conversation channels for the given user with unread counts and last message.
+   * Runs ensureUserProjectChannels in background (non-blocking) for instant response.
    */
   async getUserChannels(userId: string): Promise<ChatChannelSummary[]> {
-    await this.ensureUserProjectChannels(userId);
+    // Run project channel sync in background — don't block the list load
+    this.ensureUserProjectChannels(userId).catch(() => {});
+
     const query = `
       SELECT 
         c.id,
@@ -139,7 +142,8 @@ export class ChatService {
         other_u.full_name AS other_user_name,
         other_u.avatar_url AS other_user_avatar,
         other_u.role AS other_user_role,
-        other_u.department AS other_user_dept
+        other_u.department AS other_user_dept,
+        other_u.is_active AS other_user_active
       FROM chat_participants cp
       JOIN chat_channels c ON c.id = cp.channel_id
       LEFT JOIN projects p ON p.id = c.project_id
@@ -152,13 +156,17 @@ export class ChatService {
       ) lm ON TRUE
       LEFT JOIN users u_lm ON u_lm.id = lm.sender_id
       LEFT JOIN LATERAL (
-        SELECT u2.id, u2.full_name, u2.avatar_url, u2.role, u2.department
+        SELECT u2.id, u2.full_name, u2.avatar_url, u2.role, u2.department, u2.is_active
         FROM chat_participants cp2
         JOIN users u2 ON u2.id = cp2.user_id
         WHERE cp2.channel_id = c.id AND cp2.user_id != $1
         LIMIT 1
       ) other_u ON c.type = 'direct'
       WHERE cp.user_id = $1
+        AND (
+          c.type = 'project'
+          OR (c.type = 'direct' AND other_u.id IS NOT NULL AND other_u.is_active = TRUE)
+        )
       ORDER BY c.updated_at DESC;
     `;
 

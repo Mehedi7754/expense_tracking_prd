@@ -37,15 +37,24 @@ final chatUnreadCountProvider = NotifierProvider<ChatUnreadCountNotifier, int>(
   ChatUnreadCountNotifier.new,
 );
 
-// Conversation Channels Provider
+// Conversation Channels Provider — instant load from cache, refresh in background
 class ChatChannelsNotifier extends Notifier<AsyncValue<List<ChatChannelModel>>> {
   Timer? _pollTimer;
+  static List<ChatChannelModel>? _cache;
 
   @override
   AsyncValue<List<ChatChannelModel>> build() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => fetchChannels(silent: true));
+    // Slower poll (8s) — SSE handles realtime, poll is just a safety net
+    _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => fetchChannels(silent: true));
     ref.onDispose(() => _pollTimer?.cancel());
+
+    // Show cached data instantly, then refresh in background
+    if (_cache != null) {
+      state = AsyncValue.data(_cache!);
+      fetchChannels(silent: true);
+      return AsyncValue.data(_cache!);
+    }
     fetchChannels();
     return const AsyncValue.loading();
   }
@@ -57,12 +66,13 @@ class ChatChannelsNotifier extends Notifier<AsyncValue<List<ChatChannelModel>>> 
     try {
       final repo = ref.read(chatRepositoryProvider);
       final channels = await repo.getChannels();
+      _cache = channels;
       state = AsyncValue.data(channels);
     } catch (e, st) {
       if (!silent) {
         state = AsyncValue.error(e, st);
       } else if (state is AsyncLoading) {
-        state = const AsyncValue.data([]);
+        state = AsyncValue.data(_cache ?? []);
       }
     }
   }
@@ -90,6 +100,7 @@ class ChatMessageNotifier extends Notifier<AsyncValue<List<ChatMessageModel>>> {
   final String channelId;
   Timer? _threadPollTimer;
   StreamSubscription? _sseSub;
+  static final Map<String, List<ChatMessageModel>> _cache = {};
 
   ChatMessageNotifier(this.channelId);
 
@@ -98,14 +109,23 @@ class ChatMessageNotifier extends Notifier<AsyncValue<List<ChatMessageModel>>> {
     _threadPollTimer?.cancel();
     _sseSub?.cancel();
 
-    // Fast 1.2s polling fallback for active messaging thread
-    _threadPollTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) => fetchMessages(silent: true));
+    // 2s polling fallback for active messaging thread
+    _threadPollTimer = Timer.periodic(const Duration(seconds: 2), (_) => fetchMessages(silent: true));
     ref.onDispose(() {
       _threadPollTimer?.cancel();
       _sseSub?.cancel();
     });
 
     _initRealTimeStream();
+
+    // Show cached messages instantly, then refresh
+    final cached = _cache[channelId];
+    if (cached != null) {
+      state = AsyncValue.data(cached);
+      fetchMessages(silent: true);
+      return AsyncValue.data(cached);
+    }
+
     fetchMessages();
     return const AsyncValue.loading();
   }
@@ -163,6 +183,7 @@ class ChatMessageNotifier extends Notifier<AsyncValue<List<ChatMessageModel>>> {
       final repo = ref.read(chatRepositoryProvider);
       final auth = ref.read(authProvider);
       final msgs = await repo.getMessages(channelId, currentUserId: auth.currentUser?.id);
+      _cache[channelId] = msgs;
       state = AsyncValue.data(msgs);
 
       // Mark channel as read on backend and locally
