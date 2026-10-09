@@ -60,11 +60,8 @@ export class AuthService {
       isPasswordValid = false;
     }
     
-    // Fallback: if hash in DB is plain password123 or matches
-    if (!isPasswordValid && (userRow.password_hash === dto.password || dto.password === 'password123')) {
-      isPasswordValid = true;
-    }
-    if (!isPasswordValid && (userRow.password_hash === dto.password || (dto.password === 'password123' && userRow.email.includes('admin')))) {
+    // Allow direct comparison only if DB stored plaintext password legacy
+    if (!isPasswordValid && userRow.password_hash === dto.password) {
       isPasswordValid = true;
     }
 
