@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
+import '../../core/utils/image_utils.dart';
 import '../../core/widgets/app_avatar.dart';
 import '../../models/chat_models.dart';
 import '../../models/project_model.dart';
@@ -325,19 +326,27 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           children: [
             // Avatar
             if (channel.isProject)
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: AppImageHelper.buildImage(
+                    path: channel.projectImageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: () => Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(CupertinoIcons.folder_badge_person_crop, color: Colors.white, size: 24),
+                      ),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Center(
-                  child: Icon(CupertinoIcons.folder_badge_person_crop, color: Colors.white, size: 24),
                 ),
               )
             else
@@ -620,15 +629,21 @@ class _NewChatBottomSheetState extends ConsumerState<_NewChatBottomSheet> with S
                               itemBuilder: (ctx, i) {
                                 final proj = filteredProjects[i];
                                 return ListTile(
-                                  leading: Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Center(
-                                      child: Icon(CupertinoIcons.folder_fill, color: Color(0xFF2563EB), size: 20),
+                                  leading: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: SizedBox(
+                                      width: 40,
+                                      height: 40,
+                                      child: AppImageHelper.buildImage(
+                                        path: proj.imageUrl,
+                                        fit: BoxFit.cover,
+                                        placeholder: () => Container(
+                                          color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                                          child: const Center(
+                                            child: Icon(CupertinoIcons.folder_fill, color: Color(0xFF2563EB), size: 20),
+                                          ),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   title: Text(

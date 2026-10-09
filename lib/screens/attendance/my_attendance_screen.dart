@@ -99,7 +99,6 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
 
     String fmtH(int h) => '${(h % 12 == 0 ? 12 : h % 12).toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
     final isMorningSlot = !isWeekendToday && currentHour >= startH && currentHour < dividerH;
-    final isAfternoonSlot = !isWeekendToday && currentHour >= dividerH && currentHour < endH;
 
     String currentSlotBadge;
     Color currentSlotBadgeColor;
@@ -379,12 +378,10 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                       isSubmitting: attendanceState.isSubmitting,
                       icon: CupertinoIcons.sunset_fill,
                       iconColor: const Color(0xFF6366F1),
-                      isCorrectTimeSlot: isAfternoonSlot,
-                      timingHint: currentHour < dividerH
-                          ? 'Opens ${fmtH(dividerH)}'
-                          : (currentHour < endH
-                              ? '${fmtH(dividerH)} - ${fmtH(endH)}'
-                              : 'Evening Departure'),
+                      isCorrectTimeSlot: true,
+                      timingHint: todayAfternoon != null
+                          ? 'Logged at ${todayAfternoon.formattedTime}'
+                          : 'Available anytime • Shift ends ${fmtH(endH)}',
                     ),
                   ],
                 ),

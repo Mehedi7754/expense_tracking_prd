@@ -138,15 +138,21 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                         final p = filtered[idx];
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Center(
-                              child: Icon(CupertinoIcons.folder_fill, color: Color(0xFF2563EB), size: 18),
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: SizedBox(
+                              width: 38,
+                              height: 38,
+                              child: AppImageHelper.buildImage(
+                                path: p.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder: () => Container(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                                  child: const Center(
+                                    child: Icon(CupertinoIcons.folder_fill, color: Color(0xFF2563EB), size: 18),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                           title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -243,17 +249,25 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
         title: Row(
           children: [
             if (isProject)
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+              ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: SizedBox(
+                  width: 38,
+                  height: 38,
+                  child: AppImageHelper.buildImage(
+                    path: activeChannel?.projectImageUrl,
+                    fit: BoxFit.cover,
+                    placeholder: () => Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(CupertinoIcons.folder_badge_person_crop, color: Colors.white, size: 20),
+                      ),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                child: const Center(
-                  child: Icon(CupertinoIcons.folder_badge_person_crop, color: Colors.white, size: 20),
                 ),
               )
             else
@@ -593,6 +607,21 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (msg.projectImageUrl != null && msg.projectImageUrl!.trim().isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox(
+                height: 110,
+                width: double.infinity,
+                child: AppImageHelper.buildImage(
+                  path: msg.projectImageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: () => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             children: [
               Container(
@@ -752,8 +781,26 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(CupertinoIcons.folder_fill, size: 16, color: Color(0xFF2563EB)),
-                            const SizedBox(width: 6),
+                            if (_selectedProject!.imageUrl != null && _selectedProject!.imageUrl!.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: AppImageHelper.buildImage(
+                                      path: _selectedProject!.imageUrl,
+                                      fit: BoxFit.cover,
+                                      placeholder: () => const Icon(CupertinoIcons.folder_fill, size: 16, color: Color(0xFF2563EB)),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else ...[
+                              const Icon(CupertinoIcons.folder_fill, size: 16, color: Color(0xFF2563EB)),
+                              const SizedBox(width: 6),
+                            ],
                             Text(
                               _selectedProject!.name,
                               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),

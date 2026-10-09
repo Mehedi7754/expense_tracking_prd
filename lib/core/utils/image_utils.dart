@@ -37,10 +37,12 @@ class AppImageHelper {
         final bytes = base64Decode(b64);
         if (bytes.isEmpty || bytes.lengthInBytes < 12) return placeholder();
         return Image.memory(
+          key: ValueKey('b64_${trimmed.hashCode}'),
           bytes,
           fit: fit,
           width: width,
           height: height,
+          gaplessPlayback: true,
           errorBuilder: (_, __, ___) => placeholder(),
         );
       } catch (_) {
@@ -52,10 +54,12 @@ class AppImageHelper {
         final bytes = base64Decode(trimmed);
         if (bytes.isNotEmpty && bytes.lengthInBytes >= 12) {
           return Image.memory(
+            key: ValueKey('raw_b64_${trimmed.hashCode}'),
             bytes,
             fit: fit,
             width: width,
             height: height,
+            gaplessPlayback: true,
             errorBuilder: (_, __, ___) => placeholder(),
           );
         }
@@ -65,10 +69,12 @@ class AppImageHelper {
     // 2. HTTP/HTTPS Network URL
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return Image.network(
+        key: ValueKey(trimmed),
         trimmed,
         fit: fit,
         width: width,
         height: height,
+        gaplessPlayback: true,
         errorBuilder: (_, __, ___) => placeholder(),
       );
     }
@@ -79,10 +85,12 @@ class AppImageHelper {
       final resolved = AppEnv.resolveUrl(normalized);
       if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
         return Image.network(
+          key: ValueKey(resolved),
           resolved,
           fit: fit,
           width: width,
           height: height,
+          gaplessPlayback: true,
           errorBuilder: (_, __, ___) => placeholder(),
         );
       }
@@ -94,10 +102,12 @@ class AppImageHelper {
         final file = File(trimmed);
         if (file.existsSync()) {
           return Image.file(
+            key: ValueKey(file.path),
             file,
             fit: fit,
             width: width,
             height: height,
+            gaplessPlayback: true,
             errorBuilder: (_, __, ___) => placeholder(),
           );
         }

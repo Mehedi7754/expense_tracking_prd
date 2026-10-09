@@ -84,7 +84,7 @@ describe('AttendanceService Unit & Session Logic', () => {
       expect(result.status).toBe('present');
     });
 
-    it('updates existing attendance check-in when checking in again for same session', async () => {
+    it('throws ConflictException when checking in again for same session', async () => {
       const userId = 'user-emp-1';
       const checkInDto = {
         sessionType: 'morning' as const,
@@ -96,27 +96,52 @@ describe('AttendanceService Unit & Session Logic', () => {
       // Query 0: getTimingSettings
       mockDb.query
         .mockResolvedValueOnce({ rows: [] })
-      // Query 1: User role check
+        // Query 1: User role check
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
         // Query 2: Check existing -> found
         .mockResolvedValueOnce({
           rows: [{ id: 'existing-rec' }],
-        })
-        // Query 3: Update query
+        });
+
+      await expect(service.checkIn(userId, checkInDto)).rejects.toThrow(
+        'You have already checked in for the morning session today.',
+      );
+    });
+
+    it('creates attendance check-out record for afternoon session without late penalty', async () => {
+      const userId = 'user-emp-1';
+      const checkInDto = {
+        sessionType: 'afternoon' as const,
+        latitude: 23.8103,
+        longitude: 90.4125,
+        addressText: 'Dhaka, Bangladesh',
+        deviceInfo: 'Flutter Mobile App',
+      };
+
+      // Query 0: getTimingSettings
+      mockDb.query
         .mockResolvedValueOnce({ rows: [] })
+        // Query 1: User role check
+        .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 2: Check existing check-in -> none
+        .mockResolvedValueOnce({ rows: [] })
+        // Query 3: Insert returning id
+        .mockResolvedValueOnce({
+          rows: [{ id: 'att-rec-checkout' }],
+        })
         // Query 4: getRecordById
         .mockResolvedValueOnce({
           rows: [
             {
-              id: 'existing-rec',
+              id: 'att-rec-checkout',
               userId: userId,
               date: '2026-10-02',
-              sessionType: 'morning',
+              sessionType: 'afternoon',
               loginTime: new Date().toISOString(),
-              latitude: 23.8120,
-              longitude: 90.4140,
-              addressText: 'Updated Location, Dhaka',
-              deviceInfo: '',
+              latitude: 23.8103,
+              longitude: 90.4125,
+              addressText: 'Dhaka, Bangladesh',
+              deviceInfo: 'Flutter Mobile App',
               status: 'present',
               notes: '',
               createdAt: new Date().toISOString(),
@@ -131,8 +156,14 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({ rows: [{ id: 'admin1' }] });
 
       const result = await service.checkIn(userId, checkInDto);
-      expect(result.id).toBe('existing-rec');
-      expect(result.latitude).toBe(23.8120);
+      expect(result.id).toBe('att-rec-checkout');
+      expect(result.sessionType).toBe('afternoon');
+      expect(mockNotifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Attendance Check-Out 📍',
+          message: expect.stringContaining('check-out was successfully recorded'),
+        }),
+      );
     });
   });
 });

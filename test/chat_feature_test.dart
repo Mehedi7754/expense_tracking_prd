@@ -49,6 +49,7 @@ void main() {
         'project_name': 'Project Alpha',
         'project_code': 'PRJ-2026-001',
         'project_status': 'inProgress',
+        'project_image_url': '/uploads/projects/bridge.jpg',
         'unread_count': 0,
         'updated_at': '2026-10-09T12:05:00.000Z',
       };
@@ -58,6 +59,7 @@ void main() {
       expect(channel.type, 'project');
       expect(channel.title, 'Project Alpha');
       expect(channel.projectCode, 'PRJ-2026-001');
+      expect(channel.projectImageUrl, '/uploads/projects/bridge.jpg');
       expect(channel.unreadCount, 0);
       expect(channel.subtitle, 'Project group discussion');
     });
@@ -94,6 +96,7 @@ void main() {
         'project_id': 'proj-1',
         'project_name': 'Metro Rail Bridge',
         'project_code': 'PRJ-2026-001',
+        'project_image_url': '/uploads/projects/rail.jpg',
         'created_at': '2026-10-09T12:10:00.000Z',
         'is_me': true,
       };
@@ -105,6 +108,7 @@ void main() {
       expect(message.projectId, 'proj-1');
       expect(message.projectName, 'Metro Rail Bridge');
       expect(message.projectCode, 'PRJ-2026-001');
+      expect(message.projectImageUrl, '/uploads/projects/rail.jpg');
       expect(message.hasImage, true);
       expect(message.hasProject, true);
     });
@@ -138,6 +142,23 @@ void main() {
       expect(route, RoutePaths.chatThread('channel-99'));
       expect(route.contains('/chat/'), true);
       expect(route.contains('notifications'), false);
+    });
+
+    test('ChatChannelModel.copyWith preserves projectImageUrl and other properties', () {
+      final channel = ChatChannelModel(
+        id: 'chan-001',
+        type: 'project',
+        projectName: 'Bridge Metro',
+        projectImageUrl: '/uploads/projects/bridge.jpg',
+        unreadCount: 5,
+        updatedAt: DateTime.now(),
+      );
+
+      final updated = channel.copyWith(unreadCount: 0);
+      expect(updated.id, 'chan-001');
+      expect(updated.unreadCount, 0);
+      expect(updated.projectName, 'Bridge Metro');
+      expect(updated.projectImageUrl, '/uploads/projects/bridge.jpg');
     });
   });
 }

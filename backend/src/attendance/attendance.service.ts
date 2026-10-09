@@ -248,27 +248,30 @@ export class AttendanceService {
           isLate = true;
         }
       } else {
-        if (currentHour > afternoonStart || (currentHour === afternoonStart && currentMinute > gracePeriod)) {
-          isLate = true;
-        }
+        // Evening / afternoon check-out can be done at any time when employee leaves
+        isLate = false;
       }
 
       const statusTag = isLate ? '⚠️ LATE' : '✅ ON TIME';
+      const isCheckOut = session === 'afternoon';
 
       // Notify employee with attendance confirmation
       await this.notificationsService.create({
         userId,
-        title: 'Attendance Recorded 📍',
-        message: `Your check-in for the ${session} session was successfully recorded at ${timeStr}.`,
-        fullExplanation: `Attendance check-in verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: Present.`,
+        title: isCheckOut ? 'Attendance Check-Out 📍' : 'Attendance Recorded 📍',
+        message: isCheckOut
+          ? `Your check-out was successfully recorded at ${timeStr}.`
+          : `Your check-in for the ${session} session was successfully recorded at ${timeStr}.`,
+        fullExplanation: isCheckOut
+          ? `Attendance check-out verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: Checked Out.`
+          : `Attendance check-in verified at ${timeStr}. Shift: ${userShift.name}. GPS Location: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}. Status: Present.`,
         type: isLate ? 'attendance_late' : 'attendance_reminder',
         actorId: userId,
         actorName: empName,
         actorAvatarUrl: empAvatar,
       });
 
-      // Send Email to Employee (using dynamic import to avoid circular dep if any, or injected if available. Wait, I should inject EmailService into AttendanceService!)
-      // Let's rely on the EmailService injection (which I will add in the constructor).
+      // Send Email to Employee
       if (this.emailService && empEmail) {
         await this.emailService.sendCheckInConfirmation(
           empEmail,
@@ -280,7 +283,7 @@ export class AttendanceService {
         );
       }
 
-      // Notify Super Admin & Managers about the employee check-in (FCM Push)
+      // Notify Super Admin & Managers about the employee check-in/check-out (FCM Push)
       const adminsRes = await this.db.query(
         `SELECT id FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
         [userId],
@@ -288,9 +291,15 @@ export class AttendanceService {
       for (const admin of adminsRes.rows) {
         await this.notificationsService.create({
           userId: admin.id,
-          title: `Employee Checked In: ${statusTag}`,
-          message: `${empName} recorded attendance for ${session} session at ${timeStr}.`,
-          fullExplanation: `${empName} logged in for the ${session} session on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
+          title: isCheckOut
+            ? `Employee Checked Out: ${empName}`
+            : `Employee Checked In: ${statusTag}`,
+          message: isCheckOut
+            ? `${empName} checked out at ${timeStr}.`
+            : `${empName} recorded attendance for ${session} session at ${timeStr}.`,
+          fullExplanation: isCheckOut
+            ? `${empName} checked out on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`
+            : `${empName} logged in for the ${session} session on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
           type: isLate ? 'attendance_late' : 'attendance_reminder',
           actorId: userId,
           actorName: empName,

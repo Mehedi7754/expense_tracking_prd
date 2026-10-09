@@ -263,8 +263,13 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
   }
 
   /// Returns null when check-in is allowed; otherwise a reason.
-  /// Evaluates specific shift timings. Weekend/off-day check-in is always permitted.
+  /// Evaluates specific shift timings. Afternoon check-out is permitted anytime.
   static String? checkInWindowError(String session, AttendanceSettingsState? s, {String? userId}) {
+    // Afternoon session is check-out / departure; employees can check out at any time.
+    if (session == 'afternoon') {
+      return null;
+    }
+
     if (s != null && userId != null) {
       final shift = s.getShiftForUser(userId);
       final h = DateTime.now().hour;
@@ -272,9 +277,6 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
       if (session == 'morning') {
         if (h < shift.morningStartHour) return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';
         if (h >= shift.morningEndHour) return 'Morning check-in for ${shift.name} is locked after ${_fmt(shift.morningEndHour)}.';
-      } else {
-        if (h < shift.afternoonStartHour) return 'Afternoon check-in for ${shift.name} opens at ${_fmt(shift.afternoonStartHour)}.';
-        if (h >= shift.afternoonEndHour) return 'Afternoon shift for ${shift.name} ended at ${_fmt(shift.afternoonEndHour)}.';
       }
       return null;
     }
@@ -284,8 +286,6 @@ class AttendanceNotifier extends Notifier<AttendanceState> with FetchCacheMixin 
     
     if (session == 'morning') {
       if (h >= divider) return 'Morning check-in is locked after ${_fmt(divider)}.';
-    } else {
-      if (h < divider) return 'Afternoon check-in opens at ${_fmt(divider)}.';
     }
     return null;
   }

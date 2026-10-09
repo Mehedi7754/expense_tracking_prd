@@ -76,6 +76,7 @@ class ChatChannelModel {
   final String? projectName;
   final String? projectCode;
   final String? projectStatus;
+  final String? projectImageUrl;
   final int unreadCount;
   final DateTime updatedAt;
   final ChatParticipantModel? otherUser;
@@ -89,6 +90,7 @@ class ChatChannelModel {
     this.projectName,
     this.projectCode,
     this.projectStatus,
+    this.projectImageUrl,
     this.unreadCount = 0,
     required this.updatedAt,
     this.otherUser,
@@ -120,6 +122,36 @@ class ChatChannelModel {
     return isProject ? 'Project group discussion' : 'Start a conversation';
   }
 
+  ChatChannelModel copyWith({
+    String? id,
+    String? type,
+    String? name,
+    String? projectId,
+    String? projectName,
+    String? projectCode,
+    String? projectStatus,
+    String? projectImageUrl,
+    int? unreadCount,
+    DateTime? updatedAt,
+    ChatParticipantModel? otherUser,
+    ChatMessageSummaryModel? lastMessage,
+  }) {
+    return ChatChannelModel(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      name: name ?? this.name,
+      projectId: projectId ?? this.projectId,
+      projectName: projectName ?? this.projectName,
+      projectCode: projectCode ?? this.projectCode,
+      projectStatus: projectStatus ?? this.projectStatus,
+      projectImageUrl: projectImageUrl ?? this.projectImageUrl,
+      unreadCount: unreadCount ?? this.unreadCount,
+      updatedAt: updatedAt ?? this.updatedAt,
+      otherUser: otherUser ?? this.otherUser,
+      lastMessage: lastMessage ?? this.lastMessage,
+    );
+  }
+
   factory ChatChannelModel.fromJson(Map<String, dynamic> json) {
     return ChatChannelModel(
       id: (json['id'] ?? '').toString(),
@@ -129,6 +161,7 @@ class ChatChannelModel {
       projectName: json['projectName'] ?? json['project_name'],
       projectCode: json['projectCode'] ?? json['project_code'],
       projectStatus: json['projectStatus'] ?? json['project_status'],
+      projectImageUrl: json['projectImageUrl'] ?? json['project_image_url'] ?? json['imageUrl'] ?? json['image_url'],
       unreadCount: (json['unreadCount'] ?? json['unread_count']) is num
           ? ((json['unreadCount'] ?? json['unread_count']) as num).toInt()
           : int.tryParse((json['unreadCount'] ?? json['unread_count'])?.toString() ?? '0') ?? 0,
@@ -142,6 +175,22 @@ class ChatChannelModel {
           ? ChatMessageSummaryModel.fromJson(Map<String, dynamic>.from(json['lastMessage'] ?? json['last_message']))
           : null,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'type': type,
+      'name': name,
+      'project_id': projectId,
+      'project_name': projectName,
+      'project_code': projectCode,
+      'project_status': projectStatus,
+      'project_image_url': projectImageUrl,
+      'unread_count': unreadCount,
+      'updated_at': updatedAt.toIso8601String(),
+      if (otherUser != null) 'other_user': otherUser!.toJson(),
+    };
   }
 }
 
@@ -160,6 +209,7 @@ class ChatMessageModel {
   final String? projectStatus;
   final double? projectBudget;
   final double? projectSpent;
+  final String? projectImageUrl;
   final String? replyToId;
   final DateTime createdAt;
   final bool isMe;
@@ -179,6 +229,7 @@ class ChatMessageModel {
     this.projectStatus,
     this.projectBudget,
     this.projectSpent,
+    this.projectImageUrl,
     this.replyToId,
     required this.createdAt,
     this.isMe = false,
@@ -206,11 +257,35 @@ class ChatMessageModel {
       projectStatus: json['projectStatus'] ?? json['project_status'],
       projectBudget: json['projectBudget'] != null ? (json['projectBudget'] as num).toDouble() : null,
       projectSpent: json['projectSpent'] != null ? (json['projectSpent'] as num).toDouble() : null,
+      projectImageUrl: json['projectImageUrl'] ?? json['project_image_url'] ?? json['imageUrl'] ?? json['image_url'],
       replyToId: json['replyToId'] ?? json['reply_to_id'],
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
       isMe: me,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'channel_id': channelId,
+      'sender_id': senderId,
+      'sender_name': senderName,
+      'sender_avatar_url': senderAvatarUrl,
+      'sender_role': senderRole,
+      'content': content,
+      'image_url': imageUrl,
+      'project_id': projectId,
+      'project_name': projectName,
+      'project_code': projectCode,
+      'project_status': projectStatus,
+      'project_budget': projectBudget,
+      'project_spent': projectSpent,
+      'project_image_url': projectImageUrl,
+      'reply_to_id': replyToId,
+      'created_at': createdAt.toIso8601String(),
+      'is_me': isMe,
+    };
   }
 }

@@ -71,19 +71,7 @@ class ChatChannelsNotifier extends Notifier<AsyncValue<List<ChatChannelModel>>> 
     state.whenData((channels) {
       final updated = channels.map((c) {
         if (c.id == channelId) {
-          return ChatChannelModel(
-            id: c.id,
-            type: c.type,
-            name: c.name,
-            projectId: c.projectId,
-            projectName: c.projectName,
-            projectCode: c.projectCode,
-            projectStatus: c.projectStatus,
-            unreadCount: 0,
-            updatedAt: c.updatedAt,
-            otherUser: c.otherUser,
-            lastMessage: c.lastMessage,
-          );
+          return c.copyWith(unreadCount: 0);
         }
         return c;
       }).toList();
