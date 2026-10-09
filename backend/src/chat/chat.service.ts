@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Subject, Observable } from 'rxjs';
 import { DatabaseService } from '../database/database.service';
 import { FcmService } from '../notifications/fcm.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -34,6 +35,7 @@ export interface ChatChannelSummary {
 @Injectable()
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
+  private readonly channelStreams = new Map<string, Subject<{ data: any }>>();
 
   constructor(
     private readonly db: DatabaseService,
@@ -41,10 +43,71 @@ export class ChatService {
     private readonly uploads: UploadsService,
   ) {}
 
+  getChannelStream(channelId: string): Observable<{ data: any }> {
+    if (!this.channelStreams.has(channelId)) {
+      this.channelStreams.set(channelId, new Subject<{ data: any }>());
+    }
+    return this.channelStreams.get(channelId)!.asObservable();
+  }
+
+  private broadcastToChannel(channelId: string, message: any) {
+    const stream = this.channelStreams.get(channelId);
+    if (stream) {
+      stream.next({ data: message });
+    }
+  }
+
+  /**
+   * Automatically ensure project channels exist for all assigned projects.
+   */
+  private async ensureUserProjectChannels(userId: string): Promise<void> {
+    try {
+      const userRes = await this.db.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+      if (userRes.rows.length === 0) return;
+      const role = userRes.rows[0].role;
+      const isAdminOrManager = role === 'main_admin' || role === 'project_manager' || role === 'finance';
+
+      const projQuery = isAdminOrManager
+        ? `SELECT p.id, p.name, p.project_code, p.created_by FROM projects p WHERE p.is_closed = FALSE`
+        : `SELECT p.id, p.name, p.project_code, p.created_by FROM projects p 
+           WHERE p.is_closed = FALSE 
+             AND (p.created_by = $1 OR p.id IN (SELECT project_id FROM project_members WHERE user_id = $1))`;
+
+      const projects = await this.db.query(projQuery, isAdminOrManager ? [] : [userId]);
+
+      for (const proj of projects.rows) {
+        const existing = await this.db.query(
+          `SELECT id FROM chat_channels WHERE type = 'project' AND project_id = $1 LIMIT 1`,
+          [proj.id],
+        );
+        let channelId: string;
+        if (existing.rows.length > 0) {
+          channelId = existing.rows[0].id;
+        } else {
+          const newChan = await this.db.query(
+            `INSERT INTO chat_channels (type, name, project_id, created_by)
+             VALUES ('project', $1, $2, $3)
+             RETURNING id`,
+            [proj.name, proj.id, proj.created_by || userId],
+          );
+          channelId = newChan.rows[0].id;
+        }
+
+        await this.db.query(
+          `INSERT INTO chat_participants (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [channelId, userId],
+        );
+      }
+    } catch (e) {
+      this.logger.error('Error in ensureUserProjectChannels', e);
+    }
+  }
+
   /**
    * Get all conversation channels for the given user with unread counts and last message.
    */
   async getUserChannels(userId: string): Promise<ChatChannelSummary[]> {
+    await this.ensureUserProjectChannels(userId);
     const query = `
       SELECT 
         c.id,
@@ -197,7 +260,7 @@ export class ChatService {
    * Get or create a group channel for a project.
    */
   async getOrCreateProjectChannel(currentUserId: string, projectId: string) {
-    const pRes = await this.db.query(`SELECT id, name, code, status, manager_id FROM projects WHERE id = $1`, [projectId]);
+    const pRes = await this.db.query(`SELECT id, name, project_code, status, created_by FROM projects WHERE id = $1`, [projectId]);
     if (pRes.rows.length === 0) {
       throw new NotFoundException('Project not found');
     }
@@ -233,7 +296,7 @@ export class ChatService {
            OR u.id IN (SELECT user_id FROM project_members WHERE project_id = $4)
         ON CONFLICT DO NOTHING
         `,
-        [channelId, currentUserId, project.manager_id, projectId],
+        [channelId, currentUserId, project.created_by, projectId],
       );
     }
 
@@ -242,7 +305,7 @@ export class ChatService {
       type: 'project',
       projectId: project.id,
       projectName: project.name,
-      projectCode: project.code,
+      projectCode: project.project_code,
       projectStatus: project.status,
     };
   }
@@ -409,6 +472,8 @@ export class ChatService {
     this.dispatchPushToParticipants(channel, sender, fullMessage, userId).catch((err) => {
       this.logger.error('Failed to dispatch chat push notification', err);
     });
+
+    this.broadcastToChannel(channelId, fullMessage);
 
     return fullMessage;
   }

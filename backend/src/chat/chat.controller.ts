@@ -8,7 +8,9 @@ import {
   UseGuards,
   Request,
   BadRequestException,
+  Sse,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -16,6 +18,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 @Controller('chat')
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
+
+  @Sse('channels/:id/stream')
+  streamChannel(@Param('id') channelId: string): Observable<{ data: any }> {
+    return this.chatService.getChannelStream(channelId);
+  }
 
   @Get('channels')
   async getChannels(@Request() req: any) {
