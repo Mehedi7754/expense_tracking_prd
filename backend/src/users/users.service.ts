@@ -16,12 +16,11 @@ export class UsersService {
              COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
       FROM users u
       LEFT JOIN project_members pm ON pm.user_id = u.id
-      WHERE u.is_active = TRUE
     `;
     const params: any[] = [];
 
     if (query && query.trim().length > 0) {
-      sql += ` AND (u.full_name ILIKE $1 OR u.email ILIKE $1)`;
+      sql += ` WHERE (u.full_name ILIKE $1 OR u.email ILIKE $1)`;
       params.push(`%${query.trim()}%`);
     }
 
@@ -284,41 +283,34 @@ export class UsersService {
       return { success: true, message: 'User already deleted or not found' };
     }
     const targetId = userRes.rows[0].id;
+    const targetEmail = userRes.rows[0].email;
 
-    // Check if user has historical expenses (accounting ledger integrity)
-    const expRes = await this.db.query(
-      `SELECT 1 FROM expenses WHERE employee_id = $1 LIMIT 1`,
-      [targetId],
-    );
+    // Hard delete cascade all dependent references to guarantee clean permanent deletion
+    await this.db.query(`DELETE FROM expense_comments WHERE author_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM expenses WHERE employee_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM attendance_records WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM employee_salaries WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM leave_records WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM salary_calculations WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM salary_adjustments WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM project_members WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM chat_messages WHERE sender_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM chat_participants WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM notifications WHERE user_id = $1 OR actor_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM user_fcm_tokens WHERE user_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`DELETE FROM password_resets WHERE email = $1`, [targetEmail]).catch(() => {});
+    await this.db.query(`UPDATE tasks SET assignee_id = NULL WHERE assignee_id = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE projects SET created_by = NULL WHERE created_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE project_revenues SET created_by = NULL WHERE created_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE expenses SET justification_reviewed_by = NULL WHERE justification_reviewed_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE holidays SET created_by = NULL WHERE created_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE leave_records SET approved_by = NULL WHERE approved_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE salary_calculations SET calculated_by = NULL WHERE calculated_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE salary_adjustments SET adjusted_by = NULL WHERE adjusted_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE chat_channels SET created_by = NULL WHERE created_by = $1`, [targetId]).catch(() => {});
+    await this.db.query(`UPDATE audit_logs SET user_id = NULL WHERE user_id = $1`, [targetId]).catch(() => {});
 
-    if (expRes.rows.length > 0) {
-      // Historical financial records exist: deactivate user so they are hidden from all active UI and can never log in
-      await this.db.query(
-        `UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = $1`,
-        [targetId],
-      );
-      await this.db.query(`DELETE FROM project_members WHERE user_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`DELETE FROM fcm_tokens WHERE user_id = $1`, [targetId]).catch(() => {});
-    } else {
-      // No ledger locks: perform complete permanent cascade deletion
-      await this.db.query(`DELETE FROM attendance_records WHERE user_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`DELETE FROM employee_salaries WHERE user_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`DELETE FROM project_members WHERE user_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`DELETE FROM chat_messages WHERE sender_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`DELETE FROM notifications WHERE user_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`DELETE FROM fcm_tokens WHERE user_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`UPDATE tasks SET assignee_id = NULL WHERE assignee_id = $1`, [targetId]).catch(() => {});
-      await this.db.query(`UPDATE projects SET created_by = NULL WHERE created_by = $1`, [targetId]).catch(() => {});
-
-      try {
-        await this.db.query(`DELETE FROM users WHERE id = $1`, [targetId]);
-      } catch (_) {
-        await this.db.query(
-          `UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = $1`,
-          [targetId],
-        );
-      }
-    }
+    await this.db.query(`DELETE FROM users WHERE id = $1`, [targetId]);
 
     return { success: true, id: targetId };
   }

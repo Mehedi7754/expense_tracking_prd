@@ -57,13 +57,11 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
         fetched = response
             .whereType<Map<String, dynamic>>()
             .map(UserModel.fromJson)
-            .where((u) => u.isActive)
             .toList();
       } else if (response is Map<String, dynamic> && response['data'] is List) {
         fetched = (response['data'] as List)
             .whereType<Map<String, dynamic>>()
             .map(UserModel.fromJson)
-            .where((u) => u.isActive)
             .toList();
       }
 
@@ -207,6 +205,7 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
           await _persistUsers();
         }
       }
+      await fetchUsers(force: true);
     } catch (_) {
       // Offline fallback
     }
@@ -231,7 +230,10 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
         ...updated.toJson(),
         if (password != null && password.trim().isNotEmpty) 'password': password.trim(),
       };
-      await client.put('/users/${updated.id}', body: body);
+      final isLocalId = updated.id.startsWith('usr_') || !updated.id.contains('-');
+      final target = (isLocalId && updated.email.isNotEmpty) ? updated.email : updated.id;
+      await client.put('/users/$target', body: body);
+      await fetchUsers(force: true);
     } catch (_) {
       // Offline fallback
     }
@@ -266,6 +268,9 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
   }
 
   Future<void> changeRole(String userId, UserRole newRole) async {
+    final idx = state.indexWhere((u) => u.id == userId);
+    final user = idx != -1 ? state[idx] : null;
+
     state = [
       for (final u in state)
         if (u.id == userId) u.copyWith(role: newRole) else u,
@@ -274,7 +279,9 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
 
     try {
       final client = ref.read(apiClientProvider);
-      await client.patch('/users/$userId/role', body: {'role': newRole.name});
+      final isLocalId = userId.startsWith('usr_') || !userId.contains('-');
+      final target = (isLocalId && user != null && user.email.isNotEmpty) ? user.email : userId;
+      await client.patch('/users/$target/role', body: {'role': newRole.name});
     } catch (_) {
       // Offline fallback
     }
@@ -294,7 +301,9 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
 
     try {
       final client = ref.read(apiClientProvider);
-      await client.patch('/users/$userId/status', body: {'is_active': updated.isActive});
+      final isLocalId = userId.startsWith('usr_') || !userId.contains('-');
+      final target = (isLocalId && user.email.isNotEmpty) ? user.email : userId;
+      await client.patch('/users/$target/status', body: {'is_active': updated.isActive, 'isActive': updated.isActive});
     } catch (_) {
       // Offline fallback
     }
@@ -314,7 +323,9 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
 
     try {
       final client = ref.read(apiClientProvider);
-      await client.patch('/users/$userId/status', body: {'is_active': true, 'is_approved': true});
+      final isLocalId = userId.startsWith('usr_') || !userId.contains('-');
+      final target = (isLocalId && user.email.isNotEmpty) ? user.email : userId;
+      await client.patch('/users/$target/status', body: {'is_active': true, 'isActive': true, 'is_approved': true});
     } catch (_) {
       // Offline fallback
     }
@@ -328,15 +339,18 @@ class UserManagementNotifier extends Notifier<List<UserModel>> with FetchCacheMi
     state = state
         .where((u) =>
             u.id != cleanId &&
-            (cleanEmail == null || u.email.trim().toLowerCase() != cleanEmail))
+            (cleanEmail == null || cleanEmail.isEmpty || u.email.trim().toLowerCase() != cleanEmail))
         .toList();
     await _persistUsers();
 
     final client = ref.read(apiClientProvider);
+    final isLocalId = cleanId.startsWith('usr_') || !cleanId.contains('-');
+    final target = (isLocalId && cleanEmail != null && cleanEmail.isNotEmpty) ? cleanEmail : cleanId;
+
     try {
-      await client.delete('/users/$cleanId');
+      await client.delete('/users/$target');
     } catch (_) {
-      if (cleanEmail != null && cleanEmail.isNotEmpty) {
+      if (cleanEmail != null && cleanEmail.isNotEmpty && target != cleanEmail) {
         try {
           await client.delete('/users/$cleanEmail');
         } catch (_) {}
