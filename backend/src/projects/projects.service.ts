@@ -44,6 +44,10 @@ export class ProjectsService {
       createdById: p.created_by,
       teamMemberIds: memberIds,
       imageUrl: p.image_url || null,
+      progressPercentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
+      progress_percentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
+      progressNotes: typeof p.progress_notes === 'string' ? JSON.parse(p.progress_notes) : (p.progress_notes || []),
+      progress_notes: typeof p.progress_notes === 'string' ? JSON.parse(p.progress_notes) : (p.progress_notes || []),
       revenueEntries: revenues.map((r) => ({
         id: r.id,
         projectId: r.project_id,
@@ -196,6 +200,9 @@ export class ProjectsService {
       }
 
       const imageUrl = data.imageUrl || data.image_url || null;
+      const rawProgress = Number(data.progressPercentage ?? data.progress_percentage ?? data.categoryBudgets?._meta_progress ?? data.category_budgets?._meta_progress ?? 0);
+      const initialProgress = Math.max(0, Math.min(100, isNaN(rawProgress) ? 0 : rawProgress));
+      const initialNotes = data.progressNotes ?? data.progress_notes ?? [];
 
       const projRes = await client.query(
         `INSERT INTO projects (
@@ -203,13 +210,15 @@ export class ProjectsService {
           gross_project_value, tax_status, tax_rate, expected_net_revenue,
           advance_received, amount_received, amount_receivable, budget,
           category_budgets, estimated_remaining_cost, office_benefit_rate,
-          start_date, end_date, status, created_by, image_url
+          start_date, end_date, status, created_by, image_url,
+          progress_percentage, progress_notes
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7,
           $8, $9, $10, $11,
           $12, $13, $14, $15,
           $16, $17, $18,
-          $19, $20, $21, $22, $23
+          $19, $20, $21, $22, $23,
+          $24, $25
         ) RETURNING *`,
         [
           projectCode,
@@ -235,6 +244,8 @@ export class ProjectsService {
           data.status || 'ongoing',
           validCreatedBy,
           imageUrl,
+          initialProgress,
+          JSON.stringify(initialNotes),
         ],
       );
 
@@ -327,8 +338,23 @@ export class ProjectsService {
       values.push(data.status);
     }
     if (data.categoryBudgets !== undefined || data.category_budgets !== undefined) {
+      const catBudgets = data.categoryBudgets ?? data.category_budgets;
       fields.push(`category_budgets = $${idx++}`);
-      values.push(JSON.stringify(data.categoryBudgets ?? data.category_budgets));
+      values.push(JSON.stringify(catBudgets));
+      if (catBudgets && catBudgets._meta_progress !== undefined && data.progressPercentage === undefined && data.progress_percentage === undefined) {
+        fields.push(`progress_percentage = $${idx++}`);
+        const val = Number(catBudgets._meta_progress);
+        values.push(Math.max(0, Math.min(100, isNaN(val) ? 0 : val)));
+      }
+    }
+    if (data.progressPercentage !== undefined || data.progress_percentage !== undefined) {
+      fields.push(`progress_percentage = $${idx++}`);
+      const val = Number(data.progressPercentage ?? data.progress_percentage);
+      values.push(Math.max(0, Math.min(100, isNaN(val) ? 0 : val)));
+    }
+    if (data.progressNotes !== undefined || data.progress_notes !== undefined) {
+      fields.push(`progress_notes = $${idx++}`);
+      values.push(JSON.stringify(data.progressNotes ?? data.progress_notes ?? []));
     }
     if (data.imageUrl !== undefined || data.image_url !== undefined) {
       fields.push(`image_url = $${idx++}`);
@@ -450,12 +476,13 @@ export class ProjectsService {
   }
 
   async reopenProject(projectId: string) {
+    const rawTarget = (projectId || '').trim();
     const res = await this.db.query(
       `UPDATE projects
        SET status = 'ongoing', is_closed = FALSE, closed_at = NULL, closing_summary = NULL
-       WHERE id = $1
+       WHERE id::text = $1 OR project_code = $1
        RETURNING *`,
-      [projectId],
+      [rawTarget],
     );
 
     if (!res.rows.length) {
@@ -466,12 +493,12 @@ export class ProjectsService {
       await this.auditLogsService.log({
         action: 'PROJECT_REOPENED',
         entityType: 'Project',
-        entityId: projectId,
+        entityId: res.rows[0].id,
         details: {},
       });
     } catch (_) {}
 
-    return this.findOne(projectId);
+    return this.findOne(res.rows[0].id);
   }
 
   async delete(id: string, user?: any) {
@@ -480,107 +507,38 @@ export class ProjectsService {
       return { success: false, message: 'Invalid project ID', deletedCount: 0 };
     }
 
-    // Resolve all matching project IDs, project codes, and names
-    const findRes = await this.db.query(
-      `SELECT id::text AS id, project_code, name FROM projects 
+    const res = await this.db.query(
+      `DELETE FROM projects 
        WHERE id::text = $1 
           OR project_code = $1 
           OR LOWER(project_code) = LOWER($1) 
-          OR LOWER(name) = LOWER($1)`,
+          OR LOWER(name) = LOWER($1)
+       RETURNING id, project_code, name`,
       [rawTarget],
     );
 
-    const idsToDelete = new Set<string>([rawTarget]);
-    const codesToDelete = new Set<string>([rawTarget]);
-    const namesToDelete = new Set<string>([rawTarget]);
-
-    for (const row of findRes.rows) {
-      if (row.id) idsToDelete.add(row.id.toString());
-      if (row.project_code) codesToDelete.add(row.project_code.toString());
-      if (row.name) namesToDelete.add(row.name.toString());
-    }
-
-    return this.db.transaction(async (client) => {
-      const idList = Array.from(idsToDelete);
-      const codeList = Array.from(codesToDelete);
-      const nameList = Array.from(namesToDelete);
-      // 0. Clean up chat messages and project chat channels
-      await client.query(
-        'UPDATE chat_messages SET project_id = NULL WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
-        [idList, codeList],
-      ).catch(() => {});
-      await client.query(
-        'DELETE FROM chat_channels WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
-        [idList, codeList],
-      ).catch(() => {});
-
-      // 1. Delete comments on expenses belonging to this project
-      await client.query(
-        `DELETE FROM expense_comments
-         WHERE expense_id IN (
-           SELECT id FROM expenses WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])
-         )`,
-        [idList, codeList],
-      );
-
-      // 2. Delete notifications referencing expenses or this project
-      await client.query(
-        `DELETE FROM notifications
-         WHERE related_project_id::text = ANY($1::text[]) OR related_project_id::text = ANY($2::text[])
-            OR related_expense_id IN (
-              SELECT id FROM expenses WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])
-            )`,
-        [idList, codeList],
-      );
-
-      // 3. Delete expenses belonging to this project
-      await client.query(
-        'DELETE FROM expenses WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
-        [idList, codeList],
-      );
-
-      // 4. Delete tasks belonging to this project
-      await client.query(
-        'DELETE FROM tasks WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
-        [idList, codeList],
-      );
-
-      // 5. Delete project revenues
-      await client.query(
-        'DELETE FROM project_revenues WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
-        [idList, codeList],
-      );
-
-      // 6. Delete project members
-      await client.query(
-        'DELETE FROM project_members WHERE project_id::text = ANY($1::text[]) OR project_id::text = ANY($2::text[])',
-        [idList, codeList],
-      );
-
-      // 7. Delete project record
-      const res = await client.query(
-        `DELETE FROM projects 
-         WHERE id::text = ANY($1::text[]) 
-            OR project_code = ANY($2::text[]) 
-            OR LOWER(name) = ANY(SELECT LOWER(x) FROM unnest($3::text[]) x) 
-         RETURNING *`,
-        [idList, codeList, nameList],
-      );
-
+    const deleted = res.rows;
+    if (deleted.length > 0) {
       try {
         await this.auditLogsService.log(
           {
             action: 'PROJECT_DELETED',
             entityType: 'Project',
-            entityId: idList[0],
-            details: { id, idList, codeList, nameList },
+            entityId: deleted[0].id,
+            details: { id: rawTarget, deleted },
           },
           user ? { id: user.id } : undefined,
         );
       } catch (_) {}
+    }
 
-      return { success: true, message: `Project ${id} deleted successfully`, deletedCount: res.rowCount };
-    });
+    return { 
+      success: true, 
+      message: `Project ${id} deleted successfully`, 
+      deletedCount: res.rowCount,
+      deletedProjects: deleted 
+    };
   }
 }
+
 
