@@ -113,10 +113,12 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
       0.0,
       (sum, p) => sum + (p.grossProjectValue > 0 ? p.grossProjectValue : p.budget),
     );
+    final totalProjectTax = visibleProjects.fold<double>(0.0, (sum, p) => sum + p.calculatedTax);
     final totalCostIncurred = visibleExpenses.fold<double>(0.0, (sum, e) => sum + (e.amount + e.taxAmount));
-    final remainingBalance = totalContractValue - totalCostIncurred;
+    final totalDeductions = totalCostIncurred + totalProjectTax;
+    final remainingBalance = totalContractValue - totalDeductions;
     final spentRatio = totalContractValue > 0
-        ? (totalCostIncurred / totalContractValue) * 100
+        ? (totalDeductions / totalContractValue) * 100
         : 0.0;
 
     final totalUnreceipted = visibleExpenses
@@ -1056,7 +1058,8 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
       itemBuilder: (ctx, i) {
         final p = filtered[i];
         final budget = p.project.grossProjectValue > 0 ? p.project.grossProjectValue : p.project.budget;
-        final incurred = p.totalIncurred;
+        final tax = p.project.calculatedTax;
+        final incurred = p.totalIncurred + tax;
         final remaining = budget - incurred;
         final burnRate = budget > 0 ? (incurred / budget) : 0.0;
         final isExpanded = _expandedProjectIds.contains(p.project.id);

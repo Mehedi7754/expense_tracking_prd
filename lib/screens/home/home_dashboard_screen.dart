@@ -246,21 +246,27 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       totalCostIncurred += (directCostByProjectId[p.id] ?? 0.0);
     }
 
-    final remainingBalance = totalContractValue - totalCostIncurred;
-    final spentPercentage = totalContractValue > 0 ? (totalCostIncurred / totalContractValue) * 100 : 0.0;
+    double totalProjectTax = 0.0;
+    for (final p in projects) {
+      totalProjectTax += p.calculatedTax;
+    }
+
+    final remainingBalance = totalContractValue - totalCostIncurred - totalProjectTax;
+    final spentPercentage = totalContractValue > 0 ? ((totalCostIncurred + totalProjectTax) / totalContractValue) * 100 : 0.0;
 
     // Filter projects using O(1) direct cost lookup
     final profitableProjects = projects.where((p) {
       final direct = directCostByProjectId[p.id] ?? 0.0;
       final budget = p.grossProjectValue > 0 ? p.grossProjectValue : p.budget;
-      final remaining = budget - direct;
+      final remaining = budget - direct - p.calculatedTax;
       return budget > 0 && (remaining / budget) >= 0.30;
     }).toList();
 
     final approachingProjects = projects.where((p) {
       final direct = directCostByProjectId[p.id] ?? 0.0;
       final budget = p.grossProjectValue > 0 ? p.grossProjectValue : p.budget;
-      return budget > 0 && direct >= (budget * 0.80) && direct <= budget;
+      final totalSpent = direct + p.calculatedTax;
+      return budget > 0 && totalSpent >= (budget * 0.80) && totalSpent <= budget;
     }).toList();
 
     final overBudgetProjects = projects.where((p) {

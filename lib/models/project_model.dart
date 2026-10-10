@@ -434,6 +434,17 @@ class ProjectModel {
   // Backward compatibility getter
   double get expectedRevenue => expectedNetRevenue;
 
+  /// Tax deduction amount for the project (Gross Project Value * Tax Rate when tax is included)
+  double get calculatedTax {
+    if (taxStatus == TaxStatus.included && taxRate > 0) {
+      if (grossProjectValue > expectedNetRevenue && expectedNetRevenue > 0) {
+        return grossProjectValue - expectedNetRevenue;
+      }
+      return grossProjectValue * taxRate;
+    }
+    return 0.0;
+  }
+
   ProjectModel copyWith({
     String? id,
     String? projectId,

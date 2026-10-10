@@ -914,8 +914,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     required bool isDark,
   }) {
     final budget = project.grossProjectValue > 0 ? project.grossProjectValue : project.budget;
-    final remainingBalance = budget - costIncurred;
-    final spentRatio = budget > 0 ? (costIncurred / budget) * 100.0 : 0.0;
+    final projectTax = project.calculatedTax;
+    final totalDeductions = costIncurred + projectTax;
+    final remainingBalance = budget - totalDeductions;
+    final spentRatio = budget > 0 ? (totalDeductions / budget) * 100.0 : 0.0;
     final remainingRatio = (100.0 - spentRatio).clamp(0.0, 100.0);
 
     return Container(
@@ -1109,7 +1111,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerRight,
                         child: Text(
-                          '${CurrencyFormatter.format(costIncurred)} of ${CurrencyFormatter.format(budget)}',
+                          '${CurrencyFormatter.format(totalDeductions)} of ${CurrencyFormatter.format(budget)}',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
