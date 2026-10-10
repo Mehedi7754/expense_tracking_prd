@@ -284,10 +284,24 @@ class AuthNotifier extends Notifier<AuthState> {
 
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      final msg = e.message.toLowerCase();
+      final isInvalidCreds = e is UnauthorizedException ||
+          e.statusCode == 401 ||
+          msg.contains('invalid email') ||
+          msg.contains('invalid credentials') ||
+          msg.contains('invalid password') ||
+          msg.contains('unauthorized');
+      final displayMessage = isInvalidCreds ? 'Invalid credentials' : e.message;
+      state = state.copyWith(isLoading: false, errorMessage: displayMessage);
       return false;
     } catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: 'Login error: $e');
+      final errStr = e.toString().toLowerCase();
+      final isInvalidCreds = errStr.contains('invalid email') ||
+          errStr.contains('invalid credentials') ||
+          errStr.contains('invalid password') ||
+          errStr.contains('unauthorized');
+      final displayMessage = isInvalidCreds ? 'Invalid credentials' : 'Login error: $e';
+      state = state.copyWith(isLoading: false, errorMessage: displayMessage);
       return false;
     }
   }

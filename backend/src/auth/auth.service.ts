@@ -49,7 +49,7 @@ export class AuthService {
     );
 
     if (!res.rows.length) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const userRow = res.rows[0];
@@ -66,7 +66,7 @@ export class AuthService {
     }
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const payload = { sub: userRow.id, email: userRow.email, role: userRow.role };
