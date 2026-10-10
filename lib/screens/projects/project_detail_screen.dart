@@ -335,15 +335,33 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () async {
+              final notifier = ref.read(projectProvider.notifier);
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
+              final goRouter = GoRouter.of(context);
+
               Navigator.pop(ctx);
-              if (context.mounted) {
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).pop();
-                } else {
-                  context.go(RoutePaths.projects);
-                }
+
+              // 1. Fire optimistic instant delete
+              final deleteFuture = notifier.deleteProject(project.id);
+
+              // 2. Safely pop screen back to dashboard/projects
+              if (navigator.canPop()) {
+                navigator.pop();
+              } else {
+                goRouter.go(RoutePaths.projects);
               }
-              await ref.read(projectProvider.notifier).deleteProject(project.id);
+
+              // 3. Show feedback snackbar on target screen
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text('Project "${project.name}" deleted successfully'),
+                  backgroundColor: Colors.red.shade700,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+
+              await deleteFuture;
             },
             child: const Text('Confirm Delete'),
           ),
@@ -470,7 +488,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final user = ref.watch(authProvider).currentUser;
     final role = user?.role ?? UserRole.projectMember;
 
-    final projectList = allProjects.where((p) => p.id == widget.projectId).toList();
+    final projectList = allProjects.where((p) => p.id == widget.projectId || p.projectId == widget.projectId).toList();
     if (projectList.isEmpty) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -667,7 +685,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final validExpenses = expenses.where((e) => e.status == ExpenseStatus.approved);
     final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     final totalTaxIncurred = validExpenses.fold<double>(0.0, (sum, e) => sum + e.taxAmount);
-    final costIncurred = directCost;
+    final costIncurred = directCost + totalTaxIncurred;
     final expectedRemaining = project.estimatedRemainingCost;
     final projectedFinalCost = costIncurred + expectedRemaining;
     final projectedProfit = project.grossProjectValue - projectedFinalCost;

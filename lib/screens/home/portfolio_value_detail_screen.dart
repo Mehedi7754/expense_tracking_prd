@@ -113,7 +113,7 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
       0.0,
       (sum, p) => sum + (p.grossProjectValue > 0 ? p.grossProjectValue : p.budget),
     );
-    final totalCostIncurred = visibleExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final totalCostIncurred = visibleExpenses.fold<double>(0.0, (sum, e) => sum + (e.amount + e.taxAmount));
     final remainingBalance = totalContractValue - totalCostIncurred;
     final spentRatio = totalContractValue > 0
         ? (totalCostIncurred / totalContractValue) * 100
@@ -1023,10 +1023,10 @@ class _PortfolioValueDetailScreenState extends ConsumerState<PortfolioValueDetai
     final List<_ProjectCostSummary> projectSummaries = [];
     for (final p in projects) {
       final pExp = expenses.where((e) => e.projectId == p.id).toList();
-      final totalIncurred = pExp.fold<double>(0.0, (sum, e) => sum + e.amount);
+      final totalIncurred = pExp.fold<double>(0.0, (sum, e) => sum + (e.amount + e.taxAmount));
       final Map<String, double> pAmounts = {};
       for (final e in pExp) {
-        pAmounts[e.employeeName] = (pAmounts[e.employeeName] ?? 0.0) + e.amount;
+        pAmounts[e.employeeName] = (pAmounts[e.employeeName] ?? 0.0) + (e.amount + e.taxAmount);
       }
       projectSummaries.add(_ProjectCostSummary(
         project: p,

@@ -237,7 +237,7 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
     final Map<String, double> directCostByProjectId = {};
     for (final e in expenses) {
       if (e.status == ExpenseStatus.approved) {
-        directCostByProjectId[e.projectId] = (directCostByProjectId[e.projectId] ?? 0.0) + e.amount;
+        directCostByProjectId[e.projectId] = (directCostByProjectId[e.projectId] ?? 0.0) + (e.amount + e.taxAmount);
       }
     }
 
@@ -557,10 +557,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         else
           ...filteredProjects.map((p) {
             final pExp = expenses.where((e) => e.projectId == p.id).toList();
+            final canDeleteProject = ref.watch(authProvider).currentUser?.role.canCreateProject ?? false;
             return ProjectCostCard(
               project: p,
               projectExpenses: pExp,
               onTap: () => context.push(RoutePaths.projectDetail(p.id)),
+              onDelete: canDeleteProject ? () => _showDeleteProjectDialog(context, ref, p) : null,
             );
           }),
       ],
@@ -1150,4 +1152,54 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
       ),
     );
   }
+
+  void _showDeleteProjectDialog(BuildContext context, WidgetRef ref, ProjectModel project) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Delete Project',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "${project.name}" (${project.projectId})?\n\nThis will permanently purge this project and all associated expenses. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final notifier = ref.read(projectProvider.notifier);
+              final messenger = ScaffoldMessenger.of(context);
+              await notifier.deleteProject(project.id);
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text('Project "${project.name}" deleted successfully'),
+                  backgroundColor: Colors.red.shade700,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: const Text('Confirm Delete'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
