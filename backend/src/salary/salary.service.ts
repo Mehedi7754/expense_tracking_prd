@@ -364,6 +364,31 @@ export class SalaryService {
       }
     }
 
+    // Fetch office timing settings and shift assignment to determine dynamic weekend days
+    let userWeekendDays: number[] = [5, 6]; // Default 5=Fri, 6=Sat
+    try {
+      const settingsRes = await this.db.query(
+        `SELECT value FROM app_settings WHERE key = 'attendance_timing_settings'`,
+      );
+      if (settingsRes.rows.length > 0) {
+        const settings = typeof settingsRes.rows[0].value === 'string'
+          ? JSON.parse(settingsRes.rows[0].value)
+          : settingsRes.rows[0].value;
+        const shifts = settings?.shifts || [];
+        const userShifts = settings?.userShifts || {};
+        const userShiftId = userShifts[userId];
+        let matchedShift = shifts.find((s: any) => s.id === userShiftId);
+        if (!matchedShift) {
+          matchedShift = shifts.find((s: any) => s.isDefault) || shifts[0];
+        }
+        if (matchedShift && Array.isArray(matchedShift.weekendDays) && matchedShift.weekendDays.length > 0) {
+          userWeekendDays = matchedShift.weekendDays;
+        } else if (Array.isArray(settings?.weekendDays) && settings.weekendDays.length > 0) {
+          userWeekendDays = settings.weekendDays;
+        }
+      }
+    } catch (_) {}
+
     // Iterate through every single day of the month
     const breakdown: DailyBreakdownItem[] = [];
     let weekendCount = 0;
@@ -383,12 +408,14 @@ export class SalaryService {
       const dd = String(day).padStart(2, '0');
       const dateStr = `${yyyy}-${mm}-${dd}`;
 
-      const dayOfWeekIdx = dateObj.getDay(); // 0 = Sun, 5 = Fri, 6 = Sat
+      // In app/attendance system: 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 7=Sun
+      const jsDay = dateObj.getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+      const shiftDayOfWeek = jsDay === 0 ? 7 : jsDay;
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const dayName = dayNames[dayOfWeekIdx];
+      const dayName = dayNames[jsDay];
 
-      // Regional corporate calendar: Friday and Saturday are weekends
-      const isWeekend = dayOfWeekIdx === 5 || dayOfWeekIdx === 6;
+      // Dynamic weekend check based on shift settings
+      const isWeekend = userWeekendDays.includes(shiftDayOfWeek);
       if (isWeekend) weekendCount++;
 
       // Check Holiday
