@@ -42,11 +42,14 @@ import '../../screens/salary/salary_dashboard_screen.dart';
 import '../../screens/salary/salary_detail_screen.dart';
 import '../../screens/salary/my_salary_screen.dart';
 import '../../screens/salary/holidays_management_screen.dart';
+import '../../screens/leaves/leave_management_screen.dart';
+import '../../screens/leaves/apply_leave_screen.dart';
 import '../../screens/chat/chat_list_screen.dart';
 import '../../screens/chat/chat_thread_screen.dart';
 import '../../screens/splash/splash_screen.dart';
 import '../../screens/tasks/add_edit_task_screen.dart';
 import '../../screens/tasks/task_detail_screen.dart';
+import '../../screens/tasks/tasks_screen.dart';
 import '../../state/auth_provider.dart';
 import 'route_paths.dart';
 
@@ -277,6 +280,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Tasks
       GoRoute(
+        path: RoutePaths.tasks,
+        builder: (context, state) => const TasksScreen(),
+      ),
+      GoRoute(
         path: RoutePaths.addTask,
         builder: (context, state) {
           final projectId = state.uri.queryParameters['projectId'];
@@ -401,6 +408,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.holidaysManagement,
         builder: (context, state) => const HolidaysManagementScreen(),
+      ),
+      // Leave Management & Requests
+      GoRoute(
+        path: RoutePaths.leaves,
+        builder: (context, state) => const LeaveManagementScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.applyLeave,
+        builder: (context, state) => const ApplyLeaveScreen(),
       ),
 
       // Real-Time Corporate Chat & Messenger

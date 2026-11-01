@@ -38,6 +38,7 @@ class RoutePaths {
   static const String projectTeamPattern = '/projects/:id/team';
   static const String projectNotesPattern = '/projects/:id/notes';
   static const String taskDetail = '/tasks/:id';
+  static const String tasks = '/tasks';
   static const String addTask = '/tasks/new';
   static const String companyDashboard = '/company-dashboard';
   static const String userManagement = '/admin/users';
@@ -59,6 +60,13 @@ class RoutePaths {
   static const String salaryDetailPattern = '/salary/:id';
   static const String mySalary = '/salary/my';
   static const String holidaysManagement = '/admin/holidays';
+
+  // Leave Management & Requests
+  static const String leaves = '/leaves';
+  static const String applyLeave = '/leaves/apply';
+
+  // Storage & Document Retention
+  static const String storageRetention = '/settings/storage-retention';
 
   static String salaryDetail(String id) => '/salary/$id';
 

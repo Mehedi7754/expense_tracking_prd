@@ -33,7 +33,11 @@ enum UserRole {
     }
   }
 
-  bool get canViewAllProjects => this == UserRole.mainAdmin || this == UserRole.finance;
+  bool get canViewAllProjects =>
+      this == UserRole.mainAdmin || this == UserRole.finance;
+  bool get isAdminOrFinance =>
+      this == UserRole.mainAdmin || this == UserRole.finance;
+
   /// Only Manager (projectManager) and Employee (projectMember) are required to check in.
   /// Super Admin (mainAdmin), Finance, and Viewer do NOT check in.
   bool get requiresAttendanceCheckIn =>
@@ -50,7 +54,8 @@ enum UserRole {
       this == UserRole.mainAdmin || this == UserRole.projectManager;
   bool get canApproveMembers =>
       this == UserRole.mainAdmin ||
-      this == UserRole.projectManager;
+      this == UserRole.projectManager ||
+      this == UserRole.finance;
   bool get canApproveExpenses =>
       this == UserRole.mainAdmin || this == UserRole.projectManager;
   bool get canApproveJustifications =>
@@ -62,7 +67,11 @@ enum UserRole {
   bool get isReadOnly => this == UserRole.viewer;
 
   static UserRole fromString(String role) {
-    switch (role.toLowerCase().replaceAll(' ', '').replaceAll('/', '').replaceAll('_', '')) {
+    switch (role
+        .toLowerCase()
+        .replaceAll(' ', '')
+        .replaceAll('/', '')
+        .replaceAll('_', '')) {
       case 'superadmin':
       case 'mainadmin':
       case 'admin':
@@ -73,6 +82,7 @@ enum UserRole {
       case 'manager':
         return UserRole.projectManager;
       case 'finance':
+      case 'financemanager':
       case 'accounts':
       case 'accountsfinance':
         return UserRole.finance;

@@ -70,6 +70,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             longitude NUMERIC(10, 7),
             address_text TEXT DEFAULT '',
             device_info TEXT DEFAULT '',
+            work_mode VARCHAR(20) NOT NULL DEFAULT 'office',
             status VARCHAR(20) NOT NULL DEFAULT 'present',
             notes TEXT DEFAULT '',
             created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
@@ -221,6 +222,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         END $$;
       `);
 
+      // Task status, priority, and assignment notifications are persisted across both clients.
+      // Run enum changes as standalone statements so PostgreSQL commits new enum labels
+      // before any request attempts to write them. Do not swallow failures here: the API
+      // must not accept task writes until its schema is ready.
+      await this.pool.query("ALTER TYPE task_status_enum ADD VALUE IF NOT EXISTS 'todo';");
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'task_assigned';");
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'task_status_updated';");
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'leave_request';");
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'leave_decision';");
+      await this.pool.query(`
+        ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority VARCHAR(20) NOT NULL DEFAULT 'medium';
+        CREATE TABLE IF NOT EXISTS task_assignees (
+          task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          assigned_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+          PRIMARY KEY (task_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_task_assignees_user ON task_assignees(user_id);
+        INSERT INTO task_assignees (task_id, user_id)
+        SELECT id, assignee_id FROM tasks WHERE assignee_id IS NOT NULL
+        ON CONFLICT (task_id, user_id) DO NOTHING;
+        ALTER TABLE notifications ADD COLUMN IF NOT EXISTS related_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE;
+        ALTER TABLE leave_records ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending';
+        UPDATE leave_records SET status = CASE WHEN is_approved THEN 'approved' ELSE 'pending' END WHERE status = 'pending';
+      `);
+      await this.pool.query("ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS work_mode VARCHAR(20) NOT NULL DEFAULT 'office';");
+      await this.pool.query(`UPDATE attendance_records SET work_mode = CASE
+        WHEN notes ILIKE '%[Work Mode: Field]%' OR notes ILIKE '%[Field Duty]%' THEN 'field'
+        WHEN notes ILIKE '%[Work Mode: Home Office]%' OR notes ILIKE '%[Home Office]%' THEN 'home_office'
+        WHEN notes ILIKE '%[Work Mode: Home]%' OR notes ILIKE '%[Work From Home]%' THEN 'home'
+        ELSE 'office' END WHERE work_mode = 'office'`);
 
     } catch (err: any) {
       this.logger.error(`Database connection failed: ${err.message}`, err.stack);

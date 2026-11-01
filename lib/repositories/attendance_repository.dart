@@ -18,8 +18,30 @@ class AttendanceRepository {
     String? deviceInfo,
     String? notes,
     String? userId,
+    String? workMode,
+    String? earlyDepartureReason,
   }) async {
     final localDateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    final finalNotesBuffer = StringBuffer();
+    if (workMode == 'field' && !(notes?.toLowerCase().contains('work mode') ?? false)) {
+      finalNotesBuffer.write('[Work Mode: Field] ');
+    } else if (workMode == 'home' && !(notes?.toLowerCase().contains('work mode') ?? false)) {
+      finalNotesBuffer.write('[Work Mode: Home] ');
+    } else if (workMode == 'home_office' && !(notes?.toLowerCase().contains('work mode') ?? false)) {
+      finalNotesBuffer.write('[Work Mode: Home Office] ');
+    }
+
+    if (earlyDepartureReason != null && earlyDepartureReason.isNotEmpty && !(notes?.toLowerCase().contains('early departure') ?? false)) {
+      finalNotesBuffer.write('[Early Departure: $earlyDepartureReason] ');
+    }
+
+    if (notes != null && notes.trim().isNotEmpty) {
+      finalNotesBuffer.write(notes.trim());
+    }
+
+    final resolvedNotes = finalNotesBuffer.toString().trim();
+
     final response = await _client.post(
       ApiEndpoints.attendanceCheckIn,
       body: {
@@ -29,7 +51,8 @@ class AttendanceRepository {
         if (addressText != null && addressText.isNotEmpty) 'addressText': addressText,
         if (sessionType != null && sessionType.isNotEmpty) 'sessionType': sessionType,
         if (deviceInfo != null && deviceInfo.isNotEmpty) 'deviceInfo': deviceInfo,
-        if (notes != null && notes.isNotEmpty) 'notes': notes,
+        if (resolvedNotes.isNotEmpty) 'notes': resolvedNotes,
+        if (workMode != null && workMode.isNotEmpty) 'work_mode': workMode,
       },
     );
 
@@ -147,6 +170,12 @@ class AttendanceRepository {
     double? halfDayDeductionAmount,
     List<Map<String, dynamic>>? shifts,
     Map<String, String>? userShifts,
+    double? officeLatitude,
+    double? officeLongitude,
+    String? officeName,
+    String? officeAddress,
+    double? geofenceRadiusMeters,
+    bool? isGeofenceEnforced,
   }) async {
     final body = <String, dynamic>{
       if (morningStartHour != null) 'morningStartHour': morningStartHour,
@@ -159,6 +188,12 @@ class AttendanceRepository {
       if (halfDayDeductionAmount != null) 'halfDayDeductionAmount': halfDayDeductionAmount,
       if (shifts != null) 'shifts': shifts,
       if (userShifts != null) 'userShifts': userShifts,
+      if (officeLatitude != null) 'officeLatitude': officeLatitude,
+      if (officeLongitude != null) 'officeLongitude': officeLongitude,
+      if (officeName != null) 'officeName': officeName,
+      if (officeAddress != null) 'officeAddress': officeAddress,
+      if (geofenceRadiusMeters != null) 'geofenceRadiusMeters': geofenceRadiusMeters,
+      if (isGeofenceEnforced != null) 'isGeofenceEnforced': isGeofenceEnforced,
     };
     final response = await _client.post(
       '/attendance/settings',

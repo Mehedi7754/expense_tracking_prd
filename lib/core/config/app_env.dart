@@ -74,7 +74,7 @@ class AppEnv {
   /// The Base URL for all backend REST API requests.
   ///
   static const String defaultApiBaseUrl =
-      'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1';
+      'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1';
 
   /// The Base URL for all backend REST API requests.
   static String get apiBaseUrl {

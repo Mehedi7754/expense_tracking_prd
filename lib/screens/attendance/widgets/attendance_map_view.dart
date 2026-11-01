@@ -10,6 +10,9 @@ class AttendanceMapView extends StatefulWidget {
   final double initialLng;
   final double initialZoom;
   final Function(AttendanceRecordModel record)? onMarkerTap;
+  final LatLng? officeLocation;
+  final double? officeRadiusMeters;
+  final String? officeName;
 
   const AttendanceMapView({
     super.key,
@@ -18,6 +21,9 @@ class AttendanceMapView extends StatefulWidget {
     this.initialLng = 90.4125,
     this.initialZoom = 12.0,
     this.onMarkerTap,
+    this.officeLocation,
+    this.officeRadiusMeters,
+    this.officeName,
   });
 
   @override
@@ -198,6 +204,58 @@ class _AttendanceMapViewState extends State<AttendanceMapView> {
       );
     }).toList();
 
+    final allMarkers = List<Marker>.from(markers);
+    if (widget.officeLocation != null) {
+      allMarkers.add(
+        Marker(
+          point: widget.officeLocation!,
+          width: 140,
+          height: 60,
+          alignment: Alignment.topCenter,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF6366F1), width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(50),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.business_rounded, color: Colors.amber, size: 12),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        widget.officeName ?? 'Office HQ',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_drop_down, color: Color(0xFF0F172A), size: 16),
+            ],
+          ),
+        ),
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: Stack(
@@ -215,7 +273,20 @@ class _AttendanceMapViewState extends State<AttendanceMapView> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.gw.project',
               ),
-              MarkerLayer(markers: markers),
+              if (widget.officeLocation != null && widget.officeRadiusMeters != null)
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: widget.officeLocation!,
+                      radius: widget.officeRadiusMeters!,
+                      useRadiusInMeter: true,
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                      borderColor: const Color(0xFF4F46E5),
+                      borderStrokeWidth: 2.0,
+                    ),
+                  ],
+                ),
+              MarkerLayer(markers: allMarkers),
             ],
           ),
 

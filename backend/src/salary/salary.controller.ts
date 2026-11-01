@@ -20,11 +20,15 @@ import { SetSalaryDto } from './dto/set-salary.dto';
 import { CreateHolidayDto } from './dto/holiday.dto';
 import { CreateLeaveDto } from './dto/leave.dto';
 import { CreateAdjustmentDto } from './dto/adjustment.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('salary')
 export class SalaryController {
-  constructor(private readonly salaryService: SalaryService) {}
+  constructor(
+    private readonly salaryService: SalaryService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   private checkCanViewUserData(currentUser: any, targetUserId: string, message: string) {
     const isAdminOrFinance =
@@ -119,7 +123,7 @@ export class SalaryController {
       this.checkCanViewUserData(req.user, userId, 'You can only view your own leave records');
     }
     const queryUserId = userId || (req.user.role === 'project_member' ? req.user.id : undefined);
-    return this.salaryService.getLeaves(queryUserId, targetMonth, targetYear);
+    return this.salaryService.getLeaves(queryUserId, targetMonth, targetYear, req.user);
   }
 
   @Post('leaves')
@@ -132,7 +136,38 @@ export class SalaryController {
     if (!isAdminOrFinance && dto.userId && dto.userId !== req.user.id) {
       throw new ForbiddenException('You can only submit leaves for yourself');
     }
-    return this.salaryService.addLeave(dto, req.user.id);
+    const isPrivileged = ['main_admin', 'finance_manager', 'finance'].includes(req.user.role);
+    const result = await this.salaryService.addLeave(
+      { ...dto, userId: isAdminOrFinance ? dto.userId : req.user.id, isApproved: isPrivileged && dto.isApproved === true },
+      isPrivileged ? req.user.id : undefined,
+    );
+    if (!result.isApproved) {
+      await this.notifications.create({
+        userId: null,
+        title: 'Leave request submitted',
+        message: 'A leave request is waiting for review.',
+        type: 'leave_request',
+        actorId: req.user.id,
+        actorName: req.user.name,
+      });
+    }
+    return result;
+  }
+
+  @Roles('main_admin', 'project_manager', 'finance_manager', 'finance')
+  @Post('leaves/:id/approve')
+  async approveLeave(@Param('id') id: string, @Request() req: any) {
+    const leave = await this.salaryService.setLeaveDecision(id, true, req.user);
+    await this.notifications.create({ userId: leave.userId, title: 'Leave request approved', message: `Your ${leave.leaveType} leave request was approved.`, type: 'leave_decision', actorId: req.user.id, actorName: req.user.name });
+    return leave;
+  }
+
+  @Roles('main_admin', 'project_manager', 'finance_manager', 'finance')
+  @Post('leaves/:id/reject')
+  async rejectLeave(@Param('id') id: string, @Request() req: any) {
+    const leave = await this.salaryService.setLeaveDecision(id, false, req.user);
+    await this.notifications.create({ userId: leave.userId, title: 'Leave request declined', message: `Your ${leave.leaveType} leave request was declined.`, type: 'leave_decision', actorId: req.user.id, actorName: req.user.name });
+    return leave;
   }
 
   @Roles('main_admin', 'finance_manager')

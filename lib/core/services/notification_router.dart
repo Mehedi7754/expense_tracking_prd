@@ -24,7 +24,18 @@ class NotificationRouter {
   /// Encode FCM data map into a local-notification payload string.
   static String encode(Map<String, dynamic> data) {
     final params = <String, String>{};
-    for (final k in const ['type', 'notificationId', 'expenseId', 'projectId', 'relatedExpenseId', 'relatedProjectId', 'channelId', 'chatChannelId']) {
+    for (final k in const [
+      'type',
+      'notificationId',
+      'expenseId',
+      'projectId',
+      'relatedExpenseId',
+      'relatedProjectId',
+      'taskId',
+      'relatedTaskId',
+      'channelId',
+      'chatChannelId',
+    ]) {
       final v = data[k];
       if (v != null && v.toString().isNotEmpty) params[k] = v.toString();
     }
@@ -53,10 +64,14 @@ class NotificationRouter {
 
   static String resolve(Map<String, dynamic> data) {
     final type = (data['type'] ?? '').toString().toLowerCase();
-    final expenseId = (data['expenseId'] ?? data['relatedExpenseId'])?.toString();
-    final projectId = (data['projectId'] ?? data['relatedProjectId'])?.toString();
+    final expenseId =
+        (data['expenseId'] ?? data['relatedExpenseId'])?.toString();
+    final projectId =
+        (data['projectId'] ?? data['relatedProjectId'])?.toString();
+    final taskId = (data['taskId'] ?? data['relatedTaskId'])?.toString();
     final notifId = data['notificationId']?.toString();
-    final chatChannelId = (data['channelId'] ?? data['chatChannelId'])?.toString();
+    final chatChannelId =
+        (data['channelId'] ?? data['chatChannelId'])?.toString();
 
     // Isolated Chat Notification Deep Linking
     if (type == 'chat' || type.contains('chat')) {
@@ -66,14 +81,26 @@ class NotificationRouter {
       return RoutePaths.chatList;
     }
 
-    if (expenseId != null && expenseId.isNotEmpty) return RoutePaths.expenseDetail(expenseId);
+    if (expenseId != null && expenseId.isNotEmpty) {
+      return RoutePaths.expenseDetail(expenseId);
+    }
+    if (taskId != null && taskId.isNotEmpty) {
+      return RoutePaths.taskDetail.replaceFirst(':id', taskId);
+    }
+    if (type.contains('leave')) return RoutePaths.leaves;
     if (type.contains('attendance')) {
-      return canManageAttendance ? RoutePaths.attendanceDashboard : RoutePaths.myAttendance;
+      return canManageAttendance
+          ? RoutePaths.attendanceDashboard
+          : RoutePaths.myAttendance;
     }
     if (type.contains('salary') || type.contains('payroll')) {
-      return canManageAttendance ? RoutePaths.salaryDashboard : RoutePaths.mySalary;
+      return canManageAttendance
+          ? RoutePaths.salaryDashboard
+          : RoutePaths.mySalary;
     }
-    if (projectId != null && projectId.isNotEmpty) return RoutePaths.projectDetail(projectId);
+    if (projectId != null && projectId.isNotEmpty) {
+      return RoutePaths.projectDetail(projectId);
+    }
     if (notifId != null && notifId.isNotEmpty) return '/notifications/$notifId';
     return RoutePaths.notifications;
   }
@@ -91,7 +118,11 @@ class NotificationRouter {
     final router = _router!;
     for (var i = 0; i < 40; i++) {
       final path = router.routerDelegate.currentConfiguration.uri.path;
-      if (path != RoutePaths.splash && path != RoutePaths.login && path.isNotEmpty) break;
+      if (path != RoutePaths.splash &&
+          path != RoutePaths.login &&
+          path.isNotEmpty) {
+        break;
+      }
       await Future.delayed(const Duration(milliseconds: 150));
     }
     try {

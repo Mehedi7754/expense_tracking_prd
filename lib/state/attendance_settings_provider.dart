@@ -111,6 +111,14 @@ class AttendanceSettingsState {
   /// Grace period in minutes for late check-in
   final int gracePeriodMinutes;
 
+  /// Office Geofencing & Location Configuration
+  final double officeLatitude;
+  final double officeLongitude;
+  final String officeName;
+  final String officeAddress;
+  final double geofenceRadiusMeters;
+  final bool isGeofenceEnforced;
+
   const AttendanceSettingsState({
     this.morningStartHour = 9,
     this.morningEndHour = 13,
@@ -122,6 +130,12 @@ class AttendanceSettingsState {
     this.fullDayDeductionAmount = 1.0,
     this.halfDayDeductionAmount = 0.5,
     this.gracePeriodMinutes = 15,
+    this.officeLatitude = 23.7925,
+    this.officeLongitude = 90.4078,
+    this.officeName = 'Geospatial Works HQ',
+    this.officeAddress = 'Road 11, Block D, Banani, Dhaka',
+    this.geofenceRadiusMeters = 200.0,
+    this.isGeofenceEnforced = true,
     this.shifts = const [
       AttendanceShift(
         id: 'shift_default',
@@ -178,6 +192,12 @@ class AttendanceSettingsState {
     double? fullDayDeductionAmount,
     double? halfDayDeductionAmount,
     int? gracePeriodMinutes,
+    double? officeLatitude,
+    double? officeLongitude,
+    String? officeName,
+    String? officeAddress,
+    double? geofenceRadiusMeters,
+    bool? isGeofenceEnforced,
     List<AttendanceShift>? shifts,
     Map<String, String>? userShifts,
   }) {
@@ -192,6 +212,12 @@ class AttendanceSettingsState {
       fullDayDeductionAmount: fullDayDeductionAmount ?? this.fullDayDeductionAmount,
       halfDayDeductionAmount: halfDayDeductionAmount ?? this.halfDayDeductionAmount,
       gracePeriodMinutes: gracePeriodMinutes ?? this.gracePeriodMinutes,
+      officeLatitude: officeLatitude ?? this.officeLatitude,
+      officeLongitude: officeLongitude ?? this.officeLongitude,
+      officeName: officeName ?? this.officeName,
+      officeAddress: officeAddress ?? this.officeAddress,
+      geofenceRadiusMeters: geofenceRadiusMeters ?? this.geofenceRadiusMeters,
+      isGeofenceEnforced: isGeofenceEnforced ?? this.isGeofenceEnforced,
       shifts: shifts ?? this.shifts,
       userShifts: userShifts ?? this.userShifts,
     );
@@ -208,6 +234,12 @@ class AttendanceSettingsState {
         'fullDayDeductionAmount': fullDayDeductionAmount,
         'halfDayDeductionAmount': halfDayDeductionAmount,
         'gracePeriodMinutes': gracePeriodMinutes,
+        'officeLatitude': officeLatitude,
+        'officeLongitude': officeLongitude,
+        'officeName': officeName,
+        'officeAddress': officeAddress,
+        'geofenceRadiusMeters': geofenceRadiusMeters,
+        'isGeofenceEnforced': isGeofenceEnforced,
         'shifts': shifts.map((s) => s.toJson()).toList(),
         'userShifts': userShifts,
       };
@@ -264,6 +296,12 @@ class AttendanceSettingsState {
       fullDayDeductionAmount: (json['fullDayDeductionAmount'] as num?)?.toDouble() ?? 1.0,
       halfDayDeductionAmount: (json['halfDayDeductionAmount'] as num?)?.toDouble() ?? 0.5,
       gracePeriodMinutes: (json['gracePeriodMinutes'] as num?)?.toInt() ?? 15,
+      officeLatitude: (json['officeLatitude'] as num?)?.toDouble() ?? 23.7925,
+      officeLongitude: (json['officeLongitude'] as num?)?.toDouble() ?? 90.4078,
+      officeName: json['officeName']?.toString() ?? 'Geospatial Works HQ',
+      officeAddress: json['officeAddress']?.toString() ?? 'Road 11, Block D, Banani, Dhaka',
+      geofenceRadiusMeters: (json['geofenceRadiusMeters'] as num?)?.toDouble() ?? 200.0,
+      isGeofenceEnforced: json['isGeofenceEnforced'] as bool? ?? true,
       shifts: shiftList,
       userShifts: userMap,
     );
@@ -323,11 +361,37 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
         halfDayDeductionAmount: newSettings.halfDayDeductionAmount,
         shifts: newSettings.shifts.map((s) => s.toJson()).toList(),
         userShifts: newSettings.userShifts,
+        officeLatitude: newSettings.officeLatitude,
+        officeLongitude: newSettings.officeLongitude,
+        officeName: newSettings.officeName,
+        officeAddress: newSettings.officeAddress,
+        geofenceRadiusMeters: newSettings.geofenceRadiusMeters,
+        isGeofenceEnforced: newSettings.isGeofenceEnforced,
       );
       // Immediately refresh attendance state & daily overview so UI reflects real-time off-days & shift changes
       ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
       ref.read(attendanceProvider.notifier).fetchAttendanceRecords(force: true);
     } catch (_) {}
+  }
+
+  Future<void> setGeofenceSettings({
+    double? officeLatitude,
+    double? officeLongitude,
+    String? officeName,
+    String? officeAddress,
+    double? geofenceRadiusMeters,
+    bool? isGeofenceEnforced,
+  }) async {
+    final current = state.value ?? const AttendanceSettingsState();
+    final updated = current.copyWith(
+      officeLatitude: officeLatitude ?? current.officeLatitude,
+      officeLongitude: officeLongitude ?? current.officeLongitude,
+      officeName: officeName ?? current.officeName,
+      officeAddress: officeAddress ?? current.officeAddress,
+      geofenceRadiusMeters: geofenceRadiusMeters ?? current.geofenceRadiusMeters,
+      isGeofenceEnforced: isGeofenceEnforced ?? current.isGeofenceEnforced,
+    );
+    await updateSettings(updated);
   }
 
   Future<void> setMorningEndHour(int hour) async {

@@ -86,6 +86,7 @@ BEGIN
 
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'task_status_enum') THEN
         CREATE TYPE task_status_enum AS ENUM (
+            'todo',
             'in_progress',
             'completed'
         );
@@ -103,6 +104,8 @@ BEGIN
             'justification_approved',
             'justification_rejected',
             'project_assigned',
+            'task_assigned',
+            'task_status_updated',
             'budget_critical',
             'attendance_reminder',
             'attendance_late',
@@ -226,9 +229,18 @@ CREATE TABLE IF NOT EXISTS tasks (
     assignee_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     due_date DATE NOT NULL,
     status task_status_enum NOT NULL DEFAULT 'in_progress',
+    priority VARCHAR(20) NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'important')),
     budget_line VARCHAR(100),
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+-- Additional task assignees. tasks.assignee_id remains the primary owner for backwards compatibility.
+CREATE TABLE IF NOT EXISTS task_assignees (
+    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (task_id, user_id)
 );
 
 -- EXPENSES TABLE (Core transactional financial entity)
@@ -299,6 +311,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     type notification_type_enum NOT NULL DEFAULT 'general',
     related_expense_id UUID REFERENCES expenses(id) ON DELETE CASCADE,
     related_project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    related_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
@@ -646,6 +659,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
     longitude NUMERIC(10, 7),
     address_text TEXT DEFAULT '',
     device_info TEXT DEFAULT '',
+    work_mode VARCHAR(20) NOT NULL DEFAULT 'office' CHECK (work_mode IN ('office', 'home', 'home_office', 'field')),
     status VARCHAR(20) NOT NULL DEFAULT 'present' CHECK (status IN ('present', 'late', 'half_day', 'missing', 'confirmed_absent')),
     notes TEXT DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
@@ -655,6 +669,12 @@ CREATE TABLE IF NOT EXISTS attendance_records (
 
 CREATE INDEX IF NOT EXISTS idx_attendance_user_date ON attendance_records(user_id, date DESC);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance_records(date DESC);
+UPDATE attendance_records SET work_mode = CASE
+    WHEN notes ILIKE '%[Work Mode: Field]%' OR notes ILIKE '%[Field Duty]%' THEN 'field'
+    WHEN notes ILIKE '%[Work Mode: Home Office]%' OR notes ILIKE '%[Home Office]%' THEN 'home_office'
+    WHEN notes ILIKE '%[Work Mode: Home]%' OR notes ILIKE '%[Work From Home]%' THEN 'home'
+    ELSE 'office'
+END WHERE work_mode = 'office';
 
 -- ----------------------------------------------------------------------------
 -- 9. MONTHLY SALARY, HOLIDAYS, LEAVES & ATTENDANCE-BASED DEDUCTIONS
@@ -694,6 +714,7 @@ CREATE TABLE IF NOT EXISTS leave_records (
     leave_type VARCHAR(50) NOT NULL DEFAULT 'paid' CHECK (leave_type IN ('paid', 'unpaid', 'sick', 'casual', 'maternity', 'emergency')),
     reason TEXT NOT NULL DEFAULT '',
     is_approved BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'approved' CHECK (status IN ('pending', 'approved', 'rejected')),
     approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),

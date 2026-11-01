@@ -74,12 +74,6 @@ class ApiClient {
       'X-Client-Environment': AppEnv.isInitialized ? AppEnv.environment : 'development',
     };
 
-    // Forward the Coolify virtual host header so both domain and direct-IP requests route accurately
-    final targetHost = Uri.tryParse(effectiveBaseUrl)?.host ?? '';
-    if (targetHost == '163.227.239.97' || targetHost.contains('sslip.io')) {
-      headers['Host'] = 'xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io';
-    }
-
     if (_authToken != null && _authToken!.isNotEmpty) {
       headers['Authorization'] = 'Bearer $_authToken';
     }
@@ -192,26 +186,8 @@ class ApiClient {
       final response = await requestFn(effectiveBaseUrl).timeout(timeout);
       return _processResponse(response);
     } on SocketException {
-      if (effectiveBaseUrl.contains('sslip.io') && !effectiveBaseUrl.contains('163.227.239.97')) {
-        _effectiveBaseUrl = 'http://163.227.239.97/api/v1';
-        try {
-          final fallbackResponse = await requestFn(_effectiveBaseUrl!).timeout(timeout);
-          return _processResponse(fallbackResponse);
-        } catch (_) {
-          // Fall through to throw original exception
-        }
-      }
       throw const NetworkException('Unable to connect to server. Please check your internet connection.');
     } on http.ClientException {
-      if (effectiveBaseUrl.contains('sslip.io') && !effectiveBaseUrl.contains('163.227.239.97')) {
-        _effectiveBaseUrl = 'http://163.227.239.97/api/v1';
-        try {
-          final fallbackResponse = await requestFn(_effectiveBaseUrl!).timeout(timeout);
-          return _processResponse(fallbackResponse);
-        } catch (_) {
-          // Fall through to throw original exception
-        }
-      }
       throw const NetworkException('Unable to connect to server. Please check your internet connection.');
     } on TimeoutException {
       throw const ApiTimeoutException();

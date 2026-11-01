@@ -141,6 +141,26 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.task_alt_rounded, color: Color(0xFF4F46E5), size: 22),
+                ),
+                title: Text(role == UserRole.projectMember ? 'My Tasks' : 'Task Management', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                subtitle: const Text('View assignments and update task status', style: TextStyle(fontSize: 12)),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(RoutePaths.tasks);
+                },
+              ),
+              const Divider(height: 16),
               if (role.canApproveExpenses) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,

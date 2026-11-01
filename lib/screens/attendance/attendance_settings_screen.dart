@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/location_service.dart';
 import '../../state/attendance_settings_provider.dart';
 import '../../state/user_management_provider.dart';
 
@@ -19,12 +20,21 @@ class _AttendanceSettingsScreenState
   late double _fullDayDeductionAmount;
   late double _halfDayDeductionAmount;
   late int _gracePeriodMinutes;
+  late double _geofenceRadius;
+  late bool _isGeofenceEnforced;
 
   final TextEditingController _fullDayCtrl = TextEditingController();
   final TextEditingController _halfDayCtrl = TextEditingController();
   final TextEditingController _gracePeriodCtrl = TextEditingController();
+  final TextEditingController _officeNameCtrl = TextEditingController();
+  final TextEditingController _officeAddressCtrl = TextEditingController();
+  final TextEditingController _officeLatCtrl = TextEditingController();
+  final TextEditingController _officeLngCtrl = TextEditingController();
+  final TextEditingController _radiusCtrl = TextEditingController();
+
   bool _saving = false;
   bool _initialized = false;
+  bool _isAcquiringLocation = false;
 
   @override
   void didChangeDependencies() {
@@ -37,9 +47,18 @@ class _AttendanceSettingsScreenState
       _fullDayDeductionAmount = s.fullDayDeductionAmount;
       _halfDayDeductionAmount = s.halfDayDeductionAmount;
       _gracePeriodMinutes = s.gracePeriodMinutes;
+      _geofenceRadius = s.geofenceRadiusMeters;
+      _isGeofenceEnforced = s.isGeofenceEnforced;
+
       _fullDayCtrl.text = _fullDayDeductionAmount.toStringAsFixed(1);
       _halfDayCtrl.text = _halfDayDeductionAmount.toStringAsFixed(1);
       _gracePeriodCtrl.text = _gracePeriodMinutes.toString();
+      _officeNameCtrl.text = s.officeName;
+      _officeAddressCtrl.text = s.officeAddress;
+      _officeLatCtrl.text = s.officeLatitude.toStringAsFixed(6);
+      _officeLngCtrl.text = s.officeLongitude.toStringAsFixed(6);
+      _radiusCtrl.text = _geofenceRadius.toStringAsFixed(0);
+
       _initialized = true;
     }
   }
@@ -49,6 +68,11 @@ class _AttendanceSettingsScreenState
     _fullDayCtrl.dispose();
     _halfDayCtrl.dispose();
     _gracePeriodCtrl.dispose();
+    _officeNameCtrl.dispose();
+    _officeAddressCtrl.dispose();
+    _officeLatCtrl.dispose();
+    _officeLngCtrl.dispose();
+    _radiusCtrl.dispose();
     super.dispose();
   }
 
@@ -80,19 +104,68 @@ class _AttendanceSettingsScreenState
     }
   }
 
+  Future<void> _acquireCurrentGpsLocation() async {
+    setState(() => _isAcquiringLocation = true);
+    try {
+      final res = await LocationService.getCurrentCoordinates();
+      if (res.isSuccess && res.latitude != null && res.longitude != null) {
+        setState(() {
+          _officeLatCtrl.text = res.latitude!.toStringAsFixed(6);
+          _officeLngCtrl.text = res.longitude!.toStringAsFixed(6);
+          if (res.addressText.isNotEmpty) {
+            _officeAddressCtrl.text = res.addressText;
+          }
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Acquired device GPS: ${res.latitude!.toStringAsFixed(4)}, ${res.longitude!.toStringAsFixed(4)}'),
+              backgroundColor: const Color(0xFF10B981),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(res.errorMessage ?? 'Could not acquire GPS location'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isAcquiringLocation = false);
+    }
+  }
+
   Future<void> _saveDeductions() async {
     setState(() => _saving = true);
     final fullVal = double.tryParse(_fullDayCtrl.text) ?? _fullDayDeductionAmount;
     final halfVal = double.tryParse(_halfDayCtrl.text) ?? _halfDayDeductionAmount;
     final graceVal = int.tryParse(_gracePeriodCtrl.text) ?? _gracePeriodMinutes;
-
     final currentSettings = ref.read(attendanceSettingsProvider).value ?? const AttendanceSettingsState();
+
+    final lat = double.tryParse(_officeLatCtrl.text) ?? currentSettings.officeLatitude;
+    final lng = double.tryParse(_officeLngCtrl.text) ?? currentSettings.officeLongitude;
+    final radius = double.tryParse(_radiusCtrl.text) ?? _geofenceRadius;
+    final officeName = _officeNameCtrl.text.trim().isNotEmpty ? _officeNameCtrl.text.trim() : currentSettings.officeName;
+    final officeAddress = _officeAddressCtrl.text.trim().isNotEmpty ? _officeAddressCtrl.text.trim() : currentSettings.officeAddress;
+
     final updated = currentSettings.copyWith(
       deductionType: _deductionType,
       isDeductionEnabled: _isDeductionEnabled,
       fullDayDeductionAmount: fullVal,
       halfDayDeductionAmount: halfVal,
       gracePeriodMinutes: graceVal,
+      officeLatitude: lat,
+      officeLongitude: lng,
+      officeName: officeName,
+      officeAddress: officeAddress,
+      geofenceRadiusMeters: radius,
+      isGeofenceEnforced: _isGeofenceEnforced,
     );
 
     await ref.read(attendanceSettingsProvider.notifier).updateSettings(updated);
@@ -101,7 +174,7 @@ class _AttendanceSettingsScreenState
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Attendance & Payroll Settings Saved Successfully!'),
+          content: Text('Attendance, Geofence & Shift Settings Saved Successfully!'),
           backgroundColor: Color(0xFF10B981),
           behavior: SnackBarBehavior.floating,
         ),
@@ -926,7 +999,7 @@ class _AttendanceSettingsScreenState
                             ),
                           ),
                           value: _isDeductionEnabled,
-                          activeColor: const Color(0xFF10B981),
+                          activeTrackColor: const Color(0xFF10B981),
                           onChanged: (val) => setState(() => _isDeductionEnabled = val),
                         ),
                       ),
@@ -1213,10 +1286,355 @@ class _AttendanceSettingsScreenState
 
                 const SizedBox(height: 20),
 
-                // SECTION 3: Employee Shift Assignments
+                // SECTION 3: Office Geofence & Location Settings
                 _buildCardContainer(
                   isDark: isDark,
-                  title: '3. Employee Shift Assignment',
+                  title: '3. Office Geofence & Boundary Radius',
+                  subtitle: 'Configure company headquarters GPS centroid and allowable check-in radius for in-office attendance.',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Office Name & Address Inputs
+                      Text(
+                        'Office Name & Facility Title',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _officeNameCtrl,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. Geospatial Works HQ',
+                          prefixIcon: const Icon(Icons.apartment_rounded, size: 18, color: Color(0xFF4F46E5)),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          isDense: true,
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      Text(
+                        'Physical Office Address',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: _officeAddressCtrl,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'e.g. House 42, Road 11, Block D, Banani, Dhaka',
+                          prefixIcon: const Icon(Icons.pin_drop_rounded, size: 18, color: Color(0xFF64748B)),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          isDense: true,
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Coordinates Row (Lat & Lng)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Latitude (°N/S)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: _officeLatCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '23.7925',
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Longitude (°E/W)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: _officeLngCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText: '90.4078',
+                                    filled: true,
+                                    fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                                    ),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Set to Current GPS Location Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _isAcquiringLocation ? null : _acquireCurrentGpsLocation,
+                          icon: _isAcquiringLocation
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.my_location_rounded, size: 16, color: Color(0xFF4F46E5)),
+                          label: Text(
+                            _isAcquiringLocation ? 'Acquiring GPS...' : 'Use Current Device GPS Location',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF4F46E5)),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: const Color(0xFF4F46E5).withValues(alpha: 0.5)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Geofence Radius Setter
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Geofence Allowed Radius',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4F46E5).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${_geofenceRadius.toInt()} Meters',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF4F46E5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Employees checking in with Office mode must be within this perimeter distance.',
+                        style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Radius Preset Chips
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [50, 100, 150, 200, 300, 500, 1000].map((radiusMeters) {
+                            final isSelected = (_geofenceRadius.toInt() == radiusMeters);
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: Text('${radiusMeters}m'),
+                                selected: isSelected,
+                                selectedColor: const Color(0xFF4F46E5),
+                                labelStyle: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                                ),
+                                onSelected: (_) {
+                                  setState(() {
+                                    _geofenceRadius = radiusMeters.toDouble();
+                                    _radiusCtrl.text = radiusMeters.toString();
+                                  });
+                                },
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Smooth Radius Slider
+                      Slider.adaptive(
+                        value: _geofenceRadius.clamp(25.0, 1000.0),
+                        min: 25.0,
+                        max: 1000.0,
+                        divisions: 39, // steps of 25m
+                        activeColor: const Color(0xFF4F46E5),
+                        label: '${_geofenceRadius.toInt()}m',
+                        onChanged: (val) {
+                          setState(() {
+                            _geofenceRadius = val;
+                            _radiusCtrl.text = val.toInt().toString();
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Geofence Enforcement Toggle
+                      Container(
+                        decoration: BoxDecoration(
+                          color: _isGeofenceEnforced
+                              ? (isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.5) : const Color(0xFFEEF2FF))
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _isGeofenceEnforced
+                                ? const Color(0xFF4F46E5).withValues(alpha: 0.5)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                        ),
+                        child: SwitchListTile.adaptive(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                          title: Text(
+                            'Enforce Office Geofence Verification',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          subtitle: Text(
+                            _isGeofenceEnforced
+                                ? 'Active: In-office punches beyond ${_geofenceRadius.toInt()}m will be flagged as outside boundary.'
+                                : 'Disabled: Office punches will not check proximity radius.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            ),
+                          ),
+                          value: _isGeofenceEnforced,
+                          activeTrackColor: const Color(0xFF4F46E5),
+                          onChanged: (val) => setState(() => _isGeofenceEnforced = val),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Preview summary card
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.radar_rounded, color: Color(0xFF4F46E5), size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Active Geofence: ${_geofenceRadius.toInt()}m circle around ${_officeNameCtrl.text.isNotEmpty ? _officeNameCtrl.text : "Office HQ"}. Distance will be calculated for every office check-in.',
+                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // SECTION 4: Employee Shift Assignments
+                _buildCardContainer(
+                  isDark: isDark,
+                  title: '4. Employee Shift Assignment',
                   subtitle: 'Assign specific shifts to team members. Each employee follows their assigned shift schedule.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

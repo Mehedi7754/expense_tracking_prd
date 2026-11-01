@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { SetSalaryDto } from './dto/set-salary.dto';
 import { CreateHolidayDto } from './dto/holiday.dto';
@@ -191,7 +191,8 @@ export class SalaryService {
        RETURNING id, date::text, name, is_recurring`,
       [dto.date, dto.name, dto.isRecurring ?? false, adminId || null],
     );
-    return res.rows[0];
+    const row = res.rows[0];
+    return { id: row.id, date: row.date, name: row.name, isRecurring: row.is_recurring };
   }
 
   async deleteHoliday(id: string) {
@@ -200,10 +201,10 @@ export class SalaryService {
   }
 
   // --- Leaves ---
-  async getLeaves(userId?: string, month?: number, year?: number) {
+  async getLeaves(userId?: string, month?: number, year?: number, reviewer?: { id: string; role: string; assignedProjectIds?: string[] }) {
     let sql = `
       SELECT l.id, l.user_id, l.start_date::text, l.end_date::text, l.leave_type,
-             l.reason, l.is_approved, u.full_name, u.email
+             l.reason, l.is_approved, l.status, u.full_name, u.email
       FROM leave_records l
       JOIN users u ON u.id = l.user_id
     `;
@@ -214,6 +215,12 @@ export class SalaryService {
     if (userId) {
       conds.push(`l.user_id = $${idx++}`);
       params.push(userId);
+    }
+    if (reviewer?.role === 'project_manager') {
+      const projectIds = reviewer.assignedProjectIds || [];
+      if (!projectIds.length) return [];
+      conds.push(`EXISTS (SELECT 1 FROM project_members pm WHERE pm.user_id = l.user_id AND pm.project_id = ANY($${idx++}::uuid[]))`);
+      params.push(projectIds);
     }
     if (year && month) {
       conds.push(`(
@@ -241,17 +248,59 @@ export class SalaryService {
       leaveType: r.leave_type,
       reason: r.reason,
       isApproved: r.is_approved,
+      status: r.status,
     }));
   }
 
   async addLeave(dto: CreateLeaveDto, approvedBy?: string) {
     const res = await this.db.query(
-      `INSERT INTO leave_records (user_id, start_date, end_date, leave_type, reason, is_approved, approved_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, user_id, start_date::text, end_date::text, leave_type, reason, is_approved`,
-      [dto.userId, dto.startDate, dto.endDate, dto.leaveType, dto.reason || '', dto.isApproved ?? true, approvedBy || null],
+       `INSERT INTO leave_records (user_id, start_date, end_date, leave_type, reason, is_approved, status, approved_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, user_id, start_date::text, end_date::text, leave_type, reason, is_approved, status`,
+      [dto.userId, dto.startDate, dto.endDate, dto.leaveType, dto.reason || '', dto.isApproved ?? false, dto.isApproved ? 'approved' : 'pending', dto.isApproved ? approvedBy || null : null],
     );
-    return res.rows[0];
+    const row = res.rows[0];
+    return {
+      id: row.id,
+      userId: row.user_id,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      leaveType: row.leave_type,
+      reason: row.reason,
+      isApproved: row.is_approved,
+      status: row.status,
+    };
+  }
+
+  async setLeaveDecision(id: string, approved: boolean, reviewer: { id: string; role: string; assignedProjectIds?: string[] }) {
+    if (reviewer.role === 'project_manager') {
+      const projects = reviewer.assignedProjectIds || [];
+      const access = projects.length ? await this.db.query(
+        `SELECT 1 FROM leave_records l JOIN project_members pm ON pm.user_id = l.user_id
+         WHERE l.id = $1 AND pm.project_id = ANY($2::uuid[]) LIMIT 1`, [id, projects]) : { rows: [] };
+      if (!access.rows.length) throw new ForbiddenException('You can review leave only for members of your assigned projects');
+    }
+    const result = await this.db.query(
+      `UPDATE leave_records
+       SET is_approved = $2, status = $3, approved_by = CASE WHEN $2 THEN $4::uuid ELSE NULL END, updated_at = NOW()
+       WHERE id = $1 AND status = 'pending'
+       RETURNING id, user_id, start_date::text, end_date::text, leave_type, reason, is_approved, status`,
+      [id, approved, approved ? 'approved' : 'rejected', reviewer.id],
+    );
+    if (!result.rows.length) throw new NotFoundException('Pending leave request not found');
+    const user = await this.db.query('SELECT full_name, email FROM users WHERE id = $1', [result.rows[0].user_id]);
+    return {
+      id: result.rows[0].id,
+      userId: result.rows[0].user_id,
+      userName: user.rows[0]?.full_name || '',
+      userEmail: user.rows[0]?.email || '',
+      startDate: result.rows[0].start_date,
+      endDate: result.rows[0].end_date,
+      leaveType: result.rows[0].leave_type,
+      reason: result.rows[0].reason,
+      isApproved: result.rows[0].is_approved,
+      status: result.rows[0].status,
+    };
   }
 
   async deleteLeave(id: string) {

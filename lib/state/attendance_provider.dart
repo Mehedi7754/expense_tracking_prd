@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import '../core/network/api_exceptions.dart';
 import '../core/services/location_service.dart';
@@ -188,6 +189,12 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
   Future<bool> checkIn({
     String? explicitSession,
     String? notes,
+    String workMode = 'office',
+    String? fieldLocation,
+    String? fieldClient,
+    bool isEarlyDeparture = false,
+    String? earlyDepartureReason,
+    bool bypassRoleCheck = false,
   }) async {
     final currentUser = ref.read(authProvider).currentUser;
     if (currentUser == null || currentUser.id.isEmpty) {
@@ -197,8 +204,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       );
       return false;
     }
-    // Super Admin & non-attendance roles do not check in
-    if (!currentUser.role.requiresAttendanceCheckIn) {
+    // Super Admin & non-attendance roles do not check in unless explicitly testing
+    if (!bypassRoleCheck && !currentUser.role.requiresAttendanceCheckIn) {
       state = state.copyWith(
         isSubmitting: false,
         errorMessage: '${currentUser.role.displayName} is exempt from attendance check-in.',
@@ -210,11 +217,15 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
 
     // 0. Enforce session window: morning locks at the divider, afternoon opens at the divider
     final settings = ref.read(attendanceSettingsProvider).value;
-    final session = explicitSession ?? resolveSession(settings, userId: userId);
-    final windowError = checkInWindowError(session, settings, userId: userId);
-    if (windowError != null) {
-      state = state.copyWith(isSubmitting: false, errorMessage: windowError);
-      return false;
+    String session = explicitSession ?? resolveSession(settings, userId: userId);
+    if (isEarlyDeparture) {
+      session = 'afternoon'; // Early departure is logged as afternoon/closing checkout
+    } else {
+      final windowError = checkInWindowError(session, settings, userId: userId);
+      if (windowError != null) {
+        state = state.copyWith(isSubmitting: false, errorMessage: windowError);
+        return false;
+      }
     }
     explicitSession = session;
 
@@ -236,7 +247,38 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       final lat = locResult.latitude!;
       final lng = locResult.longitude!;
       final address = locResult.addressText;
-      final resolvedNotes = notes ?? '';
+
+      final extraNotesBuffer = StringBuffer();
+      if (workMode == 'office') {
+        final currentSettings = ref.read(attendanceSettingsProvider).value ?? const AttendanceSettingsState();
+        final officeLat = currentSettings.officeLatitude;
+        final officeLng = currentSettings.officeLongitude;
+        final allowedRadius = currentSettings.geofenceRadiusMeters;
+
+        final distMeters = Geolocator.distanceBetween(lat, lng, officeLat, officeLng);
+        final isInside = distMeters <= allowedRadius;
+        final distText = distMeters >= 1000
+            ? '${(distMeters / 1000).toStringAsFixed(1)}km'
+            : '${distMeters.toStringAsFixed(0)}m';
+
+        extraNotesBuffer.write('[Work Mode: Office] [Geofence: ${isInside ? "Inside" : "Outside"} ($distText)] ');
+      } else if (workMode == 'field') {
+        extraNotesBuffer.write('[Work Mode: Field] ');
+      } else if (workMode == 'home_office') {
+        extraNotesBuffer.write('[Work Mode: Home Office] ');
+      }
+
+      if (fieldLocation != null && fieldLocation.trim().isNotEmpty) {
+        extraNotesBuffer.write('Site: ${fieldLocation.trim()} ');
+      }
+      if (fieldClient != null && fieldClient.trim().isNotEmpty) {
+        extraNotesBuffer.write('| Client: ${fieldClient.trim()} ');
+      }
+      if (notes != null && notes.trim().isNotEmpty) {
+        extraNotesBuffer.write(notes.trim());
+      }
+
+      final resolvedNotes = extraNotesBuffer.toString().trim();
 
       final deviceInfo = kIsWeb ? 'Web Browser' : (Platform.isAndroid ? 'Android' : (Platform.isIOS ? 'iOS' : 'Desktop'));
 
@@ -249,8 +291,10 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
           addressText: address,
           sessionType: explicitSession,
           deviceInfo: deviceInfo,
-          notes: resolvedNotes,
+          notes: resolvedNotes.isNotEmpty ? resolvedNotes : null,
           userId: userId,
+          workMode: workMode,
+          earlyDepartureReason: earlyDepartureReason,
         );
       } on ApiException catch (apiErr) {
         final code = apiErr.statusCode ?? 0;

@@ -6,6 +6,10 @@ enum NotificationType {
   justificationApproved,
   justificationRejected,
   projectAssigned,
+  taskAssigned,
+  taskStatusUpdated,
+  leaveRequest,
+  leaveDecision,
   budgetWarning,
   budgetCritical,
   commentAdded,
@@ -37,6 +41,14 @@ enum NotificationType {
         return 'Justification Rejected';
       case NotificationType.projectAssigned:
         return 'Project Assignment';
+      case NotificationType.taskAssigned:
+        return 'Task Assignment';
+      case NotificationType.taskStatusUpdated:
+        return 'Task Status Update';
+      case NotificationType.leaveRequest:
+        return 'Leave Request';
+      case NotificationType.leaveDecision:
+        return 'Leave Decision';
       case NotificationType.budgetWarning:
         return 'Budget Warning';
       case NotificationType.budgetCritical:
@@ -84,6 +96,14 @@ enum NotificationType {
         return NotificationType.justificationRejected;
       case 'projectassigned':
         return NotificationType.projectAssigned;
+      case 'taskassigned':
+        return NotificationType.taskAssigned;
+      case 'taskstatusupdated':
+        return NotificationType.taskStatusUpdated;
+      case 'leaverequest':
+        return NotificationType.leaveRequest;
+      case 'leavedecision':
+        return NotificationType.leaveDecision;
       case 'budgetwarning':
         return NotificationType.budgetWarning;
       case 'budgetcritical':
@@ -117,7 +137,6 @@ enum NotificationType {
   }
 }
 
-
 class NotificationModel {
   final String id;
   final String userId;
@@ -130,6 +149,7 @@ class NotificationModel {
   final NotificationType type;
   final String? relatedExpenseId;
   final String? relatedProjectId;
+  final String? relatedTaskId;
   final bool isRead;
   final DateTime timestamp;
 
@@ -145,6 +165,7 @@ class NotificationModel {
     required this.type,
     this.relatedExpenseId,
     this.relatedProjectId,
+    this.relatedTaskId,
     this.isRead = false,
     required this.timestamp,
   });
@@ -161,6 +182,7 @@ class NotificationModel {
     NotificationType? type,
     String? relatedExpenseId,
     String? relatedProjectId,
+    String? relatedTaskId,
     bool? isRead,
     DateTime? timestamp,
   }) {
@@ -176,6 +198,7 @@ class NotificationModel {
       type: type ?? this.type,
       relatedExpenseId: relatedExpenseId ?? this.relatedExpenseId,
       relatedProjectId: relatedProjectId ?? this.relatedProjectId,
+      relatedTaskId: relatedTaskId ?? this.relatedTaskId,
       isRead: isRead ?? this.isRead,
       timestamp: timestamp ?? this.timestamp,
     );
@@ -187,14 +210,26 @@ class NotificationModel {
       id: (json['id'] ?? '').toString(),
       userId: (json['user_id'] ?? json['userId'] ?? '').toString(),
       actorId: json['actor_id']?.toString() ?? json['actorId']?.toString(),
-      actorName: json['actor_name']?.toString() ?? json['actorName']?.toString(),
-      actorAvatarUrl: json['actor_avatar_url']?.toString() ?? json['actorAvatarUrl']?.toString(),
+      actorName:
+          json['actor_name']?.toString() ?? json['actorName']?.toString(),
+      actorAvatarUrl:
+          json['actor_avatar_url']?.toString() ??
+          json['actorAvatarUrl']?.toString(),
       title: (json['title'] ?? '').toString(),
       message: (json['message'] ?? '').toString(),
-      fullExplanation: (json['full_explanation'] ?? json['fullExplanation'] ?? '').toString(),
+      fullExplanation:
+          (json['full_explanation'] ?? json['fullExplanation'] ?? '')
+              .toString(),
       type: NotificationType.fromString(typeStr),
-      relatedExpenseId: json['related_expense_id']?.toString() ?? json['relatedExpenseId']?.toString(),
-      relatedProjectId: json['related_project_id']?.toString() ?? json['relatedProjectId']?.toString(),
+      relatedExpenseId:
+          json['related_expense_id']?.toString() ??
+          json['relatedExpenseId']?.toString(),
+      relatedProjectId:
+          json['related_project_id']?.toString() ??
+          json['relatedProjectId']?.toString(),
+      relatedTaskId:
+          json['related_task_id']?.toString() ??
+          json['relatedTaskId']?.toString(),
       isRead: json['is_read'] ?? json['isRead'] ?? false,
       timestamp: () {
         for (final key in ['createdAt', 'created_at', 'timestamp', 'date']) {
@@ -227,6 +262,7 @@ class NotificationModel {
       'type': type.name,
       if (relatedExpenseId != null) 'related_expense_id': relatedExpenseId,
       if (relatedProjectId != null) 'related_project_id': relatedProjectId,
+      if (relatedTaskId != null) 'related_task_id': relatedTaskId,
       'is_read': isRead,
       'timestamp': timestamp.toIso8601String(),
     };

@@ -37,5 +37,15 @@ export class CheckInDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['office', 'home', 'home_office', 'field'])
+  workMode?: 'office' | 'home' | 'home_office' | 'field';
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['office', 'home', 'home_office', 'field'])
+  work_mode?: 'office' | 'home' | 'home_office' | 'field';
+
+  @IsOptional()
+  @IsString()
   date?: string;
 }

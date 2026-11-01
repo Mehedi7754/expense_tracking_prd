@@ -15,6 +15,7 @@ class AttendanceRecordModel {
   final double? longitude;
   final String addressText;
   final String deviceInfo;
+  final String workMode;
   final String status;
   final String notes;
   final DateTime createdAt;
@@ -34,6 +35,7 @@ class AttendanceRecordModel {
     this.longitude,
     this.addressText = '',
     this.deviceInfo = '',
+    this.workMode = '',
     this.status = 'present',
     this.notes = '',
     required this.createdAt,
@@ -42,6 +44,82 @@ class AttendanceRecordModel {
   bool get isMorning => sessionType.toLowerCase() == 'morning';
   bool get isAfternoon => sessionType.toLowerCase() == 'afternoon';
   bool get hasValidLocation => latitude != null && longitude != null;
+
+  bool get isFieldDuty =>
+      workMode.toLowerCase() == 'field' ||
+      notes.toLowerCase().contains('[work mode: field]') ||
+      notes.toLowerCase().contains('[field duty]') ||
+      notes.toLowerCase().contains('field:');
+
+  bool get isHomeOffice =>
+      workMode.toLowerCase() == 'home_office' ||
+      notes.toLowerCase().contains('[work mode: home office]') ||
+      notes.toLowerCase().contains('[home office]') ||
+      notes.toLowerCase().contains('home office:');
+
+  bool get isHome =>
+      workMode.toLowerCase() == 'home' ||
+      notes.toLowerCase().contains('[work mode: home]') ||
+      notes.toLowerCase().contains('[work from home]');
+
+  bool get isEarlyDeparture =>
+      notes.toLowerCase().contains('[early departure') ||
+      notes.toLowerCase().contains('early departure') ||
+      notes.toLowerCase().contains('[checked out before time]');
+
+  String get workModeLabel {
+    if (isFieldDuty) return 'On Field';
+    if (isHomeOffice) return 'Home Office';
+    if (isHome) return 'Home';
+    return 'Office';
+  }
+
+  String? get fieldSite {
+    final match = RegExp(r'(?:Site|site):\s*([^|\[\n]+)').firstMatch(notes);
+    return match?.group(1)?.trim();
+  }
+
+  String? get fieldClient {
+    final match = RegExp(r'(?:Client|client):\s*([^|\[\n]+)').firstMatch(notes);
+    return match?.group(1)?.trim();
+  }
+
+  String? get earlyDepartureReason {
+    final match = RegExp(r'\[Early Departure:\s*([^\]]+)\]', caseSensitive: false).firstMatch(notes);
+    return match?.group(1)?.trim();
+  }
+
+  bool get isInsideGeofence =>
+      notes.toLowerCase().contains('[geofence: inside') ||
+      notes.toLowerCase().contains('in geofence');
+
+  bool get isOutsideGeofence =>
+      notes.toLowerCase().contains('[geofence: outside') ||
+      notes.toLowerCase().contains('outside geofence');
+
+  String? get geofenceDistanceText {
+    final match = RegExp(r'\[Geofence:\s*(?:Inside|Outside)\s*\(([^)]+)\)\]', caseSensitive: false).firstMatch(notes);
+    return match?.group(1)?.trim();
+  }
+
+  String get locationOriginBadge {
+    if (isFieldDuty) {
+      final site = fieldSite;
+      return site != null && site.isNotEmpty ? 'On Field ($site)' : 'On Field';
+    }
+    if (isHomeOffice) {
+      return 'Home Office';
+    }
+    if (isOutsideGeofence) {
+      final dist = geofenceDistanceText;
+      return dist != null ? 'Office (Outside • $dist)' : 'Office (Outside Range)';
+    }
+    if (isInsideGeofence) {
+      final dist = geofenceDistanceText;
+      return dist != null ? 'Office (In Range • $dist)' : 'Office (In Range)';
+    }
+    return 'Office';
+  }
 
   String get formattedTime => DateFormat('hh:mm a').format(loginTime.toLocal());
   String get formattedDate => DateFormat('EEE, MMM d, yyyy').format(DateTime.tryParse(date) ?? loginTime);
@@ -89,6 +167,7 @@ class AttendanceRecordModel {
       longitude: parseCoord(json['longitude']),
       addressText: json['addressText']?.toString() ?? json['address_text'] ?? '',
       deviceInfo: json['deviceInfo']?.toString() ?? json['device_info'] ?? '',
+      workMode: json['workMode']?.toString() ?? json['work_mode']?.toString() ?? '',
       status: json['status']?.toString() ?? 'present',
       notes: json['notes']?.toString() ?? '',
       createdAt: parsedCreated,
@@ -111,6 +190,7 @@ class AttendanceRecordModel {
       'longitude': longitude,
       'addressText': addressText,
       'deviceInfo': deviceInfo,
+      'workMode': workMode,
       'status': status,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),

@@ -10,13 +10,12 @@ class TaskNotifier extends Notifier<List<TaskModel>> {
   }
 
   Future<void> fetchTasks({String? projectId, String? assigneeId}) async {
-    try {
-      final repo = ref.read(taskRepositoryProvider);
-      final tasks = await repo.getTasks(projectId: projectId, assigneeId: assigneeId);
-      state = tasks;
-    } catch (_) {
-      // Keep existing state on network disconnect
-    }
+    final repo = ref.read(taskRepositoryProvider);
+    final tasks = await repo.getTasks(
+      projectId: projectId,
+      assigneeId: assigneeId,
+    );
+    state = tasks;
   }
 
   void setTasks(List<TaskModel> tasks) {
@@ -29,38 +28,35 @@ class TaskNotifier extends Notifier<List<TaskModel>> {
     required String description,
     required String assigneeId,
     required String assigneeName,
+    List<String>? assigneeIds,
     required DateTime dueDate,
     String? budgetLine,
+    TaskStatus status = TaskStatus.todo,
+    String priority = 'medium',
   }) async {
     final newTask = TaskModel(
-      id: 'tsk_${DateTime.now().microsecondsSinceEpoch}',
+      id: '',
       projectId: projectId,
       title: title,
       description: description,
       assigneeId: assigneeId,
       assigneeName: assigneeName,
+      assigneeIds: assigneeIds ?? [assigneeId],
+      assigneeNames: [assigneeName],
       dueDate: dueDate,
-      status: TaskStatus.inProgress,
+      status: status,
+      priority: priority,
       budgetLine: budgetLine,
     );
 
-    // Optimistic local update
-    state = [...state, newTask];
-
-    try {
-      final repo = ref.read(taskRepositoryProvider);
-      final saved = await repo.createTask(newTask);
-      state = [
-        for (final t in state)
-          if (t.id == newTask.id) saved else t,
-      ];
-      return saved;
-    } catch (_) {
-      return newTask;
-    }
+    final repo = ref.read(taskRepositoryProvider);
+    final saved = await repo.createTask(newTask);
+    state = [...state, saved];
+    return saved;
   }
 
   Future<void> updateTask(TaskModel updated) async {
+    final previous = state;
     state = [
       for (final t in state)
         if (t.id == updated.id) updated else t,
@@ -68,20 +64,31 @@ class TaskNotifier extends Notifier<List<TaskModel>> {
 
     try {
       final repo = ref.read(taskRepositoryProvider);
-      await repo.updateTask(updated);
+      final saved = await repo.updateTask(updated);
+      state = [
+        for (final t in state)
+          if (t.id == updated.id) saved else t,
+      ];
     } catch (_) {
-      // Offline fallback
+      state = previous;
+      rethrow;
     }
   }
 
   Future<void> toggleTaskComplete(String taskId) async {
     final current = state.firstWhere((t) => t.id == taskId);
-    final updated = current.copyWith(
-      status: current.status == TaskStatus.completed
+    await updateTaskStatus(
+      taskId,
+      current.status == TaskStatus.completed
           ? TaskStatus.inProgress
           : TaskStatus.completed,
     );
+  }
 
+  Future<void> updateTaskStatus(String taskId, TaskStatus status) async {
+    final current = state.firstWhere((t) => t.id == taskId);
+    final updated = current.copyWith(status: status);
+    final previous = state;
     state = [
       for (final t in state)
         if (t.id == taskId) updated else t,
@@ -89,11 +96,18 @@ class TaskNotifier extends Notifier<List<TaskModel>> {
 
     try {
       final repo = ref.read(taskRepositoryProvider);
-      await repo.updateTask(updated);
+      final saved = await repo.updateTaskStatus(taskId, status);
+      state = [
+        for (final t in state)
+          if (t.id == taskId) saved else t,
+      ];
     } catch (_) {
-      // Offline fallback
+      state = previous;
+      rethrow;
     }
   }
 }
 
-final taskProvider = NotifierProvider<TaskNotifier, List<TaskModel>>(TaskNotifier.new);
+final taskProvider = NotifierProvider<TaskNotifier, List<TaskModel>>(
+  TaskNotifier.new,
+);

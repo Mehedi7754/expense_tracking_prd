@@ -19,6 +19,8 @@ enum NotificationCategoryFilter {
   unread,
   expenses,
   projects,
+  tasks,
+  leaves,
   attendance,
 }
 
@@ -26,13 +28,17 @@ class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+  ConsumerState<NotificationsScreen> createState() =>
+      _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   NotificationCategoryFilter _selectedFilter = NotificationCategoryFilter.all;
 
-  bool _matchesFilter(NotificationModel notif, NotificationCategoryFilter filter) {
+  bool _matchesFilter(
+    NotificationModel notif,
+    NotificationCategoryFilter filter,
+  ) {
     switch (filter) {
       case NotificationCategoryFilter.all:
         return true;
@@ -54,6 +60,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             notif.type == NotificationType.budgetCritical ||
             notif.type == NotificationType.commentAdded ||
             notif.type == NotificationType.memberAdded;
+      case NotificationCategoryFilter.tasks:
+        return notif.type == NotificationType.taskAssigned ||
+            notif.type == NotificationType.taskStatusUpdated;
+      case NotificationCategoryFilter.leaves:
+        return notif.type == NotificationType.leaveRequest ||
+            notif.type == NotificationType.leaveDecision;
       case NotificationCategoryFilter.attendance:
         return notif.type == NotificationType.attendanceReminder ||
             notif.type == NotificationType.attendanceLate ||
@@ -70,13 +82,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final isDark = AppColors.isDark(context);
 
     // Filter notifications: Super Admin and Finance see all alerts; others see their own or broadcast
-    final userNotifs = notifications.where((n) {
-      if (user == null) return true;
-      if (user.role == UserRole.mainAdmin || user.role == UserRole.finance) {
-        return true;
-      }
-      return n.userId == user.id || n.userId.isEmpty;
-    }).toList();
+    final userNotifs =
+        notifications.where((n) {
+          if (user == null) return true;
+          if (user.role == UserRole.mainAdmin ||
+              user.role == UserRole.finance) {
+            return true;
+          }
+          return n.userId == user.id || n.userId.isEmpty;
+        }).toList();
 
     // Ensure notifications are strictly sorted newest first
     userNotifs.sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -85,7 +99,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final hasUnread = unreadCount > 0;
 
     // Filter by selected category pill
-    final filteredNotifs = userNotifs.where((n) => _matchesFilter(n, _selectedFilter)).toList();
+    final filteredNotifs =
+        userNotifs.where((n) => _matchesFilter(n, _selectedFilter)).toList();
 
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
@@ -108,7 +123,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary,
+                  color:
+                      isDark
+                          ? AppColors.brandPrimaryDark
+                          : AppColors.brandPrimary,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -145,231 +163,319 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           const SizedBox(width: 4),
         ],
       ),
-      body: userNotifs.isEmpty
-          ? const EmptyStateWidget(
-              icon: Icons.notifications_off_outlined,
-              title: 'No Notifications',
-              message: 'You are all caught up! There are no alerts for your account right now.',
-            )
-          : Column(
-              children: [
-                // Top Action & Category Filter Bar
-                Container(
-                  color: isDark ? AppColors.darkSurface : AppColors.surface,
-                  padding: const EdgeInsets.only(top: 10, bottom: 12),
-                  child: Column(
-                    children: [
-                      // Status and Mark-All-Read Strip
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: hasUnread
-                                          ? const Color(0xFF10B981)
-                                          : const Color(0xFF94A3B8),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Flexible(
-                                    child: Text(
-                                      hasUnread
-                                          ? '$unreadCount unread ${unreadCount == 1 ? "notification" : "notifications"}'
-                                          : 'All notifications caught up',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? Colors.white70 : const Color(0xFF64748B),
+      body:
+          userNotifs.isEmpty
+              ? const EmptyStateWidget(
+                icon: Icons.notifications_off_outlined,
+                title: 'No Notifications',
+                message:
+                    'You are all caught up! There are no alerts for your account right now.',
+              )
+              : Column(
+                children: [
+                  // Top Action & Category Filter Bar
+                  Container(
+                    color: isDark ? AppColors.darkSurface : AppColors.surface,
+                    padding: const EdgeInsets.only(top: 10, bottom: 12),
+                    child: Column(
+                      children: [
+                        // Status and Mark-All-Read Strip
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color:
+                                            hasUnread
+                                                ? const Color(0xFF10B981)
+                                                : const Color(0xFF94A3B8),
                                       ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (hasUnread)
-                              InkWell(
-                                onTap: () {
-                                  ref.read(notificationProvider.notifier).markAllAsRead();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('All notifications marked as read'),
-                                      duration: Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.done_all_rounded,
-                                        size: 16,
-                                        color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Mark all read',
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        hasUnread
+                                            ? '$unreadCount unread ${unreadCount == 1 ? "notification" : "notifications"}'
+                                            : 'All notifications caught up',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          fontWeight: FontWeight.w700,
-                                          color: isDark ? const Color(0xFF818CF8) : const Color(0xFF4F46E5),
+                                          fontWeight: FontWeight.w600,
+                                          color:
+                                              isDark
+                                                  ? Colors.white70
+                                                  : const Color(0xFF64748B),
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      // Filter Pills Row
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            _buildFilterPill(
-                              label: 'All',
-                              icon: Icons.all_inbox_rounded,
-                              filter: NotificationCategoryFilter.all,
-                              count: userNotifs.length,
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildFilterPill(
-                              label: 'Unread',
-                              icon: Icons.mark_email_unread_rounded,
-                              filter: NotificationCategoryFilter.unread,
-                              count: unreadCount,
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildFilterPill(
-                              label: 'Expenses',
-                              icon: Icons.receipt_long_rounded,
-                              filter: NotificationCategoryFilter.expenses,
-                              count: userNotifs.where((n) => _matchesFilter(n, NotificationCategoryFilter.expenses)).length,
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildFilterPill(
-                              label: 'Projects',
-                              icon: Icons.folder_open_rounded,
-                              filter: NotificationCategoryFilter.projects,
-                              count: userNotifs.where((n) => _matchesFilter(n, NotificationCategoryFilter.projects)).length,
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: 8),
-                            _buildFilterPill(
-                              label: 'Attendance',
-                              icon: Icons.schedule_rounded,
-                              filter: NotificationCategoryFilter.attendance,
-                              count: userNotifs.where((n) => _matchesFilter(n, NotificationCategoryFilter.attendance)).length,
-                              isDark: isDark,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // Notification List
-                Expanded(
-                  child: filteredNotifs.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 64,
-                                  height: 64,
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.filter_list_off_rounded,
-                                    size: 30,
-                                    color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                              if (hasUnread)
+                                InkWell(
+                                  onTap: () {
+                                    ref
+                                        .read(notificationProvider.notifier)
+                                        .markAllAsRead();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'All notifications marked as read',
+                                        ),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.done_all_rounded,
+                                          size: 16,
+                                          color:
+                                              isDark
+                                                  ? const Color(0xFF818CF8)
+                                                  : const Color(0xFF4F46E5),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Mark all read',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color:
+                                                isDark
+                                                    ? const Color(0xFF818CF8)
+                                                    : const Color(0xFF4F46E5),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No ${_filterName(_selectedFilter)} notifications',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Try selecting a different filter above to view all notifications.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: isDark ? Colors.white60 : const Color(0xFF64748B),
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                OutlinedButton.icon(
-                                  onPressed: () => setState(() => _selectedFilter = NotificationCategoryFilter.all),
-                                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                                  label: const Text('Show All Notifications'),
-                                  style: OutlinedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            ],
                           ),
-                        )
-                      : RefreshIndicator(
-                          onRefresh: () => ref.read(notificationProvider.notifier).fetchNotifications(),
-                          child: ListView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            itemCount: filteredNotifs.length,
-                            itemBuilder: (ctx, i) {
-                              final notif = filteredNotifs[i];
-                              return _NotificationCard(
-                                notif: notif,
-                                allUsers: allUsers,
+                        ),
+                        const SizedBox(height: 10),
+                        // Filter Pills Row
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              _buildFilterPill(
+                                label: 'All',
+                                icon: Icons.all_inbox_rounded,
+                                filter: NotificationCategoryFilter.all,
+                                count: userNotifs.length,
                                 isDark: isDark,
-                                onDelete: () => ref
-                                    .read(notificationProvider.notifier)
-                                    .deleteNotification(notif.id),
-                                onTap: () {
-                                  ref.read(notificationProvider.notifier).markAsRead(notif.id);
-                                  context.push(NotificationRouter.resolve({
-                                    'type': notif.type.name,
-                                    'expenseId': notif.relatedExpenseId,
-                                    'projectId': notif.relatedProjectId,
-                                    'notificationId': notif.id,
-                                  }));
-                                },
-                              );
-                            },
+                              ),
+                              const SizedBox(width: 8),
+                              _buildFilterPill(
+                                label: 'Unread',
+                                icon: Icons.mark_email_unread_rounded,
+                                filter: NotificationCategoryFilter.unread,
+                                count: unreadCount,
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildFilterPill(
+                                label: 'Expenses',
+                                icon: Icons.receipt_long_rounded,
+                                filter: NotificationCategoryFilter.expenses,
+                                count:
+                                    userNotifs
+                                        .where(
+                                          (n) => _matchesFilter(
+                                            n,
+                                            NotificationCategoryFilter.expenses,
+                                          ),
+                                        )
+                                        .length,
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildFilterPill(
+                                label: 'Projects',
+                                icon: Icons.folder_open_rounded,
+                                filter: NotificationCategoryFilter.projects,
+                                count:
+                                    userNotifs
+                                        .where(
+                                          (n) => _matchesFilter(
+                                            n,
+                                            NotificationCategoryFilter.projects,
+                                          ),
+                                        )
+                                        .length,
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildFilterPill(
+                                label: 'Attendance',
+                                icon: Icons.schedule_rounded,
+                                filter: NotificationCategoryFilter.attendance,
+                                count:
+                                    userNotifs
+                                        .where(
+                                          (n) => _matchesFilter(
+                                            n,
+                                            NotificationCategoryFilter
+                                                .attendance,
+                                          ),
+                                        )
+                                        .length,
+                                isDark: isDark,
+                              ),
+                            ],
                           ),
                         ),
-                ),
-              ],
-            ),
+                      ],
+                    ),
+                  ),
+                  // Notification List
+                  Expanded(
+                    child:
+                        filteredNotifs.isEmpty
+                            ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 64,
+                                      height: 64,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            isDark
+                                                ? const Color(0xFF1E293B)
+                                                : const Color(0xFFF1F5F9),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.filter_list_off_rounded,
+                                        size: 30,
+                                        color:
+                                            isDark
+                                                ? Colors.white38
+                                                : const Color(0xFF94A3B8),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      'No ${_filterName(_selectedFilter)} notifications',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color:
+                                            isDark
+                                                ? Colors.white
+                                                : const Color(0xFF0F172A),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Try selecting a different filter above to view all notifications.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color:
+                                            isDark
+                                                ? Colors.white60
+                                                : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 18),
+                                    OutlinedButton.icon(
+                                      onPressed:
+                                          () => setState(
+                                            () =>
+                                                _selectedFilter =
+                                                    NotificationCategoryFilter
+                                                        .all,
+                                          ),
+                                      icon: const Icon(
+                                        Icons.refresh_rounded,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        'Show All Notifications',
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 8,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                            : RefreshIndicator(
+                              onRefresh:
+                                  () =>
+                                      ref
+                                          .read(notificationProvider.notifier)
+                                          .fetchNotifications(),
+                              child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                itemCount: filteredNotifs.length,
+                                itemBuilder: (ctx, i) {
+                                  final notif = filteredNotifs[i];
+                                  return _NotificationCard(
+                                    notif: notif,
+                                    allUsers: allUsers,
+                                    isDark: isDark,
+                                    onDelete:
+                                        () => ref
+                                            .read(notificationProvider.notifier)
+                                            .deleteNotification(notif.id),
+                                    onTap: () {
+                                      ref
+                                          .read(notificationProvider.notifier)
+                                          .markAsRead(notif.id);
+                                      context.push(
+                                        NotificationRouter.resolve({
+                                          'type': notif.type.name,
+                                          'expenseId': notif.relatedExpenseId,
+                                          'projectId': notif.relatedProjectId,
+                                          'relatedTaskId': notif.relatedTaskId,
+                                          'notificationId': notif.id,
+                                        }),
+                                      );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                  ),
+                ],
+              ),
     );
   }
 
@@ -382,9 +488,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }) {
     final isSelected = _selectedFilter == filter;
     final activeBg = isDark ? const Color(0xFF4338CA) : const Color(0xFF4F46E5);
-    final inactiveBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final inactiveBg =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
     final activeText = Colors.white;
-    final inactiveText = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final inactiveText =
+        isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return InkWell(
       onTap: () => setState(() => _selectedFilter = filter),
@@ -396,29 +504,31 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           color: isSelected ? activeBg : inactiveBg,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected
-                ? (isDark ? const Color(0xFF6366F1) : const Color(0xFF4338CA))
-                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+            color:
+                isSelected
+                    ? (isDark
+                        ? const Color(0xFF6366F1)
+                        : const Color(0xFF4338CA))
+                    : (isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFE2E8F0)),
             width: 1,
           ),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+          boxShadow:
+              isSelected
+                  ? [
+                    BoxShadow(
+                      color: const Color(0xFF4F46E5).withValues(alpha: 0.25),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                  : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isSelected ? activeText : inactiveText,
-            ),
+            Icon(icon, size: 14, color: isSelected ? activeText : inactiveText),
             const SizedBox(width: 6),
             Text(
               label,
@@ -431,11 +541,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             if (count > 0) ...[
               const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 1.5,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.white.withValues(alpha: 0.25)
-                      : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                  color:
+                      isSelected
+                          ? Colors.white.withValues(alpha: 0.25)
+                          : (isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFCBD5E1)),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -443,7 +559,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: isSelected ? Colors.white : (isDark ? Colors.white70 : const Color(0xFF334155)),
+                    color:
+                        isSelected
+                            ? Colors.white
+                            : (isDark
+                                ? Colors.white70
+                                : const Color(0xFF334155)),
                   ),
                 ),
               ),
@@ -464,6 +585,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         return 'expense';
       case NotificationCategoryFilter.projects:
         return 'project';
+      case NotificationCategoryFilter.tasks:
+        return 'tasks';
+      case NotificationCategoryFilter.leaves:
+        return 'leave';
       case NotificationCategoryFilter.attendance:
         return 'attendance';
     }
@@ -498,10 +623,15 @@ _CategoryStyle _getCategoryStyle(NotificationType type, bool isDark) {
       label: 'EXPENSE',
       icon: Icons.receipt_long_rounded,
       primaryColor: const Color(0xFFD97706),
-      backgroundColor: isDark ? const Color(0xFF451A03).withValues(alpha: 0.6) : const Color(0xFFFEF3C7),
+      backgroundColor:
+          isDark
+              ? const Color(0xFF451A03).withValues(alpha: 0.6)
+              : const Color(0xFFFEF3C7),
     );
   }
   if (type == NotificationType.projectAssigned ||
+      type == NotificationType.taskAssigned ||
+      type == NotificationType.taskStatusUpdated ||
       type == NotificationType.budgetWarning ||
       type == NotificationType.budgetCritical ||
       type == NotificationType.commentAdded ||
@@ -510,7 +640,22 @@ _CategoryStyle _getCategoryStyle(NotificationType type, bool isDark) {
       label: 'PROJECT',
       icon: Icons.folder_open_rounded,
       primaryColor: const Color(0xFF4F46E5),
-      backgroundColor: isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.6) : const Color(0xFFEEF2FF),
+      backgroundColor:
+          isDark
+              ? const Color(0xFF1E1B4B).withValues(alpha: 0.6)
+              : const Color(0xFFEEF2FF),
+    );
+  }
+  if (type == NotificationType.leaveRequest ||
+      type == NotificationType.leaveDecision) {
+    return _CategoryStyle(
+      label: 'LEAVE',
+      icon: Icons.event_available_rounded,
+      primaryColor: const Color(0xFF059669),
+      backgroundColor:
+          isDark
+              ? const Color(0xFF064E3B).withValues(alpha: 0.6)
+              : const Color(0xFFD1FAE5),
     );
   }
   if (type == NotificationType.attendanceReminder ||
@@ -521,14 +666,20 @@ _CategoryStyle _getCategoryStyle(NotificationType type, bool isDark) {
       label: 'ATTENDANCE',
       icon: Icons.schedule_rounded,
       primaryColor: const Color(0xFF059669),
-      backgroundColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.6) : const Color(0xFFD1FAE5),
+      backgroundColor:
+          isDark
+              ? const Color(0xFF064E3B).withValues(alpha: 0.6)
+              : const Color(0xFFD1FAE5),
     );
   }
   return _CategoryStyle(
     label: 'SYSTEM',
     icon: Icons.notifications_active_rounded,
     primaryColor: const Color(0xFF7C3AED),
-    backgroundColor: isDark ? const Color(0xFF2E1065).withValues(alpha: 0.6) : const Color(0xFFF3E8FF),
+    backgroundColor:
+        isDark
+            ? const Color(0xFF2E1065).withValues(alpha: 0.6)
+            : const Color(0xFFF3E8FF),
   );
 }
 
@@ -559,12 +710,16 @@ class _NotificationCard extends StatelessWidget {
     final lowerTitle = notif.title.toLowerCase();
 
     for (final u in allUsers) {
-      if (u.email.isNotEmpty && (lowerMsg.contains(u.email.toLowerCase()) || lowerTitle.contains(u.email.toLowerCase()))) {
+      if (u.email.isNotEmpty &&
+          (lowerMsg.contains(u.email.toLowerCase()) ||
+              lowerTitle.contains(u.email.toLowerCase()))) {
         return u;
       }
     }
     for (final u in allUsers) {
-      if (u.name.trim().isNotEmpty && (lowerMsg.contains(u.name.toLowerCase()) || lowerTitle.contains(u.name.toLowerCase()))) {
+      if (u.name.trim().isNotEmpty &&
+          (lowerMsg.contains(u.name.toLowerCase()) ||
+              lowerTitle.contains(u.name.toLowerCase()))) {
         return u;
       }
     }
@@ -582,26 +737,32 @@ class _NotificationCard extends StatelessWidget {
     final senderUser = _findSenderUser();
 
     // Resolve avatar URL: prioritize explicit actorAvatarUrl, then matched senderUser avatar
-    final avatarUrl = (notif.actorAvatarUrl != null && notif.actorAvatarUrl!.isNotEmpty)
-        ? notif.actorAvatarUrl
-        : senderUser?.avatarUrl;
+    final avatarUrl =
+        (notif.actorAvatarUrl != null && notif.actorAvatarUrl!.isNotEmpty)
+            ? notif.actorAvatarUrl
+            : senderUser?.avatarUrl;
 
     // Resolve display name for avatar initials
-    final displayName = (notif.actorName != null && notif.actorName!.trim().isNotEmpty)
-        ? notif.actorName!.trim()
-        : (senderUser != null && senderUser.name.trim().isNotEmpty
-            ? senderUser.name.trim()
-            : notif.title);
+    final displayName =
+        (notif.actorName != null && notif.actorName!.trim().isNotEmpty)
+            ? notif.actorName!.trim()
+            : (senderUser != null && senderUser.name.trim().isNotEmpty
+                ? senderUser.name.trim()
+                : notif.title);
 
     final categoryStyle = _getCategoryStyle(notif.type, isDark);
 
-    final borderColor = notif.isRead
-        ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
-        : (isDark ? const Color(0xFF6366F1).withValues(alpha: 0.6) : const Color(0xFF818CF8).withValues(alpha: 0.5));
+    final borderColor =
+        notif.isRead
+            ? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0))
+            : (isDark
+                ? const Color(0xFF6366F1).withValues(alpha: 0.6)
+                : const Color(0xFF818CF8).withValues(alpha: 0.5));
 
-    final cardBg = notif.isRead
-        ? AppColors.getSurface(context)
-        : (isDark ? const Color(0xFF161F33) : const Color(0xFFF8FAFC));
+    final cardBg =
+        notif.isRead
+            ? AppColors.getSurface(context)
+            : (isDark ? const Color(0xFF161F33) : const Color(0xFFF8FAFC));
 
     return Dismissible(
       key: Key('notif_${notif.id}'),
@@ -670,7 +831,8 @@ class _NotificationCard extends StatelessWidget {
                         color: categoryStyle.primaryColor,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isDark ? const Color(0xFF161F33) : Colors.white,
+                          color:
+                              isDark ? const Color(0xFF161F33) : Colors.white,
                           width: 1.5,
                         ),
                       ),
@@ -692,7 +854,10 @@ class _NotificationCard extends StatelessWidget {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: categoryStyle.backgroundColor,
                                 borderRadius: BorderRadius.circular(6),
@@ -724,7 +889,10 @@ class _NotificationCard extends StatelessWidget {
                               child: Text(
                                 notif.title,
                                 style: TextStyle(
-                                  fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.w700,
+                                  fontWeight:
+                                      notif.isRead
+                                          ? FontWeight.w600
+                                          : FontWeight.w700,
                                   fontSize: 13.5,
                                   color: AppColors.getTextPrimary(context),
                                 ),
@@ -740,9 +908,12 @@ class _NotificationCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 11.5,
                             height: 1.35,
-                            color: notif.isRead
-                                ? AppColors.getTextMuted(context)
-                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
+                            color:
+                                notif.isRead
+                                    ? AppColors.getTextMuted(context)
+                                    : (isDark
+                                        ? const Color(0xFFCBD5E1)
+                                        : const Color(0xFF475569)),
                           ),
                           maxLines: 4,
                           overflow: TextOverflow.ellipsis,
@@ -773,7 +944,10 @@ class _NotificationCard extends StatelessWidget {
                           child: Icon(
                             Icons.close_rounded,
                             size: 18,
-                            color: isDark ? Colors.white54 : const Color(0xFF94A3B8),
+                            color:
+                                isDark
+                                    ? Colors.white54
+                                    : const Color(0xFF94A3B8),
                           ),
                         ),
                       ),

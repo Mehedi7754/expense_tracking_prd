@@ -39,6 +39,7 @@ describe('AttendanceService Unit & Session Logic', () => {
         longitude: 90.4125,
         addressText: 'Dhaka, Bangladesh',
         deviceInfo: 'Flutter Mobile App',
+        workMode: 'home_office' as const,
       };
 
       // Query 0: getTimingSettings
@@ -82,6 +83,8 @@ describe('AttendanceService Unit & Session Logic', () => {
       expect(result.id).toBe('att-rec-1');
       expect(result.sessionType).toBe('morning');
       expect(result.status).toBe('present');
+      expect(mockDb.query.mock.calls[3][0]).toContain('work_mode');
+      expect(mockDb.query.mock.calls[3][1]).toContain('home_office');
     });
 
     it('throws ConflictException when checking in again for same session', async () => {
@@ -104,7 +107,7 @@ describe('AttendanceService Unit & Session Logic', () => {
         });
 
       await expect(service.checkIn(userId, checkInDto)).rejects.toThrow(
-        'You have already checked in for the morning session today.',
+        'You have already checked in for the morning session on 2026-10-02.',
       );
     });
 

@@ -9,8 +9,10 @@ import '../../../core/widgets/notification_banner.dart';
 import '../../../models/attendance_model.dart';
 import '../../../models/salary_model.dart';
 import '../../../state/attendance_provider.dart';
+import '../../../state/attendance_settings_provider.dart';
 import '../../../state/salary_provider.dart';
 import '../../../repositories/salary_repository.dart';
+import 'package:geolocator/geolocator.dart';
 import 'attendance_map_view.dart';
 
 /// Modal bottom sheet displaying an employee's 2-times geo-locations (Morning & Afternoon)
@@ -324,6 +326,7 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
     final emp = widget.employee;
     final morning = emp.morning;
     final afternoon = emp.afternoon;
+    final attendanceSettings = ref.watch(attendanceSettingsProvider).value;
 
     final validRecords = <AttendanceRecordModel>[
       if (morning != null && morning.latitude != null) morning,
@@ -460,6 +463,7 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                     color: const Color(0xFF4F46E5),
                     icon: Icons.wb_sunny_rounded,
                     isDark: isDark,
+                    settings: attendanceSettings,
                   ),
 
                   const SizedBox(height: 10),
@@ -472,11 +476,12 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                     color: const Color(0xFF10B981),
                     icon: Icons.nights_stay_rounded,
                     isDark: isDark,
+                    settings: attendanceSettings,
                   ),
 
                   const SizedBox(height: 14),
 
-                  // INTERACTIVE MAP WITH BOTH PINS
+                  // INTERACTIVE MAP WITH BOTH PINS & OFFICE GEOFENCE
                   if (validRecords.isNotEmpty) ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -512,6 +517,11 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                           initialLat: validRecords.first.latitude!,
                           initialLng: validRecords.first.longitude!,
                           initialZoom: 13.0,
+                          officeLocation: (attendanceSettings != null && attendanceSettings.officeLatitude != 0)
+                              ? LatLng(attendanceSettings.officeLatitude, attendanceSettings.officeLongitude)
+                              : null,
+                          officeRadiusMeters: attendanceSettings?.geofenceRadiusMeters,
+                          officeName: attendanceSettings?.officeName,
                         ),
                       ),
                     ),
@@ -591,7 +601,10 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Monthly Base:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const Flexible(
+                                    child: Text('Monthly Base:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(
                                     CurrencyFormatter.format(_salaryProfile?.monthlySalary ?? 50000.0),
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
@@ -602,7 +615,10 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('Daily Rate:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  const Flexible(
+                                    child: Text('Daily Rate:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(
                                     '${CurrencyFormatter.format(_dailySalaryRate)} / day',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF4F46E5)),
@@ -613,7 +629,10 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text("Today's Absence Cut:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  const Flexible(
+                                    child: Text("Today's Absence Cut:", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(
                                     _todayDeduction > 0 ? '- ${CurrencyFormatter.format(_todayDeduction)}' : '৳0.00 (No Cut)',
                                     style: TextStyle(
@@ -733,6 +752,7 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
     required Color color,
     required IconData icon,
     required bool isDark,
+    AttendanceSettingsState? settings,
   }) {
     final hasRecord = record != null && record.status != 'confirmed_absent';
 
@@ -786,6 +806,129 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
           const SizedBox(height: 8),
 
           if (hasRecord) ...[
+            // 1. Work Mode & Geofence Origin Verification Card
+            () {
+              Color bannerBg;
+              Color bannerBorder;
+              Color bannerFg;
+              IconData bannerIcon;
+              String modeTitle;
+              String modeSubtitle;
+
+              if (record.isFieldDuty) {
+                bannerBg = isDark ? const Color(0xFF312E81).withAlpha(100) : const Color(0xFFEEF2FF);
+                bannerBorder = isDark ? const Color(0xFF4338CA).withAlpha(120) : const Color(0xFFC7D2FE);
+                bannerFg = isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4338CA);
+                bannerIcon = Icons.directions_car_rounded;
+                modeTitle = 'On Field Duty';
+                final site = record.fieldSite;
+                final client = record.fieldClient;
+                modeSubtitle = 'Site: ${site ?? "Not specified"}${client != null ? " • Client: $client" : ""}';
+              } else if (record.isHomeOffice) {
+                bannerBg = isDark ? const Color(0xFF4C1D95).withAlpha(100) : const Color(0xFFF3E8FF);
+                bannerBorder = isDark ? const Color(0xFF6B21A8).withAlpha(120) : const Color(0xFFE9D5FF);
+                bannerFg = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF6B21A8);
+                bannerIcon = Icons.home_work_rounded;
+                modeTitle = 'Home Office';
+                modeSubtitle = 'Remote approved attendance';
+              } else {
+                // Office Check-In
+                double? distMeters;
+                if (settings != null && settings.officeLatitude != 0 && record.latitude != null && record.longitude != null) {
+                  distMeters = Geolocator.distanceBetween(
+                    record.latitude!,
+                    record.longitude!,
+                    settings.officeLatitude,
+                    settings.officeLongitude,
+                  );
+                }
+
+                final allowedRadius = settings?.geofenceRadiusMeters ?? 200.0;
+                final isInside = record.isInsideGeofence || (distMeters != null && distMeters <= allowedRadius);
+                final isOutside = record.isOutsideGeofence || (distMeters != null && distMeters > allowedRadius);
+                final distText = record.geofenceDistanceText ??
+                    (distMeters != null
+                        ? (distMeters >= 1000
+                            ? '${(distMeters / 1000).toStringAsFixed(1)}km'
+                            : '${distMeters.toStringAsFixed(0)}m')
+                        : null);
+
+                if (isOutside) {
+                  bannerBg = isDark ? const Color(0xFF7F1D1D).withAlpha(90) : const Color(0xFFFEF2F2);
+                  bannerBorder = isDark ? const Color(0xFF991B1B).withAlpha(120) : const Color(0xFFFECACA);
+                  bannerFg = isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
+                  bannerIcon = Icons.warning_amber_rounded;
+                  modeTitle = 'Office • Outside Geofence Perimeter';
+                  modeSubtitle = 'Device logged outside allowed office radius${distText != null ? " ($distText away)" : ""}';
+                } else if (isInside) {
+                  bannerBg = isDark ? const Color(0xFF064E3B).withAlpha(90) : const Color(0xFFECFDF5);
+                  bannerBorder = isDark ? const Color(0xFF047857).withAlpha(120) : const Color(0xFFA7F3D0);
+                  bannerFg = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669);
+                  bannerIcon = Icons.verified_rounded;
+                  modeTitle = 'Office • Verified Within Radius';
+                  modeSubtitle = 'Confirmed inside office geofence${distText != null ? " ($distText away)" : ""}';
+                } else {
+                  bannerBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+                  bannerBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+                  bannerFg = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+                  bannerIcon = Icons.business_rounded;
+                  modeTitle = 'Office Headquarters';
+                  modeSubtitle = 'Office workstation session';
+                }
+              }
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: bannerBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: bannerBorder, width: 0.8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(bannerIcon, size: 18, color: bannerFg),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            modeTitle,
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: bannerFg),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            modeSubtitle,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+                            ),
+                          ),
+                          if (record.earlyDepartureReason != null) ...[
+                            const SizedBox(height: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withAlpha(25),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Early Departure: ${record.earlyDepartureReason}',
+                                style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }(),
+
             // Coordinates Row with Copy button
             Row(
               children: [

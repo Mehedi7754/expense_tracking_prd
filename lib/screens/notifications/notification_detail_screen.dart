@@ -10,10 +10,7 @@ import '../../state/notification_provider.dart';
 class NotificationDetailScreen extends ConsumerWidget {
   final String notificationId;
 
-  const NotificationDetailScreen({
-    super.key,
-    required this.notificationId,
-  });
+  const NotificationDetailScreen({super.key, required this.notificationId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -30,21 +27,27 @@ class NotificationDetailScreen extends ConsumerWidget {
 
     final notif = notifList.first;
 
-    Color badgeBg = isDark ? AppColors.brandPrimary.withAlpha(40) : AppColors.brandPrimary.withAlpha(25);
-    Color badgeTextColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
+    Color badgeBg =
+        isDark
+            ? AppColors.brandPrimary.withAlpha(40)
+            : AppColors.brandPrimary.withAlpha(25);
+    Color badgeTextColor =
+        isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
     switch (notif.type) {
       case NotificationType.expenseRejected:
       case NotificationType.absenceDeducted:
       case NotificationType.securityAlert:
         badgeBg = isDark ? AppColors.darkCrimsonLight : AppColors.crimsonLight;
-        badgeTextColor = isDark ? AppColors.crimsonAccent : AppColors.crimsonDark;
+        badgeTextColor =
+            isDark ? AppColors.crimsonAccent : AppColors.crimsonDark;
         break;
       case NotificationType.expenseApproved:
       case NotificationType.salaryReady:
       case NotificationType.payrollFinalized:
       case NotificationType.revenueReceived:
         badgeBg = isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight;
-        badgeTextColor = isDark ? AppColors.emeraldAccent : AppColors.emeraldDark;
+        badgeTextColor =
+            isDark ? AppColors.emeraldAccent : AppColors.emeraldDark;
         break;
       case NotificationType.budgetWarning:
       case NotificationType.attendanceReminder:
@@ -62,8 +65,12 @@ class NotificationDetailScreen extends ConsumerWidget {
       case NotificationType.userRegistration:
       case NotificationType.general:
       default:
-        badgeBg = isDark ? AppColors.brandPrimary.withAlpha(40) : AppColors.brandPrimary.withAlpha(25);
-        badgeTextColor = isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
+        badgeBg =
+            isDark
+                ? AppColors.brandPrimary.withAlpha(40)
+                : AppColors.brandPrimary.withAlpha(25);
+        badgeTextColor =
+            isDark ? AppColors.brandPrimaryDark : AppColors.brandPrimary;
         break;
     }
 
@@ -90,7 +97,10 @@ class NotificationDetailScreen extends ConsumerWidget {
                   color: AppColors.getSurface(context),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: AppColors.getBorder(context)),
-                  boxShadow: isDark ? AppColors.darkCardShadow() : AppColors.cardShadow,
+                  boxShadow:
+                      isDark
+                          ? AppColors.darkCardShadow()
+                          : AppColors.cardShadow,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,7 +108,10 @@ class NotificationDetailScreen extends ConsumerWidget {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: badgeBg,
                             borderRadius: BorderRadius.circular(12),
@@ -114,33 +127,44 @@ class NotificationDetailScreen extends ConsumerWidget {
                         const Spacer(),
                         Text(
                           DateFormatter.formatRelative(notif.timestamp),
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextMuted(context)),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.getTextMuted(context),
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 14),
                     Text(
                       notif.title,
-                      style: AppTextStyles.titleMedium.copyWith(color: AppColors.getTextPrimary(context)),
+                      style: AppTextStyles.titleMedium.copyWith(
+                        color: AppColors.getTextPrimary(context),
+                      ),
                     ),
                     const SizedBox(height: 10),
                     Text(
                       notif.message,
-                      style: AppTextStyles.bodyLarge.copyWith(color: AppColors.getTextSecondary(context)),
+                      style: AppTextStyles.bodyLarge.copyWith(
+                        color: AppColors.getTextSecondary(context),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 14),
                     Text(
                       'Full Context & Details',
-                      style: AppTextStyles.labelMedium.copyWith(color: AppColors.getTextPrimary(context)),
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.getTextPrimary(context),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
+                        color:
+                            isDark
+                                ? AppColors.darkSurfaceSubtle
+                                : AppColors.surfaceSubtle,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -161,7 +185,9 @@ class NotificationDetailScreen extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => context.push('/expenses/${notif.relatedExpenseId}'),
+                    onPressed:
+                        () =>
+                            context.push('/expenses/${notif.relatedExpenseId}'),
                     icon: const Icon(Icons.receipt_long_rounded, size: 18),
                     label: const Text('View Related Expense Claim'),
                   ),
@@ -171,9 +197,22 @@ class NotificationDetailScreen extends ConsumerWidget {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => context.push('/projects/${notif.relatedProjectId}'),
+                    onPressed:
+                        () =>
+                            context.push('/projects/${notif.relatedProjectId}'),
                     icon: const Icon(Icons.folder_open_rounded, size: 18),
                     label: const Text('View Related Project'),
+                  ),
+                ),
+              ],
+              if (notif.relatedTaskId != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed:
+                        () => context.push('/tasks/${notif.relatedTaskId}'),
+                    icon: const Icon(Icons.task_alt_rounded, size: 18),
+                    label: const Text('View Assigned Task'),
                   ),
                 ),
               ],

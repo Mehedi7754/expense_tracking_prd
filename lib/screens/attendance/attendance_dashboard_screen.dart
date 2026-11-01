@@ -12,6 +12,8 @@ import '../../state/attendance_provider.dart';
 import '../../state/auth_provider.dart';
 import '../../state/attendance_settings_provider.dart';
 import '../../state/user_management_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'my_attendance_screen.dart';
 import 'widgets/attendance_map_view.dart';
 import 'widgets/member_geo_location_modal.dart';
@@ -143,7 +145,111 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Work Mode & Geofence Origin Banner
+            () {
+              Color bannerBg;
+              Color bannerBorder;
+              Color bannerFg;
+              IconData bannerIcon;
+              String modeTitle;
+              String modeSubtitle;
+
+              if (record.isFieldDuty) {
+                bannerBg = isDark ? const Color(0xFF312E81).withAlpha(100) : const Color(0xFFEEF2FF);
+                bannerBorder = isDark ? const Color(0xFF4338CA) : const Color(0xFFC7D2FE);
+                bannerFg = isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4F46E5);
+                bannerIcon = Icons.directions_car_rounded;
+                modeTitle = 'On Field Duty Attendance';
+                final site = record.fieldSite;
+                final client = record.fieldClient;
+                modeSubtitle = 'Site: ${site ?? "Site Not Specified"}${client != null ? " • Client: $client" : ""}';
+              } else if (record.isHomeOffice) {
+                bannerBg = isDark ? const Color(0xFF4C1D95).withAlpha(100) : const Color(0xFFF3E8FF);
+                bannerBorder = isDark ? const Color(0xFF6B21A8) : const Color(0xFFE9D5FF);
+                bannerFg = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF7E22CE);
+                bannerIcon = Icons.home_work_rounded;
+                modeTitle = 'Home Office Attendance';
+                modeSubtitle = 'Logged remotely from approved residential/home workstation';
+              } else {
+                // Office check-in
+                final distText = record.geofenceDistanceText;
+                if (record.isInsideGeofence) {
+                  bannerBg = isDark ? const Color(0xFF064E3B).withAlpha(100) : const Color(0xFFECFDF5);
+                  bannerBorder = isDark ? const Color(0xFF047857) : const Color(0xFFA7F3D0);
+                  bannerFg = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669);
+                  bannerIcon = Icons.verified_rounded;
+                  modeTitle = 'Office Attendance • Verified In-Range';
+                  modeSubtitle = 'Device GPS within allowed perimeter${distText != null ? " (Distance: $distText)" : ""}';
+                } else if (record.isOutsideGeofence) {
+                  bannerBg = isDark ? const Color(0xFF7F1D1D).withAlpha(100) : const Color(0xFFFEF2F2);
+                  bannerBorder = isDark ? const Color(0xFF991B1B) : const Color(0xFFFECACA);
+                  bannerFg = isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
+                  bannerIcon = Icons.warning_amber_rounded;
+                  modeTitle = 'Office Attendance • Outside Geofence';
+                  modeSubtitle = 'Device logged outside allowed office boundary${distText != null ? " ($distText away)" : ""}';
+                } else {
+                  bannerBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+                  bannerBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+                  bannerFg = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+                  bannerIcon = Icons.business_rounded;
+                  modeTitle = 'Office Headquarters Attendance';
+                  modeSubtitle = 'Office workstation session';
+                }
+              }
+
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: bannerBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: bannerBorder),
+                ),
+                child: Row(
+                  children: [
+                    Icon(bannerIcon, size: 24, color: bannerFg),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            modeTitle,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: bannerFg),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            modeSubtitle,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+                            ),
+                          ),
+                          if (record.earlyDepartureReason != null) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B).withAlpha(30),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Early Departure: ${record.earlyDepartureReason}',
+                                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }(),
+            const SizedBox(height: 16),
             _buildDetailRow(
               icon: Icons.access_time_rounded,
               title: 'Login Timestamp',
@@ -309,7 +415,8 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
     DateTime parsedDate = DateTime.tryParse(attendanceState.selectedDate) ?? DateTime.now();
     final formattedDateTitle = DateFormat('EEE, MMM d, yyyy').format(parsedDate);
     final settingsState = ref.watch(attendanceSettingsProvider);
-    final weekendDays = settingsState.value?.weekendDays ?? [DateTime.friday, DateTime.saturday];
+    final currentSettings = settingsState.value;
+    final weekendDays = currentSettings?.weekendDays ?? [DateTime.friday, DateTime.saturday];
     final isWeekend = weekendDays.contains(parsedDate.weekday);
     final isHoliday = employees.isNotEmpty && employees.every((e) => e.status == 'holiday');
 
@@ -652,6 +759,11 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
                           child: AttendanceMapView(
                             records: gpsRecords,
                             onMarkerTap: _showRecordDetailsModal,
+                            officeLocation: (currentSettings != null && currentSettings.officeLatitude != 0)
+                                ? LatLng(currentSettings.officeLatitude, currentSettings.officeLongitude)
+                                : null,
+                            officeRadiusMeters: currentSettings?.geofenceRadiusMeters,
+                            officeName: currentSettings?.officeName,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -854,64 +966,219 @@ class _AttendanceDashboardScreenState extends ConsumerState<AttendanceDashboardS
           onTap: () => MemberGeoLocationModal.show(context, emp, ref.read(attendanceProvider).selectedDate),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppAvatar(
-                  imageUrl: effectiveAvatar,
-                  name: emp.userName,
-                  size: 40,
+                Row(
+                  children: [
+                    AppAvatar(
+                      imageUrl: effectiveAvatar,
+                      name: emp.userName,
+                      size: 40,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            emp.userName,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: -0.2),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${emp.department} • ${emp.designation.isEmpty ? emp.role : emp.designation}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusColor.withAlpha(16),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 12, color: statusColor),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusLabel,
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: statusColor),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: isDark ? Colors.white30 : const Color(0xFFCBD5E1),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (emp.morning != null || emp.afternoon != null) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
                     children: [
-                      Text(
-                        emp.userName,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, letterSpacing: -0.2),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${emp.department} • ${emp.designation.isEmpty ? emp.role : emp.designation}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      if (emp.morning != null)
+                        _buildLocationBadge(emp.morning!, true, isDark, currentSettings),
+                      if (emp.afternoon != null)
+                        _buildLocationBadge(emp.afternoon!, false, isDark, currentSettings),
+                      if (emp.morning?.earlyDepartureReason != null)
+                        _buildEarlyLeaveBadge(emp.morning!.earlyDepartureReason!, isDark),
+                      if (emp.afternoon?.earlyDepartureReason != null &&
+                          emp.afternoon?.earlyDepartureReason != emp.morning?.earlyDepartureReason)
+                        _buildEarlyLeaveBadge(emp.afternoon!.earlyDepartureReason!, isDark),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withAlpha(16),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(statusIcon, size: 12, color: statusColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        statusLabel,
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: statusColor),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: isDark ? Colors.white30 : const Color(0xFFCBD5E1),
-                ),
+                ],
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLocationBadge(
+    AttendanceRecordModel record,
+    bool isMorning,
+    bool isDark,
+    AttendanceSettingsState? settings,
+  ) {
+    Color bgColor;
+    Color textColor;
+    Color borderColor;
+    IconData icon;
+    String text;
+
+    final sessionTag = isMorning ? 'AM' : 'PM';
+
+    if (record.isFieldDuty) {
+      bgColor = isDark ? const Color(0xFF312E81).withAlpha(100) : const Color(0xFFEEF2FF);
+      textColor = isDark ? const Color(0xFFA5B4FC) : const Color(0xFF4338CA);
+      borderColor = isDark ? const Color(0xFF4338CA).withAlpha(120) : const Color(0xFFC7D2FE);
+      icon = Icons.directions_car_rounded;
+      final site = record.fieldSite;
+      text = '$sessionTag: Field${site != null && site.isNotEmpty ? ' • $site' : ''}';
+    } else if (record.isHomeOffice) {
+      bgColor = isDark ? const Color(0xFF4C1D95).withAlpha(100) : const Color(0xFFF3E8FF);
+      textColor = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF6B21A8);
+      borderColor = isDark ? const Color(0xFF6B21A8).withAlpha(120) : const Color(0xFFE9D5FF);
+      icon = Icons.home_work_rounded;
+      text = '$sessionTag: Home Office';
+    } else {
+      // Office Mode
+      double? distMeters;
+      if (settings != null && settings.officeLatitude != 0 && record.latitude != null && record.longitude != null) {
+        distMeters = Geolocator.distanceBetween(
+          record.latitude!,
+          record.longitude!,
+          settings.officeLatitude,
+          settings.officeLongitude,
+        );
+      }
+
+      final allowedRadius = settings?.geofenceRadiusMeters ?? 200.0;
+      final isInside = record.isInsideGeofence || (distMeters != null && distMeters <= allowedRadius);
+      final isOutside = record.isOutsideGeofence || (distMeters != null && distMeters > allowedRadius);
+      final distText = record.geofenceDistanceText ??
+          (distMeters != null
+              ? (distMeters >= 1000
+                  ? '${(distMeters / 1000).toStringAsFixed(1)}km'
+                  : '${distMeters.toStringAsFixed(0)}m')
+              : null);
+
+      if (isOutside) {
+        bgColor = isDark ? const Color(0xFF7F1D1D).withAlpha(90) : const Color(0xFFFEF2F2);
+        textColor = isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626);
+        borderColor = isDark ? const Color(0xFF991B1B).withAlpha(120) : const Color(0xFFFECACA);
+        icon = Icons.warning_amber_rounded;
+        text = '$sessionTag: Office Outside${distText != null ? ' ($distText)' : ''}';
+      } else if (isInside) {
+        bgColor = isDark ? const Color(0xFF064E3B).withAlpha(90) : const Color(0xFFECFDF5);
+        textColor = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669);
+        borderColor = isDark ? const Color(0xFF047857).withAlpha(120) : const Color(0xFFA7F3D0);
+        icon = Icons.verified_rounded;
+        text = '$sessionTag: Office In-Range${distText != null ? ' ($distText)' : ''}';
+      } else {
+        bgColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+        textColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
+        borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+        icon = Icons.business_rounded;
+        text = '$sessionTag: Office';
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: borderColor, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: textColor),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: textColor,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEarlyLeaveBadge(String reason, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF78350F).withAlpha(90) : const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isDark ? const Color(0xFF92400E).withAlpha(120) : const Color(0xFFFDE68A),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.directions_run_rounded, size: 11, color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706)),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              'Early Leave: $reason',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFD97706),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -8,7 +8,10 @@ class TaskRepository {
 
   TaskRepository(this._client);
 
-  Future<List<TaskModel>> getTasks({String? projectId, String? assigneeId}) async {
+  Future<List<TaskModel>> getTasks({
+    String? projectId,
+    String? assigneeId,
+  }) async {
     final queryParams = <String, dynamic>{
       if (projectId != null) 'project_id': projectId,
       if (assigneeId != null) 'assignee_id': assigneeId,
@@ -40,9 +43,11 @@ class TaskRepository {
       body: task.toJson(),
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return TaskModel.fromJson(data);
   }
 
@@ -52,9 +57,24 @@ class TaskRepository {
       body: task.toJson(),
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
+    return TaskModel.fromJson(data);
+  }
+
+  Future<TaskModel> updateTaskStatus(String taskId, TaskStatus status) async {
+    final response = await _client.patch(
+      ApiEndpoints.taskById(taskId),
+      body: {'status': status.dbValue},
+    );
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return TaskModel.fromJson(data);
   }
 }

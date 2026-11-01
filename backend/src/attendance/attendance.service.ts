@@ -20,6 +20,7 @@ export interface AttendanceRecord {
   longitude: number | null;
   addressText: string;
   deviceInfo: string;
+  workMode: string;
   status: string;
   notes: string;
   createdAt: string;
@@ -228,6 +229,7 @@ export class AttendanceService {
     const address = dto.addressText || dto.address_text || '';
     const deviceInfo = dto.deviceInfo || '';
     let notes = dto.notes || '';
+    const workMode = dto.workMode || dto.work_mode || 'office';
     if (isEarly) {
       notes = notes ? `${notes} [Checked out before time]` : '[Checked out before time]';
     } else if (isLate) {
@@ -249,10 +251,10 @@ export class AttendanceService {
       throw new ConflictException(`You have already checked in for the ${session} session on ${targetDate}.`);
     } else {
       const res = await this.db.query(
-        `INSERT INTO attendance_records (user_id, date, session_type, login_time, latitude, longitude, address_text, device_info, status, notes)
-         VALUES ($1, $2, $3, clock_timestamp(), $4, $5, $6, $7, 'present', $8)
+        `INSERT INTO attendance_records (user_id, date, session_type, login_time, latitude, longitude, address_text, device_info, status, notes, work_mode)
+         VALUES ($1, $2, $3, clock_timestamp(), $4, $5, $6, $7, 'present', $8, $9)
          RETURNING id`,
-        [userId, targetDate, session, dto.latitude, dto.longitude, address, deviceInfo, notes],
+        [userId, targetDate, session, dto.latitude, dto.longitude, address, deviceInfo, notes, workMode],
       );
       recordId = res.rows[0].id;
       this.logger.log(`Created new attendance check-in for user ${userId} (${session}) on ${targetDate} at [${dto.latitude}, ${dto.longitude}]`);
@@ -349,7 +351,7 @@ export class AttendanceService {
               u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
               a.login_time::text as "loginTime", a.latitude, a.longitude,
               a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.created_at::text as "createdAt"
+              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
        WHERE a.id = $1`,
@@ -368,7 +370,7 @@ export class AttendanceService {
                       u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
                       a.login_time::text as "loginTime", a.latitude, a.longitude,
                       a.address_text as "addressText", a.device_info as "deviceInfo",
-                      a.status, a.notes, a.created_at::text as "createdAt"
+                      a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
                FROM attendance_records a
                JOIN users u ON a.user_id = u.id
                WHERE u.is_active = TRUE`;
@@ -402,7 +404,7 @@ export class AttendanceService {
               u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
               a.login_time::text as "loginTime", a.latitude, a.longitude,
               a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.created_at::text as "createdAt"
+              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
        WHERE a.user_id = $1 AND a.date >= $2 AND a.date < $3 AND u.is_active = TRUE
@@ -424,7 +426,7 @@ export class AttendanceService {
               u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
               a.login_time::text as "loginTime", a.latitude, a.longitude,
               a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.created_at::text as "createdAt"
+              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
        WHERE a.date >= $1 AND a.date < $2 AND u.is_active = TRUE
@@ -459,7 +461,7 @@ export class AttendanceService {
               u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
               a.login_time::text as "loginTime", a.latitude, a.longitude,
               a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.created_at::text as "createdAt"
+              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
        WHERE a.date = $1 AND u.is_active = TRUE`,

@@ -50,27 +50,29 @@ export class NotificationsService {
       createdAt: r.created_at,
       relatedProjectId: r.related_project_id,
       relatedExpenseId: r.related_expense_id,
+      relatedTaskId: r.related_task_id,
     }));
   }
 
   async create(data: {
-    userId: string;
+    userId?: string | null;
     title: string;
     message: string;
     fullExplanation?: string;
     type?: string;
     relatedProjectId?: string;
     relatedExpenseId?: string;
+    relatedTaskId?: string;
     actorId?: string;
     actorName?: string;
     actorAvatarUrl?: string;
   }) {
     const res = await this.db.query(
-      `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
-        data.userId,
+        data.userId || null,
         data.title,
         data.message,
         data.fullExplanation || data.message,
@@ -80,6 +82,7 @@ export class NotificationsService {
         data.actorId || null,
         data.actorName || null,
         data.actorAvatarUrl || null,
+        data.relatedTaskId || null,
       ],
     );
 
@@ -91,6 +94,7 @@ export class NotificationsService {
       };
       if (data.relatedExpenseId) payloadData.expenseId = data.relatedExpenseId;
       if (data.relatedProjectId) payloadData.projectId = data.relatedProjectId;
+      if (data.relatedTaskId) payloadData.taskId = data.relatedTaskId;
       if (data.actorId) payloadData.actorId = data.actorId;
       if (data.actorName) payloadData.actorName = data.actorName;
       if (data.actorAvatarUrl) payloadData.actorAvatarUrl = data.actorAvatarUrl;

@@ -10,10 +10,12 @@ import '../../core/widgets/expense_list_row.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../models/task_model.dart';
+import '../../models/user_role.dart';
+import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/task_provider.dart';
 
-class TaskDetailScreen extends ConsumerWidget {
+class TaskDetailScreen extends ConsumerStatefulWidget {
   final String taskId;
 
   const TaskDetailScreen({
@@ -22,12 +24,19 @@ class TaskDetailScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TaskDetailScreen> createState() => _TaskDetailScreenState();
+}
+
+class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
+  bool _updating = false;
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allTasks = ref.watch(taskProvider);
     final allExpenses = ref.watch(expenseProvider);
 
-    final match = allTasks.where((t) => t.id == taskId);
+    final match = allTasks.where((t) => t.id == widget.taskId);
     if (match.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Task Detail')),
@@ -37,6 +46,9 @@ class TaskDetailScreen extends ConsumerWidget {
 
     final task = match.first;
     final isCompleted = task.status == TaskStatus.completed;
+    final role = ref.watch(authProvider).currentUser?.role;
+    final canManage = role == UserRole.mainAdmin || role == UserRole.projectManager;
+    final canUpdateStatus = canManage || role == UserRole.projectMember;
 
     // Expenses linked to this task (PRD Section 4.4)
     final linkedExpenses = allExpenses.where((e) => e.taskId == task.id).toList();
@@ -54,6 +66,7 @@ class TaskDetailScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
         actions: [
+          if (canManage)
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Edit Task',
@@ -136,7 +149,7 @@ class TaskDetailScreen extends ConsumerWidget {
               const SizedBox(height: 20),
 
               // Mark Complete Toggle Button (PRD Section 4.4)
-              SizedBox(
+          if (canUpdateStatus) SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   icon: Icon(
@@ -144,12 +157,18 @@ class TaskDetailScreen extends ConsumerWidget {
                     color: isCompleted ? AppColors.textSecondary : AppColors.emerald,
                   ),
                   label: Text(isCompleted ? 'Mark as In Progress' : 'Mark Task Complete'),
-                  onPressed: () {
-                    ref.read(taskProvider.notifier).toggleTaskComplete(task.id);
-                    NotificationBanner.showSuccess(
-                      context,
-                      isCompleted ? 'Task reopened.' : 'Task marked complete!',
-                    );
+                  onPressed: _updating ? null : () async {
+                    setState(() => _updating = true);
+                    try {
+                      await ref.read(taskProvider.notifier).toggleTaskComplete(task.id);
+                      if (!context.mounted) return;
+                      NotificationBanner.showSuccess(context, isCompleted ? 'Task reopened.' : 'Task marked complete!');
+                    } catch (_) {
+                      if (!context.mounted) return;
+                      NotificationBanner.showError(context, 'Task status could not be saved. Please retry.');
+                    } finally {
+                      if (mounted) setState(() => _updating = false);
+                    }
                   },
                 ),
               ),
