@@ -63,54 +63,58 @@ export class ChatService {
    */
   private async ensureUserProjectChannels(userId: string): Promise<void> {
     try {
-      const userRes = await this.db.query(`SELECT role FROM users WHERE id = $1`, [userId]);
-      if (userRes.rows.length === 0) return;
-      const role = userRes.rows[0].role;
-      const isAdminOrManager = role === 'main_admin' || role === 'project_manager' || role === 'finance';
-
-      const projQuery = isAdminOrManager
-        ? `SELECT p.id, p.name, p.project_code, p.created_by FROM projects p WHERE p.is_closed = FALSE`
-        : `SELECT p.id, p.name, p.project_code, p.created_by FROM projects p 
-           WHERE p.is_closed = FALSE 
-             AND (p.created_by = $1 OR p.id IN (SELECT project_id FROM project_members WHERE user_id = $1))`;
-
-      const projects = await this.db.query(projQuery, isAdminOrManager ? [] : [userId]);
-
-      for (const proj of projects.rows) {
-        const existing = await this.db.query(
-          `SELECT id FROM chat_channels WHERE type = 'project' AND project_id = $1 LIMIT 1`,
-          [proj.id],
-        );
-        let channelId: string;
-        if (existing.rows.length > 0) {
-          channelId = existing.rows[0].id;
-        } else {
-          const newChan = await this.db.query(
-            `INSERT INTO chat_channels (type, name, project_id, created_by)
-             VALUES ('project', $1, $2, $3)
-             RETURNING id`,
-            [proj.name, proj.id, proj.created_by || userId],
-          );
-          channelId = newChan.rows[0].id;
-        }
-
-        await this.db.query(
-          `INSERT INTO chat_participants (channel_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-          [channelId, userId],
-        );
-      }
+      await this.db.query(
+        `
+        WITH user_scope AS (
+          SELECT id, role FROM users WHERE id = $1
+        ), eligible_projects AS (
+          SELECT p.id, p.name, p.created_by
+          FROM projects p
+          CROSS JOIN user_scope u
+          WHERE p.is_closed = FALSE
+            AND (
+              u.role IN ('main_admin', 'project_manager', 'finance')
+              OR p.created_by = u.id
+              OR EXISTS (
+                SELECT 1 FROM project_members pm
+                WHERE pm.project_id = p.id AND pm.user_id = u.id
+              )
+            )
+        ), new_channels AS (
+          INSERT INTO chat_channels (type, name, project_id, created_by)
+          SELECT 'project', p.name, p.id, COALESCE(p.created_by, $1)
+          FROM eligible_projects p
+          WHERE NOT EXISTS (
+            SELECT 1 FROM chat_channels c
+            WHERE c.type = 'project' AND c.project_id = p.id
+          )
+          RETURNING id, project_id
+        ), eligible_channels AS (
+          SELECT c.id
+          FROM chat_channels c
+          JOIN eligible_projects p ON p.id = c.project_id
+          WHERE c.type = 'project'
+          UNION ALL
+          SELECT id FROM new_channels
+        )
+        INSERT INTO chat_participants (channel_id, user_id)
+        SELECT id, $1 FROM eligible_channels
+        ON CONFLICT (channel_id, user_id) DO NOTHING
+        `,
+        [userId],
+      );
     } catch (e) {
       this.logger.error('Error in ensureUserProjectChannels', e);
+      throw e;
     }
   }
 
   /**
    * Get all conversation channels for the given user with unread counts and last message.
-   * Runs ensureUserProjectChannels in background (non-blocking) for instant response.
+   * Ensures project channels before listing so the first response is complete.
    */
   async getUserChannels(userId: string): Promise<ChatChannelSummary[]> {
-    // Run project channel sync in background — don't block the list load
-    this.ensureUserProjectChannels(userId).catch(() => {});
+    await this.ensureUserProjectChannels(userId);
 
     const query = `
       SELECT 

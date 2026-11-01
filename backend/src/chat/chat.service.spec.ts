@@ -30,3 +30,28 @@ describe('ChatService.getChannelMessages', () => {
     expect(startedWithoutWaitingForReadWrite).toBe(true);
   });
 });
+
+describe('ChatService.getUserChannels', () => {
+  it('waits for channel sync before returning the first channel list', async () => {
+    let finishSync: (() => void) | undefined;
+    let channelListRead = false;
+    const db = {
+      query: jest.fn((sql: string) => {
+        if (sql.includes('FROM chat_participants cp')) channelListRead = true;
+        return Promise.resolve({ rows: [] });
+      }),
+    };
+    const service = new ChatService(db as any, {} as any, {} as any);
+    jest.spyOn(service as any, 'ensureUserProjectChannels').mockImplementation(
+      () => new Promise<void>((resolve) => { finishSync = resolve; }),
+    );
+
+    const result = service.getUserChannels('user-1');
+    await new Promise((resolve) => setImmediate(resolve));
+    const listReadBeforeSync = channelListRead;
+    finishSync?.();
+    await result;
+
+    expect(listReadBeforeSync).toBe(false);
+  });
+});
