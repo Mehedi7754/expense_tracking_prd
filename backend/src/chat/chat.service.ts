@@ -331,6 +331,7 @@ export class ChatService {
    * Get messages for a channel. Auto marks as read for current user.
    */
   async getChannelMessages(channelId: string, userId: string, limit = 50) {
+    const boundedLimit = Math.min(Math.max(Math.floor(limit) || 50, 1), 100);
     const partCheck = await this.db.query(
       `SELECT id FROM chat_participants WHERE channel_id = $1 AND user_id = $2`,
       [channelId, userId],
@@ -346,11 +347,6 @@ export class ChatService {
       );
     }
 
-    await this.db.query(
-      `UPDATE chat_participants SET last_read_at = NOW() WHERE channel_id = $1 AND user_id = $2`,
-      [channelId, userId],
-    );
-
     const msgQuery = `
       SELECT 
         m.id,
@@ -363,22 +359,25 @@ export class ChatService {
         m.created_at,
         u.full_name AS sender_name,
         u.avatar_url AS sender_avatar_url,
-        u.role AS sender_role,
-        p.name AS project_name,
-        p.project_code AS project_code,
-        p.status AS project_status,
-        p.budget AS project_budget,
-        p.image_url AS project_image_url,
-        (SELECT COALESCE(SUM(e.amount), 0) FROM expenses e WHERE e.project_id = p.id AND e.status = 'approved') AS project_spent
-      FROM chat_messages m
+        u.role AS sender_role
+      FROM (
+        SELECT id, channel_id, sender_id, content, image_url, project_id, reply_to_id, created_at
+        FROM chat_messages
+        WHERE channel_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2
+      ) m
       JOIN users u ON u.id = m.sender_id
-      LEFT JOIN projects p ON p.id = m.project_id
-      WHERE m.channel_id = $1
       ORDER BY m.created_at ASC
-      LIMIT $2;
     `;
 
-    const res = await this.db.query(msgQuery, [channelId, limit]);
+    const [res] = await Promise.all([
+      this.db.query(msgQuery, [channelId, boundedLimit]),
+      this.db.query(
+        `UPDATE chat_participants SET last_read_at = NOW() WHERE channel_id = $1 AND user_id = $2`,
+        [channelId, userId],
+      ),
+    ]);
 
     return res.rows.map((r) => ({
       id: r.id,
@@ -390,12 +389,6 @@ export class ChatService {
       content: r.content,
       imageUrl: r.image_url,
       projectId: r.project_id,
-      projectName: r.project_name,
-      projectCode: r.project_code,
-      projectStatus: r.project_status,
-      projectBudget: r.project_budget ? Number(r.project_budget) : undefined,
-      projectSpent: r.project_spent ? Number(r.project_spent) : undefined,
-      projectImageUrl: r.project_image_url,
       replyToId: r.reply_to_id,
       createdAt: r.created_at,
       isMe: r.sender_id === userId,
