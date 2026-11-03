@@ -47,5 +47,13 @@ export class CheckInDto {
 
   @IsOptional()
   @IsString()
+  fieldProjectId?: string;
+
+  @IsOptional()
+  @IsString()
+  field_project_id?: string;
+
+  @IsOptional()
+  @IsString()
   date?: string;
 }

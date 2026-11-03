@@ -31,6 +31,23 @@ describe('AttendanceService Unit & Session Logic', () => {
       jest.useRealTimers();
     });
 
+    it('rejects field attendance outside the assigned project geofence', async () => {
+      mockDb.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'project-1', name: 'Survey Site', project_code: 'PRJ-1', site_latitude: 23.81, site_longitude: 90.41 }] });
+
+      await expect(service.checkIn('user-emp-1', {
+        sessionType: 'morning',
+        latitude: 24.81,
+        longitude: 90.41,
+        workMode: 'field',
+        fieldProjectId: 'project-1',
+      })).rejects.toThrow('Outside the Survey Site field site geofence');
+
+      expect(mockDb.query).toHaveBeenCalledTimes(3);
+    });
+
     it('creates attendance record for a valid check-in', async () => {
       const userId = 'user-emp-1';
       const checkInDto = {

@@ -207,6 +207,47 @@ export class AttendanceService {
       this.logger.log(`Privileged user ${userId} (${user.role}) is recording check-in.`);
     }
 
+    const workMode = dto.workMode || dto.work_mode || 'office';
+    let fieldSiteNote = '';
+    if (workMode === 'field') {
+      const fieldProjectId = dto.fieldProjectId || dto.field_project_id;
+      if (!fieldProjectId) {
+        throw new BadRequestException('Select a project with a saved field site before checking in.');
+      }
+      const isPrivileged = user?.role === 'main_admin' || user?.role === 'finance' || user?.role === 'finance_manager';
+      const siteRes = await this.db.query(
+        `SELECT p.id, p.name, p.project_code, p.site_latitude, p.site_longitude
+         FROM projects p
+         WHERE p.id::text = $1
+           AND ($3::boolean OR p.created_by = $2 OR EXISTS (
+             SELECT 1 FROM project_members pm WHERE pm.project_id = p.id AND pm.user_id = $2
+           ))
+         LIMIT 1`,
+        [fieldProjectId, userId, isPrivileged],
+      );
+      const site = siteRes.rows[0];
+      if (!site) throw new ForbiddenException('You are not assigned to the selected field project.');
+      if (site.site_latitude == null || site.site_longitude == null) {
+        throw new BadRequestException('The selected project has no saved site pin. Ask an admin to set its field site.');
+      }
+      const latitude = Number(dto.latitude);
+      const longitude = Number(dto.longitude);
+      const siteLatitude = Number(site.site_latitude);
+      const siteLongitude = Number(site.site_longitude);
+      const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+      const earthRadiusMeters = 6371000;
+      const deltaLat = toRadians(siteLatitude - latitude);
+      const deltaLng = toRadians(siteLongitude - longitude);
+      const a = Math.sin(deltaLat / 2) ** 2 +
+        Math.cos(toRadians(latitude)) * Math.cos(toRadians(siteLatitude)) * Math.sin(deltaLng / 2) ** 2;
+      const distanceMeters = earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const radiusMeters = Number(this.officeTimingSettings.geofenceRadiusMeters) || 200;
+      if (this.officeTimingSettings.isGeofenceEnforced && distanceMeters > radiusMeters) {
+        throw new BadRequestException(`Outside the ${site.name} field site geofence (${Math.round(distanceMeters)}m away; ${radiusMeters}m allowed).`);
+      }
+      fieldSiteNote = ` [Field project: ${site.name} (${site.project_code})] [Site geofence: ${Math.round(distanceMeters)}m from pin]`;
+    }
+
     // 2. Resolve local office hour (Bangladesh Standard Time: UTC+6) and assigned user shift
     const dhakaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
     const currentHour = dhakaNow.getHours();
@@ -246,7 +287,7 @@ export class AttendanceService {
     const address = dto.addressText || dto.address_text || '';
     const deviceInfo = dto.deviceInfo || '';
     let notes = dto.notes || '';
-    const workMode = dto.workMode || dto.work_mode || 'office';
+    notes = `${notes}${fieldSiteNote}`.trim();
     if (isEarly) {
       notes = notes ? `${notes} [Checked out before time]` : '[Checked out before time]';
     } else if (isLate) {
