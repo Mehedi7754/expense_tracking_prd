@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 
 describe('ProjectsService Unit & Access Rules', () => {
@@ -15,6 +15,24 @@ describe('ProjectsService Unit & Access Rules', () => {
       log: jest.fn().mockResolvedValue(true),
     };
     service = new ProjectsService(mockDb, mockAudit);
+  });
+
+  it('maps saved site coordinates and rejects incomplete or out-of-range pins', () => {
+    const mapped = (service as any).mapProjectRow({
+      id: 'p1', project_code: 'PRJ-1', name: 'Survey',
+      site_latitude: '23.8103000', site_longitude: '90.4125000',
+    });
+    expect(mapped.siteLatitude).toBe(23.8103);
+    expect(mapped.siteLongitude).toBe(90.4125);
+    expect((service as any).parseSiteLocation({ siteLatitude: 23.81, siteLongitude: 90.41 }))
+      .toEqual({ lat: 23.81, lng: 90.41 });
+    expect((service as any).parseSiteLocation({ siteLatitude: null, siteLongitude: null },
+      { siteLatitude: 23.81, siteLongitude: 90.41 }))
+      .toEqual({ lat: null, lng: null });
+    expect(() => (service as any).parseSiteLocation({ siteLatitude: 91, siteLongitude: 90 }))
+      .toThrow(BadRequestException);
+    expect(() => (service as any).parseSiteLocation({ siteLatitude: 23.81 }))
+      .toThrow(BadRequestException);
   });
 
   describe('IDOR & Project Visibility', () => {

@@ -99,6 +99,12 @@ export class AttendanceService {
       },
     ] as ShiftDefinition[],
     userShifts: {} as Record<string, string>,
+    officeLatitude: 23.7925,
+    officeLongitude: 90.4078,
+    officeName: 'Office',
+    officeAddress: '',
+    geofenceRadiusMeters: 200,
+    isGeofenceEnforced: true,
   };
 
   async getTimingSettings() {
@@ -115,6 +121,16 @@ export class AttendanceService {
   }
 
   async updateTimingSettings(settings: Partial<typeof this.officeTimingSettings>) {
+    if (settings.officeLatitude !== undefined || settings.officeLongitude !== undefined || settings.geofenceRadiusMeters !== undefined) {
+      const lat = settings.officeLatitude ?? this.officeTimingSettings.officeLatitude;
+      const lng = settings.officeLongitude ?? this.officeTimingSettings.officeLongitude;
+      const radius = settings.geofenceRadiusMeters ?? this.officeTimingSettings.geofenceRadiusMeters;
+      if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+          !Number.isFinite(lng) || lng < -180 || lng > 180 ||
+          !Number.isFinite(radius) || radius < 25 || radius > 1000) {
+        throw new BadRequestException('Invalid office coordinates or geofence radius');
+      }
+    }
     this.officeTimingSettings = {
       ...this.officeTimingSettings,
       ...settings,
@@ -157,6 +173,7 @@ export class AttendanceService {
       );
     } catch (e) {
       this.logger.warn(`Could not persist timing settings to db: ${e}`);
+      throw e;
     }
     return this.officeTimingSettings;
   }

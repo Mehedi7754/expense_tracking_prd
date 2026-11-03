@@ -1,9 +1,25 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class ProjectsService {
+  private parseSiteLocation(data: any, current?: { siteLatitude?: number | null; siteLongitude?: number | null }) {
+    const latRaw = data.siteLatitude !== undefined ? data.siteLatitude : data.site_latitude;
+    const lngRaw = data.siteLongitude !== undefined ? data.siteLongitude : data.site_longitude;
+    const latGiven = data.siteLatitude !== undefined || data.site_latitude !== undefined;
+    const lngGiven = data.siteLongitude !== undefined || data.site_longitude !== undefined;
+    if (!latGiven && !lngGiven) return null;
+    const lat = latGiven ? (latRaw === null ? null : Number(latRaw)) : current?.siteLatitude ?? null;
+    const lng = lngGiven ? (lngRaw === null ? null : Number(lngRaw)) : current?.siteLongitude ?? null;
+    if ((lat === null) !== (lng === null) ||
+        (lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
+        (lng !== null && (!Number.isFinite(lng) || lng < -180 || lng > 180))) {
+      throw new BadRequestException('Provide a valid project site latitude and longitude together');
+    }
+    return { lat, lng };
+  }
+
   constructor(
     private readonly db: DatabaseService,
     private readonly auditLogsService: AuditLogsService,
@@ -27,6 +43,7 @@ export class ProjectsService {
       grossProjectValue: Number(p.gross_project_value),
       taxStatus: p.tax_status,
       taxRate: Number(p.tax_rate),
+      incomeTaxRate: Number((p.category_budgets || {})._meta_income_tax_rate || 0),
       expectedNetRevenue: Number(p.expected_net_revenue),
       advanceReceived: Number(p.advance_received),
       amountReceived: Number(p.amount_received),
@@ -44,6 +61,8 @@ export class ProjectsService {
       createdById: p.created_by,
       teamMemberIds: memberIds,
       imageUrl: p.image_url || null,
+      siteLatitude: p.site_latitude == null ? null : Number(p.site_latitude),
+      siteLongitude: p.site_longitude == null ? null : Number(p.site_longitude),
       progressPercentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
       progress_percentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
       progressNotes: typeof p.progress_notes === 'string' ? JSON.parse(p.progress_notes) : (p.progress_notes || []),
@@ -200,6 +219,7 @@ export class ProjectsService {
       }
 
       const imageUrl = data.imageUrl || data.image_url || null;
+      const site = this.parseSiteLocation(data);
       const rawProgress = Number(data.progressPercentage ?? data.progress_percentage ?? data.categoryBudgets?._meta_progress ?? data.category_budgets?._meta_progress ?? 0);
       const initialProgress = Math.max(0, Math.min(100, isNaN(rawProgress) ? 0 : rawProgress));
       const initialNotes = data.progressNotes ?? data.progress_notes ?? [];
@@ -211,14 +231,14 @@ export class ProjectsService {
           advance_received, amount_received, amount_receivable, budget,
           category_budgets, estimated_remaining_cost, office_benefit_rate,
           start_date, end_date, status, created_by, image_url,
-          progress_percentage, progress_notes
+          progress_percentage, progress_notes, site_latitude, site_longitude
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7,
           $8, $9, $10, $11,
           $12, $13, $14, $15,
           $16, $17, $18,
           $19, $20, $21, $22, $23,
-          $24, $25
+          $24, $25, $26, $27
         ) RETURNING *`,
         [
           projectCode,
@@ -246,6 +266,8 @@ export class ProjectsService {
           imageUrl,
           initialProgress,
           JSON.stringify(initialNotes),
+          site?.lat ?? null,
+          site?.lng ?? null,
         ],
       );
 
@@ -314,6 +336,11 @@ export class ProjectsService {
     const fields: string[] = [];
     const values: any[] = [];
     let idx = 1;
+    const site = this.parseSiteLocation(data, existing);
+    if (site) {
+      fields.push(`site_latitude = $${idx++}`, `site_longitude = $${idx++}`);
+      values.push(site.lat, site.lng);
+    }
 
     if (data.name !== undefined) {
       fields.push(`name = $${idx++}`);
@@ -322,6 +349,48 @@ export class ProjectsService {
     if (data.description !== undefined) {
       fields.push(`description = $${idx++}`);
       values.push(data.description);
+    }
+    const textFields: Array<[string, string[]]> = [
+      ['client_name', ['client', 'client_name']],
+      ['client_type', ['clientType', 'client_type']],
+      ['assignment_type', ['assignmentType', 'assignment_type']],
+      ['tax_status', ['taxStatus', 'tax_status']],
+      ['status', ['status']],
+    ];
+    for (const [column, keys] of textFields) {
+      const key = keys.find((candidate) => data[candidate] !== undefined);
+      if (key) {
+        fields.push(`${column} = $${idx++}`);
+        values.push(data[key]);
+      }
+    }
+    const monetaryFields: Array<[string, string[]]> = [
+      ['gross_project_value', ['grossProjectValue', 'gross_project_value']],
+      ['tax_rate', ['taxRate', 'tax_rate']],
+      ['expected_net_revenue', ['expectedNetRevenue', 'expected_net_revenue']],
+      ['advance_received', ['advanceReceived', 'advance_received']],
+      ['amount_received', ['amountReceived', 'amount_received']],
+      ['amount_receivable', ['amountReceivable', 'amount_receivable']],
+      ['office_benefit_rate', ['officeBenefitRate', 'office_benefit_rate']],
+    ];
+    for (const [column, keys] of monetaryFields) {
+      const key = keys.find((candidate) => data[candidate] !== undefined);
+      if (key) {
+        const value = Number(data[key]);
+        fields.push(`${column} = $${idx++}`);
+        values.push(Math.max(0, isNaN(value) ? 0 : value));
+      }
+    }
+    const dateFields: Array<[string, string[]]> = [
+      ['start_date', ['startDate', 'start_date']],
+      ['end_date', ['endDate', 'end_date']],
+    ];
+    for (const [column, keys] of dateFields) {
+      const key = keys.find((candidate) => data[candidate] !== undefined);
+      if (key) {
+        fields.push(`${column} = $${idx++}`);
+        values.push(data[key]);
+      }
     }
     if (data.budget !== undefined) {
       fields.push(`budget = $${idx++}`);
@@ -332,10 +401,6 @@ export class ProjectsService {
       fields.push(`estimated_remaining_cost = $${idx++}`);
       const val = Number(data.estimatedRemainingCost ?? data.estimated_remaining_cost);
       values.push(Math.max(0, isNaN(val) ? 0 : val));
-    }
-    if (data.status !== undefined) {
-      fields.push(`status = $${idx++}`);
-      values.push(data.status);
     }
     if (data.categoryBudgets !== undefined || data.category_budgets !== undefined) {
       const catBudgets = data.categoryBudgets ?? data.category_budgets;

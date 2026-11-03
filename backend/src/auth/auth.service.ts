@@ -37,15 +37,16 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const email = dto.email.trim().toLowerCase();
+    const identifier = dto.email.trim();
+    const normalizedIdentifier = identifier.toLowerCase();
     let res = await this.db.query(
-      `SELECT u.id, u.email, u.password_hash, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url,
+      `SELECT u.id, u.employee_code, u.email, u.password_hash, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.home_latitude, u.home_longitude,
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
-       WHERE u.email = $1 AND u.is_active = TRUE
+       WHERE (LOWER(u.email::text) = $1 OR LOWER(COALESCE(u.employee_code, '')) = $1) AND u.is_active = TRUE
        GROUP BY u.id`,
-      [email],
+      [normalizedIdentifier],
     );
 
     if (!res.rows.length) {
@@ -74,6 +75,7 @@ export class AuthService {
 
     const user = {
       id: userRow.id,
+      employeeCode: userRow.employee_code || '',
       name: userRow.full_name,
       email: userRow.email,
       role: userRow.role,
@@ -81,6 +83,8 @@ export class AuthService {
       designation: userRow.designation,
       phone: userRow.phone,
       avatarUrl: userRow.avatar_url,
+      homeLatitude: userRow.home_latitude === null ? null : Number(userRow.home_latitude),
+      homeLongitude: userRow.home_longitude === null ? null : Number(userRow.home_longitude),
       assignedProjectIds: userRow.assigned_project_ids,
     };
 
@@ -99,7 +103,7 @@ export class AuthService {
 
   async getProfile(userId: string) {
     const res = await this.db.query(
-      `SELECT u.id, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url,
+      `SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.home_latitude, u.home_longitude,
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
@@ -115,6 +119,7 @@ export class AuthService {
     const row = res.rows[0];
     return {
       id: row.id,
+      employeeCode: row.employee_code || '',
       name: row.full_name,
       email: row.email,
       role: row.role,
@@ -122,6 +127,8 @@ export class AuthService {
       designation: row.designation,
       phone: row.phone,
       avatarUrl: row.avatar_url,
+      homeLatitude: row.home_latitude === null ? null : Number(row.home_latitude),
+      homeLongitude: row.home_longitude === null ? null : Number(row.home_longitude),
       assignedProjectIds: row.assigned_project_ids,
     };
   }
@@ -156,27 +163,33 @@ export class AuthService {
       values.push(data.department);
     }
 
+    if (data.homeLatitude !== undefined || data.home_latitude !== undefined || data.homeLongitude !== undefined || data.home_longitude !== undefined) {
+      const latitude = data.homeLatitude ?? data.home_latitude ?? null;
+      const longitude = data.homeLongitude ?? data.home_longitude ?? null;
+      if ((latitude === null) !== (longitude === null)) {
+        throw new BadRequestException('Both home location coordinates are required.');
+      }
+      if (latitude !== null && (!Number.isFinite(Number(latitude)) || Number(latitude) < -90 || Number(latitude) > 90 || !Number.isFinite(Number(longitude)) || Number(longitude) < -180 || Number(longitude) > 180)) {
+        throw new BadRequestException('Home location coordinates are invalid.');
+      }
+      fields.push(`home_latitude = $${idx++}`);
+      values.push(latitude === null ? null : Number(latitude));
+      fields.push(`home_longitude = $${idx++}`);
+      values.push(longitude === null ? null : Number(longitude));
+    }
+
     if (!fields.length) {
       return this.getProfile(userId);
     }
 
     values.push(userId);
-    const sql = `UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id::text = $${idx} OR email ILIKE $${idx} RETURNING id, email, full_name, role, department, designation, phone, avatar_url`;
+    const sql = `UPDATE users SET ${fields.join(', ')}, updated_at = NOW() WHERE id::text = $${idx} OR email ILIKE $${idx} RETURNING id, email, full_name, role, department, designation, phone, avatar_url, home_latitude, home_longitude`;
     const res = await this.db.query(sql, values);
     if (!res.rows.length) {
       throw new UnauthorizedException('User not found');
     }
     const r = res.rows[0];
-    const userObj = {
-      id: r.id,
-      name: r.full_name,
-      email: r.email,
-      role: r.role,
-      department: r.department,
-      designation: r.designation,
-      phone: r.phone,
-      avatarUrl: r.avatar_url,
-    };
+    const userObj = await this.getProfile(r.id);
     return {
       ...userObj,
       user: userObj,
@@ -185,7 +198,7 @@ export class AuthService {
 
   async updateAvatar(userId: string, avatarUrl: string | null) {
     const res = await this.db.query(
-      `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id::text = $2 OR email ILIKE $2 RETURNING id, email, full_name, role, department, designation, phone, avatar_url`,
+      `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id::text = $2 OR email ILIKE $2 RETURNING id, email, full_name, role, department, designation, phone, avatar_url, home_latitude, home_longitude`,
       [avatarUrl, userId],
     );
     if (!res.rows.length) {
@@ -201,6 +214,8 @@ export class AuthService {
       designation: r.designation,
       phone: r.phone,
       avatarUrl: r.avatar_url,
+      homeLatitude: r.home_latitude === null ? null : Number(r.home_latitude),
+      homeLongitude: r.home_longitude === null ? null : Number(r.home_longitude),
     };
     return {
       ...userObj,

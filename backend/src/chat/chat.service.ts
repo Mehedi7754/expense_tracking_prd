@@ -24,6 +24,7 @@ export interface ChatChannelSummary {
     id: string;
     content: string;
     imageUrl?: string;
+    fileName?: string;
     senderId: string;
     senderName: string;
     createdAt: string;
@@ -138,6 +139,7 @@ export class ChatService {
         lm.id AS last_msg_id,
         lm.content AS last_msg_content,
         lm.image_url AS last_msg_image_url,
+        lm.file_name AS last_msg_file_name,
         lm.project_id AS last_msg_project_id,
         lm.created_at AS last_msg_created_at,
         lm.sender_id AS last_msg_sender_id,
@@ -152,7 +154,7 @@ export class ChatService {
       JOIN chat_channels c ON c.id = cp.channel_id
       LEFT JOIN projects p ON p.id = c.project_id
       LEFT JOIN LATERAL (
-        SELECT cm.id, cm.content, cm.image_url, cm.project_id, cm.created_at, cm.sender_id
+        SELECT cm.id, cm.content, cm.image_url, cm.file_name, cm.project_id, cm.created_at, cm.sender_id
         FROM chat_messages cm
         WHERE cm.channel_id = c.id
         ORDER BY cm.created_at DESC
@@ -210,6 +212,7 @@ export class ChatService {
           id: r.last_msg_id,
           content: r.last_msg_content,
           imageUrl: r.last_msg_image_url,
+          fileName: r.last_msg_file_name,
           senderId: r.last_msg_sender_id,
           senderName: r.last_msg_sender_name || 'Colleague',
           createdAt: r.last_msg_created_at,
@@ -358,6 +361,9 @@ export class ChatService {
         m.sender_id,
         m.content,
         m.image_url,
+        m.file_url,
+        m.file_name,
+        m.file_mime_type,
         m.project_id,
         m.reply_to_id,
         m.created_at,
@@ -365,7 +371,7 @@ export class ChatService {
         u.avatar_url AS sender_avatar_url,
         u.role AS sender_role
       FROM (
-        SELECT id, channel_id, sender_id, content, image_url, project_id, reply_to_id, created_at
+        SELECT id, channel_id, sender_id, content, image_url, file_url, file_name, file_mime_type, project_id, reply_to_id, created_at
         FROM chat_messages
         WHERE channel_id = $1
         ORDER BY created_at DESC
@@ -392,6 +398,9 @@ export class ChatService {
       senderRole: r.sender_role,
       content: r.content,
       imageUrl: r.image_url,
+      fileUrl: r.file_url,
+      fileName: r.file_name,
+      fileMimeType: r.file_mime_type,
       projectId: r.project_id,
       replyToId: r.reply_to_id,
       createdAt: r.created_at,
@@ -409,8 +418,11 @@ export class ChatService {
     content: string,
     imageUrl?: string,
     projectId?: string,
+    fileUrl?: string,
+    fileName?: string,
+    fileMimeType?: string,
   ) {
-    if ((!content || content.trim().length === 0) && !imageUrl && !projectId) {
+    if ((!content || content.trim().length === 0) && !imageUrl && !projectId && !fileUrl) {
       throw new BadRequestException('Message cannot be empty');
     }
 
@@ -433,11 +445,11 @@ export class ChatService {
 
     const insRes = await this.db.query(
       `
-      INSERT INTO chat_messages (channel_id, sender_id, content, image_url, project_id)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO chat_messages (channel_id, sender_id, content, image_url, project_id, file_url, file_name, file_mime_type)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
       `,
-      [channelId, userId, content ? content.trim() : '', imageUrl || null, projectId || null],
+      [channelId, userId, content ? content.trim() : '', imageUrl || null, projectId || null, fileUrl || null, fileName || null, fileMimeType || null],
     );
     const msg = insRes.rows[0];
 
@@ -474,6 +486,9 @@ export class ChatService {
       senderRole: sender.role,
       content: msg.content,
       imageUrl: msg.image_url,
+      fileUrl: msg.file_url,
+      fileName: msg.file_name,
+      fileMimeType: msg.file_mime_type,
       projectId: msg.project_id,
       projectName: mentionedProj?.name,
       projectCode: mentionedProj?.project_code,
@@ -515,6 +530,8 @@ export class ChatService {
 
       const bodyText = message.imageUrl && (!message.content || message.content.length === 0)
         ? '📷 Sent a photo'
+        : message.fileName && (!message.content || message.content.length === 0)
+          ? `📄 Shared ${message.fileName}`
         : message.content || 'New message';
 
       const payload: Record<string, string> = {

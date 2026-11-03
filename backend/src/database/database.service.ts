@@ -30,7 +30,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Database connected successfully: ${res.rows[0].current_time}`);
       // Auto-migrate missing columns for image uploads
       await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_url TEXT;');
+      await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_latitude NUMERIC(10, 7);');
+      await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_longitude NUMERIC(10, 7);');
       await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;');
+      await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_code VARCHAR(64);');
+      await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS home_latitude NUMERIC(10, 7);');
+      await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS home_longitude NUMERIC(10, 7);');
+      await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_employee_code_unique ON users (LOWER(employee_code)) WHERE employee_code IS NOT NULL AND employee_code <> '';");
 
       // Persistent file storage for uploads
       await this.pool.query(`
@@ -205,10 +211,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             sender_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             content TEXT NOT NULL DEFAULT '',
             image_url TEXT,
+            file_url TEXT,
+            file_name TEXT,
+            file_mime_type TEXT,
             project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
             reply_to_id UUID REFERENCES chat_messages(id) ON DELETE SET NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
         );
+        ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS file_url TEXT;
+        ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS file_name TEXT;
+        ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS file_mime_type TEXT;
         CREATE INDEX IF NOT EXISTS idx_chat_messages_channel_created ON chat_messages(channel_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_chat_messages_project ON chat_messages(project_id);
 

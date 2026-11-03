@@ -26,6 +26,16 @@ export class ExpensesService {
       projectName: e.project_name || 'Project',
       taskId: e.task_id,
       amount: Number(e.amount),
+      baseCost: Number(e.base_amount || e.amount),
+      base_cost: Number(e.base_amount || e.amount),
+      vatRate: Number(e.vat_rate || 0),
+      vat_rate: Number(e.vat_rate || 0),
+      vatAmount: Number(e.vat_amount || 0),
+      vat_amount: Number(e.vat_amount || 0),
+      taxRate: Number(e.tax_rate || 0),
+      tax_rate: Number(e.tax_rate || 0),
+      taxAmount: Number(e.tax_amount || 0),
+      tax_amount: Number(e.tax_amount || 0),
       officeBenefitAmount: Number(e.office_benefit_amount),
       currency: e.currency,
       categoryId: e.category_id,
@@ -256,17 +266,23 @@ export class ExpensesService {
     const hasReceipt = data.hasReceipt ?? data.has_receipt ?? true;
     const justificationStatus = hasReceipt ? 'none' : (data.justificationStatus || 'submitted');
 
+    const baseAmount = Number(data.baseAmount ?? data.base_amount ?? data.baseCost ?? data.base_cost ?? data.amount);
+    const vatRate = Number(data.vatRate ?? data.vat_rate ?? 0);
+    const vatAmount = Number(data.vatAmount ?? data.vat_amount ?? (vatRate > 0 ? (baseAmount * vatRate / 100) : 0));
+    const taxRate = Number(data.taxRate ?? data.tax_rate ?? 0);
+    const taxAmount = Number(data.taxAmount ?? data.tax_amount ?? (taxRate > 0 ? (baseAmount * taxRate / 100) : 0));
+
     const res = await this.db.query(
       `INSERT INTO expenses (
         employee_id, project_id, task_id, amount, currency, category_id,
         note, date, has_receipt, receipt_photo_url, status,
         justification_status, justification_reason, justification_comment,
-        category_details
+        category_details, base_amount, vat_rate, vat_amount, tax_rate, tax_amount
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
         $12, $13, $14,
-        $15
+        $15, $16, $17, $18, $19, $20
       ) RETURNING id`,
       [
         employeeId,
@@ -284,6 +300,11 @@ export class ExpensesService {
         data.justificationReason || data.justification_reason || null,
         data.justificationComment || data.justification_comment || null,
         JSON.stringify(categoryDetails),
+        baseAmount,
+        vatRate,
+        vatAmount,
+        taxRate,
+        taxAmount,
       ],
     );
 
@@ -397,6 +418,26 @@ export class ExpensesService {
     if (data.justificationStatus !== undefined || data.justification_status !== undefined) {
       fields.push(`justification_status = $${idx++}`);
       values.push(data.justificationStatus ?? data.justification_status);
+    }
+    if (data.baseAmount !== undefined || data.base_amount !== undefined || data.baseCost !== undefined || data.base_cost !== undefined) {
+      fields.push(`base_amount = $${idx++}`);
+      values.push(Number(data.baseAmount ?? data.base_amount ?? data.baseCost ?? data.base_cost));
+    }
+    if (data.vatRate !== undefined || data.vat_rate !== undefined) {
+      fields.push(`vat_rate = $${idx++}`);
+      values.push(Number(data.vatRate ?? data.vat_rate));
+    }
+    if (data.vatAmount !== undefined || data.vat_amount !== undefined) {
+      fields.push(`vat_amount = $${idx++}`);
+      values.push(Number(data.vatAmount ?? data.vat_amount));
+    }
+    if (data.taxRate !== undefined || data.tax_rate !== undefined) {
+      fields.push(`tax_rate = $${idx++}`);
+      values.push(Number(data.taxRate ?? data.tax_rate));
+    }
+    if (data.taxAmount !== undefined || data.tax_amount !== undefined) {
+      fields.push(`tax_amount = $${idx++}`);
+      values.push(Number(data.taxAmount ?? data.tax_amount));
     }
     if (data.categoryDetails !== undefined || data.category_details !== undefined) {
       fields.push(`category_details = $${idx++}`);

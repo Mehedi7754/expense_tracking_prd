@@ -59,7 +59,14 @@ export class ChatController {
   async sendMessage(
     @Request() req: any,
     @Param('id') channelId: string,
-    @Body() body: { content?: string; imageUrl?: string; projectId?: string },
+    @Body() body: {
+      content?: string;
+      imageUrl?: string;
+      fileUrl?: string;
+      fileName?: string;
+      fileMimeType?: string;
+      projectId?: string;
+    },
   ) {
     return this.chatService.sendMessage(
       req.user.id,
@@ -67,6 +74,9 @@ export class ChatController {
       body.content || '',
       body.imageUrl,
       body.projectId,
+      body.fileUrl,
+      body.fileName,
+      body.fileMimeType,
     );
   }
 
@@ -82,7 +92,7 @@ export class ChatController {
   }
 
   @Post('upload')
-  async uploadPhoto(@Body() body: { file: string }) {
+  async uploadPhoto(@Body() body: { file: string; fileName?: string; mimeType?: string }) {
     if (!body.file || body.file.trim().length === 0) {
       throw new BadRequestException('Missing required field: file (base64 data)');
     }
@@ -91,6 +101,7 @@ export class ChatController {
       success: true,
       url: result.url,
       filename: result.filename,
+      sizeBytes: result.sizeBytes,
     };
   }
 }

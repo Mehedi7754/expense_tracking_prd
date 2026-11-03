@@ -18,12 +18,19 @@ export class UploadsService {
   // Maximum file size: 10 MB
   private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-  // Allowed MIME types for image uploads
+  // Chat attachments allow common office documents; uploads stay size-limited.
   private static readonly ALLOWED_MIME_TYPES = new Set([
     'image/jpeg',
     'image/png',
     'image/webp',
     'image/gif',
+    'application/pdf',
+    'text/plain',
+    'text/csv',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   ]);
 
   constructor(private readonly db: DatabaseService) {
@@ -88,9 +95,9 @@ export class UploadsService {
 
     if (base64Data.startsWith('data:')) {
       // Data URI format: data:image/png;base64,iVBOR...
-      const match = base64Data.match(/^data:(image\/\w+);base64,(.+)$/);
+      const match = base64Data.match(/^data:([\w.+-]+\/[\w.+-]+);base64,(.+)$/);
       if (!match) {
-        throw new BadRequestException('Invalid data URI format. Expected data:image/<type>;base64,<data>');
+        throw new BadRequestException('Invalid data URI format.');
       }
       mimeType = match[1];
       buffer = Buffer.from(match[2], 'base64');
@@ -191,7 +198,14 @@ export class UploadsService {
       try {
         const buffer = await fs.promises.readFile(diskPath);
         const ext = path.extname(safeFilename).toLowerCase().replace('.', '');
-        const mimeType = ext === 'png' ? 'image/png' : ext === 'gif' ? 'image/gif' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        const mimeTypes: Record<string, string> = {
+          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+          pdf: 'application/pdf', txt: 'text/plain', csv: 'text/csv', doc: 'application/msword',
+          docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          xls: 'application/vnd.ms-excel',
+          xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        };
+        const mimeType = mimeTypes[ext] || 'application/octet-stream';
         return { buffer, mimeType };
       } catch (_) {}
     }
@@ -265,12 +279,14 @@ export class UploadsService {
    * Maps MIME type to file extension.
    */
   private mimeToExtension(mime: string): string {
-    switch (mime) {
-      case 'image/png': return 'png';
-      case 'image/webp': return 'webp';
-      case 'image/gif': return 'gif';
-      case 'image/jpeg':
-      default: return 'jpg';
-    }
+    const extensions: Record<string, string> = {
+      'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
+      'application/pdf': 'pdf', 'text/plain': 'txt', 'text/csv': 'csv',
+      'application/msword': 'doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/vnd.ms-excel': 'xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    };
+    return extensions[mime] || 'bin';
   }
 }

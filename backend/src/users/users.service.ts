@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { FcmService } from '../notifications/fcm.service';
 import * as bcrypt from 'bcryptjs';
@@ -12,7 +12,7 @@ export class UsersService {
 
   async findAll(query?: string) {
     let sql = `
-      SELECT u.id, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+      SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
              COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
       FROM users u
       LEFT JOIN project_members pm ON pm.user_id = u.id
@@ -20,7 +20,7 @@ export class UsersService {
     const params: any[] = [];
 
     if (query && query.trim().length > 0) {
-      sql += ` WHERE (u.full_name ILIKE $1 OR u.email ILIKE $1)`;
+      sql += ` WHERE (u.full_name ILIKE $1 OR u.email ILIKE $1 OR u.employee_code ILIKE $1)`;
       params.push(`%${query.trim()}%`);
     }
 
@@ -29,6 +29,7 @@ export class UsersService {
     const res = await this.db.query(sql, params);
     return res.rows.map((r) => ({
       id: r.id,
+      employeeCode: r.employee_code || '',
       name: r.full_name,
       email: r.email,
       role: r.role,
@@ -44,7 +45,7 @@ export class UsersService {
 
   async findByEmail(email: string) {
     const res = await this.db.query(
-      `SELECT u.id, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+      `SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
@@ -57,6 +58,7 @@ export class UsersService {
     const r = res.rows[0];
     return {
       id: r.id,
+      employeeCode: r.employee_code || '',
       name: r.full_name,
       email: r.email,
       role: r.role,
@@ -72,7 +74,7 @@ export class UsersService {
 
   async findOne(id: string) {
     const res = await this.db.query(
-      `SELECT u.id, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+      `SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
@@ -84,6 +86,7 @@ export class UsersService {
     const r = res.rows[0];
     return {
       id: r.id,
+      employeeCode: r.employee_code || '',
       name: r.full_name,
       email: r.email,
       role: r.role,
@@ -125,27 +128,38 @@ export class UsersService {
 
     const department = data.department || '';
     const designation = data.designation || '';
+    const employeeCode = (data.employeeCode ?? data.employee_code ?? '').toString().trim();
+    if (employeeCode.length > 64) throw new ConflictException('Employee ID must be 64 characters or fewer');
+    if (employeeCode) {
+      const duplicate = await this.db.query(
+        'SELECT id FROM users WHERE LOWER(employee_code) = LOWER($1) AND LOWER(email::text) <> $2 LIMIT 1',
+        [employeeCode, email],
+      );
+      if (duplicate.rows.length) throw new ConflictException('Employee ID is already in use');
+    }
     const phone = data.phone || '';
     const passwordHash = await bcrypt.hash(data.password || 'password123', 10);
 
     const res = await this.db.query(
-      `INSERT INTO users (email, password_hash, full_name, role, department, designation, phone, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+      `INSERT INTO users (email, password_hash, full_name, role, department, designation, employee_code, phone, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), $8, TRUE)
        ON CONFLICT (email) DO UPDATE
        SET full_name = EXCLUDED.full_name,
            password_hash = EXCLUDED.password_hash,
            role = EXCLUDED.role,
            department = EXCLUDED.department,
            designation = EXCLUDED.designation,
+           employee_code = EXCLUDED.employee_code,
            phone = EXCLUDED.phone,
            is_active = TRUE,
            updated_at = NOW()
-       RETURNING id, email, full_name, role, department, designation, phone, avatar_url, is_active`,
-      [email, passwordHash, fullName, role, department, designation, phone],
+       RETURNING id, employee_code, email, full_name, role, department, designation, phone, avatar_url, is_active`,
+      [email, passwordHash, fullName, role, department, designation, employeeCode, phone],
     );
     const r = res.rows[0];
     return {
       id: r.id,
+      employeeCode: r.employee_code || '',
       name: r.full_name,
       email: r.email,
       role: r.role,
@@ -212,6 +226,19 @@ export class UsersService {
     if (data.designation !== undefined) {
       fields.push(`designation = $${idx++}`);
       values.push(data.designation);
+    }
+    if (data.employeeCode !== undefined || data.employee_code !== undefined) {
+      const employeeCode = (data.employeeCode ?? data.employee_code ?? '').toString().trim();
+      if (employeeCode.length > 64) throw new ConflictException('Employee ID must be 64 characters or fewer');
+      if (employeeCode) {
+        const duplicate = await this.db.query(
+          'SELECT id FROM users WHERE LOWER(employee_code) = LOWER($1) AND id <> $2 LIMIT 1',
+          [employeeCode, targetId],
+        );
+        if (duplicate.rows.length) throw new ConflictException('Employee ID is already in use');
+      }
+      fields.push(`employee_code = NULLIF($${idx++}, '')`);
+      values.push(employeeCode);
     }
     if (data.phone !== undefined) {
       fields.push(`phone = $${idx++}`);
