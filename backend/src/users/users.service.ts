@@ -323,7 +323,7 @@ export class UsersService {
   private async dispatchApprovalNotifications(user: { id: string; email: string; full_name: string }) {
     try {
       // Resolve dedicated mobile app download portal dynamically
-      const defaultDownloadPortal = process.env.APP_DOWNLOAD_PORTAL_URL || 'https://gw-download.203.96.190.78.sslip.io';
+      const defaultDownloadPortal = process.env.APP_DOWNLOAD_PORTAL_URL || process.env.FRONTEND_URL || '/download';
       let downloadUrl = defaultDownloadPortal;
       try {
         const releaseRes = await this.db.query(

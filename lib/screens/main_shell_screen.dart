@@ -347,7 +347,108 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   },
                 ),
                 const Divider(height: 16),
-              ],
+                ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color:
+                            isDark
+                                ? const Color(0xFF312E81)
+                                : const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.people_alt_rounded,
+                        color: Color(0xFF4F46E5),
+                        size: 22,
+                      ),
+                    ),
+                    title: const Text(
+                      'Employees & Team Directory',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    subtitle: const Text(
+                      'Browse team members, roles and departments',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      context.push(RoutePaths.userManagement);
+                    },
+                  ),
+                  const Divider(height: 16),
+                ],
+                if (role.canManageUsers) ...[
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color:
+                            isDark
+                                ? const Color(0xFF1E3A8A)
+                                : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.person_add_alt_1_rounded,
+                        color: Color(0xFF2563EB),
+                        size: 22,
+                      ),
+                    ),
+                    title: const Text(
+                      'Add / Invite Employee',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    subtitle: const Text(
+                      'Create employee credentials and assign roles',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      context.push(RoutePaths.addUser);
+                    },
+                  ),
+                  const Divider(height: 16),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color:
+                            isDark
+                                ? const Color(0xFF312E81)
+                                : const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.people_alt_rounded,
+                        color: Color(0xFF4F46E5),
+                        size: 22,
+                      ),
+                    ),
+                    title: const Text(
+                      'Employee Management',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    subtitle: const Text(
+                      'View all employees, active status & departments',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      context.push(RoutePaths.userManagement);
+                    },
+                  ),
+                  const Divider(height: 16),
+                ],
               if (role.canApproveExpenses) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -423,6 +524,116 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   },
                 ),
                 const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? const Color(0xFF312E81)
+                              : const Color(0xFFEEF2FF),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.assignment_ind_rounded,
+                      color: Color(0xFF4F46E5),
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'Assign New Task',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Delegate tasks to employees with deadlines',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(RoutePaths.addTask);
+                  },
+                ),
+                const Divider(height: 16),
+              ],
+              if (role.canManageAttendanceAndSalary) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? const Color(0xFF065F46)
+                              : const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.how_to_reg_rounded,
+                      color: Color(0xFF059669),
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'Attendance Overview',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Live check-in feed and geofence tracking',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(RoutePaths.attendanceDashboard);
+                  },
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? const Color(0xFF0E7490)
+                              : const Color(0xFFCFFAFE),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.payments_rounded,
+                      color: Color(0xFF0891B2),
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'Payroll & Salary',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Monthly salary sheets, deductions & payouts',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(RoutePaths.salaryDashboard);
+                  },
+                ),
+                const Divider(height: 16),
               ],
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -465,6 +676,39 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   decoration: BoxDecoration(
                     color:
                         isDark
+                            ? const Color(0xFF4C1D95)
+                            : const Color(0xFFEDE9FE),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.analytics_rounded,
+                    color: Color(0xFF7C3AED),
+                    size: 22,
+                  ),
+                ),
+                title: const Text(
+                  'Reports & Analytics',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+                subtitle: const Text(
+                  'Financial audit charts and project metrics',
+                  style: TextStyle(fontSize: 12),
+                ),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(RoutePaths.reports);
+                },
+              ),
+              const Divider(height: 16),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color:
+                        isDark
                             ? const Color(0xFF1E3A8A)
                             : const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(14),
@@ -489,6 +733,41 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   context.push(RoutePaths.chatList);
                 },
               ),
+              if (role != UserRole.projectMember) ...[
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? const Color(0xFF1E3A8A)
+                              : const Color(0xFFDBEAFE),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.home_work_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'Home / Office Location',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Setup coordinates for geofenced attendance',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    HomeLocationSetupModal.show(context, user);
+                  },
+                ),
+              ],
             ],
           ),
           ),

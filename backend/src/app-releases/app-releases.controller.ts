@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Request, Res } from '@nestjs/common';
 import { AppReleasesService } from './app-releases.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -48,9 +48,68 @@ export class AppReleasesController {
       return reply.redirect(latest.downloadUrl, 302);
     }
 
-    // Default friendly fallback redirect to web download page
-    return reply.redirect('https://mtoam6j7bojzuo6lhsakwfp8.203.96.190.78.sslip.io/download', 302);
+    const portalUrl = process.env.APP_DOWNLOAD_PORTAL_URL || process.env.FRONTEND_URL;
+    if (portalUrl) {
+      return reply.redirect(`${portalUrl.replace(/\/+$/, '')}/download`, 302);
+    }
+
+    return reply.status(404).send({
+      statusCode: 404,
+      error: 'Not Found',
+      message: 'APK package file is not currently available for download on this server.',
+    });
   }
+
+  // Public endpoint: download specific release APK by release id
+  @Get(':id/download')
+  async downloadRelease(@Param('id') id: string, @Res() reply: FastifyReply) {
+    if (id === 'latest') {
+      return this.downloadLatest(reply);
+    }
+
+    const item = await this.releasesService.getReleaseDownload(id);
+    if (!item) {
+      const portalUrl = process.env.APP_DOWNLOAD_PORTAL_URL || process.env.FRONTEND_URL;
+      if (portalUrl) {
+        return reply.redirect(`${portalUrl.replace(/\/+$/, '')}/download`, 302);
+      }
+      return reply.status(404).send({
+        statusCode: 404,
+        error: 'Not Found',
+        message: `APK package file not found for release ${id}`,
+      });
+    }
+
+    if (item.stream) {
+      return reply
+        .header('Content-Type', 'application/vnd.android.package-archive')
+        .header('Content-Disposition', `attachment; filename="${item.filename}"`)
+        .send(item.stream);
+    }
+
+    if (item.buffer && item.buffer.length > 0) {
+      return reply
+        .header('Content-Type', 'application/vnd.android.package-archive')
+        .header('Content-Disposition', `attachment; filename="${item.filename}"`)
+        .send(item.buffer);
+    }
+
+    if (item.redirectUrl) {
+      return reply.redirect(item.redirectUrl, 302);
+    }
+
+    const portalUrl = process.env.APP_DOWNLOAD_PORTAL_URL || process.env.FRONTEND_URL;
+    if (portalUrl) {
+      return reply.redirect(`${portalUrl.replace(/\/+$/, '')}/download`, 302);
+    }
+
+    return reply.status(404).send({
+      statusCode: 404,
+      error: 'Not Found',
+      message: `APK package file not found for release ${id}`,
+    });
+  }
+
 
   // Protected Admin endpoints
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -69,8 +128,23 @@ export class AppReleasesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('main_admin', 'admin')
+  @Patch(':id/set-latest')
+  async setLatestPatch(@Param('id') id: string) {
+    return this.releasesService.setLatestRelease(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('main_admin', 'admin')
+  @Post(':id/set-latest')
+  async setLatestPost(@Param('id') id: string) {
+    return this.releasesService.setLatestRelease(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('main_admin', 'admin')
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.releasesService.deleteRelease(id);
   }
 }
+

@@ -21,6 +21,11 @@ class QuickAccessDockMenu extends StatelessWidget {
     if (role == UserRole.projectMember) {
       return const [
         _QuickDestination(
+          'Employees',
+          '/admin/users',
+          Icons.people_alt_outlined,
+        ),
+        _QuickDestination(
           'Leaves',
           '/leaves',
           Icons.event_available_outlined,
@@ -55,6 +60,11 @@ class QuickAccessDockMenu extends StatelessWidget {
     }
     if (role == UserRole.viewer) {
       return const [
+        _QuickDestination(
+          'Employees',
+          '/admin/users',
+          Icons.people_alt_outlined,
+        ),
         _QuickDestination('Projects', '/projects', Icons.folder_open_outlined),
         _QuickDestination('Reports', '/reports', Icons.analytics_outlined),
         _QuickDestination(
@@ -66,8 +76,24 @@ class QuickAccessDockMenu extends StatelessWidget {
     }
 
     final destinations = <_QuickDestination>[
-      const _QuickDestination('Tasks', '/tasks', Icons.task_alt_rounded),
+      const _QuickDestination(
+        'Employees',
+        '/admin/users',
+        Icons.people_alt_outlined,
+      ),
     ];
+    if (role.canManageUsers) {
+      destinations.add(
+        const _QuickDestination(
+          'Add Employee',
+          '/admin/users/new',
+          Icons.person_add_alt_1_rounded,
+        ),
+      );
+    }
+    destinations.add(
+      const _QuickDestination('Tasks', '/tasks', Icons.task_alt_rounded),
+    );
     if (role.canCreateProject) {
       destinations.add(
         const _QuickDestination(
@@ -78,10 +104,12 @@ class QuickAccessDockMenu extends StatelessWidget {
       );
     }
     destinations.addAll(const [
+      _QuickDestination('Projects', '/projects', Icons.folder_open_outlined),
       _QuickDestination('Payroll', '/salary', Icons.payments_outlined),
       _QuickDestination('Reports', '/reports', Icons.analytics_outlined),
       _QuickDestination('Attendance', '/attendance', Icons.how_to_reg_outlined),
       _QuickDestination('Leave', '/leaves', Icons.event_available_outlined),
+      _QuickDestination('Home Office Location', '/set-home-location', Icons.home_work_outlined),
       _QuickDestination('Messages', '/chat', Icons.chat_bubble_outline_rounded),
     ]);
     return destinations;
@@ -93,7 +121,7 @@ class QuickAccessDockMenu extends StatelessWidget {
     final screen = MediaQuery.sizeOf(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
     final width = (screen.width - 24).clamp(220.0, 400.0);
-    final maxHeight = (screen.height * 0.58).clamp(240.0, 440.0);
+    final maxHeight = (screen.height * 0.72).clamp(280.0, 560.0);
     const dockBlue = Color(0xFF2563EB);
 
     return IgnorePointer(
