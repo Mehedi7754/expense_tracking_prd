@@ -19,27 +19,6 @@ async function bootstrap() {
     fastifyAdapter,
   );
 
-  // Fastify fix: Allow empty JSON bodies without failing with FST_ERR_CTP_EMPTY_JSON_BODY
-  const fastifyInstance = app.getHttpAdapter().getInstance();
-  fastifyInstance.removeContentTypeParser('application/json');
-  fastifyInstance.addContentTypeParser(
-    'application/json',
-    { parseAs: 'string' },
-    (req: any, body: any, done: (err: any, res?: any) => void) => {
-      if (!body || (typeof body === 'string' && body.trim().length === 0)) {
-        done(null, {});
-        return;
-      }
-      try {
-        const json = JSON.parse(body);
-        done(null, json);
-      } catch (err: any) {
-        err.statusCode = 400;
-        done(err, undefined);
-      }
-    },
-  );
-
   // CORS: restrict origins in production, allow all in development
   const corsOrigins = process.env.CORS_ORIGINS;
   app.enableCors({
