@@ -313,8 +313,9 @@ export class UsersService {
 
   private async dispatchApprovalNotifications(user: { id: string; email: string; full_name: string }) {
     try {
-      // Resolve latest mobile app download link dynamically
-      let downloadUrl = 'https://mtoam6j7bojzuo6lhsakwfp8.203.96.190.78.sslip.io/download';
+      // Resolve dedicated mobile app download portal dynamically
+      const defaultDownloadPortal = process.env.APP_DOWNLOAD_PORTAL_URL || 'https://gw-download.203.96.190.78.sslip.io';
+      let downloadUrl = defaultDownloadPortal;
       try {
         const releaseRes = await this.db.query(
           `SELECT download_url FROM app_releases WHERE is_latest = TRUE ORDER BY created_at DESC LIMIT 1`,
