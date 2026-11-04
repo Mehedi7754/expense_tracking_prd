@@ -9,8 +9,8 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const fastifyAdapter = new FastifyAdapter({
     logger: false,
-    // Increase body size limit for base64 image uploads (15 MB)
-    bodyLimit: 15 * 1024 * 1024,
+    // Increase body size limit for APK and document uploads (150 MB)
+    bodyLimit: 150 * 1024 * 1024,
   });
 
 
