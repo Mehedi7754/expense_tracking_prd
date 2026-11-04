@@ -181,7 +181,7 @@ export class AuthService {
   private async sendLoginAlertToAdmins(userId: string, name: string, email: string, role: string) {
     try {
       const adminRes = await this.db.query(
-        `SELECT email FROM users WHERE role IN ('main_admin', 'admin') AND is_active = TRUE AND id != $1`,
+        `SELECT email FROM users WHERE role::text IN ('main_admin', 'admin') AND is_active = TRUE AND id != $1`,
         [userId],
       );
       const adminEmails = adminRes.rows.map((r: any) => r.email).filter(Boolean);
@@ -196,7 +196,7 @@ export class AuthService {
   private async sendNewEmployeeAlertToAdmins(name: string, email: string, department?: string | null, designation?: string | null) {
     try {
       const adminRes = await this.db.query(
-        `SELECT email FROM users WHERE role IN ('main_admin', 'admin') AND is_active = TRUE`,
+        `SELECT email FROM users WHERE role::text IN ('main_admin', 'admin') AND is_active = TRUE`,
       );
       const adminEmails = adminRes.rows.map((r: any) => r.email).filter(Boolean);
       if (adminEmails.length > 0) {

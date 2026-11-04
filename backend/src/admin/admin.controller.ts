@@ -108,7 +108,7 @@ export class AdminController {
 
     // Delete non-admin users
     await this.db.query(
-      `DELETE FROM users WHERE role NOT IN ('main_admin', 'admin') AND is_active = TRUE`,
+      `DELETE FROM users WHERE role::text NOT IN ('main_admin', 'admin') AND is_active = TRUE`,
       [],
     );
 

@@ -282,6 +282,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'employee_registration';").catch(() => {});
       await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'user_registration';").catch(() => {});
       await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'account_approved';").catch(() => {});
+      await this.pool.query("ALTER TYPE user_role_type ADD VALUE IF NOT EXISTS 'admin';").catch(() => {});
 
       // Backfill any existing pending employee registrations into the notifications table so admins see them in the notification dropdown
       try {
