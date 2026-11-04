@@ -151,7 +151,7 @@ export class FcmService implements OnModuleInit {
         `SELECT DISTINCT t.token 
          FROM user_fcm_tokens t
          JOIN users u ON u.id = t.user_id
-         WHERE u.role IN ('main_admin', 'finance')`,
+         WHERE u.role IN ('main_admin', 'admin', 'finance', 'project_manager') AND u.is_active = TRUE`,
       );
 
       const tokens = res.rows.map((r) => r.token).filter(Boolean);

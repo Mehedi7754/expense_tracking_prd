@@ -17,7 +17,7 @@ export class NotificationsService {
       [userId],
     );
     const role = userRes.rows[0]?.role;
-    const isPrivileged = role === 'main_admin' || role === 'finance';
+    const isPrivileged = role === 'main_admin' || role === 'admin' || role === 'finance' || role === 'project_manager';
 
     const res = await this.db.query(
       isPrivileged
