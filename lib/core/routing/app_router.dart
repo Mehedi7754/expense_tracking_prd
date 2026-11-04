@@ -50,6 +50,7 @@ import '../../screens/tasks/add_edit_task_screen.dart';
 import '../../screens/tasks/task_detail_screen.dart';
 import '../../screens/tasks/tasks_screen.dart';
 import '../../state/auth_provider.dart';
+import '../widgets/home_location_setup_modal.dart';
 import 'route_paths.dart';
 
 class RouterNotifier extends ChangeNotifier {
@@ -428,6 +429,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
           return ChatThreadScreen(channelId: id);
+        },
+      ),
+      GoRoute(
+        path: RoutePaths.homeLocation,
+        builder: (context, state) {
+          final user = ref.read(authProvider).currentUser;
+          if (user != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              HomeLocationSetupModal.show(context, user);
+            });
+          }
+          return const MainShellScreen();
         },
       ),
     ],

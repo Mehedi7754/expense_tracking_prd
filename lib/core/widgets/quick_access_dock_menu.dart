@@ -20,17 +20,26 @@ class QuickAccessDockMenu extends StatelessWidget {
   List<_QuickDestination> get _destinations {
     if (role == UserRole.projectMember) {
       return const [
+        _QuickDestination(
+          'Leaves',
+          '/leaves',
+          Icons.event_available_outlined,
+        ),
+        _QuickDestination(
+          'Financials',
+          '/salary/my',
+          Icons.account_balance_wallet_outlined,
+        ),
+        _QuickDestination(
+          'Home Office Location',
+          '/set-home-location',
+          Icons.home_work_outlined,
+        ),
         _QuickDestination('My Tasks', '/tasks', Icons.task_alt_rounded),
-        _QuickDestination('My Pay', '/salary/my', Icons.payments_outlined),
         _QuickDestination(
           'My Attendance',
           '/attendance/my',
           Icons.how_to_reg_outlined,
-        ),
-        _QuickDestination(
-          'Request Leave',
-          '/leaves/apply',
-          Icons.event_available_outlined,
         ),
         _QuickDestination(
           'My Expenses',
@@ -84,7 +93,7 @@ class QuickAccessDockMenu extends StatelessWidget {
     final screen = MediaQuery.sizeOf(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
     final width = (screen.width - 24).clamp(220.0, 400.0);
-    final maxHeight = (screen.height * 0.48).clamp(220.0, 390.0);
+    final maxHeight = (screen.height * 0.58).clamp(240.0, 440.0);
     const dockBlue = Color(0xFF2563EB);
 
     return IgnorePointer(

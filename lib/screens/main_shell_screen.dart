@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../core/routing/route_paths.dart';
 import '../core/services/realtime_sync_service.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
+import '../core/widgets/home_location_setup_modal.dart';
 import '../core/widgets/quick_access_dock_menu.dart';
 import '../models/expense_model.dart';
+import '../models/user_model.dart';
 import '../models/user_role.dart';
 import '../state/auth_provider.dart';
 import '../state/expense_provider.dart';
@@ -32,6 +34,25 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   int _currentIndex = 2;
   bool _quickMenuOpen = false;
   UserRole? _lastRole;
+  static bool _hasPromptedHomeLocationThisSession = false;
+
+  void _checkEmployeeHomeLocationPrompt(UserModel user) {
+    if (_hasPromptedHomeLocationThisSession) return;
+    // Strictly for employee (projectMember) only, never for admin
+    if (user.role != UserRole.projectMember) return;
+
+    final hasLocation = user.homeLatitude != null &&
+        user.homeLongitude != null &&
+        !(user.homeLatitude == 0.0 && user.homeLongitude == 0.0);
+
+    if (!hasLocation) {
+      _hasPromptedHomeLocationThisSession = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        HomeLocationSetupModal.show(context, user, isMandatoryPrompt: true);
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -48,6 +69,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     if (user == null || !authState.isAuthenticated) {
       return const Scaffold(body: Center(child: SizedBox.shrink()));
     }
+
+    // Check if employee needs to set their home/office location for geofencing
+    _checkEmployeeHomeLocationPrompt(user);
 
     // Start real-time notification & app data sync loop
     RealtimeSyncService.instance.initialize(ref);
@@ -95,7 +119,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             },
             onNavigate: (path) {
               setState(() => _quickMenuOpen = false);
-              context.push(path);
+              if (path == RoutePaths.homeLocation) {
+                HomeLocationSetupModal.show(context, user);
+              } else {
+                context.push(path);
+              }
             },
           ),
           Positioned(
@@ -131,7 +159,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       .fetchDailyOverview(force: true);
                 }
               },
-              onAddTap: () => _handleCenterAction(context, role),
+              onAddTap: () => _handleCenterAction(context, user),
             ),
           ),
         ],
@@ -139,22 +167,28 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     );
   }
 
-  void _handleCenterAction(BuildContext context, UserRole role) {
+  void _handleCenterAction(BuildContext context, UserModel user) {
+    final role = user.role;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(ctx).height * 0.78,
+          ),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
               Center(
                 child: Container(
                   width: 36,
@@ -213,6 +247,107 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                 },
               ),
               const Divider(height: 16),
+              if (role == UserRole.projectMember) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? const Color(0xFF065F46)
+                              : const Color(0xFFD1FAE5),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.event_available_rounded,
+                      color: Color(0xFF059669),
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'Leave Requests',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Apply for leave or view leave status',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(RoutePaths.leaves);
+                  },
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? const Color(0xFF0E7490)
+                              : const Color(0xFFCFFAFE),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: Color(0xFF0891B2),
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'My Financials & Salary',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'View earnings breakdown and payslips',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    context.push(RoutePaths.mySalary);
+                  },
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color:
+                          isDark
+                              ? const Color(0xFF1E3A8A)
+                              : const Color(0xFFDBEAFE),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.home_work_rounded,
+                      color: Color(0xFF2563EB),
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    'Home / Office Location',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Setup location coordinates for geofenced attendance',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    HomeLocationSetupModal.show(context, user);
+                  },
+                ),
+                const Divider(height: 16),
+              ],
               if (role.canApproveExpenses) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
@@ -355,6 +490,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                 },
               ),
             ],
+          ),
           ),
         );
       },

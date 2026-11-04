@@ -54,6 +54,7 @@ class RoutePaths {
   static const String attendanceDashboard = '/attendance';
   static const String myAttendance = '/attendance/my';
   static const String attendanceSettings = '/admin/attendance-settings';
+  static const String homeLocation = '/set-home-location';
 
   // Salary & Attendance Deductions
   static const String salaryDashboard = '/salary';
