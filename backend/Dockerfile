@@ -22,6 +22,7 @@ ENV PORT=8080
 ENV HOST=0.0.0.0
 
 COPY package*.json ./
+COPY firebase-service-account*.json ./
 RUN npm ci --quiet --omit=dev && npm cache clean --force
 
 COPY --from=builder /usr/src/app/dist ./dist

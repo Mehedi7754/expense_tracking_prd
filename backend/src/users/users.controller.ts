@@ -41,7 +41,7 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
-  @Roles('main_admin', 'project_manager')
+  @Roles('main_admin', 'admin', 'project_manager')
   @Post()
   async createUser(@Body() body: any, @Request() req: any) {
     return this.usersService.create(body, req.user);
@@ -51,7 +51,7 @@ export class UsersController {
   async updateUser(@Param('id') id: string, @Body() body: any, @Request() req: any) {
     // Allow if user is admin/manager OR if they are updating their own profile
     const isSelf = req.user.id === id || req.user.email?.toLowerCase() === id.toLowerCase();
-    const isManagerOrAdmin = req.user.role === 'main_admin' || req.user.role === 'project_manager';
+    const isManagerOrAdmin = ['main_admin', 'admin', 'project_manager'].includes(req.user.role);
     
     if (!isSelf && !isManagerOrAdmin) {
       throw new ForbiddenException('You can only update your own profile.');
@@ -60,20 +60,20 @@ export class UsersController {
     return this.usersService.update(id, body, req.user);
   }
 
-  @Roles('main_admin')
+  @Roles('main_admin', 'admin')
   @Patch(':id/role')
   async updateRole(@Param('id') id: string, @Body('role') role: string) {
     return this.usersService.updateRole(id, role);
   }
 
-  @Roles('main_admin', 'project_manager')
+  @Roles('main_admin', 'admin', 'project_manager')
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() body: any) {
     const active = body?.isActive !== undefined ? body.isActive : (body?.is_active ?? true);
     return this.usersService.updateStatus(id, active);
   }
 
-  @Roles('main_admin', 'project_manager')
+  @Roles('main_admin', 'admin', 'project_manager')
   @Delete(':id')
   async deleteUser(@Param('id') id: string) {
     return this.usersService.delete(id);

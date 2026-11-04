@@ -55,10 +55,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         notificationId: notifId,
         payload: NotificationRouter.encode(data),
       );
+    } else if (type.contains('registration') || type.contains('employee')) {
+      await PushNotificationService.instance.showEmployeeRegistrationAlert(
+        title: title,
+        body: body,
+        notificationId: notifId,
+        payload: NotificationRouter.encode(data),
+      );
     } else {
       await PushNotificationService.instance.showImmediate(
         title: title,
         body: body,
+        channel: 'high_importance_channel',
         notificationId: notifId,
         payload: NotificationRouter.encode(data),
       );
@@ -160,10 +168,18 @@ class FcmService {
             notificationId: notifId,
             payload: NotificationRouter.encode(data),
           );
+        } else if (type.contains('registration') || type.contains('employee')) {
+          await PushNotificationService.instance.showEmployeeRegistrationAlert(
+            title: title,
+            body: body,
+            notificationId: notifId,
+            payload: NotificationRouter.encode(data),
+          );
         } else {
           await PushNotificationService.instance.showImmediate(
             title: title,
             body: body,
+            channel: 'high_importance_channel',
             notificationId: notifId,
             payload: NotificationRouter.encode(data),
           );

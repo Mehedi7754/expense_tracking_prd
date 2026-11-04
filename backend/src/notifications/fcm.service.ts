@@ -142,8 +142,12 @@ export class FcmService implements OnModuleInit {
     data: Record<string, string> = {},
   ) {
     if (!this.initialized) {
-      this.logger.warn('FCM not initialized, skipping push to admins.');
-      return;
+      this.logger.warn('FCM not initialized, attempting reinitialization before pushing to admins.');
+      this.initFirebase();
+      if (!this.initialized) {
+        this.logger.error('FCM initialization failed; skipping push to admins.');
+        return;
+      }
     }
 
     try {
@@ -151,12 +155,18 @@ export class FcmService implements OnModuleInit {
         `SELECT DISTINCT t.token 
          FROM user_fcm_tokens t
          JOIN users u ON u.id = t.user_id
-         WHERE u.role IN ('main_admin', 'admin', 'finance', 'project_manager') AND u.is_active = TRUE`,
+         WHERE (
+           LOWER(TRIM(u.role)) IN ('main_admin', 'admin', 'finance', 'project_manager', 'super_admin', 'administrator', 'finance_manager') 
+           OR LOWER(u.role) LIKE '%admin%' 
+           OR LOWER(u.role) LIKE '%manager%'
+         )
+         AND (u.is_active IS TRUE OR u.is_active IS NULL)`,
       );
 
       const tokens = res.rows.map((r) => r.token).filter(Boolean);
+      this.logger.log(`Found ${tokens.length} admin FCM token(s) to dispatch push to.`);
       if (tokens.length === 0) {
-        this.logger.debug('No admin FCM tokens found.');
+        this.logger.warn('No active admin FCM tokens found in user_fcm_tokens table.');
         return;
       }
 
@@ -189,7 +199,13 @@ export class FcmService implements OnModuleInit {
         ? 'expenses_channel'
         : notifType.includes('chat')
           ? 'chat_messages_channel'
-          : 'general_channel';
+          : 'high_importance_channel';
+
+    if (notifType.includes('registration') || notifType.includes('employee')) {
+      stringData.click_action = 'FLUTTER_NOTIFICATION_CLICK';
+      stringData.route = '/admin/users';
+      stringData.target = 'user_management';
+    }
 
     const notifTag =
       stringData.messageId ||
@@ -216,6 +232,22 @@ export class FcmService implements OnModuleInit {
           defaultSound: true,
           tag: notifTag,
           clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      },
+      apns: {
+        headers: {
+          'apns-priority': '10',
+        },
+        payload: {
+          aps: {
+            alert: {
+              title,
+              body,
+            },
+            sound: 'default',
+            badge: 1,
+            contentAvailable: true,
+          },
         },
       },
     };

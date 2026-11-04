@@ -323,6 +323,22 @@ class PushNotificationService {
     return scheduled;
   }
 
+  /// Show registration / employee approval alert (high importance channel).
+  Future<void> showEmployeeRegistrationAlert({
+    required String title,
+    required String body,
+    String? notificationId,
+    String? payload,
+  }) async {
+    await showImmediate(
+      title: title,
+      body: body,
+      channel: 'high_importance_channel',
+      notificationId: notificationId,
+      payload: payload,
+    );
+  }
+
   String _channelName(String channelId) {
     switch (channelId) {
       case _channelExpenses:
@@ -331,6 +347,8 @@ class PushNotificationService {
         return 'Attendance Reminders';
       case _channelChat:
         return 'Chat Messages';
+      case 'high_importance_channel':
+        return 'Important Notifications';
       default:
         return 'General Notifications';
     }
