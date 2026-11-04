@@ -15,7 +15,6 @@ import '../../screens/attendance/attendance_settings_screen.dart';
 import '../../screens/attendance/my_attendance_screen.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/login_screen.dart';
-import '../../screens/auth/register_screen.dart';
 import '../../screens/auth/reset_password_screen.dart';
 import '../../screens/expenses/edit_expense_screen.dart';
 import '../../screens/expenses/expense_detail_screen.dart';
@@ -142,7 +141,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RoutePaths.register,
-        builder: (context, state) => const RegisterScreen(),
+        redirect: (context, state) => RoutePaths.login,
       ),
       GoRoute(
         path: RoutePaths.forgotPassword,

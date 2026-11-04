@@ -86,7 +86,7 @@ class UserModel {
       homeLatitude: _asDouble(json['home_latitude'] ?? json['homeLatitude']),
       homeLongitude: _asDouble(json['home_longitude'] ?? json['homeLongitude']),
       isActive: json['is_active'] ?? json['isActive'] ?? true,
-      isApproved: json['is_approved'] ?? json['isApproved'] ?? true,
+      isApproved: json['is_approved'] ?? json['isApproved'] ?? (json['is_active'] ?? json['isActive'] ?? true),
       assignedProjectIds: parseProjectIds(
         json['assigned_project_ids'] ?? json['assignedProjectIds'],
       ),

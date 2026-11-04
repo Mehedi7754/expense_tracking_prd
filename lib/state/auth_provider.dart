@@ -305,25 +305,42 @@ class AuthNotifier extends Notifier<AuthState> {
       return true;
     } on ApiException catch (e) {
       final msg = e.message.toLowerCase();
-      final isInvalidCreds =
-          e is UnauthorizedException ||
-          e.statusCode == 401 ||
-          msg.contains('invalid email') ||
-          msg.contains('invalid credentials') ||
-          msg.contains('invalid password') ||
-          msg.contains('unauthorized');
-      final displayMessage = isInvalidCreds ? 'Invalid credentials' : e.message;
+      final isPending = msg.contains('pending') ||
+          msg.contains('approval') ||
+          msg.contains('activate') ||
+          msg.contains('not approved') ||
+          msg.contains('deactivated');
+
+      final isInvalidCreds = !isPending &&
+          (e is UnauthorizedException ||
+              e.statusCode == 401 ||
+              msg.contains('invalid email') ||
+              msg.contains('invalid credentials') ||
+              msg.contains('invalid password') ||
+              msg.contains('unauthorized'));
+
+      final displayMessage = isPending
+          ? e.message
+          : (isInvalidCreds ? 'Invalid credentials' : e.message);
       state = state.copyWith(isLoading: false, errorMessage: displayMessage);
       return false;
     } catch (e) {
       final errStr = e.toString().toLowerCase();
-      final isInvalidCreds =
-          errStr.contains('invalid email') ||
-          errStr.contains('invalid credentials') ||
-          errStr.contains('invalid password') ||
-          errStr.contains('unauthorized');
-      final displayMessage =
-          isInvalidCreds ? 'Invalid credentials' : 'Login error: $e';
+      final isPending = errStr.contains('pending') ||
+          errStr.contains('approval') ||
+          errStr.contains('activate') ||
+          errStr.contains('not approved') ||
+          errStr.contains('deactivated');
+
+      final isInvalidCreds = !isPending &&
+          (errStr.contains('invalid email') ||
+              errStr.contains('invalid credentials') ||
+              errStr.contains('invalid password') ||
+              errStr.contains('unauthorized'));
+
+      final displayMessage = isPending
+          ? e.toString().replaceFirst('Exception: ', '')
+          : (isInvalidCreds ? 'Invalid credentials' : 'Login error: $e');
       state = state.copyWith(isLoading: false, errorMessage: displayMessage);
       return false;
     }

@@ -100,6 +100,10 @@ class NotificationRouter {
     }
     if (type == 'employee_registration' ||
         type == 'user_registration' ||
+        type == 'userregistration' ||
+        type == 'employeeregistration' ||
+        type == 'newuser' ||
+        type.contains('registration') ||
         type == 'employee_account_pending') {
       return RoutePaths.userManagement;
     }

@@ -68,8 +68,9 @@ export class UsersController {
 
   @Roles('main_admin', 'project_manager')
   @Patch(':id/status')
-  async updateStatus(@Param('id') id: string, @Body('isActive') isActive: boolean) {
-    return this.usersService.updateStatus(id, isActive);
+  async updateStatus(@Param('id') id: string, @Body() body: any) {
+    const active = body?.isActive !== undefined ? body.isActive : (body?.is_active ?? true);
+    return this.usersService.updateStatus(id, active);
   }
 
   @Roles('main_admin', 'project_manager')

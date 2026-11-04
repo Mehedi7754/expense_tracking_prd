@@ -42,6 +42,9 @@ export class UsersService {
       phone: r.phone || '',
       avatarUrl: r.avatar_url,
       isActive: r.is_active,
+      is_active: r.is_active,
+      isApproved: r.is_active,
+      is_approved: r.is_active,
       assignedProjectIds: r.assigned_project_ids || [],
       assigned_project_ids: r.assigned_project_ids || [],
     }));
@@ -71,6 +74,9 @@ export class UsersService {
       phone: r.phone || '',
       avatarUrl: r.avatar_url,
       isActive: r.is_active,
+      is_active: r.is_active,
+      isApproved: r.is_active,
+      is_approved: r.is_active,
       assignedProjectIds: r.assigned_project_ids || [],
       assigned_project_ids: r.assigned_project_ids || [],
     };
@@ -99,6 +105,9 @@ export class UsersService {
       phone: r.phone || '',
       avatarUrl: r.avatar_url,
       isActive: r.is_active,
+      is_active: r.is_active,
+      isApproved: r.is_active,
+      is_approved: r.is_active,
       assignedProjectIds: r.assigned_project_ids || [],
       assigned_project_ids: r.assigned_project_ids || [],
     };

@@ -29,6 +29,80 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
+  void _showPendingApprovalDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.pending_actions_rounded, color: Color(0xFFD97706), size: 26),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Approval Pending',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.isNotEmpty
+                  ? message
+                  : 'Your account has been registered but is currently pending Super Admin review and activation.\n\nYou cannot sign in until your account has been approved. You will receive an email once your profile is active.',
+              style: const TextStyle(fontSize: 13.5, height: 1.5),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: const [
+                  Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFF64748B)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Please contact your organization administrator or HR team if this requires expedited approval.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4F46E5),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Understood', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -42,6 +116,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         LocationService.requestLocationPermission();
       } catch (_) {}
       context.go(RoutePaths.home);
+    } else if (mounted) {
+      final err = ref.read(authProvider).errorMessage ?? '';
+      final lower = err.toLowerCase();
+      if (lower.contains('pending') ||
+          lower.contains('approval') ||
+          lower.contains('activate') ||
+          lower.contains('not approved') ||
+          lower.contains('deactivated')) {
+        _showPendingApprovalDialog(err);
+      }
     }
   }
 

@@ -124,9 +124,11 @@ enum NotificationType {
         return NotificationType.payrollFinalized;
       case 'revenuereceived':
         return NotificationType.revenueReceived;
-      case 'memberadded':
-        return NotificationType.memberAdded;
       case 'userregistration':
+      case 'employeeregistration':
+      case 'newuser':
+      case 'userregistered':
+      case 'employeeregistered':
         return NotificationType.userRegistration;
       case 'securityalert':
         return NotificationType.securityAlert;
