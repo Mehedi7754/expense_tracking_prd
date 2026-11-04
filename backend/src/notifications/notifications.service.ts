@@ -26,14 +26,14 @@ export class NotificationsService {
                   COALESCE(u_actor.avatar_url, n.actor_avatar_url) AS resolved_actor_avatar_url
            FROM notifications n
            LEFT JOIN users u_actor ON n.actor_id = u_actor.id
-           ORDER BY n.created_at DESC LIMIT 100`
+           ORDER BY n.created_at DESC LIMIT 500`
         : `SELECT n.*, 
                   COALESCE(u_actor.full_name, n.actor_name) AS resolved_actor_name, 
                   COALESCE(u_actor.avatar_url, n.actor_avatar_url) AS resolved_actor_avatar_url
            FROM notifications n
            LEFT JOIN users u_actor ON n.actor_id = u_actor.id
            WHERE (n.user_id = $1 OR n.user_id IS NULL) 
-           ORDER BY n.created_at DESC LIMIT 100`,
+           ORDER BY n.created_at DESC LIMIT 500`,
       isPrivileged ? [] : [userId],
     );
     return res.rows.map((r) => ({
