@@ -24,21 +24,11 @@ class NotificationRouter {
   /// Encode FCM data map into a local-notification payload string.
   static String encode(Map<String, dynamic> data) {
     final params = <String, String>{};
-    for (final k in const [
-      'type',
-      'notificationId',
-      'expenseId',
-      'projectId',
-      'relatedExpenseId',
-      'relatedProjectId',
-      'taskId',
-      'relatedTaskId',
-      'channelId',
-      'chatChannelId',
-    ]) {
-      final v = data[k];
-      if (v != null && v.toString().isNotEmpty) params[k] = v.toString();
-    }
+    data.forEach((key, value) {
+      if (value != null && value.toString().isNotEmpty) {
+        params[key] = value.toString();
+      }
+    });
     return Uri(queryParameters: params).query;
   }
 
@@ -63,6 +53,7 @@ class NotificationRouter {
   static void handleData(Map<String, dynamic> data) => open(resolve(data));
 
   static String resolve(Map<String, dynamic> data) {
+    final explicitRoute = data['route']?.toString();
     final type = (data['type'] ?? '').toString().toLowerCase();
     final expenseId =
         (data['expenseId'] ?? data['relatedExpenseId'])?.toString();
@@ -105,10 +96,13 @@ class NotificationRouter {
         type == 'newuser' ||
         type.contains('registration') ||
         type == 'employee_account_pending') {
-      return RoutePaths.userManagement;
+      return '${RoutePaths.userManagement}?filter=pending';
     }
     if (projectId != null && projectId.isNotEmpty) {
       return RoutePaths.projectDetail(projectId);
+    }
+    if (explicitRoute != null && explicitRoute.isNotEmpty) {
+      return explicitRoute;
     }
     if (notifId != null && notifId.isNotEmpty) return '/notifications/$notifId';
     return RoutePaths.notifications;

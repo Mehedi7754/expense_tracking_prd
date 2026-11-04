@@ -316,7 +316,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: RoutePaths.userManagement,
-        builder: (context, state) => const UserManagementScreen(),
+        builder: (context, state) {
+          final filter = state.uri.queryParameters['filter'];
+          return UserManagementScreen(initialFilter: filter);
+        },
       ),
       GoRoute(
         path: RoutePaths.addUser,

@@ -19,10 +19,12 @@ enum _UserFilter { all, pending, active, deactivated }
 
 class UserManagementScreen extends ConsumerStatefulWidget {
   final bool isEmbedded;
+  final String? initialFilter;
 
   const UserManagementScreen({
     super.key,
     this.isEmbedded = false,
+    this.initialFilter,
   });
 
   @override
@@ -31,7 +33,28 @@ class UserManagementScreen extends ConsumerStatefulWidget {
 
 class _UserManagementScreenState extends ConsumerState<UserManagementScreen> {
   String _searchQuery = '';
-  _UserFilter _selectedFilter = _UserFilter.all;
+  late _UserFilter _selectedFilter;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedFilter = widget.initialFilter == 'pending'
+        ? _UserFilter.pending
+        : _UserFilter.all;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(userManagementProvider.notifier).fetchUsers(force: true);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant UserManagementScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialFilter != oldWidget.initialFilter &&
+        widget.initialFilter == 'pending') {
+      setState(() => _selectedFilter = _UserFilter.pending);
+      ref.read(userManagementProvider.notifier).fetchUsers(force: true);
+    }
+  }
 
   void _showChangeRoleDialog(UserModel user) {
     final currentUser = ref.read(authProvider).currentUser;

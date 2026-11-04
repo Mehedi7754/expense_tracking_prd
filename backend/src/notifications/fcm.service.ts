@@ -210,7 +210,7 @@ export class FcmService implements OnModuleInit {
 
     if (notifType.includes('registration') || notifType.includes('employee')) {
       stringData.click_action = 'FLUTTER_NOTIFICATION_CLICK';
-      stringData.route = '/admin/users';
+      stringData.route = '/admin/users?filter=pending';
       stringData.target = 'user_management';
     }
 

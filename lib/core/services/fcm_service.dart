@@ -234,7 +234,7 @@ class FcmService {
           ApiEndpoints.resolve('/users/fcm-token'),
           body: {
             'token': tokenToSync,
-            'deviceInfo': 'Android',
+            'deviceInfo': defaultTargetPlatform.name,
           },
         );
         debugPrint('[FCM] Successfully registered token with backend: $response');
@@ -244,7 +244,7 @@ class FcmService {
             ApiEndpoints.resolve('/notifications/fcm-token'),
             body: {
               'token': tokenToSync,
-              'deviceInfo': 'Android',
+              'deviceInfo': defaultTargetPlatform.name,
             },
           );
           debugPrint('[FCM] Successfully registered token via notifications endpoint: $response');

@@ -672,6 +672,17 @@ _CategoryStyle _getCategoryStyle(NotificationType type, bool isDark) {
               : const Color(0xFFD1FAE5),
     );
   }
+  if (type == NotificationType.userRegistration) {
+    return _CategoryStyle(
+      label: 'REGISTRATION',
+      icon: Icons.person_add_alt_1_rounded,
+      primaryColor: const Color(0xFF2563EB),
+      backgroundColor:
+          isDark
+              ? const Color(0xFF1E3A8A).withValues(alpha: 0.6)
+              : const Color(0xFFDBEAFE),
+    );
+  }
   return _CategoryStyle(
     label: 'SYSTEM',
     icon: Icons.notifications_active_rounded,
