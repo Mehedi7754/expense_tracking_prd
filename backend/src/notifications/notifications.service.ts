@@ -16,8 +16,11 @@ export class NotificationsService {
       `SELECT role FROM users WHERE id = $1`,
       [userId],
     );
-    const role = userRes.rows[0]?.role;
-    const isPrivileged = role === 'main_admin' || role === 'admin' || role === 'finance' || role === 'project_manager';
+    const role = (userRes.rows[0]?.role || '').toLowerCase().trim();
+    const isPrivileged =
+      ['main_admin', 'admin', 'finance', 'project_manager', 'super_admin'].includes(role) ||
+      role.includes('admin') ||
+      role.includes('manager');
 
     const res = await this.db.query(
       isPrivileged
@@ -67,30 +70,36 @@ export class NotificationsService {
     actorName?: string;
     actorAvatarUrl?: string;
   }) {
-    const res = await this.db.query(
-      `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       RETURNING *`,
-      [
-        data.userId || null,
-        data.title,
-        data.message,
-        data.fullExplanation || data.message,
-        data.type || 'general',
-        data.relatedProjectId || null,
-        data.relatedExpenseId || null,
-        data.actorId || null,
-        data.actorName || null,
-        data.actorAvatarUrl || null,
-        data.relatedTaskId || null,
-      ],
-    );
+    let savedNotification: any = null;
+    try {
+      const res = await this.db.query(
+        `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         RETURNING *`,
+        [
+          data.userId || null,
+          data.title,
+          data.message,
+          data.fullExplanation || data.message,
+          data.type || 'general',
+          data.relatedProjectId || null,
+          data.relatedExpenseId || null,
+          data.actorId || null,
+          data.actorName || null,
+          data.actorAvatarUrl || null,
+          data.relatedTaskId || null,
+        ],
+      );
+      savedNotification = res.rows[0];
+    } catch (dbErr) {
+      this.logger.error('Database error creating notification row:', dbErr);
+    }
 
     // Dispatch real-time FCM Push Notification (arrives even if app is closed)
     try {
       const payloadData: Record<string, string> = {
         type: data.type || 'general',
-        notificationId: res.rows[0]?.id || '',
+        notificationId: savedNotification?.id || '',
       };
       if (data.relatedExpenseId) payloadData.expenseId = data.relatedExpenseId;
       if (data.relatedProjectId) payloadData.projectId = data.relatedProjectId;
@@ -109,33 +118,52 @@ export class NotificationsService {
       this.logger.error('Error dispatching FCM push from NotificationsService', err);
     }
 
-    return res.rows[0];
+    return savedNotification;
   }
 
   async markAsRead(id: string, userId: string) {
-    await this.db.query(
-      'UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
-      [id, userId],
-    );
+    const userRes = await this.db.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    const role = (userRes.rows[0]?.role || '').toLowerCase().trim();
+    const isPrivileged =
+      ['main_admin', 'admin', 'finance', 'project_manager', 'super_admin'].includes(role) ||
+      role.includes('admin') ||
+      role.includes('manager');
+
+    if (isPrivileged) {
+      await this.db.query('UPDATE notifications SET is_read = TRUE WHERE id = $1', [id]);
+    } else {
+      await this.db.query(
+        'UPDATE notifications SET is_read = TRUE WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)',
+        [id, userId],
+      );
+    }
     return { success: true };
   }
 
   async delete(id: string, userId: string) {
     const userRes = await this.db.query(`SELECT role FROM users WHERE id = $1`, [userId]);
-    const role = userRes.rows[0]?.role;
-    const isPrivileged = role === 'main_admin' || role === 'admin' || role === 'finance' || role === 'project_manager';
+    const role = (userRes.rows[0]?.role || '').toLowerCase().trim();
+    const isPrivileged =
+      ['main_admin', 'admin', 'finance', 'project_manager', 'super_admin'].includes(role) ||
+      role.includes('admin') ||
+      role.includes('manager');
+
     if (isPrivileged) {
       await this.db.query('DELETE FROM notifications WHERE id = $1', [id]);
     } else {
-      await this.db.query('DELETE FROM notifications WHERE id = $1 AND user_id = $2', [id, userId]);
+      await this.db.query('DELETE FROM notifications WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)', [id, userId]);
     }
     return { success: true };
   }
 
   async deleteAll(userId: string) {
     const userRes = await this.db.query(`SELECT role FROM users WHERE id = $1`, [userId]);
-    const role = userRes.rows[0]?.role;
-    const isPrivileged = role === 'main_admin' || role === 'admin' || role === 'finance' || role === 'project_manager';
+    const role = (userRes.rows[0]?.role || '').toLowerCase().trim();
+    const isPrivileged =
+      ['main_admin', 'admin', 'finance', 'project_manager', 'super_admin'].includes(role) ||
+      role.includes('admin') ||
+      role.includes('manager');
+
     if (isPrivileged) {
       await this.db.query('DELETE FROM notifications', []);
     } else {

@@ -163,10 +163,17 @@ export class FcmService implements OnModuleInit {
          AND (u.is_active IS TRUE OR u.is_active IS NULL)`,
       );
 
-      const tokens = res.rows.map((r) => r.token).filter(Boolean);
-      this.logger.log(`Found ${tokens.length} admin FCM token(s) to dispatch push to.`);
+      let tokens = res.rows.map((r) => r.token).filter(Boolean);
       if (tokens.length === 0) {
-        this.logger.warn('No active admin FCM tokens found in user_fcm_tokens table.');
+        this.logger.warn('No admin FCM tokens found matching role filter. Checking all active device tokens.');
+        const fallbackRes = await this.db.query(
+          `SELECT DISTINCT token FROM user_fcm_tokens WHERE updated_at > NOW() - INTERVAL '30 days'`
+        );
+        tokens = fallbackRes.rows.map((r: any) => r.token).filter(Boolean);
+      }
+      this.logger.log(`Found ${tokens.length} FCM token(s) to dispatch push to.`);
+      if (tokens.length === 0) {
+        this.logger.warn('No active FCM tokens found in user_fcm_tokens table.');
         return;
       }
 

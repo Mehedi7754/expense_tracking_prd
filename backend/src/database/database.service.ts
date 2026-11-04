@@ -266,6 +266,46 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         WHEN notes ILIKE '%[Work Mode: Home]%' OR notes ILIKE '%[Work From Home]%' THEN 'home'
         ELSE 'office' END WHERE work_mode = 'office'`);
 
+      // Ensure notifications table supports broadcast/admin notifications (nullable user_id) and employee_registration type
+      try {
+        await this.pool.query("ALTER TABLE notifications ALTER COLUMN user_id DROP NOT NULL;");
+      } catch (e: any) {
+        this.logger.warn(`Could not alter notifications.user_id nullability: ${e.message}`);
+      }
+
+      try {
+        await this.pool.query("ALTER TABLE notifications ALTER COLUMN type TYPE VARCHAR(100) USING type::text;");
+      } catch (e: any) {
+        this.logger.warn(`Could not alter notifications.type to varchar: ${e.message}`);
+      }
+
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'employee_registration';").catch(() => {});
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'user_registration';").catch(() => {});
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'account_approved';").catch(() => {});
+
+      // Backfill any existing pending employee registrations into the notifications table so admins see them in the notification dropdown
+      try {
+        await this.pool.query(`
+          INSERT INTO notifications (user_id, title, message, full_explanation, type, actor_id, actor_name, created_at)
+          SELECT NULL, 
+                 'New Employee Registration', 
+                 u.full_name || ' (' || u.email || ') registered and is awaiting administrator approval.',
+                 'Employee ' || u.full_name || ' has submitted a registration request for Department: ' || COALESCE(u.department, 'General') || '. An administrator must review and approve their profile before they can access the mobile app and dashboard.',
+                 'employee_registration',
+                 u.id,
+                 u.full_name,
+                 COALESCE(u.created_at, NOW())
+          FROM users u
+          WHERE u.is_active = FALSE
+            AND NOT EXISTS (
+              SELECT 1 FROM notifications n 
+              WHERE n.actor_id = u.id AND (n.type = 'employee_registration' OR n.type = 'user_registration')
+            );
+        `);
+      } catch (e: any) {
+        this.logger.warn(`Failed to backfill pending employee notifications: ${e.message}`);
+      }
+
     } catch (err: any) {
       this.logger.error(`Database connection failed: ${err.message}`, err.stack);
       throw err;
