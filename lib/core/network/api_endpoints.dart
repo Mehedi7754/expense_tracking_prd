@@ -83,6 +83,11 @@ class ApiEndpoints {
   static String deleteNotification(String id) => resolve('${AppEnv.endpointNotifications}/$id');
   static String get deleteAllNotifications => resolve('${AppEnv.endpointNotifications}/all');
 
+  // Danger Zone / System Administration
+  static String get wipeAllData => resolve('/admin/wipe-all-data');
+  static String get dataBackups => resolve('/admin/data-backups');
+  static String revertBackup(String id) => resolve('/admin/data-backups/$id/revert');
+
 
   // Reports & Financial Analytics
   static String get financialSummaryReport => resolve(AppEnv.endpointReportsFinancialSummary);

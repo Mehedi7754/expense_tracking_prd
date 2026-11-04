@@ -1,9 +1,13 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/network/api_client.dart';
+import '../../core/network/api_endpoints.dart';
 import '../../core/services/cache_retention_service.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/user_role.dart';
@@ -272,7 +276,21 @@ class SettingsScreen extends ConsumerWidget {
             Text('Storage & Document Retention', style: AppTextStyles.titleSmall),
             const SizedBox(height: 8),
             const _StorageRetentionCard(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
+
+            // Danger Zone for Super Admin
+            if (user?.role == UserRole.mainAdmin) ...[
+              Text(
+                'Danger Zone — System Purge',
+                style: AppTextStyles.titleSmall.copyWith(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const _DangerZoneCard(),
+              const SizedBox(height: 24),
+            ],
           ],
         ),
       ),
@@ -542,6 +560,391 @@ class _StorageRetentionCardState extends State<_StorageRetentionCard> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DangerZoneCard extends ConsumerStatefulWidget {
+  const _DangerZoneCard();
+
+  @override
+  ConsumerState<_DangerZoneCard> createState() => _DangerZoneCardState();
+}
+
+class _DangerZoneCardState extends ConsumerState<_DangerZoneCard> {
+  String _confirmCode = '';
+  final _inputController = TextEditingController();
+  bool _isWiping = false;
+  List<dynamic> _backups = [];
+  bool _isLoadingBackups = false;
+  String? _revertingId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackups();
+  }
+
+  @override
+  void dispose() {
+    _inputController.dispose();
+    super.dispose();
+  }
+
+  void _generateCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    final rand = Random();
+    final code = List.generate(12, (_) => chars[rand.nextInt(chars.length)]).join();
+    setState(() {
+      _confirmCode = code;
+      _inputController.clear();
+    });
+  }
+
+  Future<void> _loadBackups() async {
+    setState(() => _isLoadingBackups = true);
+    try {
+      final client = ref.read(apiClientProvider);
+      final res = await client.get(ApiEndpoints.dataBackups);
+      if (mounted) {
+        setState(() {
+          _backups = res is List ? res : [];
+          _isLoadingBackups = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingBackups = false);
+    }
+  }
+
+  Future<void> _wipeAllData() async {
+    if (_inputController.text.trim() != _confirmCode) return;
+    setState(() => _isWiping = true);
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.delete(
+        ApiEndpoints.wipeAllData,
+        body: {'confirmToken': _confirmCode},
+      );
+      if (mounted) {
+        setState(() {
+          _confirmCode = '';
+          _inputController.clear();
+          _isWiping = false;
+        });
+        NotificationBanner.showSuccess(
+          context,
+          'All project data has been permanently deleted. Backup snapshot created.',
+        );
+        _loadBackups();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isWiping = false);
+        NotificationBanner.showError(context, 'Wipe failed: $e');
+      }
+    }
+  }
+
+  Future<void> _revertBackup(String id) async {
+    setState(() => _revertingId = id);
+    try {
+      final client = ref.read(apiClientProvider);
+      final res = await client.post(ApiEndpoints.revertBackup(id));
+      if (mounted) {
+        setState(() => _revertingId = null);
+        final msg = res is Map && res['message'] != null
+            ? res['message'].toString()
+            : 'Backup revert requested.';
+        NotificationBanner.showSuccess(context, msg);
+        _loadBackups();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _revertingId = null);
+        NotificationBanner.showError(context, 'Revert failed: $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isCodeMatched = _confirmCode.isNotEmpty && _inputController.text.trim() == _confirmCode;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF261014) : const Color(0xFFFFF1F2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFDA4AF), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 22, color: Color(0xFFE11D48)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Delete All System Data (Super Admin Only)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFF9F1239),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'This permanently wipes all projects, employee records, expense submissions, attendance tracking, tasks, and notifications. System administrator accounts remain active.',
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? const Color(0xFFFECDD3) : const Color(0xFF881337),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (_confirmCode.isEmpty) ...[
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE11D48),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              icon: const Icon(Icons.delete_forever_rounded, size: 18),
+              label: const Text(
+                'Initiate Data Wipe',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              ),
+              onPressed: _generateCode,
+            ),
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF3B1219) : const Color(0xFFFFE4E6),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFB7185)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Type the following 12-character security code to confirm:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? const Color(0xFFFDA4AF) : const Color(0xFF9F1239),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  SelectableText(
+                    _confirmCode,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 3,
+                      fontFamily: 'monospace',
+                      color: Color(0xFFE11D48),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _inputController,
+              onChanged: (_) => setState(() {}),
+              style: const TextStyle(
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                letterSpacing: 2,
+              ),
+              decoration: InputDecoration(
+                hintText: 'Type 12-character code',
+                filled: true,
+                fillColor: isDark ? AppColors.darkSurface : Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFFB7185)),
+                ),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  tooltip: 'Paste code',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: _confirmCode));
+                    _inputController.text = _confirmCode;
+                    setState(() {});
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE11D48),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade400,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: _isWiping
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.delete_forever_rounded, size: 18),
+                    label: Text(
+                      _isWiping ? 'Wiping All Data...' : 'Confirm Delete All',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                    ),
+                    onPressed: isCodeMatched && !_isWiping ? _wipeAllData : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _confirmCode = '';
+                      _inputController.clear();
+                    });
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 20),
+          const Divider(color: Color(0xFFFDA4AF)),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Wipe History & Backups',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              IconButton(
+                icon: _isLoadingBackups
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 18),
+                tooltip: 'Refresh backups',
+                onPressed: _isLoadingBackups ? null : _loadBackups,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (_backups.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No past wipe history found.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+              ),
+            )
+          else
+            ..._backups.map((b) {
+              final id = b['id']?.toString() ?? '';
+              final createdAt = b['createdAt']?.toString() ?? '';
+              final rowCounts = b['rowCounts'] as Map<String, dynamic>? ?? {};
+              final isReverted = rowCounts['reverted'] == true;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.darkSurface : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Wipe: $createdAt',
+                            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            rowCounts.entries
+                                .where((e) => e.key != 'reverted')
+                                .map((e) => '${e.key}: ${e.value}')
+                                .join(' · '),
+                            style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (isReverted)
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Reverted',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green.shade800,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      onPressed: isReverted || _revertingId == id
+                          ? null
+                          : () => _revertBackup(id),
+                      child: _revertingId == id
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 1.5),
+                            )
+                          : const Text('Revert', style: TextStyle(fontSize: 11)),
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );

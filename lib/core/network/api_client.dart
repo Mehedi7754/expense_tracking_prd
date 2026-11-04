@@ -170,13 +170,19 @@ class ApiClient {
 
   Future<dynamic> delete(
     String endpoint, {
+    dynamic body,
     Map<String, dynamic>? queryParams,
     Map<String, String>? headers,
   }) async {
+    final reqHeaders = _buildHeaders(headers);
+    if (body == null) {
+      reqHeaders.remove('Content-Type');
+    }
     return _send(
       (activeUrl) => _httpClient.delete(
         _buildUri(activeUrl, endpoint, queryParams),
-        headers: _buildHeaders(headers),
+        headers: reqHeaders,
+        body: body != null ? jsonEncode(body) : null,
       ),
     );
   }
