@@ -319,5 +319,70 @@ export class AppReleasesService {
     }
     return Buffer.from(b64, 'base64');
   }
+
+  private chunkBuffers = new Map<string, { chunks: Buffer[]; totalChunks: number }>();
+
+  async appendChunk(id: string, chunkIndex: number, totalChunks: number, chunkBase64: string) {
+    const rel = await this.db.query('SELECT * FROM app_releases WHERE id::text = $1', [id]);
+    if (!rel.rows.length) throw new NotFoundException('Release not found');
+    const r = rel.rows[0];
+
+    let clean = chunkBase64;
+    if (clean.startsWith('data:')) {
+      const idx = clean.indexOf(',');
+      if (idx !== -1) clean = clean.substring(idx + 1);
+    }
+    const buf = Buffer.from(clean, 'base64');
+
+    if (!this.chunkBuffers.has(id)) {
+      this.chunkBuffers.set(id, { chunks: new Array(totalChunks), totalChunks });
+    }
+    const record = this.chunkBuffers.get(id)!;
+    record.chunks[chunkIndex] = buf;
+
+    const receivedCount = record.chunks.filter(Boolean).length;
+    if (receivedCount === totalChunks) {
+      const completeBuffer = Buffer.concat(record.chunks);
+      this.chunkBuffers.delete(id);
+
+      const versionFileName = `geospatial-works-${r.version_name}.apk`;
+      const versionFilePath = path.join(this.releasesDir, versionFileName);
+      const latestFilePath = path.join(this.releasesDir, 'geospatial-works.apk');
+
+      await fs.promises.writeFile(versionFilePath, completeBuffer);
+      if (r.is_latest) {
+        await fs.promises.copyFile(versionFilePath, latestFilePath);
+      }
+
+      const totalSize = completeBuffer.length;
+      await this.db.query('UPDATE app_releases SET file_size_bytes = $1 WHERE id = $2', [
+        totalSize,
+        id,
+      ]);
+
+      const b64 = completeBuffer.toString('base64');
+      await this.db.query(
+        `INSERT INTO app_uploaded_files (id, filename, category, mime_type, file_size, data_base64)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE 
+         SET data_base64 = EXCLUDED.data_base64, file_size = EXCLUDED.file_size, updated_at = NOW()`,
+        [`apk_release_${id}`, versionFileName, 'apps', 'application/vnd.android.package-archive', totalSize, b64],
+      );
+      if (r.is_latest) {
+        await this.db.query(
+          `INSERT INTO app_uploaded_files (id, filename, category, mime_type, file_size, data_base64)
+           VALUES ('apk_latest_binary', 'geospatial-works.apk', 'apps', 'application/vnd.android.package-archive', $1, $2)
+           ON CONFLICT (id) DO UPDATE 
+           SET data_base64 = EXCLUDED.data_base64, file_size = EXCLUDED.file_size, updated_at = NOW()`,
+          [totalSize, b64],
+        );
+      }
+
+      return { completed: true, totalSize };
+    }
+
+    return { completed: false, received: receivedCount, total: totalChunks };
+  }
 }
+
 

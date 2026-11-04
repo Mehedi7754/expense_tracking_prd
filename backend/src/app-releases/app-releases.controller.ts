@@ -142,9 +142,20 @@ export class AppReleasesController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('main_admin', 'admin')
+  @Post(':id/upload-chunk')
+  async uploadChunk(
+    @Param('id') id: string,
+    @Body() body: { chunkIndex: number; totalChunks: number; chunkBase64: string },
+  ) {
+    return this.releasesService.appendChunk(id, body.chunkIndex, body.totalChunks, body.chunkBase64);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('main_admin', 'admin')
   @Delete(':id')
   async delete(@Param('id') id: string) {
     return this.releasesService.deleteRelease(id);
   }
 }
+
 
