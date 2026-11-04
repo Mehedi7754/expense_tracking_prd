@@ -1,17 +1,21 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { EmailService } from '../email/email.service';
 import { DatabaseService } from '../database/database.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly db: DatabaseService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private mapRole(role: string): string {
@@ -40,11 +44,11 @@ export class AuthService {
     const identifier = dto.email.trim();
     const normalizedIdentifier = identifier.toLowerCase();
     let res = await this.db.query(
-      `SELECT u.id, u.employee_code, u.email, u.password_hash, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.home_latitude, u.home_longitude,
+      `SELECT u.id, u.employee_code, u.email, u.password_hash, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.home_latitude, u.home_longitude, u.is_active,
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
-       WHERE (LOWER(u.email::text) = $1 OR LOWER(COALESCE(u.employee_code, '')) = $1) AND u.is_active = TRUE
+       WHERE (LOWER(u.email::text) = $1 OR LOWER(COALESCE(u.employee_code, '')) = $1)
        GROUP BY u.id`,
       [normalizedIdentifier],
     );
@@ -70,6 +74,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (userRow.is_active !== true) {
+      throw new UnauthorizedException(
+        'Your account is pending administrator approval. Please wait for an administrator to activate your profile.',
+      );
+    }
+
     const payload = { sub: userRow.id, email: userRow.email, role: userRow.role };
     const token = this.jwtService.sign(payload);
 
@@ -88,6 +98,9 @@ export class AuthService {
       assignedProjectIds: userRow.assigned_project_ids,
     };
 
+    // Non-blocking security audit email to active system admins
+    this.sendLoginAlertToAdmins(userRow.id, userRow.full_name, userRow.email, userRow.role);
+
     return {
       token,
       accessToken: token,
@@ -96,9 +109,108 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto) {
-    throw new ForbiddenException(
-      'Public registration is disabled. All employee and manager accounts must be created by an authorized Admin or Super Admin.',
+    const cleanEmail = dto.email.trim().toLowerCase();
+    const cleanName = dto.name.trim();
+
+    if (!cleanName) {
+      throw new BadRequestException('Full name is required.');
+    }
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      throw new BadRequestException('A valid email address is required.');
+    }
+    if (!dto.password || dto.password.length < 3) {
+      throw new BadRequestException('Password must be at least 3 characters long.');
+    }
+
+    // Check if email is already taken
+    const existing = await this.db.query(
+      `SELECT id FROM users WHERE LOWER(email) = $1 LIMIT 1`,
+      [cleanEmail],
     );
+    if (existing.rows.length) {
+      throw new ConflictException('An account with this email address already exists.');
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+    const department = (dto.department || '').trim() || null;
+    const designation = (dto.designation || '').trim() || null;
+    const phone = (dto.phone || '').trim() || null;
+
+    // Strict security: Role is ALWAYS forced to 'project_member' and is_active is ALWAYS FALSE
+    const insertRes = await this.db.query(
+      `INSERT INTO users (email, password_hash, full_name, role, department, designation, phone, is_active, created_at, updated_at)
+       VALUES ($1, $2, $3, 'project_member', $4, $5, $6, FALSE, NOW(), NOW())
+       RETURNING id, email, full_name, role, department, designation, phone, is_active`,
+      [cleanEmail, passwordHash, cleanName, department, designation, phone],
+    );
+
+    const newUser = insertRes.rows[0];
+
+    // 1. Create In-App Notification & Broadcast Push to all Admins
+    try {
+      await this.notificationsService.create({
+        userId: null, // Broadcast to all admins
+        title: 'New Employee Registration',
+        message: `${cleanName} (${cleanEmail}) registered and is awaiting administrator approval.`,
+        fullExplanation: `Employee ${cleanName} has submitted a registration request for Department: ${department || 'General'}. An administrator must review and approve their profile before they can access the mobile app and dashboard.`,
+        type: 'employee_registration',
+        actorId: newUser.id,
+        actorName: cleanName,
+      });
+    } catch (err) {
+      this.logger.error('Failed to create admin notification for employee registration', err);
+    }
+
+    // 2. Dispatch Dynamic Admin Email Alert
+    this.sendNewEmployeeAlertToAdmins(cleanName, cleanEmail, department, designation);
+
+    return {
+      success: true,
+      isApproved: false,
+      message: 'Account registered successfully. Your profile is currently pending administrator verification. You will receive an approval email with mobile app access once approved.',
+      user: {
+        id: newUser.id,
+        name: newUser.full_name,
+        email: newUser.email,
+        department: newUser.department,
+        isActive: false,
+      },
+    };
+  }
+
+  private async sendLoginAlertToAdmins(userId: string, name: string, email: string, role: string) {
+    try {
+      const adminRes = await this.db.query(
+        `SELECT email FROM users WHERE role IN ('main_admin', 'admin') AND is_active = TRUE AND id != $1`,
+        [userId],
+      );
+      const adminEmails = adminRes.rows.map((r: any) => r.email).filter(Boolean);
+      if (adminEmails.length > 0) {
+        await this.emailService.sendAdminLoginSecurityAlert(adminEmails, name, email, role, new Date());
+      }
+    } catch (err) {
+      this.logger.error('Failed to send login alert to admins', err);
+    }
+  }
+
+  private async sendNewEmployeeAlertToAdmins(name: string, email: string, department?: string | null, designation?: string | null) {
+    try {
+      const adminRes = await this.db.query(
+        `SELECT email FROM users WHERE role IN ('main_admin', 'admin') AND is_active = TRUE`,
+      );
+      const adminEmails = adminRes.rows.map((r: any) => r.email).filter(Boolean);
+      if (adminEmails.length > 0) {
+        await this.emailService.sendNewEmployeeRegisteredAlert(
+          adminEmails,
+          name,
+          email,
+          department || undefined,
+          designation || undefined,
+        );
+      }
+    } catch (err) {
+      this.logger.error('Failed to send new employee alert to admins', err);
+    }
   }
 
   async getProfile(userId: string) {

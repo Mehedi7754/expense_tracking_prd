@@ -1,13 +1,17 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { FcmService } from '../notifications/fcm.service';
+import { EmailService } from '../email/email.service';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private readonly db: DatabaseService,
     private readonly fcmService: FcmService,
+    private readonly emailService: EmailService,
   ) {}
 
   async findAll(query?: string) {
@@ -286,16 +290,53 @@ export class UsersService {
 
   async updateStatus(id: string, isActive: boolean) {
     const userRes = await this.db.query(
-      `SELECT id FROM users WHERE id::text = $1 OR email ILIKE $1 LIMIT 1`,
+      `SELECT id, email, full_name, is_active FROM users WHERE id::text = $1 OR email ILIKE $1 LIMIT 1`,
       [id.trim()],
     );
     if (!userRes.rows.length) return null;
-    const targetId = userRes.rows[0].id;
+    const targetUser = userRes.rows[0];
+    const targetId = targetUser.id;
+    const wasInactive = targetUser.is_active !== true;
+
     await this.db.query(
       `UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2`,
       [isActive, targetId],
     );
+
+    // If account transitioned from inactive to active, dispatch approval email & FCM push
+    if (wasInactive && isActive === true) {
+      this.dispatchApprovalNotifications(targetUser);
+    }
+
     return this.findOne(targetId);
+  }
+
+  private async dispatchApprovalNotifications(user: { id: string; email: string; full_name: string }) {
+    try {
+      // Resolve latest mobile app download link dynamically
+      let downloadUrl = 'https://mtoam6j7bojzuo6lhsakwfp8.203.96.190.78.sslip.io/download';
+      try {
+        const releaseRes = await this.db.query(
+          `SELECT download_url FROM app_releases WHERE is_latest = TRUE ORDER BY created_at DESC LIMIT 1`,
+        );
+        if (releaseRes.rows.length && releaseRes.rows[0].download_url) {
+          downloadUrl = releaseRes.rows[0].download_url;
+        }
+      } catch (_) {}
+
+      // Send branded approval email with app download link
+      await this.emailService.sendEmployeeAccountApproved(user.email, user.full_name, downloadUrl);
+
+      // Send real-time FCM push notification to employee's device if registered
+      await this.fcmService.sendPushToUser(
+        user.id,
+        'Account Approved! 🎉',
+        'Your Geospatial Works account has been verified. You can now log in and use the mobile app.',
+        { type: 'account_approved', userId: user.id },
+      );
+    } catch (err) {
+      this.logger.error(`Failed to dispatch approval notification for ${user.email}`, err);
+    }
   }
 
   async delete(id: string) {

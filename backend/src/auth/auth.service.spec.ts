@@ -18,8 +18,11 @@ describe('AuthService Password Reset & OTP Flow', () => {
       sendPasswordResetOtp: jest.fn().mockResolvedValue(undefined),
       sendPasswordChangedConfirmation: jest.fn().mockResolvedValue(undefined),
     };
+    const mockNotificationsService = {
+      create: jest.fn().mockResolvedValue({ id: 'n-1' }),
+    };
 
-    service = new AuthService(mockDb, mockJwt, mockEmailService as any);
+    service = new AuthService(mockDb, mockJwt, mockEmailService as any, mockNotificationsService as any);
   });
 
   describe('forgotPassword', () => {

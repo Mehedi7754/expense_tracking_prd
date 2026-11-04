@@ -217,5 +217,200 @@ export class EmailService {
       this.logger.error(`Failed to send password changed confirmation to ${email}`, error);
     }
   }
+
+  async sendNewEmployeeRegisteredAlert(
+    adminEmails: string[],
+    employeeName: string,
+    employeeEmail: string,
+    department?: string,
+    designation?: string,
+  ) {
+    if (!this.resend || !adminEmails.length) return;
+
+    try {
+      const from = this.fromEmail.includes('<') 
+        ? this.fromEmail 
+        : `GW Project Security <${this.fromEmail}>`;
+
+      await this.resend.emails.send({
+        from,
+        to: adminEmails,
+        subject: `New Employee Registration Awaiting Approval: ${employeeName}`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #1a365d; font-size: 24px; margin: 0; font-weight: 700;">Geospatial Works</h1>
+              <p style="color: #718096; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px;">Admin Action Required</p>
+            </div>
+
+            <div style="border-top: 2px solid #3182ce; padding-top: 20px;">
+              <h2 style="color: #2d3748; font-size: 18px; margin-top: 0;">New Employee Awaiting Verification</h2>
+              <p style="color: #4a5568; font-size: 15px; line-height: 1.6;">
+                A new employee has submitted an account registration and requested mobile app & dashboard access. The account is currently <strong>Inactive / Pending Approval</strong>.
+              </p>
+
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f7fafc; border-radius: 8px;">
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #edf2f7; color: #718096; width: 35%;"><strong>Employee Name</strong></td>
+                  <td style="padding: 12px; border-bottom: 1px solid #edf2f7; color: #2d3748; font-weight: 600;">${employeeName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #edf2f7; color: #718096;"><strong>Email Address</strong></td>
+                  <td style="padding: 12px; border-bottom: 1px solid #edf2f7; color: #2d3748;">${employeeEmail}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #edf2f7; color: #718096;"><strong>Department</strong></td>
+                  <td style="padding: 12px; border-bottom: 1px solid #edf2f7; color: #2d3748;">${department || 'Not specified'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; color: #718096;"><strong>Designation</strong></td>
+                  <td style="padding: 12px; color: #2d3748;">${designation || 'Not specified'}</td>
+                </tr>
+              </table>
+
+              <div style="background-color: #ebf8ff; border-left: 4px solid #3182ce; padding: 14px 16px; margin: 20px 0; border-radius: 4px;">
+                <p style="color: #2b6cb0; font-size: 14px; margin: 0; line-height: 1.5;">
+                  <strong>Action Required:</strong> Please sign in to the Admin Dashboard or Mobile App and navigate to <strong>Employees / User Management</strong> to verify and approve this account.
+                </p>
+              </div>
+
+              <p style="color: #718096; font-size: 13px; margin-top: 30px; text-align: center; border-top: 1px solid #edf2f7; padding-top: 20px;">
+                Sent automatically to active system administrators.<br/>
+                &copy; ${new Date().getFullYear()} Geospatial Works Ltd.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+      this.logger.log(`Sent new employee alert to ${adminEmails.join(', ')}`);
+    } catch (error) {
+      this.logger.error(`Failed to send new employee alert to admins`, error);
+    }
+  }
+
+  async sendEmployeeAccountApproved(
+    employeeEmail: string,
+    employeeName: string,
+    appDownloadUrl: string,
+  ) {
+    if (!this.resend) return;
+
+    try {
+      const from = this.fromEmail.includes('<') 
+        ? this.fromEmail 
+        : `GW Project Security <${this.fromEmail}>`;
+
+      await this.resend.emails.send({
+        from,
+        to: employeeEmail,
+        subject: `Your Account Has Been Approved – Welcome to Geospatial Works`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 28px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #1a365d; font-size: 24px; margin: 0; font-weight: 700;">Geospatial Works</h1>
+              <p style="color: #38a169; font-size: 13px; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Account Approved & Active</p>
+            </div>
+
+            <div style="border-top: 2px solid #38a169; padding-top: 20px;">
+              <h2 style="color: #2d3748; font-size: 18px; margin-top: 0;">Welcome, ${employeeName}!</h2>
+              <p style="color: #4a5568; font-size: 15px; line-height: 1.6;">
+                Great news! Your Geospatial Works employee account has been verified and approved by the system administrator.
+              </p>
+
+              <div style="background-color: #f0fff4; border: 1px solid #c6f6d5; border-radius: 8px; padding: 18px; margin: 24px 0; text-align: center;">
+                <p style="color: #22543d; font-size: 15px; margin: 0 0 16px 0; font-weight: 600;">
+                  You now have full access to the Geospatial Works Mobile App & Web Portal.
+                </p>
+                <a href="${appDownloadUrl}" style="background-color: #2f855a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: 700; font-size: 16px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                  📱 Download Mobile App (APK)
+                </a>
+              </div>
+
+              <div style="background-color: #f7fafc; padding: 16px; border-radius: 8px; margin: 20px 0;">
+                <p style="color: #4a5568; font-size: 14px; margin: 0 0 8px 0;"><strong>Your Account Details:</strong></p>
+                <p style="color: #718096; font-size: 14px; margin: 4px 0;"><strong>Login Email:</strong> ${employeeEmail}</p>
+                <p style="color: #718096; font-size: 14px; margin: 4px 0;"><strong>Status:</strong> <span style="color: #38a169; font-weight: 600;">Active & Verified</span></p>
+              </div>
+
+              <p style="color: #718096; font-size: 13px; line-height: 1.5;">
+                To log in, open the downloaded mobile application or web portal and enter your registered email and password.
+              </p>
+
+              <p style="color: #718096; font-size: 13px; margin-top: 30px; text-align: center; border-top: 1px solid #edf2f7; padding-top: 20px;">
+                This is an official automated notification from <strong>Geospatial Works</strong>.<br/>
+                &copy; ${new Date().getFullYear()} Geospatial Works Ltd.
+              </p>
+            </div>
+          </div>
+        `,
+      });
+      this.logger.log(`Sent account approved confirmation to ${employeeEmail}`);
+    } catch (error) {
+      this.logger.error(`Failed to send account approval email to ${employeeEmail}`, error);
+    }
+  }
+
+  async sendAdminLoginSecurityAlert(
+    adminEmails: string[],
+    userName: string,
+    userEmail: string,
+    userRole: string,
+    loginTime: Date,
+    ipAddress?: string,
+  ) {
+    if (!this.resend || !adminEmails.length) return;
+
+    try {
+      const from = this.fromEmail.includes('<') 
+        ? this.fromEmail 
+        : `GW Project Security <${this.fromEmail}>`;
+
+      await this.resend.emails.send({
+        from,
+        to: adminEmails,
+        subject: `Security Alert: User Login - ${userName} (${userEmail})`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;">
+            <div style="margin-bottom: 16px;">
+              <h2 style="color: #2d3748; font-size: 17px; margin: 0;">🔐 User Login Notification</h2>
+              <p style="color: #718096; font-size: 13px; margin: 4px 0 0 0;">System Security Audit Log</p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+              <tr>
+                <td style="padding: 8px 12px; background-color: #f7fafc; color: #718096; width: 30%;"><strong>User</strong></td>
+                <td style="padding: 8px 12px; background-color: #f7fafc; color: #2d3748; font-weight: 600;">${userName}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; color: #718096;"><strong>Email</strong></td>
+                <td style="padding: 8px 12px; color: #2d3748;">${userEmail}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; background-color: #f7fafc; color: #718096;"><strong>Role</strong></td>
+                <td style="padding: 8px 12px; background-color: #f7fafc; color: #2d3748; text-transform: capitalize;">${userRole.replace('_', ' ')}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; color: #718096;"><strong>Timestamp</strong></td>
+                <td style="padding: 8px 12px; color: #2d3748;">${loginTime.toUTCString()}</td>
+              </tr>
+              ${ipAddress ? `
+              <tr>
+                <td style="padding: 8px 12px; background-color: #f7fafc; color: #718096;"><strong>IP Address</strong></td>
+                <td style="padding: 8px 12px; background-color: #f7fafc; color: #2d3748; font-family: monospace;">${ipAddress}</td>
+              </tr>` : ''}
+            </table>
+
+            <p style="color: #a0aec0; font-size: 12px; margin-top: 20px; text-align: center;">
+              This alert was sent automatically to active system administrators.
+            </p>
+          </div>
+        `,
+      });
+      this.logger.log(`Sent login security alert to ${adminEmails.length} admin(s) for ${userEmail}`);
+    } catch (error) {
+      this.logger.error(`Failed to send login security alert to admins`, error);
+    }
+  }
 }
+
 
