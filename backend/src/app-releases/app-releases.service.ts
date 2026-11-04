@@ -10,6 +10,8 @@ export interface CreateReleaseDto {
   downloadUrl?: string;
   fileSizeBytes?: number;
   isLatest?: boolean;
+  apkBase64?: string;
+  apkFileName?: string;
 }
 
 @Injectable()
@@ -96,6 +98,42 @@ export class AppReleasesService {
     }
     const buildNumber = Number(dto.buildNumber) || 1;
     const isLatest = dto.isLatest !== false;
+    let calculatedSizeBytes = dto.fileSizeBytes || 0;
+    let finalDownloadUrl = dto.downloadUrl || '/api/v1/app-releases/download-latest';
+    const apkFileName = 'geospatial-works.apk';
+    const filePath = path.join(this.releasesDir, apkFileName);
+
+    if (dto.apkBase64) {
+      try {
+        let cleanBase64 = dto.apkBase64;
+        if (cleanBase64.startsWith('data:')) {
+          const commaIdx = cleanBase64.indexOf(',');
+          if (commaIdx !== -1) cleanBase64 = cleanBase64.substring(commaIdx + 1);
+        }
+        const buffer = Buffer.from(cleanBase64, 'base64');
+        await fs.promises.writeFile(filePath, buffer);
+        calculatedSizeBytes = buffer.length;
+        this.logger.log(`Saved physical APK (${calculatedSizeBytes} bytes) to ${filePath}`);
+
+        // Also persist APK into app_uploaded_files table for database persistence across reboots
+        await this.db.query(
+          `INSERT INTO app_uploaded_files (id, filename, category, mime_type, file_size, data_base64)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO UPDATE 
+           SET data_base64 = EXCLUDED.data_base64, file_size = EXCLUDED.file_size, updated_at = NOW()`,
+          [
+            'apk_latest_binary',
+            apkFileName,
+            'apps',
+            'application/vnd.android.package-archive',
+            calculatedSizeBytes,
+            cleanBase64,
+          ],
+        ).catch((err) => this.logger.warn(`Could not mirror APK to DB: ${err.message}`));
+      } catch (err: any) {
+        this.logger.error(`Failed to write uploaded APK file: ${err.message}`);
+      }
+    }
 
     if (isLatest) {
       await this.db.query('UPDATE app_releases SET is_latest = FALSE WHERE is_latest = TRUE');
@@ -110,8 +148,8 @@ export class AppReleasesService {
         buildNumber,
         dto.releaseNotes || 'Bug fixes and performance improvements.',
         'uploads/apps/geospatial-works.apk',
-        dto.downloadUrl || '/api/v1/app-releases/download-latest',
-        dto.fileSizeBytes || 0,
+        finalDownloadUrl,
+        calculatedSizeBytes,
         isLatest,
         adminUserId || null,
       ],
@@ -123,5 +161,18 @@ export class AppReleasesService {
   async deleteRelease(id: string) {
     await this.db.query('DELETE FROM app_releases WHERE id::text = $1', [id]);
     return { success: true };
+  }
+
+  async getApkFromDatabase(): Promise<Buffer | null> {
+    const res = await this.db.query(
+      `SELECT data_base64 FROM app_uploaded_files WHERE id = 'apk_latest_binary' OR category = 'apps' LIMIT 1`,
+    );
+    if (!res.rows.length) return null;
+    let b64 = res.rows[0].data_base64 as string;
+    if (b64.startsWith('data:')) {
+      const idx = b64.indexOf(',');
+      if (idx !== -1) b64 = b64.substring(idx + 1);
+    }
+    return Buffer.from(b64, 'base64');
   }
 }

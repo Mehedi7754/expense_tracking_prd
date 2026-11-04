@@ -32,6 +32,17 @@ export class AppReleasesController {
         .send(stream);
     }
 
+    // Check PostgreSQL database fallback for zero-loss redeployment
+    try {
+      const dbFile = await this.releasesService.getApkFromDatabase();
+      if (dbFile && dbFile.length > 0) {
+        return reply
+          .header('Content-Type', 'application/vnd.android.package-archive')
+          .header('Content-Disposition', `attachment; filename="geospatial-works-${latest.versionName || 'latest'}.apk"`)
+          .send(dbFile);
+      }
+    } catch (_) {}
+
     // If downloadUrl is an external link (e.g. S3 / CDN / GitHub releases), redirect directly
     if (latest.downloadUrl && latest.downloadUrl.startsWith('http')) {
       return reply.redirect(latest.downloadUrl, 302);
