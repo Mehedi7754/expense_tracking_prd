@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
+import '../../core/utils/date_formatter.dart';
+import '../../core/widgets/notification_banner.dart';
+import '../../core/widgets/app_back_button.dart';
 import '../../models/task_model.dart';
 import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
@@ -18,6 +21,8 @@ class TasksScreen extends ConsumerStatefulWidget {
 
 class _TasksScreenState extends ConsumerState<TasksScreen> {
   String _filter = 'all';
+  String _projectFilter = 'all';
+  String _priorityFilter = 'all';
   String _search = '';
   bool _loading = false;
   String? _error;
@@ -54,19 +59,22 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     final projects = ref.watch(projectProvider);
     final user = ref.watch(authProvider).currentUser;
     final isManager = user?.role.canCreateProject ?? false;
-    final canUpdateStatus = user != null && const {
-      UserRole.mainAdmin,
-      UserRole.projectManager,
-      UserRole.projectMember,
-    }.contains(user.role);
     final filtered =
         tasks.where((task) {
             if (_filter != 'all' && task.status.name != _filter) return false;
+            if (_projectFilter != 'all' && task.projectId != _projectFilter)
+              return false;
+            if (_priorityFilter != 'all' &&
+                task.priority.toLowerCase() != _priorityFilter)
+              return false;
             final query = _search.trim().toLowerCase();
             if (query.isEmpty) return true;
             return task.title.toLowerCase().contains(query) ||
                 task.description.toLowerCase().contains(query) ||
                 task.assigneeName.toLowerCase().contains(query) ||
+                task.assigneeNames.any(
+                  (name) => name.toLowerCase().contains(query),
+                ) ||
                 projects.any(
                   (project) =>
                       project.id == task.projectId &&
@@ -78,6 +86,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: Text(
           user?.role == UserRole.projectMember ? 'My Tasks' : 'Tasks',
         ),
@@ -87,25 +96,53 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
           ),
-          if (isManager)
-            IconButton(
-              onPressed: () => context.push(RoutePaths.addTask),
-              icon: const Icon(Icons.add_rounded),
-              tooltip: 'Assign task',
-            ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
           children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _summaryCard(
+                    context,
+                    'To do',
+                    tasks.where((t) => t.status == TaskStatus.todo).length,
+                    AppColors.amber,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _summaryCard(
+                    context,
+                    'In progress',
+                    tasks
+                        .where((t) => t.status == TaskStatus.inProgress)
+                        .length,
+                    AppColors.indigo,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _summaryCard(
+                    context,
+                    'Done',
+                    tasks.where((t) => t.status == TaskStatus.completed).length,
+                    AppColors.emerald,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             TextField(
               onChanged: (value) => setState(() => _search = value),
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search_rounded),
                 hintText: 'Search tasks',
                 isDense: true,
+                filled: true,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -118,6 +155,50 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   _filterChip('todo', 'To do'),
                   _filterChip('inProgress', 'In progress'),
                   _filterChip('completed', 'Completed'),
+                ],
+              ),
+            ),
+            if (projects.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                initialValue: _projectFilter,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.folder_open_rounded),
+                  labelText: 'Project',
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: 'all',
+                    child: Text('All projects'),
+                  ),
+                  ...projects.map(
+                    (project) => DropdownMenuItem(
+                      value: project.id,
+                      child: Text(
+                        project.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged:
+                    (value) => setState(() => _projectFilter = value ?? 'all'),
+              ),
+            ],
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _priorityChip('all', 'Any priority'),
+                  _priorityChip('important', 'Important'),
+                  _priorityChip('high', 'High'),
+                  _priorityChip('medium', 'Medium'),
+                  _priorityChip('low', 'Low'),
                 ],
               ),
             ),
@@ -171,7 +252,17 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                 ),
               )
             else
-              ...filtered.map((task) => _taskCard(context, task, projects, canUpdateStatus)),
+              ...filtered.map(
+                (task) => _taskCard(
+                  context,
+                  task,
+                  projects,
+                  isManager ||
+                      (user != null &&
+                          user.role == UserRole.projectMember &&
+                          task.isAssignedTo(user.id)),
+                ),
+              ),
           ],
         ),
       ),
@@ -186,28 +277,125 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
     );
   }
 
-  Widget _filterChip(String value, String label) => Padding(
-    padding: const EdgeInsets.only(right: 8),
-    child: ChoiceChip(
-      label: Text(label),
-      selected: _filter == value,
-      onSelected: (_) => setState(() => _filter = value),
-    ),
-  );
+  Widget _summaryCard(
+    BuildContext context,
+    String label,
+    int count,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.getSurface(context),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.getBorder(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$count',
+            style: TextStyle(
+              color: color,
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.getTextMuted(context),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  Widget _taskCard(BuildContext context, TaskModel task, List projects, bool canUpdateStatus) {
+  Widget _filterChip(String value, String label) {
+    final selected = _filter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        selectedColor: AppColors.indigo,
+        backgroundColor: AppColors.getSurface(context),
+        side: BorderSide(
+          color: selected ? AppColors.indigo : AppColors.getBorder(context),
+        ),
+        labelStyle: TextStyle(
+          color: selected ? Colors.white : AppColors.getTextSecondary(context),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        onSelected: (_) => setState(() => _filter = value),
+      ),
+    );
+  }
+
+  Widget _priorityChip(String value, String label) {
+    final selected = _priorityFilter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 7),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        selectedColor: AppColors.indigoLight,
+        backgroundColor: AppColors.getSurface(context),
+        side: BorderSide(
+          color:
+              selected ? AppColors.indigoBorder : AppColors.getBorder(context),
+        ),
+        labelStyle: TextStyle(
+          color:
+              selected ? AppColors.indigo : AppColors.getTextSecondary(context),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        onSelected: (_) => setState(() => _priorityFilter = value),
+      ),
+    );
+  }
+
+  Widget _taskCard(
+    BuildContext context,
+    TaskModel task,
+    List projects,
+    bool canUpdateStatus,
+  ) {
     final matchingProjects = projects.where(
       (item) => item.id == task.projectId,
     );
     final project = matchingProjects.isEmpty ? null : matchingProjects.first;
     final statusColor =
         task.status == TaskStatus.completed
-            ? Colors.green
+            ? AppColors.emerald
             : task.status == TaskStatus.todo
-            ? Colors.orange
-            : Colors.blue;
+            ? AppColors.amber
+            : AppColors.indigo;
+    final priorityColor = switch (task.priority.toLowerCase()) {
+      'high' || 'urgent' => AppColors.crimson,
+      'low' => AppColors.emerald,
+      _ => AppColors.amber,
+    };
+    final overdue =
+        task.status != TaskStatus.completed &&
+        task.dueDate.isBefore(DateTime.now());
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 9),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(color: AppColors.getBorder(context)),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap:
@@ -215,12 +403,21 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
               RoutePaths.taskDetail.replaceFirst(':id', task.id),
             ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(12, 12, 9, 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
+                  Container(
+                    width: 3,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 9),
                   Expanded(
                     child: Text(
                       task.title,
@@ -230,53 +427,68 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       ),
                     ),
                   ),
-                  if (canUpdateStatus) PopupMenuButton<TaskStatus>(
-                    tooltip: 'Update status',
-                    icon: Icon(
-                      Icons.more_horiz_rounded,
-                      color: AppColors.getTextMuted(context),
-                    ),
-                    onSelected: (status) async {
-                      try {
-                        await ref
-                            .read(taskProvider.notifier)
-                            .updateTaskStatus(task.id, status);
-                      } catch (_) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Task status could not be saved. Please retry.',
-                              ),
-                            ),
-                          );
+                  if (canUpdateStatus)
+                    PopupMenuButton<TaskStatus>(
+                      tooltip: 'Update status',
+                      icon: Icon(
+                        Icons.more_horiz_rounded,
+                        color: AppColors.getTextMuted(context),
+                      ),
+                      onSelected: (status) async {
+                        if (status == task.status) return;
+                        try {
+                          await ref
+                              .read(taskProvider.notifier)
+                              .updateTaskStatus(task.id, status);
+                          if (context.mounted) {
+                            NotificationBanner.showSuccess(
+                              context,
+                              'Task updated to ${status.displayName}.',
+                            );
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            NotificationBanner.showError(
+                              context,
+                              'Task status could not be saved. Please retry.',
+                            );
+                          }
                         }
-                      }
-                    },
-                    itemBuilder:
-                        (_) =>
-                            TaskStatus.values
-                                .map(
-                                  (status) => PopupMenuItem(
-                                    value: status,
-                                    child: Text(status.displayName),
-                                  ),
-                                )
-                                .toList(),
-                  ),
+                      },
+                      itemBuilder:
+                          (_) =>
+                              TaskStatus.values
+                                  .map(
+                                    (status) => PopupMenuItem(
+                                      value: status,
+                                      child: Text(status.displayName),
+                                    ),
+                                  )
+                                  .toList(),
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
-              Text(
-                project?.name ?? 'Project',
-                style: TextStyle(
-                  color: AppColors.getTextMuted(context),
-                  fontSize: 12,
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Text(
+                  task.description.trim().isEmpty
+                      ? (project?.name ?? 'Project')
+                      : task.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.getTextMuted(context),
+                    fontSize: 12,
+                    height: 1.3,
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  const SizedBox(width: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 9,
@@ -295,25 +507,93 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: priorityColor.withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      task.priority.isEmpty
+                          ? 'Medium'
+                          : task.priority[0].toUpperCase() +
+                              task.priority.substring(1),
+                      style: TextStyle(
+                        color: priorityColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                   const Spacer(),
                   Text(
-                    'Due ${task.dueDate.month}/${task.dueDate.day}/${task.dueDate.year}',
+                    overdue
+                        ? 'Overdue · ${DateFormatter.formatShort(task.dueDate)}'
+                        : 'Due ${DateFormatter.formatShort(task.dueDate)}',
                     style: TextStyle(
-                      color: AppColors.getTextMuted(context),
-                      fontSize: 11,
+                      color:
+                          overdue
+                              ? AppColors.crimson
+                              : AppColors.getTextMuted(context),
+                      fontSize: 10.5,
+                      fontWeight: overdue ? FontWeight.w700 : FontWeight.w500,
                     ),
                   ),
                 ],
               ),
               if (task.assigneeNames.isNotEmpty) ...[
                 const SizedBox(height: 9),
-                Text(
-                  task.assigneeNames.join(', '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.getTextMuted(context),
-                    fontSize: 12,
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Row(
+                    children: [
+                      ...task.assigneeNames
+                          .take(3)
+                          .map(
+                            (name) => Padding(
+                              padding: const EdgeInsets.only(right: 5),
+                              child: CircleAvatar(
+                                radius: 11,
+                                backgroundColor: AppColors.indigoLight,
+                                child: Text(
+                                  name.trim().isEmpty
+                                      ? '?'
+                                      : name.trim()[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    color: AppColors.indigo,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      Expanded(
+                        child: Text(
+                          task.assigneeNames.join(', '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.getTextMuted(context),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      if (project != null)
+                        Text(
+                          project.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.getTextMuted(context),
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],

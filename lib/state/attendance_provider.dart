@@ -12,6 +12,7 @@ import '../repositories/attendance_repository.dart';
 import 'attendance_settings_provider.dart';
 import 'auth_provider.dart';
 import 'notification_provider.dart';
+import 'project_provider.dart';
 import 'user_management_provider.dart';
 
 class AttendanceState {
@@ -51,7 +52,8 @@ class AttendanceState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       selectedDate: selectedDate ?? this.selectedDate,
-      selectedUserId: clearSelectedUser ? null : (selectedUserId ?? this.selectedUserId),
+      selectedUserId:
+          clearSelectedUser ? null : (selectedUserId ?? this.selectedUserId),
     );
   }
 }
@@ -98,7 +100,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
     if (_isFetchingOverview) return;
     if (!force &&
         _lastOverviewFetchTime != null &&
-        DateTime.now().difference(_lastOverviewFetchTime!) < const Duration(minutes: 2) &&
+        DateTime.now().difference(_lastOverviewFetchTime!) <
+            const Duration(minutes: 2) &&
         state.dailyOverview != null) {
       return;
     }
@@ -118,12 +121,13 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       final repo = ref.read(attendanceRepositoryProvider);
       final overview = await repo.getDailyOverview(targetDate, users);
       _lastOverviewFetchTime = DateTime.now();
-      state = state.copyWith(dailyOverview: overview, isLoading: false, clearError: true);
-    } catch (e) {
       state = state.copyWith(
+        dailyOverview: overview,
         isLoading: false,
-        errorMessage: e.toString(),
+        clearError: true,
       );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
     } finally {
       _isFetchingOverview = false;
     }
@@ -138,19 +142,27 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
   }) async {
     final authUser = ref.read(authProvider).currentUser;
     final isEmployee = authUser?.role == UserRole.projectMember;
-    final effectiveUserId = userId ?? (isEmployee ? authUser?.id : state.selectedUserId);
+    final effectiveUserId =
+        userId ?? (isEmployee ? authUser?.id : state.selectedUserId);
 
     // If fetching for a specific user and date is not explicitly specified,
     // do not force today's date so that historical records are retrieved.
-    final String? resolvedDate = date ?? (effectiveUserId != null ? null : (month == null ? state.selectedDate : null));
+    final String? resolvedDate =
+        date ??
+        (effectiveUserId != null
+            ? null
+            : (month == null ? state.selectedDate : null));
 
-    final isParamsChanged = effectiveUserId != _lastRecordsUserId || resolvedDate != _lastRecordsDate;
+    final isParamsChanged =
+        effectiveUserId != _lastRecordsUserId ||
+        resolvedDate != _lastRecordsDate;
 
     if (_isFetchingRecords) return;
     if (!force &&
         !isParamsChanged &&
         _lastRecordsFetchTime != null &&
-        DateTime.now().difference(_lastRecordsFetchTime!) < const Duration(minutes: 1) &&
+        DateTime.now().difference(_lastRecordsFetchTime!) <
+            const Duration(minutes: 1) &&
         state.records.isNotEmpty) {
       return;
     }
@@ -175,10 +187,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
         clearError: true,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, errorMessage: e.toString());
     } finally {
       _isFetchingRecords = false;
     }
@@ -191,6 +200,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
     String? notes,
     String workMode = 'office',
     String? fieldLocation,
+    String? fieldProjectId,
     String? fieldClient,
     bool isEarlyDeparture = false,
     String? earlyDepartureReason,
@@ -208,7 +218,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
     if (!bypassRoleCheck && !currentUser.role.requiresAttendanceCheckIn) {
       state = state.copyWith(
         isSubmitting: false,
-        errorMessage: '${currentUser.role.displayName} is exempt from attendance check-in.',
+        errorMessage:
+            '${currentUser.role.displayName} is exempt from attendance check-in.',
       );
       return false;
     }
@@ -217,9 +228,11 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
 
     // 0. Enforce session window: morning locks at the divider, afternoon opens at the divider
     final settings = ref.read(attendanceSettingsProvider).value;
-    String session = explicitSession ?? resolveSession(settings, userId: userId);
+    String session =
+        explicitSession ?? resolveSession(settings, userId: userId);
     if (isEarlyDeparture) {
-      session = 'afternoon'; // Early departure is logged as afternoon/closing checkout
+      session =
+          'afternoon'; // Early departure is logged as afternoon/closing checkout
     } else {
       final windowError = checkInWindowError(session, settings, userId: userId);
       if (windowError != null) {
@@ -235,12 +248,13 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       // 1. Get GPS coordinates with permission checking and timeout
       final locResult = await LocationService.getCurrentCoordinates();
 
-      if (!locResult.isSuccess || locResult.latitude == null || locResult.longitude == null) {
-        final errMsg = locResult.errorMessage ?? 'Unable to acquire verified GPS coordinates. Please enable device location.';
-        state = state.copyWith(
-          isSubmitting: false,
-          errorMessage: errMsg,
-        );
+      if (!locResult.isSuccess ||
+          locResult.latitude == null ||
+          locResult.longitude == null) {
+        final errMsg =
+            locResult.errorMessage ??
+            'Unable to acquire verified GPS coordinates. Please enable device location.';
+        state = state.copyWith(isSubmitting: false, errorMessage: errMsg);
         return false;
       }
 
@@ -250,22 +264,113 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
 
       final extraNotesBuffer = StringBuffer();
       if (workMode == 'office') {
-        final currentSettings = ref.read(attendanceSettingsProvider).value ?? const AttendanceSettingsState();
-        final officeLat = currentSettings.officeLatitude;
-        final officeLng = currentSettings.officeLongitude;
-        final allowedRadius = currentSettings.geofenceRadiusMeters;
-
-        final distMeters = Geolocator.distanceBetween(lat, lng, officeLat, officeLng);
-        final isInside = distMeters <= allowedRadius;
-        final distText = distMeters >= 1000
-            ? '${(distMeters / 1000).toStringAsFixed(1)}km'
-            : '${distMeters.toStringAsFixed(0)}m';
-
-        extraNotesBuffer.write('[Work Mode: Office] [Geofence: ${isInside ? "Inside" : "Outside"} ($distText)] ');
+        final currentSettings =
+            ref.read(attendanceSettingsProvider).value ??
+            const AttendanceSettingsState();
+        extraNotesBuffer.write('[Work Mode: Office] ');
+        if (currentSettings.isGeofenceEnforced) {
+          final distMeters = Geolocator.distanceBetween(
+            lat,
+            lng,
+            currentSettings.officeLatitude,
+            currentSettings.officeLongitude,
+          );
+          final isInside = distMeters <= currentSettings.geofenceRadiusMeters;
+          final distText =
+              distMeters >= 1000
+                  ? '${(distMeters / 1000).toStringAsFixed(1)}km'
+                  : '${distMeters.toStringAsFixed(0)}m';
+          extraNotesBuffer.write(
+            '[Geofence: ${isInside ? "Inside" : "Outside"} ($distText)] ',
+          );
+        }
       } else if (workMode == 'field') {
         extraNotesBuffer.write('[Work Mode: Field] ');
+        if (fieldProjectId == null || fieldProjectId.isEmpty) {
+          state = state.copyWith(
+            isSubmitting: false,
+            errorMessage:
+                'Select a project with a saved field site before checking in.',
+          );
+          return false;
+        }
+        final matches = ref
+            .read(projectProvider)
+            .where((p) => p.id == fieldProjectId);
+        if (matches.isEmpty ||
+            matches.first.siteLatitude == null ||
+            matches.first.siteLongitude == null) {
+          state = state.copyWith(
+            isSubmitting: false,
+            errorMessage:
+                'The selected project has no saved site pin. Ask an admin to set it in project settings.',
+          );
+          return false;
+        }
+        final site = matches.first;
+        final distance = Geolocator.distanceBetween(
+          lat,
+          lng,
+          site.siteLatitude!,
+          site.siteLongitude!,
+        );
+        final radius = settings?.geofenceRadiusMeters ?? 200;
+        if (settings?.isGeofenceEnforced ?? true) {
+          if (distance > radius) {
+            state = state.copyWith(
+              isSubmitting: false,
+              errorMessage:
+                  'You are outside ${site.name} field site radius (${distance.toStringAsFixed(0)}m away; ${radius.toInt()}m allowed).',
+            );
+            return false;
+          }
+          extraNotesBuffer.write(
+            '[Field geofence: Inside (${distance.toStringAsFixed(0)}m)] ',
+          );
+        } else {
+          extraNotesBuffer.write(
+            '[Distance from site: ${distance.toStringAsFixed(0)}m] ',
+          );
+        }
+        extraNotesBuffer.write(
+          '[Project: ${site.name} (${site.projectId})] '
+          '[Site pin: ${site.siteLatitude!.toStringAsFixed(6)}, ${site.siteLongitude!.toStringAsFixed(6)}] ',
+        );
       } else if (workMode == 'home_office') {
         extraNotesBuffer.write('[Work Mode: Home Office] ');
+        if (currentUser.homeLatitude == null ||
+            currentUser.homeLongitude == null) {
+          state = state.copyWith(
+            isSubmitting: false,
+            errorMessage:
+                'Set your home office location in Profile before checking in.',
+          );
+          return false;
+        }
+        final distance = Geolocator.distanceBetween(
+          lat,
+          lng,
+          currentUser.homeLatitude!,
+          currentUser.homeLongitude!,
+        );
+        final radius = settings?.geofenceRadiusMeters ?? 200;
+        if (settings?.isGeofenceEnforced ?? true) {
+          if (distance > radius) {
+            state = state.copyWith(
+              isSubmitting: false,
+              errorMessage:
+                  'You are outside your saved home office radius (${distance.toStringAsFixed(0)}m away; ${radius.toInt()}m allowed).',
+            );
+            return false;
+          }
+          extraNotesBuffer.write(
+            '[Home geofence: Inside (${distance.toStringAsFixed(0)}m)] ',
+          );
+        } else {
+          extraNotesBuffer.write(
+            '[Distance from saved home: ${distance.toStringAsFixed(0)}m] ',
+          );
+        }
       }
 
       if (fieldLocation != null && fieldLocation.trim().isNotEmpty) {
@@ -280,7 +385,12 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
 
       final resolvedNotes = extraNotesBuffer.toString().trim();
 
-      final deviceInfo = kIsWeb ? 'Web Browser' : (Platform.isAndroid ? 'Android' : (Platform.isIOS ? 'iOS' : 'Desktop'));
+      final deviceInfo =
+          kIsWeb
+              ? 'Web Browser'
+              : (Platform.isAndroid
+                  ? 'Android'
+                  : (Platform.isIOS ? 'iOS' : 'Desktop'));
 
       final repo = ref.read(attendanceRepositoryProvider);
 
@@ -294,16 +404,28 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
           notes: resolvedNotes.isNotEmpty ? resolvedNotes : null,
           userId: userId,
           workMode: workMode,
+          fieldProjectId: workMode == 'field' ? fieldProjectId : null,
           earlyDepartureReason: earlyDepartureReason,
         );
       } on ApiException catch (apiErr) {
         final code = apiErr.statusCode ?? 0;
         if (code >= 400 && code < 500) {
-          state = state.copyWith(isSubmitting: false, errorMessage: apiErr.message);
+          state = state.copyWith(
+            isSubmitting: false,
+            errorMessage: apiErr.message,
+          );
           return false;
         }
         rethrow;
       } catch (_) {
+        if (workMode == 'field') {
+          state = state.copyWith(
+            isSubmitting: false,
+            errorMessage:
+                'Field attendance needs a live connection so the project site can be verified.',
+          );
+          return false;
+        }
         await LocationService.queueOfflineCheckIn(
           userId: userId,
           latitude: lat,
@@ -320,7 +442,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       // Fire OS status bar push notification immediately
       PushNotificationService.instance.showAttendanceReminder(
         title: 'Attendance Recorded 📍',
-        body: 'Your check-in for the $explicitSession session was recorded successfully.',
+        body:
+            'Your check-in for the $explicitSession session was recorded successfully.',
         notificationId: 'checkin_${DateTime.now().millisecondsSinceEpoch}',
       );
 
@@ -344,7 +467,9 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
   static String resolveSession(AttendanceSettingsState? s, {String? userId}) {
     if (s != null && userId != null) {
       final shift = s.getShiftForUser(userId);
-      return DateTime.now().hour < shift.morningEndHour ? 'morning' : 'afternoon';
+      return DateTime.now().hour < shift.morningEndHour
+          ? 'morning'
+          : 'afternoon';
     }
     final divider = s?.morningEndHour ?? 13;
     return DateTime.now().hour < divider ? 'morning' : 'afternoon';
@@ -352,7 +477,11 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
 
   /// Returns null when check-in is allowed; otherwise a reason.
   /// Evaluates specific shift timings. Afternoon check-out is permitted anytime.
-  static String? checkInWindowError(String session, AttendanceSettingsState? s, {String? userId}) {
+  static String? checkInWindowError(
+    String session,
+    AttendanceSettingsState? s, {
+    String? userId,
+  }) {
     // Afternoon session is check-out / departure; employees can check out at any time.
     if (session == 'afternoon') {
       return null;
@@ -363,17 +492,20 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       final h = DateTime.now().hour;
 
       if (session == 'morning') {
-        if (h < shift.morningStartHour) return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';
-        if (h >= shift.morningEndHour) return 'Morning check-in for ${shift.name} is locked after ${_fmt(shift.morningEndHour)}.';
+        if (h < shift.morningStartHour)
+          return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';
+        if (h >= shift.morningEndHour)
+          return 'Morning check-in for ${shift.name} is locked after ${_fmt(shift.morningEndHour)}.';
       }
       return null;
     }
 
     final divider = s?.morningEndHour ?? 13;
     final h = DateTime.now().hour;
-    
+
     if (session == 'morning') {
-      if (h >= divider) return 'Morning check-in is locked after ${_fmt(divider)}.';
+      if (h >= divider)
+        return 'Morning check-in is locked after ${_fmt(divider)}.';
     }
     return null;
   }
@@ -427,7 +559,11 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
     state = state.copyWith(isSubmitting: true);
     try {
       final repo = ref.read(attendanceRepositoryProvider);
-      final success = await repo.confirmAbsence(userId: userId, date: date, notes: notes);
+      final success = await repo.confirmAbsence(
+        userId: userId,
+        date: date,
+        notes: notes,
+      );
       if (success) {
         invalidateCache();
         await fetchDailyOverview(force: true);
@@ -442,6 +578,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
   }
 }
 
-final attendanceProvider = NotifierProvider<AttendanceNotifier, AttendanceState>(() {
-  return AttendanceNotifier();
-});
+final attendanceProvider =
+    NotifierProvider<AttendanceNotifier, AttendanceState>(() {
+      return AttendanceNotifier();
+    });

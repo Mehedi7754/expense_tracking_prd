@@ -325,8 +325,10 @@ class ExpenseModel {
   final String? projectImageUrl;
   final String? taskId;
   final String? taskTitle;
-  final double amount; // Total Direct Expense Cost (Base Cost + Tax)
-  final double baseCost; // Base Cost before Tax
+  final double amount; // Total Direct Expense Cost (Base Cost + VAT + Tax)
+  final double baseCost; // Base Cost before VAT & Tax
+  final double vatRate; // VAT percentage (e.g. 5.0, 7.5, 10.0, 15.0)
+  final double vatAmount; // Calculated VAT: baseCost * (vatRate / 100)
   final double taxRate; // Tax percentage (e.g. 5.0, 7.5, 10.0, 15.0)
   final double taxAmount; // Calculated Tax: baseCost * (taxRate / 100)
   final double officeBenefitAmount; // Auto-calculated 30%
@@ -371,6 +373,8 @@ class ExpenseModel {
     this.taskTitle,
     required this.amount,
     double? baseCost,
+    this.vatRate = 0.0,
+    double? vatAmount,
     this.taxRate = 0.0,
     double? taxAmount,
     this.officeBenefitAmount = 0.0,
@@ -399,11 +403,12 @@ class ExpenseModel {
     this.accommodationDetails,
     this.officeCostDetails,
   })  : baseCost = baseCost ?? amount,
+        vatAmount = vatAmount ?? 0.0,
         taxAmount = taxAmount ?? 0.0;
 
-  /// Explicit getter for total cost (Gross invoice total: Base Cost + Tax Amount).
+  /// Explicit getter for total cost (Gross invoice total: Base Cost + VAT + Tax Amount).
   double get totalCost {
-    if (hasTax) return baseCost + taxAmount;
+    if (hasVat || hasTax) return baseCost + vatAmount + taxAmount;
     if (taxRate > 0) {
       if (taxAmount > 0) return baseCost + taxAmount;
       if (taxRate < 100) return amount / (1 - (taxRate / 100.0));
@@ -412,8 +417,11 @@ class ExpenseModel {
     return amount;
   }
 
+  /// Whether VAT is applied to this expense.
+  bool get hasVat => vatRate > 0 || vatAmount > 0;
+
   /// Whether tax is applied to this expense.
-  bool get hasTax => taxRate > 0 && taxAmount > 0;
+  bool get hasTax => taxRate > 0 || taxAmount > 0;
 
   double get totalWithBenefit => amount + officeBenefitAmount;
 
@@ -429,6 +437,8 @@ class ExpenseModel {
     String? taskTitle,
     double? amount,
     double? baseCost,
+    double? vatRate,
+    double? vatAmount,
     double? taxRate,
     double? taxAmount,
     double? officeBenefitAmount,
@@ -469,6 +479,8 @@ class ExpenseModel {
       taskTitle: taskTitle ?? this.taskTitle,
       amount: amount ?? this.amount,
       baseCost: baseCost ?? this.baseCost,
+      vatRate: vatRate ?? this.vatRate,
+      vatAmount: vatAmount ?? this.vatAmount,
       taxRate: taxRate ?? this.taxRate,
       taxAmount: taxAmount ?? this.taxAmount,
       officeBenefitAmount: officeBenefitAmount ?? this.officeBenefitAmount,
@@ -549,6 +561,31 @@ class ExpenseModel {
         ? parseBool(rawReceipt, false)
         : (receiptPhoto != null && receiptPhoto.isNotEmpty);
 
+    double parsedVatRate = parseDouble(json['vat_rate'] ?? json['vatRate']);
+    double? parsedVatAmount = (json['vat_amount'] != null || json['vatAmount'] != null)
+        ? parseDouble(json['vat_amount'] ?? json['vatAmount'])
+        : null;
+    double parsedTaxRate = parseDouble(json['tax_rate'] ?? json['taxRate']);
+    double? parsedTaxAmount = (json['tax_amount'] != null || json['taxAmount'] != null)
+        ? parseDouble(json['tax_amount'] ?? json['taxAmount'])
+        : null;
+    double? parsedBaseCost = (json['base_cost'] != null || json['baseCost'] != null || json['base_amount'] != null)
+        ? parseDouble(json['base_cost'] ?? json['baseCost'] ?? json['base_amount'])
+        : null;
+
+    final rawNote = (json['note'] ?? '').toString();
+    String displayNote = rawNote;
+
+    final taxMatch = RegExp(r'\[TAX_META:vat=(\d+\.?\d*):(\d+\.?\d*)\|tax=(\d+\.?\d*):(\d+\.?\d*)\|base=(\d+\.?\d*)\]').firstMatch(rawNote);
+    if (taxMatch != null) {
+      if (parsedVatRate == 0) parsedVatRate = double.tryParse(taxMatch.group(1)!) ?? 0;
+      parsedVatAmount ??= double.tryParse(taxMatch.group(2)!);
+      if (parsedTaxRate == 0) parsedTaxRate = double.tryParse(taxMatch.group(3)!) ?? 0;
+      parsedTaxAmount ??= double.tryParse(taxMatch.group(4)!);
+      parsedBaseCost ??= double.tryParse(taxMatch.group(5)!);
+      displayNote = rawNote.replaceAll(taxMatch.group(0)!, '').trim();
+    }
+
     return ExpenseModel(
       id: (json['id'] ?? '').toString(),
       employeeId: (json['employee_id'] ?? json['employeeId'] ?? '').toString(),
@@ -560,19 +597,17 @@ class ExpenseModel {
       taskId: json['task_id']?.toString() ?? json['taskId']?.toString(),
       taskTitle: json['task_title']?.toString() ?? json['taskTitle']?.toString(),
       amount: parseDouble(json['amount']),
-      baseCost: (json['base_cost'] != null || json['baseCost'] != null)
-          ? parseDouble(json['base_cost'] ?? json['baseCost'])
-          : null,
-      taxRate: parseDouble(json['tax_rate'] ?? json['taxRate']),
-      taxAmount: (json['tax_amount'] != null || json['taxAmount'] != null)
-          ? parseDouble(json['tax_amount'] ?? json['taxAmount'])
-          : null,
+      baseCost: parsedBaseCost,
+      vatRate: parsedVatRate,
+      vatAmount: parsedVatAmount,
+      taxRate: parsedTaxRate,
+      taxAmount: parsedTaxAmount,
       officeBenefitAmount: parseDouble(json['office_benefit_amount'] ?? json['officeBenefitAmount']),
       currency: (json['currency'] ?? 'BDT').toString(),
       categoryId: (json['category_id'] ?? json['categoryId'] ?? '').toString(),
       categoryName: (json['category_name'] ?? json['categoryName'] ?? '').toString(),
       categoryIcon: (json['category_icon'] ?? json['categoryIcon'] ?? 'receipt').toString(),
-      note: (json['note'] ?? '').toString(),
+      note: displayNote,
       date: json['date'] != null
           ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
           : DateTime.now(),
@@ -602,6 +637,13 @@ class ExpenseModel {
   }
 
   Map<String, dynamic> toJson() {
+    final String encodedNote;
+    if (hasVat || hasTax) {
+      final tag = '[TAX_META:vat=$vatRate:${vatAmount.toStringAsFixed(2)}|tax=$taxRate:${taxAmount.toStringAsFixed(2)}|base:${baseCost.toStringAsFixed(2)}]';
+      encodedNote = note.contains('[TAX_META:') ? note : (note.isEmpty ? tag : '$note $tag');
+    } else {
+      encodedNote = note;
+    }
     return {
       'id': id,
       'employee_id': employeeId,
@@ -614,14 +656,18 @@ class ExpenseModel {
       if (taskTitle != null) 'task_title': taskTitle,
       'amount': amount,
       'base_cost': baseCost,
+      'base_amount': baseCost,
+      'vat_rate': vatRate,
+      'vat_amount': vatAmount,
       'tax_rate': taxRate,
       'tax_amount': taxAmount,
+      'total_cost': totalCost,
       'office_benefit_amount': officeBenefitAmount,
       'currency': currency,
       'category_id': categoryId,
       'category_name': categoryName,
       'category_icon': categoryIcon,
-      'note': note,
+      'note': encodedNote,
       'date': date.toIso8601String(),
       'has_receipt': hasReceipt,
       if (receiptPhotoUrl != null) 'receipt_photo_url': receiptPhotoUrl,

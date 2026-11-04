@@ -5,7 +5,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/routing/route_paths.dart';
-import '../../core/widgets/notification_banner.dart';
 import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 
@@ -50,11 +49,45 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         );
 
     if (success && mounted) {
-      NotificationBanner.showSuccess(
-        context,
-        'Account created successfully as ${_selectedRole.displayName}!',
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.mark_email_read_outlined, color: AppColors.emerald, size: 28),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Account Registered',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Your account has been submitted successfully.\n\n'
+            'An administrator must verify and activate your profile before you can log in. '
+            'You will receive an email confirmation once approved.',
+            style: TextStyle(fontSize: 14, height: 1.5),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go(RoutePaths.login);
+              },
+              child: const Text('Back to Login', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
       );
-      context.go(RoutePaths.home);
     }
   }
 

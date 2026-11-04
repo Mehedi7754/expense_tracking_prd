@@ -16,7 +16,8 @@ class ChatParticipantModel {
   factory ChatParticipantModel.fromJson(Map<String, dynamic> json) {
     return ChatParticipantModel(
       id: (json['id'] ?? '').toString(),
-      fullName: (json['fullName'] ?? json['full_name'] ?? 'Colleague').toString(),
+      fullName:
+          (json['fullName'] ?? json['full_name'] ?? 'Colleague').toString(),
       avatarUrl: json['avatarUrl'] ?? json['avatar_url'],
       role: (json['role'] ?? 'member').toString(),
       department: json['department']?.toString(),
@@ -38,6 +39,7 @@ class ChatMessageSummaryModel {
   final String id;
   final String content;
   final String? imageUrl;
+  final String? fileName;
   final String senderId;
   final String senderName;
   final DateTime createdAt;
@@ -47,6 +49,7 @@ class ChatMessageSummaryModel {
     required this.id,
     required this.content,
     this.imageUrl,
+    this.fileName,
     required this.senderId,
     required this.senderName,
     required this.createdAt,
@@ -58,11 +61,14 @@ class ChatMessageSummaryModel {
       id: (json['id'] ?? '').toString(),
       content: (json['content'] ?? '').toString(),
       imageUrl: json['imageUrl'] ?? json['image_url'],
+      fileName: json['fileName'] ?? json['file_name'],
       senderId: (json['senderId'] ?? json['sender_id'] ?? '').toString(),
       senderName: (json['senderName'] ?? json['sender_name'] ?? '').toString(),
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.tryParse(json['createdAt'].toString()) ??
+                  DateTime.now()
+              : DateTime.now(),
       projectId: json['projectId'] ?? json['project_id'],
     );
   }
@@ -110,7 +116,14 @@ class ChatChannelModel {
   String get subtitle {
     if (lastMessage != null) {
       if (lastMessage!.imageUrl != null && lastMessage!.imageUrl!.isNotEmpty) {
-        return lastMessage!.content.isNotEmpty ? '📷 ${lastMessage!.content}' : '📷 Photo';
+        return lastMessage!.content.isNotEmpty
+            ? '📷 ${lastMessage!.content}'
+            : '📷 Photo';
+      }
+      if (lastMessage!.fileName != null && lastMessage!.fileName!.isNotEmpty) {
+        return lastMessage!.content.isNotEmpty
+            ? '📄 ${lastMessage!.fileName} · ${lastMessage!.content}'
+            : '📄 ${lastMessage!.fileName}';
       }
       if (lastMessage!.content.isNotEmpty) {
         return lastMessage!.content;
@@ -161,19 +174,42 @@ class ChatChannelModel {
       projectName: json['projectName'] ?? json['project_name'],
       projectCode: json['projectCode'] ?? json['project_code'],
       projectStatus: json['projectStatus'] ?? json['project_status'],
-      projectImageUrl: json['projectImageUrl'] ?? json['project_image_url'] ?? json['imageUrl'] ?? json['image_url'],
-      unreadCount: (json['unreadCount'] ?? json['unread_count']) is num
-          ? ((json['unreadCount'] ?? json['unread_count']) as num).toInt()
-          : int.tryParse((json['unreadCount'] ?? json['unread_count'])?.toString() ?? '0') ?? 0,
-      updatedAt: json['updatedAt'] != null || json['updated_at'] != null
-          ? DateTime.tryParse((json['updatedAt'] ?? json['updated_at']).toString()) ?? DateTime.now()
-          : DateTime.now(),
-      otherUser: (json['otherUser'] ?? json['other_user']) != null
-          ? ChatParticipantModel.fromJson(Map<String, dynamic>.from(json['otherUser'] ?? json['other_user']))
-          : null,
-      lastMessage: (json['lastMessage'] ?? json['last_message']) != null
-          ? ChatMessageSummaryModel.fromJson(Map<String, dynamic>.from(json['lastMessage'] ?? json['last_message']))
-          : null,
+      projectImageUrl:
+          json['projectImageUrl'] ??
+          json['project_image_url'] ??
+          json['imageUrl'] ??
+          json['image_url'],
+      unreadCount:
+          (json['unreadCount'] ?? json['unread_count']) is num
+              ? ((json['unreadCount'] ?? json['unread_count']) as num).toInt()
+              : int.tryParse(
+                    (json['unreadCount'] ?? json['unread_count'])?.toString() ??
+                        '0',
+                  ) ??
+                  0,
+      updatedAt:
+          json['updatedAt'] != null || json['updated_at'] != null
+              ? DateTime.tryParse(
+                    (json['updatedAt'] ?? json['updated_at']).toString(),
+                  ) ??
+                  DateTime.now()
+              : DateTime.now(),
+      otherUser:
+          (json['otherUser'] ?? json['other_user']) != null
+              ? ChatParticipantModel.fromJson(
+                Map<String, dynamic>.from(
+                  json['otherUser'] ?? json['other_user'],
+                ),
+              )
+              : null,
+      lastMessage:
+          (json['lastMessage'] ?? json['last_message']) != null
+              ? ChatMessageSummaryModel.fromJson(
+                Map<String, dynamic>.from(
+                  json['lastMessage'] ?? json['last_message'],
+                ),
+              )
+              : null,
     );
   }
 
@@ -203,6 +239,9 @@ class ChatMessageModel {
   final String? senderRole;
   final String content;
   final String? imageUrl;
+  final String? fileUrl;
+  final String? fileName;
+  final String? fileMimeType;
   final String? projectId;
   final String? projectName;
   final String? projectCode;
@@ -223,6 +262,9 @@ class ChatMessageModel {
     this.senderRole,
     required this.content,
     this.imageUrl,
+    this.fileUrl,
+    this.fileName,
+    this.fileMimeType,
     this.projectId,
     this.projectName,
     this.projectCode,
@@ -236,32 +278,54 @@ class ChatMessageModel {
   });
 
   bool get hasImage => imageUrl != null && imageUrl!.isNotEmpty;
+  bool get hasFile => fileUrl != null && fileUrl!.isNotEmpty;
   bool get hasProject => projectId != null && projectId!.isNotEmpty;
 
-  factory ChatMessageModel.fromJson(Map<String, dynamic> json, {String? currentUserId}) {
+  factory ChatMessageModel.fromJson(
+    Map<String, dynamic> json, {
+    String? currentUserId,
+  }) {
     final sender = (json['senderId'] ?? json['sender_id'] ?? '').toString();
-    final bool me = json['isMe'] == true || (currentUserId != null && sender == currentUserId);
+    final bool me =
+        json['isMe'] == true ||
+        (currentUserId != null && sender == currentUserId);
 
     return ChatMessageModel(
       id: (json['id'] ?? '').toString(),
       channelId: (json['channelId'] ?? json['channel_id'] ?? '').toString(),
       senderId: sender,
-      senderName: (json['senderName'] ?? json['sender_name'] ?? 'Colleague').toString(),
+      senderName:
+          (json['senderName'] ?? json['sender_name'] ?? 'Colleague').toString(),
       senderAvatarUrl: json['senderAvatarUrl'] ?? json['sender_avatar_url'],
       senderRole: json['senderRole'] ?? json['sender_role'],
       content: (json['content'] ?? '').toString(),
       imageUrl: json['imageUrl'] ?? json['image_url'],
+      fileUrl: json['fileUrl'] ?? json['file_url'],
+      fileName: json['fileName'] ?? json['file_name'],
+      fileMimeType: json['fileMimeType'] ?? json['file_mime_type'],
       projectId: json['projectId'] ?? json['project_id'],
       projectName: json['projectName'] ?? json['project_name'],
       projectCode: json['projectCode'] ?? json['project_code'],
       projectStatus: json['projectStatus'] ?? json['project_status'],
-      projectBudget: json['projectBudget'] != null ? (json['projectBudget'] as num).toDouble() : null,
-      projectSpent: json['projectSpent'] != null ? (json['projectSpent'] as num).toDouble() : null,
-      projectImageUrl: json['projectImageUrl'] ?? json['project_image_url'] ?? json['imageUrl'] ?? json['image_url'],
+      projectBudget:
+          json['projectBudget'] != null
+              ? (json['projectBudget'] as num).toDouble()
+              : null,
+      projectSpent:
+          json['projectSpent'] != null
+              ? (json['projectSpent'] as num).toDouble()
+              : null,
+      projectImageUrl:
+          json['projectImageUrl'] ??
+          json['project_image_url'] ??
+          json['imageUrl'] ??
+          json['image_url'],
       replyToId: json['replyToId'] ?? json['reply_to_id'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.tryParse(json['createdAt'].toString()) ??
+                  DateTime.now()
+              : DateTime.now(),
       isMe: me,
     );
   }
@@ -276,6 +340,9 @@ class ChatMessageModel {
       'sender_role': senderRole,
       'content': content,
       'image_url': imageUrl,
+      'file_url': fileUrl,
+      'file_name': fileName,
+      'file_mime_type': fileMimeType,
       'project_id': projectId,
       'project_name': projectName,
       'project_code': projectCode,

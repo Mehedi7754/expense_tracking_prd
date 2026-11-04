@@ -7,6 +7,10 @@ class DateFormatter {
     return DateFormat('MMM d, yyyy').format(date);
   }
 
+  static String formatDayMonthYear(DateTime date) {
+    return DateFormat('dd/MM/yyyy').format(date);
+  }
+
   static String formatWithDay(DateTime date) {
     return DateFormat('EEE, MMM d, yyyy').format(date);
   }

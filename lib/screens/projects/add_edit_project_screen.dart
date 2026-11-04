@@ -8,11 +8,14 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/utils/image_utils.dart';
 import '../../core/widgets/notification_banner.dart';
+import '../../core/widgets/location_pin_picker.dart';
+import 'package:latlong2/latlong.dart';
 import '../../models/client_model.dart';
 import '../../models/project_model.dart';
 import '../../repositories/file_upload_repository.dart';
 import '../../state/auth_provider.dart';
 import '../../state/project_provider.dart';
+import '../../state/attendance_settings_provider.dart';
 import '../../state/settings_provider.dart';
 import '../../state/user_management_provider.dart';
 import '../../models/user_model.dart';
@@ -21,13 +24,11 @@ import '../../models/user_role.dart';
 class AddEditProjectScreen extends ConsumerStatefulWidget {
   final String? projectId;
 
-  const AddEditProjectScreen({
-    super.key,
-    this.projectId,
-  });
+  const AddEditProjectScreen({super.key, this.projectId});
 
   @override
-  ConsumerState<AddEditProjectScreen> createState() => _AddEditProjectScreenState();
+  ConsumerState<AddEditProjectScreen> createState() =>
+      _AddEditProjectScreenState();
 }
 
 class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
@@ -52,7 +53,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   AssignmentType _assignmentType = AssignmentType.directConsultancy;
   ProjectStatus _status = ProjectStatus.ongoing;
   TaxStatus _taxStatus = TaxStatus.included;
-  double _taxRate = 0.10; // 10%
+  double _taxRate = 0.10; // 10% VAT
+  double _incomeTaxRate = 0.05; // 5% Income Tax (IT)
   double _officeBenefitRate = 0.30; // 30% default
 
   DateTime _startDate = DateTime.now();
@@ -61,6 +63,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   final _memberSearchController = TextEditingController();
   String _memberSearchQuery = '';
   String? _imageUrl;
+  double? _siteLatitude;
+  double? _siteLongitude;
+  bool _clearSiteLocation = false;
   bool _initialized = false;
   bool _isSaving = false;
 
@@ -94,23 +99,41 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     _status = project.status;
     _taxStatus = project.taxStatus;
     _taxRate = project.taxRate;
+    _incomeTaxRate = project.incomeTaxRate;
     _officeBenefitRate = project.officeBenefitRate;
     _imageUrl = project.imageUrl;
+    _siteLatitude = project.siteLatitude;
+    _siteLongitude = project.siteLongitude;
 
     _grossValueController.text = project.grossProjectValue.toStringAsFixed(0);
-    _advanceReceivedController.text = project.advanceReceived.toStringAsFixed(0);
+    _advanceReceivedController.text = project.advanceReceived.toStringAsFixed(
+      0,
+    );
     _amountReceivedController.text = project.amountReceived.toStringAsFixed(0);
 
-    _equipBudgetController.text = (project.categoryBudgets['equipment'] ?? 0).toStringAsFixed(0);
-    _transportBudgetController.text = (project.categoryBudgets['transportation'] ?? 0).toStringAsFixed(0);
-    _foodBudgetController.text = (project.categoryBudgets['food'] ?? 0).toStringAsFixed(0);
-    _accommBudgetController.text = (project.categoryBudgets['accommodation'] ?? 0).toStringAsFixed(0);
-    _officeBudgetController.text = (project.categoryBudgets['officecost'] ?? 0).toStringAsFixed(0);
+    _equipBudgetController.text = (project.categoryBudgets['equipment'] ?? 0)
+        .toStringAsFixed(0);
+    _transportBudgetController.text =
+        (project.categoryBudgets['transportation'] ?? 0).toStringAsFixed(0);
+    _foodBudgetController.text = (project.categoryBudgets['food'] ?? 0)
+        .toStringAsFixed(0);
+    _accommBudgetController.text =
+        (project.categoryBudgets['accommodation'] ?? 0).toStringAsFixed(0);
+    _officeBudgetController.text = (project.categoryBudgets['officecost'] ?? 0)
+        .toStringAsFixed(0);
 
     // Load any custom categories
-    final standardKeys = {'equipment', 'transportation', 'food', 'accommodation', 'officecost', 'officebenefit'};
+    final standardKeys = {
+      'equipment',
+      'transportation',
+      'food',
+      'accommodation',
+      'officecost',
+      'officebenefit',
+    };
     project.categoryBudgets.forEach((key, val) {
-      if (!standardKeys.contains(key.toLowerCase()) && !key.startsWith('_meta_')) {
+      if (!standardKeys.contains(key.toLowerCase()) &&
+          !key.startsWith('_meta_')) {
         final ctrl = TextEditingController(text: val.toStringAsFixed(0));
         ctrl.addListener(() => setState(() {}));
         _customCategoryControllers[key] = ctrl;
@@ -161,7 +184,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   double get _calculatedNetRevenue {
     final gross = double.tryParse(_grossValueController.text.trim()) ?? 0.0;
     if (_taxStatus == TaxStatus.included) {
-      return gross * (1 - _taxRate);
+      final totalDeductionRate = (_taxRate + _incomeTaxRate).clamp(0.0, 1.0);
+      return gross * (1 - totalDeductionRate);
     }
     return gross;
   }
@@ -187,11 +211,18 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     return _calculatedDirectBudget + _calculatedOfficeBenefit;
   }
 
+  double get _calculatedExpectedRevenue {
+    return _calculatedNetRevenue - _calculatedTotalBudget;
+  }
+
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedTeamMemberIds.isEmpty) {
-      NotificationBanner.showError(context, 'Please assign at least one team member');
+      NotificationBanner.showError(
+        context,
+        'Please assign at least one team member',
+      );
       return;
     }
 
@@ -201,9 +232,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
 
     final rawGross = double.tryParse(_grossValueController.text.trim()) ?? 0.0;
     final gross = rawGross < 0 ? 0.0 : rawGross;
-    final rawAdvance = double.tryParse(_advanceReceivedController.text.trim()) ?? 0.0;
+    final rawAdvance =
+        double.tryParse(_advanceReceivedController.text.trim()) ?? 0.0;
     final advance = rawAdvance < 0 ? 0.0 : rawAdvance;
-    final rawReceived = double.tryParse(_amountReceivedController.text.trim()) ?? 0.0;
+    final rawReceived =
+        double.tryParse(_amountReceivedController.text.trim()) ?? 0.0;
     final received = rawReceived < 0 ? 0.0 : rawReceived;
 
     double safeBudget(String text) {
@@ -217,16 +250,20 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       'food': safeBudget(_foodBudgetController.text),
       'accommodation': safeBudget(_accommBudgetController.text),
       'officecost': safeBudget(_officeBudgetController.text),
-      'officebenefit': _calculatedOfficeBenefit < 0 ? 0.0 : _calculatedOfficeBenefit,
+      'officebenefit':
+          _calculatedOfficeBenefit < 0 ? 0.0 : _calculatedOfficeBenefit,
     };
     for (final entry in _customCategoryControllers.entries) {
       categoryBudgets[entry.key] = safeBudget(entry.value.text);
     }
 
-    final totalBudget = _calculatedTotalBudget < 0 ? 0.0 : _calculatedTotalBudget;
+    final totalBudget =
+        _calculatedTotalBudget < 0 ? 0.0 : _calculatedTotalBudget;
 
     if (isEditing) {
-      final existing = ref.read(projectProvider).firstWhere((p) => p.id == widget.projectId);
+      final existing = ref
+          .read(projectProvider)
+          .firstWhere((p) => p.id == widget.projectId);
       final updated = existing.copyWith(
         name: _nameController.text.trim(),
         description: _descController.text.trim(),
@@ -237,6 +274,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         grossProjectValue: gross,
         taxStatus: _taxStatus,
         taxRate: _taxRate,
+        incomeTaxRate: _incomeTaxRate,
         expectedNetRevenue: _calculatedNetRevenue,
         advanceReceived: advance,
         amountReceived: received,
@@ -248,6 +286,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         endDate: _endDate,
         teamMemberIds: _selectedTeamMemberIds.toList(),
         imageUrl: _imageUrl,
+        siteLatitude: _siteLatitude,
+        siteLongitude: _siteLongitude,
+        clearSiteLocation: _clearSiteLocation,
       );
       await ref.read(projectProvider.notifier).updateProject(updated);
       if (mounted) {
@@ -255,12 +296,16 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       }
     } else {
       final currentUser = ref.read(authProvider).currentUser;
-      final members = {
-        ..._selectedTeamMemberIds,
-        if (currentUser != null && currentUser.id.isNotEmpty) currentUser.id,
-      }.toList();
+      final members =
+          {
+            ..._selectedTeamMemberIds,
+            if (currentUser != null && currentUser.id.isNotEmpty)
+              currentUser.id,
+          }.toList();
 
-      final created = await ref.read(projectProvider.notifier).addProject(
+      final created = await ref
+          .read(projectProvider.notifier)
+          .addProject(
             name: _nameController.text.trim(),
             description: _descController.text.trim(),
             client: _clientController.text.trim(),
@@ -269,6 +314,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             grossProjectValue: gross,
             taxStatus: _taxStatus,
             taxRate: _taxRate,
+            incomeTaxRate: _incomeTaxRate,
             advanceReceived: advance,
             amountReceived: received,
             budget: totalBudget,
@@ -280,13 +326,21 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             teamMemberIds: members,
             createdById: currentUser?.id,
             imageUrl: _imageUrl,
+            siteLatitude: _siteLatitude,
+            siteLongitude: _siteLongitude,
           );
       if (mounted) {
         final isUploadedToServer = !created.id.startsWith('proj_');
         if (isUploadedToServer) {
-          NotificationBanner.showSuccess(context, 'Project created and uploaded to backend server!');
+          NotificationBanner.showSuccess(
+            context,
+            'Project created and uploaded to backend server!',
+          );
         } else {
-          NotificationBanner.showWarning(context, 'Saved locally (Server unreachable: Check internet / phone settings).');
+          NotificationBanner.showWarning(
+            context,
+            'Saved locally (Server unreachable: Check internet / phone settings).',
+          );
         }
       }
     }
@@ -327,10 +381,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Color(0xFF4F46E5),
-          width: 1.5,
-        ),
+        borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
       ),
     );
   }
@@ -340,7 +391,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (isEditing) {
-      final existing = ref.watch(projectProvider).where((p) => p.id == widget.projectId).toList();
+      final existing =
+          ref
+              .watch(projectProvider)
+              .where((p) => p.id == widget.projectId)
+              .toList();
       if (existing.isNotEmpty) _initProject(existing.first);
     } else if (!_initialized) {
       _initialized = true;
@@ -351,7 +406,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
+      backgroundColor:
+          isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -361,7 +417,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         ),
         title: Text(
           isEditing ? 'Edit Project' : 'New Project',
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
       ),
       body: Center(
@@ -381,9 +441,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   isDark: isDark,
                   icon: Icons.business_center_rounded,
                   iconColor: const Color(0xFF4F46E5),
-                  iconBg: isDark ? const Color(0xFF312E81).withAlpha(40) : const Color(0xFFEEF2FF),
+                  iconBg:
+                      isDark
+                          ? const Color(0xFF312E81).withAlpha(40)
+                          : const Color(0xFFEEF2FF),
                   title: 'Project Overview',
-                  subtitle: 'Basic specifications, client info and requirements',
+                  subtitle:
+                      'Basic specifications, client info and requirements',
                   children: [
                     TextFormField(
                       controller: _nameController,
@@ -392,7 +456,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                         hint: 'Enter official project title',
                         isDark: isDark,
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter project name' : null,
+                      validator:
+                          (v) =>
+                              (v == null || v.trim().isEmpty)
+                                  ? 'Please enter project name'
+                                  : null,
                     ),
                     const SizedBox(height: 12),
 
@@ -403,7 +471,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                         hint: 'Enter client or organization name',
                         isDark: isDark,
                       ),
-                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter client name' : null,
+                      validator:
+                          (v) =>
+                              (v == null || v.trim().isEmpty)
+                                  ? 'Please enter client name'
+                                  : null,
                     ),
                     const SizedBox(height: 12),
 
@@ -433,21 +505,32 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
 
                     // Assignment Type (Full width to avoid text truncation/overflow)
                     DropdownButtonFormField<AssignmentType>(
-                      value: _assignmentType,
+                      initialValue: _assignmentType,
                       isExpanded: true,
-                      decoration: _inputDeco(label: 'Assignment Type', isDark: isDark),
-                      items: AssignmentType.values.map((t) {
-                        return DropdownMenuItem(
-                          value: t,
-                          child: Text(t.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
-                        );
-                      }).toList(),
+                      decoration: _inputDeco(
+                        label: 'Assignment Type',
+                        isDark: isDark,
+                      ),
+                      items:
+                          AssignmentType.values.map((t) {
+                            return DropdownMenuItem(
+                              value: t,
+                              child: Text(
+                                t.displayName,
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            );
+                          }).toList(),
                       onChanged: (v) {
                         setState(() {
                           _assignmentType = v!;
-                          if (_assignmentType == AssignmentType.government) _officeBenefitRate = 0.30;
-                          if (_assignmentType == AssignmentType.private) _officeBenefitRate = 0.25;
-                          if (_assignmentType == AssignmentType.subConsultancy) _officeBenefitRate = 0.20;
+                          if (_assignmentType == AssignmentType.government)
+                            _officeBenefitRate = 0.30;
+                          if (_assignmentType == AssignmentType.private)
+                            _officeBenefitRate = 0.25;
+                          if (_assignmentType == AssignmentType.subConsultancy)
+                            _officeBenefitRate = 0.20;
                         });
                       },
                     ),
@@ -460,12 +543,19 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       child: InputDecorator(
                         decoration: _inputDeco(
                           label: 'Timeline Range',
-                          suffixIcon: const Icon(Icons.calendar_month_rounded, size: 18, color: Color(0xFF4F46E5)),
+                          suffixIcon: const Icon(
+                            Icons.calendar_month_rounded,
+                            size: 18,
+                            color: Color(0xFF4F46E5),
+                          ),
                           isDark: isDark,
                         ),
                         child: Text(
-                          '${DateFormatter.formatShort(_startDate)} — ${DateFormatter.formatShort(_endDate)}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          '${DateFormatter.formatDayMonthYear(_startDate)} — ${DateFormatter.formatDayMonthYear(_endDate)}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -476,10 +566,76 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       controller: _descController,
                       decoration: _inputDeco(
                         label: 'Project Requirements & Scope of Work *',
-                        hint: 'Client deliverables, technical requirements and methodology',
+                        hint:
+                            'Client deliverables, technical requirements and methodology',
                         isDark: isDark,
                       ),
                       maxLines: 3,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                _buildCardContainer(
+                  isDark: isDark,
+                  icon: Icons.location_on_outlined,
+                  iconColor: const Color(0xFF4F46E5),
+                  iconBg: const Color(0xFFEEF2FF),
+                  title: 'Project site',
+                  subtitle: 'Pin the site used for on-field attendance',
+                  children: [
+                    Text(
+                      _siteLatitude == null || _siteLongitude == null
+                          ? 'No site location selected'
+                          : '${_siteLatitude!.toStringAsFixed(6)}, ${_siteLongitude!.toStringAsFixed(6)}',
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final pin = await LocationPinPicker.show(
+                              context,
+                              initialLocation: LatLng(
+                                _siteLatitude ?? 23.8103,
+                                _siteLongitude ?? 90.4125,
+                              ),
+                              title: 'Pin project site',
+                              radiusMeters:
+                                  ref
+                                      .read(attendanceSettingsProvider)
+                                      .value
+                                      ?.geofenceRadiusMeters ??
+                                  200,
+                            );
+                            if (pin != null && mounted) {
+                              setState(() {
+                                _siteLatitude = pin.latitude;
+                                _siteLongitude = pin.longitude;
+                                _clearSiteLocation = false;
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.map_outlined),
+                          label: Text(
+                            _siteLatitude == null
+                                ? 'Select on map'
+                                : 'Change pin',
+                          ),
+                        ),
+                        if (_siteLatitude != null)
+                          TextButton(
+                            onPressed:
+                                () => setState(() {
+                                  _siteLatitude = null;
+                                  _siteLongitude = null;
+                                  _clearSiteLocation = true;
+                                }),
+                            child: const Text('Remove pin'),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -491,9 +647,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   isDark: isDark,
                   icon: Icons.account_balance_wallet_rounded,
                   iconColor: const Color(0xFF10B981),
-                  iconBg: isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5),
+                  iconBg:
+                      isDark
+                          ? const Color(0xFF064E3B).withAlpha(40)
+                          : const Color(0xFFECFDF5),
                   title: 'Contract & Tax Setup',
-                  subtitle: 'Contract value, IT-VAT treatment and revenue projection',
+                  subtitle:
+                      'Contract value, IT-VAT treatment and revenue projection',
                   children: [
                     TextFormField(
                       controller: _grossValueController,
@@ -506,72 +666,116 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       ),
                       onChanged: (_) => setState(() {}),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Enter contract value';
+                        if (v == null || v.trim().isEmpty)
+                          return 'Enter contract value';
                         final val = double.tryParse(v.trim());
                         if (val == null) return 'Enter valid amount';
-                        if (val <= 0) return 'Contract value must be greater than zero';
+                        if (val <= 0)
+                          return 'Contract value must be greater than zero';
                         return null;
                       },
                     ),
                     const SizedBox(height: 12),
 
-                    // Tax Status & Tax Rate in responsive layout
+                    // Tax Status & Tax Rates in responsive layout
                     LayoutBuilder(
                       builder: (ctx, constraints) {
-                        final isNarrow = constraints.maxWidth < 420;
+                        final isNarrow = constraints.maxWidth < 460;
                         if (isNarrow) {
                           return Column(
                             children: [
                               _buildTaxStatusDropdown(isDark),
                               const SizedBox(height: 12),
-                              _buildTaxRateInput(isDark),
+                              Row(
+                                children: [
+                                  Expanded(child: _buildTaxRateInput(isDark)),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _buildIncomeTaxRateInput(isDark),
+                                  ),
+                                ],
+                              ),
                             ],
                           );
                         }
                         return Row(
                           children: [
-                            Expanded(flex: 3, child: _buildTaxStatusDropdown(isDark)),
-                            const SizedBox(width: 12),
-                            Expanded(flex: 2, child: _buildTaxRateInput(isDark)),
+                            Expanded(
+                              flex: 3,
+                              child: _buildTaxStatusDropdown(isDark),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: _buildTaxRateInput(isDark),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              flex: 2,
+                              child: _buildIncomeTaxRateInput(isDark),
+                            ),
                           ],
                         );
                       },
                     ),
                     const SizedBox(height: 10),
 
-                    // Expected Net Revenue Preview Pill
+                    // Keep contract value and expected revenue distinct.
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
-                        borderRadius: BorderRadius.circular(12),
+                        color:
+                            isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF0FDF9),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFC7D2FE),
+                          color:
+                              isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFBBF7D0),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
                         children: [
-                          Expanded(
-                            child: Text(
-                              'Expected Net Revenue:',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF4338CA),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                          _buildFinancialPreviewRow(
+                            'Project Value Excl. IT-VAT',
+                            _calculatedNetRevenue,
+                            isDark,
+                            emphasized: true,
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            CurrencyFormatter.format(_calculatedNetRevenue),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF4F46E5),
-                            ),
+                          const SizedBox(height: 6),
+                          _buildFinancialPreviewRow(
+                            'Direct Operational Budget',
+                            _calculatedDirectBudget,
+                            isDark,
+                          ),
+                          const SizedBox(height: 6),
+                          _buildFinancialPreviewRow(
+                            'Office Benefit (${(_officeBenefitRate * 100).toInt()}%)',
+                            _calculatedOfficeBenefit,
+                            isDark,
+                          ),
+                          const Divider(height: 16),
+                          _buildFinancialPreviewRow(
+                            'Expected Revenue',
+                            _calculatedExpectedRevenue,
+                            isDark,
+                            emphasized: true,
+                            valueColor:
+                                _calculatedExpectedRevenue < 0
+                                    ? const Color(0xFFBE123C)
+                                    : const Color(0xFF047857),
+                          ),
+                          const SizedBox(height: 6),
+                          _buildFinancialPreviewRow(
+                            'Total Agreed Budget',
+                            _calculatedTotalBudget,
+                            isDark,
+                            emphasized: true,
                           ),
                         ],
                       ),
@@ -594,7 +798,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   isDark: isDark,
                                 ),
                                 validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return null;
+                                  if (v == null || v.trim().isEmpty)
+                                    return null;
                                   final val = double.tryParse(v.trim());
                                   if (val == null) return 'Enter valid amount';
                                   if (val < 0) return 'Cannot be negative';
@@ -611,7 +816,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   isDark: isDark,
                                 ),
                                 validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return null;
+                                  if (v == null || v.trim().isEmpty)
+                                    return null;
                                   final val = double.tryParse(v.trim());
                                   if (val == null) return 'Enter valid amount';
                                   if (val < 0) return 'Cannot be negative';
@@ -633,7 +839,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   isDark: isDark,
                                 ),
                                 validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return null;
+                                  if (v == null || v.trim().isEmpty)
+                                    return null;
                                   final val = double.tryParse(v.trim());
                                   if (val == null) return 'Enter valid amount';
                                   if (val < 0) return 'Cannot be negative';
@@ -652,7 +859,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   isDark: isDark,
                                 ),
                                 validator: (v) {
-                                  if (v == null || v.trim().isEmpty) return null;
+                                  if (v == null || v.trim().isEmpty)
+                                    return null;
                                   final val = double.tryParse(v.trim());
                                   if (val == null) return 'Enter valid amount';
                                   if (val < 0) return 'Cannot be negative';
@@ -674,19 +882,47 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   isDark: isDark,
                   icon: Icons.pie_chart_outline_rounded,
                   iconColor: const Color(0xFFD97706),
-                  iconBg: isDark ? const Color(0xFF78350F).withAlpha(40) : const Color(0xFFFFFBEB),
+                  iconBg:
+                      isDark
+                          ? const Color(0xFF78350F).withAlpha(40)
+                          : const Color(0xFFFFFBEB),
                   title: 'Budget Allocation',
                   subtitle: 'Category expenditure & automatic markup margin',
                   children: [
-                    _buildCompactBudgetRow('Equipment', Icons.construction_rounded, _equipBudgetController, isDark),
+                    _buildCompactBudgetRow(
+                      'Equipment',
+                      Icons.construction_rounded,
+                      _equipBudgetController,
+                      isDark,
+                    ),
                     const SizedBox(height: 8),
-                    _buildCompactBudgetRow('Transportation', Icons.directions_car_rounded, _transportBudgetController, isDark),
+                    _buildCompactBudgetRow(
+                      'Transportation',
+                      Icons.directions_car_rounded,
+                      _transportBudgetController,
+                      isDark,
+                    ),
                     const SizedBox(height: 8),
-                    _buildCompactBudgetRow('Food & Meals', Icons.restaurant_rounded, _foodBudgetController, isDark),
+                    _buildCompactBudgetRow(
+                      'Food & Meals',
+                      Icons.restaurant_rounded,
+                      _foodBudgetController,
+                      isDark,
+                    ),
                     const SizedBox(height: 8),
-                    _buildCompactBudgetRow('Accommodation', Icons.hotel_rounded, _accommBudgetController, isDark),
+                    _buildCompactBudgetRow(
+                      'Accommodation',
+                      Icons.hotel_rounded,
+                      _accommBudgetController,
+                      isDark,
+                    ),
                     const SizedBox(height: 8),
-                    _buildCompactBudgetRow('Office Cost', Icons.work_outline_rounded, _officeBudgetController, isDark),
+                    _buildCompactBudgetRow(
+                      'Office and Administration',
+                      Icons.work_outline_rounded,
+                      _officeBudgetController,
+                      isDark,
+                    ),
                     const SizedBox(height: 8),
 
                     // Custom Categories List
@@ -694,10 +930,14 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.tune_rounded, size: 13, color: AppColors.getPrimary(context)),
+                          Icon(
+                            Icons.tune_rounded,
+                            size: 13,
+                            color: AppColors.getPrimary(context),
+                          ),
                           const SizedBox(width: 6),
                           Text(
-                            'CUSTOM CATEGORIES',
+                            'ADDITIONAL OFFICE AND ADMINISTRATION LINES',
                             style: TextStyle(
                               fontSize: 10.5,
                               fontWeight: FontWeight.w800,
@@ -717,7 +957,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                             isDark,
                             onDelete: () {
                               setState(() {
-                                final ctrl = _customCategoryControllers.remove(entry.key);
+                                final ctrl = _customCategoryControllers.remove(
+                                  entry.key,
+                                );
                                 ctrl?.dispose();
                               });
                             },
@@ -731,9 +973,14 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       onTap: _showAddCategoryDialog,
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFD97706).withAlpha(isDark ? 25 : 12),
+                          color: const Color(
+                            0xFFD97706,
+                          ).withAlpha(isDark ? 25 : 12),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: const Color(0xFFD97706).withAlpha(60),
@@ -742,7 +989,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                         child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_circle_outline_rounded, size: 16, color: Color(0xFFD97706)),
+                            Icon(
+                              Icons.add_circle_outline_rounded,
+                              size: 16,
+                              color: Color(0xFFD97706),
+                            ),
                             SizedBox(width: 8),
                             Text(
                               'Add Category',
@@ -760,12 +1011,21 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
 
                     // Markup Margin Calculation Summary Card
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                        color:
+                            isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          color:
+                              isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0),
                         ),
                       ),
                       child: Column(
@@ -777,7 +1037,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   'Direct Budget Subtotal',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                    color:
+                                        isDark
+                                            ? AppColors.darkTextSecondary
+                                            : const Color(0xFF64748B),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -785,8 +1048,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                CurrencyFormatter.format(_calculatedDirectBudget),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                                CurrencyFormatter.format(
+                                  _calculatedDirectBudget,
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ],
                           ),
@@ -798,7 +1066,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   'Markup Margin (${(_officeBenefitRate * 100).toInt()}%)',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                    color:
+                                        isDark
+                                            ? AppColors.darkTextSecondary
+                                            : const Color(0xFF64748B),
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -806,8 +1077,14 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                CurrencyFormatter.format(_calculatedOfficeBenefit),
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFD97706)),
+                                CurrencyFormatter.format(
+                                  _calculatedOfficeBenefit,
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFFD97706),
+                                ),
                               ),
                             ],
                           ),
@@ -817,14 +1094,19 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                               const Expanded(
                                 child: Text(
                                   'Total Project Budget',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                CurrencyFormatter.format(_calculatedTotalBudget),
+                                CurrencyFormatter.format(
+                                  _calculatedTotalBudget,
+                                ),
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w900,
@@ -846,9 +1128,13 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   isDark: isDark,
                   icon: Icons.groups_rounded,
                   iconColor: const Color(0xFF8B5CF6),
-                  iconBg: isDark ? const Color(0xFF4C1D95).withAlpha(40) : const Color(0xFFF5F3FF),
+                  iconBg:
+                      isDark
+                          ? const Color(0xFF4C1D95).withAlpha(40)
+                          : const Color(0xFFF5F3FF),
                   title: 'Team Access',
-                  subtitle: 'Search & assign members permitted to view & submit costs',
+                  subtitle:
+                      'Search & assign members permitted to view & submit costs',
                   children: [
                     Builder(
                       builder: (context) {
@@ -859,36 +1145,49 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                         final Map<String, UserModel> userMap = {};
                         for (final u in allUsers) {
                           userMap[u.id] = u;
-                          if (u.email.isNotEmpty) userMap[u.email.toLowerCase()] = u;
+                          if (u.email.isNotEmpty)
+                            userMap[u.email.toLowerCase()] = u;
                         }
                         if (curUser != null) {
                           userMap[curUser.id] = curUser;
-                          if (curUser.email.isNotEmpty) userMap[curUser.email.toLowerCase()] = curUser;
+                          if (curUser.email.isNotEmpty)
+                            userMap[curUser.email.toLowerCase()] = curUser;
                         }
 
-                        final selectedUsers = _selectedTeamMemberIds.map((id) {
-                          return userMap[id] ?? UserModel(
-                            id: id,
-                            name: id.contains('@') ? id.split('@').first : id,
-                            email: id.contains('@') ? id : '',
-                            role: UserRole.projectMember,
-                            department: 'Operations',
-                          );
-                        }).toList();
+                        final selectedUsers =
+                            _selectedTeamMemberIds.map((id) {
+                              return userMap[id] ??
+                                  UserModel(
+                                    id: id,
+                                    name:
+                                        id.contains('@')
+                                            ? id.split('@').first
+                                            : id,
+                                    email: id.contains('@') ? id : '',
+                                    role: UserRole.projectMember,
+                                    department: 'Operations',
+                                  );
+                            }).toList();
 
                         // Filter candidates based on search
                         final query = _memberSearchQuery.trim().toLowerCase();
                         final candidatePool = userMap.values.toSet().toList();
-                        final filteredCandidates = query.isEmpty
-                            ? candidatePool
-                            : candidatePool.where((u) {
-                                return u.name.toLowerCase().contains(query) ||
-                                    u.email.toLowerCase().contains(query) ||
-                                    u.department.toLowerCase().contains(query);
-                              }).toList();
+                        final filteredCandidates =
+                            query.isEmpty
+                                ? candidatePool
+                                : candidatePool.where((u) {
+                                  return u.name.toLowerCase().contains(query) ||
+                                      u.email.toLowerCase().contains(query) ||
+                                      u.department.toLowerCase().contains(
+                                        query,
+                                      );
+                                }).toList();
 
-                        final isQueryEmail = query.contains('@') && query.contains('.');
-                        final hasExactEmailMatch = candidatePool.any((u) => u.email.toLowerCase() == query);
+                        final isQueryEmail =
+                            query.contains('@') && query.contains('.');
+                        final hasExactEmailMatch = candidatePool.any(
+                          (u) => u.email.toLowerCase() == query,
+                        );
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -902,72 +1201,125 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   _memberSearchQuery = val;
                                 });
                                 if (val.trim().length >= 2) {
-                                  ref.read(userManagementProvider.notifier).searchUsers(val.trim());
+                                  ref
+                                      .read(userManagementProvider.notifier)
+                                      .searchUsers(val.trim());
                                 }
                               },
                               decoration: InputDecoration(
                                 hintText: 'Search member by name or Gmail...',
                                 hintStyle: TextStyle(
                                   fontSize: 13,
-                                  color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                                  color:
+                                      isDark
+                                          ? AppColors.darkTextSecondary
+                                          : const Color(0xFF94A3B8),
                                 ),
-                                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                                suffixIcon: _memberSearchQuery.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(Icons.clear_rounded, size: 18),
-                                        onPressed: () {
-                                          _memberSearchController.clear();
-                                          setState(() => _memberSearchQuery = '');
-                                        },
-                                      )
-                                    : null,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                prefixIcon: const Icon(
+                                  Icons.search_rounded,
+                                  size: 20,
+                                ),
+                                suffixIcon:
+                                    _memberSearchQuery.isNotEmpty
+                                        ? IconButton(
+                                          icon: const Icon(
+                                            Icons.clear_rounded,
+                                            size: 18,
+                                          ),
+                                          onPressed: () {
+                                            _memberSearchController.clear();
+                                            setState(
+                                              () => _memberSearchQuery = '',
+                                            );
+                                          },
+                                        )
+                                        : null,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
+                                ),
                                 filled: true,
-                                fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                fillColor:
+                                    isDark
+                                        ? const Color(0xFF1E293B)
+                                        : const Color(0xFFF8FAFC),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                    color:
+                                        isDark
+                                            ? const Color(0xFF334155)
+                                            : const Color(0xFFE2E8F0),
                                   ),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
-                                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                    color:
+                                        isDark
+                                            ? const Color(0xFF334155)
+                                            : const Color(0xFFE2E8F0),
                                   ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF4F46E5),
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
 
                             // 2. Direct Add by Email Option if unlisted
-                            if (_memberSearchQuery.isNotEmpty && !hasExactEmailMatch) ...[
+                            if (_memberSearchQuery.isNotEmpty &&
+                                !hasExactEmailMatch) ...[
                               const SizedBox(height: 10),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF4F46E5).withAlpha(isDark ? 30 : 15),
+                                  color: const Color(
+                                    0xFF4F46E5,
+                                  ).withAlpha(isDark ? 30 : 15),
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: const Color(0xFF4F46E5).withAlpha(80)),
+                                  border: Border.all(
+                                    color: const Color(
+                                      0xFF4F46E5,
+                                    ).withAlpha(80),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFF4F46E5), size: 20),
+                                    const Icon(
+                                      Icons.person_add_alt_1_rounded,
+                                      color: Color(0xFF4F46E5),
+                                      size: 20,
+                                    ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            isQueryEmail ? 'Assign member with Gmail:' : 'Search or invite by email:',
-                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
+                                            isQueryEmail
+                                                ? 'Assign member with Gmail:'
+                                                : 'Search or invite by email:',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey,
+                                            ),
                                           ),
                                           Text(
                                             _memberSearchQuery,
-                                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ],
@@ -976,12 +1328,18 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                     const SizedBox(width: 8),
                                     ElevatedButton.icon(
                                       onPressed: () async {
-                                        final added = await ref.read(userManagementProvider.notifier).findOrAddMemberByEmail(
+                                        final added = await ref
+                                            .read(
+                                              userManagementProvider.notifier,
+                                            )
+                                            .findOrAddMemberByEmail(
                                               _memberSearchQuery,
                                             );
                                         if (added != null && mounted) {
                                           setState(() {
-                                            _selectedTeamMemberIds.add(added.id);
+                                            _selectedTeamMemberIds.add(
+                                              added.id,
+                                            );
                                             _memberSearchController.clear();
                                             _memberSearchQuery = '';
                                           });
@@ -992,14 +1350,32 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                         }
                                       },
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF4F46E5),
+                                        backgroundColor: const Color(
+                                          0xFF4F46E5,
+                                        ),
                                         foregroundColor: Colors.white,
                                         elevation: 0,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
                                       ),
-                                      icon: const Icon(Icons.add_rounded, size: 16),
-                                      label: const Text('Assign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                      icon: const Icon(
+                                        Icons.add_rounded,
+                                        size: 16,
+                                      ),
+                                      label: const Text(
+                                        'Assign',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -1016,7 +1392,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
-                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+                                      color:
+                                          isDark
+                                              ? AppColors.darkTextSecondary
+                                              : const Color(0xFF475569),
                                     ),
                                   ),
                                   const Spacer(),
@@ -1024,14 +1403,23 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                     onPressed: () {
                                       setState(() {
                                         _selectedTeamMemberIds.clear();
-                                        if (curUser != null) _selectedTeamMemberIds.add(curUser.id);
+                                        if (curUser != null)
+                                          _selectedTeamMemberIds.add(
+                                            curUser.id,
+                                          );
                                       });
                                     },
                                     style: TextButton.styleFrom(
                                       padding: EdgeInsets.zero,
                                       visualDensity: VisualDensity.compact,
                                     ),
-                                    child: const Text('Reset', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                    child: const Text(
+                                      'Reset',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1039,42 +1427,73 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                               Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
-                                children: selectedUsers.map((u) {
-                                  final isCurrentUser = curUser != null && curUser.id == u.id;
-                                  return Chip(
-                                    avatar: CircleAvatar(
-                                      radius: 11,
-                                      backgroundColor: const Color(0xFF4F46E5),
-                                      child: Text(
-                                        u.name.isNotEmpty ? u.name.substring(0, 1).toUpperCase() : 'U',
-                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
-                                      ),
-                                    ),
-                                    label: Text(
-                                      '${u.name.isNotEmpty ? u.name : u.email}${isCurrentUser ? ' (You)' : ''}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                      ),
-                                    ),
-                                    deleteIcon: isCurrentUser ? null : const Icon(Icons.close_rounded, size: 16),
-                                    onDeleted: isCurrentUser
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _selectedTeamMemberIds.remove(u.id);
-                                            });
-                                          },
-                                    backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      side: BorderSide(
-                                        color: isDark ? const Color(0xFF334155) : const Color(0xFFC7D2FE),
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
+                                children:
+                                    selectedUsers.map((u) {
+                                      final isCurrentUser =
+                                          curUser != null && curUser.id == u.id;
+                                      return Chip(
+                                        avatar: CircleAvatar(
+                                          radius: 11,
+                                          backgroundColor: const Color(
+                                            0xFF4F46E5,
+                                          ),
+                                          child: Text(
+                                            u.name.isNotEmpty
+                                                ? u.name
+                                                    .substring(0, 1)
+                                                    .toUpperCase()
+                                                : 'U',
+                                            style: const TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                        label: Text(
+                                          '${u.name.isNotEmpty ? u.name : u.email}${isCurrentUser ? ' (You)' : ''}',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color:
+                                                isDark
+                                                    ? Colors.white
+                                                    : const Color(0xFF1E293B),
+                                          ),
+                                        ),
+                                        deleteIcon:
+                                            isCurrentUser
+                                                ? null
+                                                : const Icon(
+                                                  Icons.close_rounded,
+                                                  size: 16,
+                                                ),
+                                        onDeleted:
+                                            isCurrentUser
+                                                ? null
+                                                : () {
+                                                  setState(() {
+                                                    _selectedTeamMemberIds
+                                                        .remove(u.id);
+                                                  });
+                                                },
+                                        backgroundColor:
+                                            isDark
+                                                ? const Color(0xFF1E293B)
+                                                : const Color(0xFFEEF2FF),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          side: BorderSide(
+                                            color:
+                                                isDark
+                                                    ? const Color(0xFF334155)
+                                                    : const Color(0xFFC7D2FE),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
                               ),
                             ],
 
@@ -1082,25 +1501,35 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
 
                             // 4. Available Candidates Selector List
                             Text(
-                              _memberSearchQuery.isEmpty ? 'Available Members' : 'Search Results (${filteredCandidates.length})',
+                              _memberSearchQuery.isEmpty
+                                  ? 'Available Members'
+                                  : 'Search Results (${filteredCandidates.length})',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
-                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF475569),
+                                color:
+                                    isDark
+                                        ? AppColors.darkTextSecondary
+                                        : const Color(0xFF475569),
                               ),
                             ),
                             const SizedBox(height: 8),
 
                             if (filteredCandidates.isEmpty)
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 child: Center(
                                   child: Text(
                                     'No registered members match "$_memberSearchQuery".\nUse "Assign member by email" above to assign them.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: isDark ? AppColors.darkTextSecondary : const Color(0xFF94A3B8),
+                                      color:
+                                          isDark
+                                              ? AppColors.darkTextSecondary
+                                              : const Color(0xFF94A3B8),
                                     ),
                                   ),
                                 ),
@@ -1109,63 +1538,120 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                               ListView.separated(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                                itemCount: filteredCandidates.length > 8 ? 8 : filteredCandidates.length,
-                                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                                itemCount:
+                                    filteredCandidates.length > 8
+                                        ? 8
+                                        : filteredCandidates.length,
+                                separatorBuilder:
+                                    (_, __) => const SizedBox(height: 6),
                                 itemBuilder: (context, index) {
                                   final u = filteredCandidates[index];
-                                  final isAssigned = _selectedTeamMemberIds.contains(u.id);
+                                  final isAssigned = _selectedTeamMemberIds
+                                      .contains(u.id);
 
                                   return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: isAssigned
-                                          ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF))
-                                          : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+                                      color:
+                                          isAssigned
+                                              ? (isDark
+                                                  ? const Color(0xFF1E293B)
+                                                  : const Color(0xFFEEF2FF))
+                                              : (isDark
+                                                  ? const Color(0xFF0F172A)
+                                                  : const Color(0xFFF8FAFC)),
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: isAssigned
-                                            ? const Color(0xFF4F46E5)
-                                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                        color:
+                                            isAssigned
+                                                ? const Color(0xFF4F46E5)
+                                                : (isDark
+                                                    ? const Color(0xFF334155)
+                                                    : const Color(0xFFE2E8F0)),
                                       ),
                                     ),
                                     child: Row(
                                       children: [
                                         CircleAvatar(
                                           radius: 16,
-                                          backgroundColor: isAssigned ? const Color(0xFF4F46E5) : const Color(0xFF94A3B8),
+                                          backgroundColor:
+                                              isAssigned
+                                                  ? const Color(0xFF4F46E5)
+                                                  : const Color(0xFF94A3B8),
                                           child: Text(
-                                            u.name.isNotEmpty ? u.name.substring(0, 1).toUpperCase() : 'U',
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                                            u.name.isNotEmpty
+                                                ? u.name
+                                                    .substring(0, 1)
+                                                    .toUpperCase()
+                                                : 'U',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
                                           ),
                                         ),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Row(
                                                 children: [
                                                   Flexible(
                                                     child: Text(
-                                                      u.name.isNotEmpty ? u.name : u.email,
+                                                      u.name.isNotEmpty
+                                                          ? u.name
+                                                          : u.email,
                                                       style: TextStyle(
                                                         fontSize: 13,
-                                                        fontWeight: FontWeight.w700,
-                                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color:
+                                                            isDark
+                                                                ? Colors.white
+                                                                : const Color(
+                                                                  0xFF1E293B,
+                                                                ),
                                                       ),
-                                                      overflow: TextOverflow.ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
                                                     decoration: BoxDecoration(
-                                                      color: (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                                                      borderRadius: BorderRadius.circular(6),
+                                                      color:
+                                                          (isDark
+                                                              ? Colors
+                                                                  .grey
+                                                                  .shade800
+                                                              : Colors
+                                                                  .grey
+                                                                  .shade200),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
                                                     ),
                                                     child: Text(
-                                                      u.role.displayName.split(' ').first,
-                                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+                                                      u.role.displayName
+                                                          .split(' ')
+                                                          .first,
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -1175,9 +1661,16 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                                   u.email,
                                                   style: TextStyle(
                                                     fontSize: 11,
-                                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                                    color:
+                                                        isDark
+                                                            ? AppColors
+                                                                .darkTextSecondary
+                                                            : const Color(
+                                                              0xFF64748B,
+                                                            ),
                                                   ),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                             ],
                                           ),
@@ -1185,16 +1678,26 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                         const SizedBox(width: 8),
                                         IconButton(
                                           icon: Icon(
-                                            isAssigned ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
-                                            color: isAssigned ? const Color(0xFF10B981) : const Color(0xFF4F46E5),
+                                            isAssigned
+                                                ? Icons.check_circle_rounded
+                                                : Icons
+                                                    .add_circle_outline_rounded,
+                                            color:
+                                                isAssigned
+                                                    ? const Color(0xFF10B981)
+                                                    : const Color(0xFF4F46E5),
                                             size: 24,
                                           ),
                                           onPressed: () {
                                             setState(() {
                                               if (isAssigned) {
-                                                _selectedTeamMemberIds.remove(u.id);
+                                                _selectedTeamMemberIds.remove(
+                                                  u.id,
+                                                );
                                               } else {
-                                                _selectedTeamMemberIds.add(u.id);
+                                                _selectedTeamMemberIds.add(
+                                                  u.id,
+                                                );
                                               }
                                             });
                                           },
@@ -1222,18 +1725,27 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       backgroundColor: const Color(0xFF4F46E5),
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check_rounded, size: 18),
+                    icon:
+                        _isSaving
+                            ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                            : const Icon(Icons.check_rounded, size: 18),
                     label: Text(
                       isEditing ? 'Save Changes' : 'Create Project',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -1247,6 +1759,44 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   }
 
   // ==================== SUB-WIDGET HELPERS ====================
+
+  Widget _buildFinancialPreviewRow(
+    String label,
+    double value,
+    bool isDark, {
+    bool emphasized = false,
+    Color? valueColor,
+  }) {
+    final mutedColor =
+        isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B);
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: emphasized ? 12 : 11,
+              fontWeight: emphasized ? FontWeight.w700 : FontWeight.w500,
+              color:
+                  emphasized
+                      ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                      : mutedColor,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          CurrencyFormatter.format(value),
+          style: TextStyle(
+            fontSize: emphasized ? 12 : 11,
+            fontWeight: emphasized ? FontWeight.w800 : FontWeight.w600,
+            color:
+                valueColor ?? (isDark ? Colors.white : const Color(0xFF0F172A)),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildCardContainer({
     required bool isDark,
@@ -1266,15 +1816,16 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
         ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        boxShadow:
+            isDark
+                ? []
+                : [
+                  BoxShadow(
+                    color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1297,14 +1848,21 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
+                      ),
                     ),
                     const SizedBox(height: 1),
                     Text(
                       subtitle,
                       style: TextStyle(
                         fontSize: 11,
-                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                        color:
+                            isDark
+                                ? AppColors.darkTextSecondary
+                                : const Color(0xFF64748B),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1315,7 +1873,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), height: 1),
+          Divider(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+            height: 1,
+          ),
           const SizedBox(height: 16),
           ...children,
         ],
@@ -1325,45 +1886,60 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
 
   Widget _buildClientTypeDropdown(bool isDark) {
     return DropdownButtonFormField<ClientType>(
-      value: _clientType,
+      initialValue: _clientType,
       isExpanded: true,
       decoration: _inputDeco(label: 'Client Type', isDark: isDark),
-      items: ClientType.values.map((t) {
-        return DropdownMenuItem(
-          value: t,
-          child: Text(t.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
-        );
-      }).toList(),
+      items:
+          ClientType.values.map((t) {
+            return DropdownMenuItem(
+              value: t,
+              child: Text(
+                t.displayName,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            );
+          }).toList(),
       onChanged: (v) => setState(() => _clientType = v!),
     );
   }
 
   Widget _buildStatusDropdown(bool isDark) {
     return DropdownButtonFormField<ProjectStatus>(
-      value: _status,
+      initialValue: _status,
       isExpanded: true,
       decoration: _inputDeco(label: 'Status', isDark: isDark),
-      items: ProjectStatus.values.map((s) {
-        return DropdownMenuItem(
-          value: s,
-          child: Text(s.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
-        );
-      }).toList(),
+      items:
+          ProjectStatus.values.map((s) {
+            return DropdownMenuItem(
+              value: s,
+              child: Text(
+                s.displayName,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            );
+          }).toList(),
       onChanged: (v) => setState(() => _status = v!),
     );
   }
 
   Widget _buildTaxStatusDropdown(bool isDark) {
     return DropdownButtonFormField<TaxStatus>(
-      value: _taxStatus,
+      initialValue: _taxStatus,
       isExpanded: true,
       decoration: _inputDeco(label: 'IT-VAT Treatment', isDark: isDark),
-      items: TaxStatus.values.map((t) {
-        return DropdownMenuItem(
-          value: t,
-          child: Text(t.displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
-        );
-      }).toList(),
+      items:
+          TaxStatus.values.map((t) {
+            return DropdownMenuItem(
+              value: t,
+              child: Text(
+                t.displayName,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            );
+          }).toList(),
       onChanged: (v) => setState(() => _taxStatus = v!),
     );
   }
@@ -1371,11 +1947,23 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   Widget _buildTaxRateInput(bool isDark) {
     return TextFormField(
       initialValue: '${(_taxRate * 100).toInt()}%',
-      decoration: _inputDeco(label: 'Tax Rate (%)', isDark: isDark),
+      decoration: _inputDeco(label: 'VAT Rate (%)', isDark: isDark),
       keyboardType: TextInputType.number,
       onChanged: (v) {
         final val = double.tryParse(v.replaceAll('%', '').trim());
         if (val != null) setState(() => _taxRate = val / 100);
+      },
+    );
+  }
+
+  Widget _buildIncomeTaxRateInput(bool isDark) {
+    return TextFormField(
+      initialValue: '${(_incomeTaxRate * 100).toInt()}%',
+      decoration: _inputDeco(label: 'IT Rate (%)', isDark: isDark),
+      keyboardType: TextInputType.number,
+      onChanged: (v) {
+        final val = double.tryParse(v.replaceAll('%', '').trim());
+        if (val != null) setState(() => _incomeTaxRate = val / 100);
       },
     );
   }
@@ -1397,7 +1985,12 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+          Icon(
+            icon,
+            size: 16,
+            color:
+                isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1423,7 +2016,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                 contentPadding: EdgeInsets.zero,
                 hintText: '0',
                 prefixText: '৳ ',
-                prefixStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                prefixStyle: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -1450,7 +2046,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.category_rounded, size: 16, color: Color(0xFFD97706)),
+          const Icon(
+            Icons.category_rounded,
+            size: 16,
+            color: Color(0xFFD97706),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1476,7 +2076,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                 contentPadding: EdgeInsets.zero,
                 hintText: '0',
                 prefixText: '৳ ',
-                prefixStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                prefixStyle: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               onChanged: (_) => setState(() {}),
             ),
@@ -1487,7 +2090,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             borderRadius: BorderRadius.circular(8),
             child: const Padding(
               padding: EdgeInsets.all(4),
-              child: Icon(Icons.close_rounded, size: 16, color: Colors.redAccent),
+              child: Icon(
+                Icons.close_rounded,
+                size: 16,
+                color: Colors.redAccent,
+              ),
             ),
           ),
         ],
@@ -1510,145 +2117,215 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD97706).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.add_circle_rounded, color: Color(0xFFD97706), size: 20),
+      builder:
+          (ctx) => StatefulBuilder(
+            builder: (context, setDialogState) {
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Add Budget Category',
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quick Suggestions:',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                backgroundColor:
+                    isDark ? const Color(0xFF1E293B) : Colors.white,
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD97706).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.add_circle_rounded,
+                        color: Color(0xFFD97706),
+                        size: 20,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: suggestions.map((sug) {
-                      final isSelected = nameController.text.trim().toLowerCase() == sug.toLowerCase();
-                      return ChoiceChip(
-                        label: Text(
-                          sug,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                            color: isSelected
-                                ? Colors.white
-                                : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Add Budget Category',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Quick Suggestions:',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              isDark
+                                  ? const Color(0xFF94A3B8)
+                                  : const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children:
+                            suggestions.map((sug) {
+                              final isSelected =
+                                  nameController.text.trim().toLowerCase() ==
+                                  sug.toLowerCase();
+                              return ChoiceChip(
+                                label: Text(
+                                  sug,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight:
+                                        isSelected
+                                            ? FontWeight.w800
+                                            : FontWeight.w600,
+                                    color:
+                                        isSelected
+                                            ? Colors.white
+                                            : (isDark
+                                                ? const Color(0xFFCBD5E1)
+                                                : const Color(0xFF334155)),
+                                  ),
+                                ),
+                                selected: isSelected,
+                                selectedColor: const Color(0xFFD97706),
+                                backgroundColor:
+                                    isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFF1F5F9),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                                showCheckmark: false,
+                                onSelected: (val) {
+                                  setDialogState(() {
+                                    nameController.text = val ? sug : '';
+                                  });
+                                },
+                              );
+                            }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameController,
+                        autofocus: false,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                          labelText: 'Category Name',
+                          hintText: 'e.g. Survey Equipment, Consultant Fee',
+                          filled: true,
+                          fillColor:
+                              isDark
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        selected: isSelected,
-                        selectedColor: const Color(0xFFD97706),
-                        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                        visualDensity: VisualDensity.compact,
-                        showCheckmark: false,
-                        onSelected: (val) {
-                          setDialogState(() {
-                            nameController.text = val ? sug : '';
-                          });
-                        },
-                      );
-                    }).toList(),
+                        onChanged: (_) => setDialogState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: amountController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Allocated Budget (৳)',
+                          hintText: '0',
+                          prefixText: '৳ ',
+                          filled: true,
+                          fillColor:
+                              isDark
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: nameController,
-                    autofocus: false,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: InputDecoration(
-                      labelText: 'Category Name',
-                      hintText: 'e.g. Survey Equipment, Consultant Fee',
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color:
+                            isDark ? Colors.white70 : const Color(0xFF64748B),
+                      ),
                     ),
-                    onChanged: (_) => setDialogState(() {}),
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: amountController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Allocated Budget (৳)',
-                      hintText: '0',
-                      prefixText: '৳ ',
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                    ),
+                    onPressed: () {
+                      final name = nameController.text.trim();
+                      if (name.isEmpty) return;
+
+                      final standardNames = {
+                        'equipment',
+                        'transportation',
+                        'food',
+                        'accommodation',
+                        'officecost',
+                        'officebenefit',
+                      };
+                      if (standardNames.contains(name.toLowerCase()) ||
+                          _customCategoryControllers.keys.any(
+                            (k) => k.toLowerCase() == name.toLowerCase(),
+                          )) {
+                        NotificationBanner.showError(
+                          context,
+                          'Category "$name" already exists',
+                        );
+                        return;
+                      }
+
+                      final amt = amountController.text.trim();
+                      setState(() {
+                        final ctrl = TextEditingController(
+                          text: amt.isEmpty ? '0' : amt,
+                        );
+                        ctrl.addListener(() => setState(() {}));
+                        _customCategoryControllers[name] = ctrl;
+                      });
+                      Navigator.pop(ctx);
+                      NotificationBanner.showSuccess(
+                        context,
+                        'Added category "$name"',
+                      );
+                    },
+                    child: const Text(
+                      'Add Category',
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text('Cancel', style: TextStyle(color: isDark ? Colors.white70 : const Color(0xFF64748B))),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD97706),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                ),
-                onPressed: () {
-                  final name = nameController.text.trim();
-                  if (name.isEmpty) return;
-
-                  final standardNames = {'equipment', 'transportation', 'food', 'accommodation', 'officecost', 'officebenefit'};
-                  if (standardNames.contains(name.toLowerCase()) ||
-                      _customCategoryControllers.keys.any((k) => k.toLowerCase() == name.toLowerCase())) {
-                    NotificationBanner.showError(context, 'Category "$name" already exists');
-                    return;
-                  }
-
-                  final amt = amountController.text.trim();
-                  setState(() {
-                    final ctrl = TextEditingController(text: amt.isEmpty ? '0' : amt);
-                    ctrl.addListener(() => setState(() {}));
-                    _customCategoryControllers[name] = ctrl;
-                  });
-                  Navigator.pop(ctx);
-                  NotificationBanner.showSuccess(context, 'Added category "$name"');
-                },
-                child: const Text('Add Category', style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
-            ],
-          );
-        },
-      ),
+              );
+            },
+          ),
     );
   }
 
@@ -1660,15 +2337,16 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         border: Border.all(
           color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
         ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withAlpha(5),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+        boxShadow:
+            isDark
+                ? []
+                : [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(5),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1680,10 +2358,17 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF312E81).withAlpha(40) : const Color(0xFFEEF2FF),
+                  color:
+                      isDark
+                          ? const Color(0xFF312E81).withAlpha(40)
+                          : const Color(0xFFEEF2FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.add_photo_alternate_rounded, color: Color(0xFF4F46E5), size: 20),
+                child: const Icon(
+                  Icons.add_photo_alternate_rounded,
+                  color: Color(0xFF4F46E5),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -1692,14 +2377,21 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                   children: [
                     const Text(
                       'Project Cover Image',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Add a project banner for visual identification',
                       style: TextStyle(
                         fontSize: 11.5,
-                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                        color:
+                            isDark
+                                ? AppColors.darkTextSecondary
+                                : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -1707,11 +2399,18 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
               ),
               if (_imageUrl != null && _imageUrl!.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Color(0xFFEF4444)),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 20,
+                    color: Color(0xFFEF4444),
+                  ),
                   tooltip: 'Remove project image',
                   onPressed: () {
                     setState(() => _imageUrl = null);
-                    NotificationBanner.showInfo(context, 'Project image removed');
+                    NotificationBanner.showInfo(
+                      context,
+                      'Project image removed',
+                    );
                   },
                 ),
             ],
@@ -1734,13 +2433,24 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.black.withAlpha(160),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         icon: const Icon(Icons.camera_alt_outlined, size: 14),
-                        label: const Text('Change Image', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                        label: const Text(
+                          'Change Image',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         onPressed: _showImageSourcePicker,
                       ),
                     ),
@@ -1754,12 +2464,21 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24,
+                  horizontal: 16,
+                ),
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0F172A).withAlpha(100) : const Color(0xFFF8FAFC),
+                  color:
+                      isDark
+                          ? const Color(0xFF0F172A).withAlpha(100)
+                          : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    color:
+                        isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFCBD5E1),
                     style: BorderStyle.solid,
                     width: 1.2,
                   ),
@@ -1771,7 +2490,10 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
+                        color:
+                            isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFEEF2FF),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1783,14 +2505,20 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                     const SizedBox(height: 10),
                     const Text(
                       'Upload Project Image',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       'Camera or Gallery • JPG, PNG supported',
                       style: TextStyle(
                         fontSize: 11,
-                        color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                        color:
+                            isDark
+                                ? AppColors.darkTextSecondary
+                                : const Color(0xFF64748B),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1798,12 +2526,23 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4F46E5),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         elevation: 0,
                       ),
                       icon: const Icon(Icons.add_a_photo_outlined, size: 15),
-                      label: const Text('Select Image', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      label: const Text(
+                        'Select Image',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       onPressed: _showImageSourcePicker,
                     ),
                   ],
@@ -1830,11 +2569,19 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.business_center_rounded, size: 36, color: Colors.white70),
+            Icon(
+              Icons.business_center_rounded,
+              size: 36,
+              color: Colors.white70,
+            ),
             SizedBox(height: 6),
             Text(
               'Project Cover Image',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
@@ -1852,21 +2599,31 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         imageQuality: 85,
       );
       if (picked != null) {
-        final base64Uri = await AppImageHelper.fileToBase64DataUri(File(picked.path));
+        final base64Uri = await AppImageHelper.fileToBase64DataUri(
+          File(picked.path),
+        );
         setState(() => _imageUrl = base64Uri);
         try {
-          final uploadResult = await ref.read(fileUploadRepositoryProvider).upload(
-            filePathOrDataUri: picked.path,
-            category: UploadCategory.projects,
-            entityId: widget.projectId,
-          );
+          final uploadResult = await ref
+              .read(fileUploadRepositoryProvider)
+              .upload(
+                filePathOrDataUri: picked.path,
+                category: UploadCategory.projects,
+                entityId: widget.projectId,
+              );
           if (mounted) {
             setState(() => _imageUrl = uploadResult.url);
-            NotificationBanner.showSuccess(context, 'Project image uploaded successfully');
+            NotificationBanner.showSuccess(
+              context,
+              'Project image uploaded successfully',
+            );
           }
         } catch (_) {
           if (mounted) {
-            NotificationBanner.showInfo(context, 'Project image selected (offline ready)');
+            NotificationBanner.showInfo(
+              context,
+              'Project image selected (offline ready)',
+            );
           }
         }
       }
@@ -1882,101 +2639,141 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
-                ),
+      builder:
+          (ctx) => Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkSurface : Colors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Upload Project Image',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: -0.3),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Select a cover photo or banner for this project',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF4F46E5).withAlpha(20),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.camera_alt_outlined, color: Color(0xFF4F46E5)),
-              ),
-              title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              subtitle: const Text('Capture project site or blueprint', style: TextStyle(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickProjectImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0284C7).withAlpha(20),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.photo_library_outlined, color: Color(0xFF0284C7)),
-              ),
-              title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-              subtitle: const Text('Select photo from local device', style: TextStyle(fontSize: 11)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickProjectImage(ImageSource.gallery);
-              },
-            ),
-            if (_imageUrl != null && _imageUrl!.isNotEmpty) ...[
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEF4444).withAlpha(20),
-                    borderRadius: BorderRadius.circular(10),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
                 ),
-                title: const Text(
-                  'Remove Cover Image',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFFEF4444)),
+                const SizedBox(height: 16),
+                const Text(
+                  'Upload Project Image',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17,
+                    letterSpacing: -0.3,
+                  ),
                 ),
-                subtitle: const Text('Revert back to project initial banner', style: TextStyle(fontSize: 11)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  setState(() => _imageUrl = null);
-                  NotificationBanner.showInfo(context, 'Cover image removed');
-                },
-              ),
-            ],
-          ],
-        ),
-      ),
+                const SizedBox(height: 4),
+                Text(
+                  'Select a cover photo or banner for this project',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color:
+                        isDark
+                            ? AppColors.darkTextSecondary
+                            : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_outlined,
+                      color: Color(0xFF4F46E5),
+                    ),
+                  ),
+                  title: const Text(
+                    'Take Photo with Camera',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Capture project site or blueprint',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickProjectImage(ImageSource.camera);
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.photo_library_outlined,
+                      color: Color(0xFF0284C7),
+                    ),
+                  ),
+                  title: const Text(
+                    'Choose from Gallery',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    'Select photo from local device',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _pickProjectImage(ImageSource.gallery);
+                  },
+                ),
+                if (_imageUrl != null && _imageUrl!.isNotEmpty) ...[
+                  ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444).withAlpha(20),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline_rounded,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                    title: const Text(
+                      'Remove Cover Image',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFFEF4444),
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Revert back to project initial banner',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      setState(() => _imageUrl = null);
+                      NotificationBanner.showInfo(
+                        context,
+                        'Cover image removed',
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
     );
   }
 }
-

@@ -61,6 +61,9 @@ class ChatRepository {
     String content = '',
     String? imageUrl,
     String? projectId,
+    String? fileUrl,
+    String? fileName,
+    String? fileMimeType,
     String? currentUserId,
   }) async {
     final response = await _client.post(
@@ -68,6 +71,9 @@ class ChatRepository {
       body: {
         'content': content,
         if (imageUrl != null) 'imageUrl': imageUrl,
+        if (fileUrl != null) 'fileUrl': fileUrl,
+        if (fileName != null) 'fileName': fileName,
+        if (fileMimeType != null) 'fileMimeType': fileMimeType,
         if (projectId != null) 'projectId': projectId,
       },
     );
@@ -102,5 +108,19 @@ class ChatRepository {
       return response['url'].toString();
     }
     return null;
+  }
+
+  Future<Map<String, dynamic>> uploadAttachment(String dataUri) async {
+    final response = await _client.post(
+      '/chat/upload',
+      body: {'file': dataUri},
+    );
+    if (response is Map<String, dynamic> && response['url'] != null) {
+      return {
+        'url': response['url'].toString(),
+        'filename': response['filename']?.toString() ?? '',
+      };
+    }
+    throw const FormatException('Invalid response while uploading chat attachment');
   }
 }

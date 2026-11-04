@@ -43,7 +43,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _checkAuth() async {
     // Restore session from persistent local storage
     try {
-      await ref.read(authProvider.notifier).restoreSession();
+      // A failed browser storage plugin must never strand the app on the
+      // splash screen. Session restore is local and should normally finish
+      // immediately; continue to sign-in if the platform doesn't respond.
+      await ref
+          .read(authProvider.notifier)
+          .restoreSession()
+          .timeout(const Duration(seconds: 3));
     } catch (_) {}
     
     if (!mounted) return;

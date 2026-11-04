@@ -12,6 +12,7 @@ import '../../models/attendance_model.dart';
 import '../../state/attendance_provider.dart';
 import '../../state/attendance_settings_provider.dart';
 import '../../state/auth_provider.dart';
+import '../../state/project_provider.dart';
 import 'package:latlong2/latlong.dart';
 import 'widgets/attendance_map_view.dart';
 
@@ -26,6 +27,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
   bool _hasInitialFetchTriggered = false;
   String _selectedWorkMode = 'office'; // 'office', 'field', 'home_office'
   final _fieldSiteController = TextEditingController();
+  String? _selectedFieldProjectId;
   final _fieldClientController = TextEditingController();
   final _workNotesController = TextEditingController();
 
@@ -45,6 +47,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
         await LocationService.requestLocationPermission();
       } catch (_) {}
       if (!mounted) return;
+      ref.read(projectProvider.notifier).fetchProjects();
       final user = ref.read(authProvider).currentUser;
       if (user != null && user.id.isNotEmpty) {
         _hasInitialFetchTriggered = true;
@@ -58,6 +61,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
       explicitSession: session,
       workMode: _selectedWorkMode,
       fieldLocation: _selectedWorkMode == 'field' ? _fieldSiteController.text.trim() : null,
+      fieldProjectId: _selectedWorkMode == 'field' ? _selectedFieldProjectId : null,
       fieldClient: _selectedWorkMode == 'field' ? _fieldClientController.text.trim() : null,
       notes: _workNotesController.text.trim().isNotEmpty ? _workNotesController.text.trim() : null,
       isEarlyDeparture: isEarlyDeparture,
@@ -299,6 +303,11 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     final authState = ref.watch(authProvider);
     final user = authState.currentUser;
     final attendanceState = ref.watch(attendanceProvider);
+    ref.watch(projectProvider);
+    final availableSites = ref.read(projectProvider.notifier)
+        .getProjectsForUser(user)
+        .where((p) => p.siteLatitude != null && p.siteLongitude != null)
+        .toList();
 
     ref.listen<AuthState>(authProvider, (previous, next) {
       final newUser = next.currentUser;
@@ -629,11 +638,50 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                     // Additional metadata fields if "On Field" is active
                     if (_selectedWorkMode == 'field') ...[
                       const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: availableSites.any((p) => p.id == _selectedFieldProjectId)
+                            ? _selectedFieldProjectId : null,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Project site pin',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        hint: const Text('Select a saved project site'),
+                        items: availableSites.map((p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Text(p.name, overflow: TextOverflow.ellipsis),
+                        )).toList(),
+                        onChanged: (id) => setState(() {
+                          _selectedFieldProjectId = id;
+                          final project = availableSites.firstWhere((p) => p.id == id);
+                          _fieldSiteController.text = project.name;
+                          _fieldClientController.text = project.client;
+                        }),
+                      ),
+                      if (availableSites.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6),
+                          child: Text('No project has a site pin yet. Add one in the project editor.',
+                              style: TextStyle(fontSize: 12)),
+                        ),
+                      if (_selectedFieldProjectId != null &&
+                          availableSites.any((p) => p.id == _selectedFieldProjectId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            'Saved site: ${availableSites.firstWhere((p) => p.id == _selectedFieldProjectId).siteLatitude!.toStringAsFixed(6)}, '
+                            '${availableSites.firstWhere((p) => p.id == _selectedFieldProjectId).siteLongitude!.toStringAsFixed(6)}',
+                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
                       Row(
                         children: [
                           Expanded(
                             child: TextField(
                               controller: _fieldSiteController,
+                              readOnly: _selectedFieldProjectId != null,
                               style: TextStyle(fontSize: 12.5, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                               decoration: InputDecoration(
                                 labelText: 'Site / Project Name',

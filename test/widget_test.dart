@@ -92,19 +92,19 @@ void main() {
 
     test('ApiEndpoints dynamically resolves custom route overrides from environment variables without hardcoding', () {
       AppEnv.initializeForTesting({
-        'API_BASE_URL': 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1',
+        'API_BASE_URL': 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1',
         'API_ENDPOINT_HEALTH': '/health',
         'API_ENDPOINT_AUTH_LOGIN': '/custom-auth/login',
         'API_ENDPOINT_EXPENSES': '/financial/expenses',
         'API_ENDPOINT_PROJECTS': '/core/projects',
       });
 
-      expect(ApiEndpoints.health, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/health');
-      expect(ApiEndpoints.login, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/custom-auth/login');
-      expect(ApiEndpoints.expenses, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/financial/expenses');
-      expect(ApiEndpoints.expenseById('exp_999'), 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/financial/expenses/exp_999');
-      expect(ApiEndpoints.projects, 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/core/projects');
-      expect(ApiEndpoints.projectById('proj_01'), 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1/core/projects/proj_01');
+      expect(ApiEndpoints.health, 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1/health');
+      expect(ApiEndpoints.login, 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1/custom-auth/login');
+      expect(ApiEndpoints.expenses, 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1/financial/expenses');
+      expect(ApiEndpoints.expenseById('exp_999'), 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1/financial/expenses/exp_999');
+      expect(ApiEndpoints.projects, 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1/core/projects');
+      expect(ApiEndpoints.projectById('proj_01'), 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1/core/projects/proj_01');
     });
 
     test('ApiClient redacts sensitive data and prevents credential leakage in logs', () {
@@ -274,11 +274,11 @@ void main() {
       expect(container.read(settingsProvider).availableTaxRates, contains(0.0));
     });
 
-    test('Tax calculation: 1000 entered with 5% tax adds 950 to project, with 50 VAT and 1000 invoice total', () {
+    test('Tax calculation: 1000 entered with 5% tax adds 1050 to project, with 50 VAT and 1000 invoice base', () {
       final totalEntered = 1000.0;
       final rate = 5.0;
       final taxAmount = totalEntered * (rate / 100.0);
-      final netCost = totalEntered - taxAmount;
+      final netCost = totalEntered + taxAmount;
 
       final expense = ExpenseModel(
         id: 'exp_tax_deduct_test',
@@ -287,7 +287,7 @@ void main() {
         projectId: 'proj_01',
         projectName: 'Enterprise Cloud ERP Platform',
         amount: netCost,
-        baseCost: netCost,
+        baseCost: totalEntered,
         taxRate: rate,
         taxAmount: taxAmount,
         categoryId: 'cat_food',
@@ -298,11 +298,11 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      expect(expense.amount, 950.0);
-      expect(expense.totalCost, 1000.0);
+      expect(expense.amount, 1050.0);
+      expect(expense.totalCost, 1050.0);
       expect(expense.taxRate, 5.0);
       expect(expense.taxAmount, 50.0);
-      expect(expense.baseCost, 950.0);
+      expect(expense.baseCost, 1000.0);
       expect(expense.hasTax, true);
     });
   });

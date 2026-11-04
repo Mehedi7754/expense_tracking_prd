@@ -14,6 +14,7 @@ import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/project_progress_badge.dart';
 import '../../core/widgets/receipt_compliance_badge.dart';
 import '../../core/widgets/update_progress_dialog.dart';
+import '../../core/widgets/report_export_bottom_sheet.dart';
 import '../../core/widgets/status_chip.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
@@ -586,12 +587,22 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 }
               },
             ),
+            IconButton(
+              icon: const Icon(Icons.ios_share_rounded, color: Color(0xFF10B981)),
+              tooltip: 'Export Financial Report',
+              onPressed: () {
+                ReportExportBottomSheet.show(context, initialProject: project);
+              },
+            ),
             if (canEdit)
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
                 tooltip: 'Project Options',
                 onSelected: (val) {
                   switch (val) {
+                    case 'export':
+                      ReportExportBottomSheet.show(context, initialProject: project);
+                      break;
                     case 'edit':
                       context.push(RoutePaths.editProject(project.id));
                       break;
@@ -607,6 +618,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   }
                 },
                 itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: 'export',
+                    child: Row(
+                      children: [
+                        Icon(Icons.ios_share_rounded, size: 18, color: Color(0xFF10B981)),
+                        SizedBox(width: 8),
+                        Text('Export Report'),
+                      ],
+                    ),
+                  ),
                   const PopupMenuItem(
                     value: 'edit',
                     child: Row(
@@ -704,6 +725,28 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           // 1. UNIFIED HERO PROGRESS & COVER CARD (At the very top)
           _buildUnifiedHeroProgressCard(context, project, canUpdateProgress, canEdit),
           const SizedBox(height: 6),
+          if (project.siteLatitude != null && project.siteLongitude != null)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.location_on_outlined, size: 20, color: Color(0xFF4F46E5)),
+                const SizedBox(width: 10),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Project site', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                    Text('${project.siteLatitude!.toStringAsFixed(6)}, ${project.siteLongitude!.toStringAsFixed(6)}',
+                        style: const TextStyle(fontSize: 11)),
+                  ],
+                )),
+              ]),
+            ),
 
           // 2. EXECUTIVE FINANCIAL OVERVIEW COCKPIT (Directly beneath Hero)
           _buildFinancialCockpitCard(
@@ -852,8 +895,29 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 12),
-                _buildForecastItem('Tax & VAT Provision', project.taxStatus.displayName.replaceAll('IT-VAT: ', 'Tax '), const Color(0xFF0D9488), isDark: isDark),
+                _buildForecastItem('Tax & VAT Policy', project.taxStatus.displayName.replaceAll('IT-VAT: ', ''), const Color(0xFF0D9488), isDark: isDark),
+                Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 16),
+                _buildForecastItem(
+                  'VAT Rate',
+                  '${(project.taxRate * 100).toStringAsFixed(1)}% (${CurrencyFormatter.format(project.calculatedVat)})',
+                  const Color(0xFF0284C7),
+                  isDark: isDark,
+                ),
+                Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 16),
+                _buildForecastItem(
+                  'Income Tax (IT)',
+                  '${(project.incomeTaxRate * 100).toStringAsFixed(1)}% (${CurrencyFormatter.format(project.calculatedIncomeTax)})',
+                  const Color(0xFF0D9488),
+                  isDark: isDark,
+                ),
+                Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 16),
+                _buildForecastItem(
+                  'Total Tax Deductions',
+                  '${((project.taxRate + project.incomeTaxRate) * 100).toStringAsFixed(1)}% (${CurrencyFormatter.format(project.calculatedTax)})',
+                  const Color(0xFF6366F1),
+                  isBold: true,
+                  isDark: isDark,
+                ),
                 Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 16),
                 _buildForecastItem(
                   'Project Lifespan',
@@ -977,7 +1041,34 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => ReportExportBottomSheet.show(context, initialProject: project),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withAlpha(15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF10B981).withAlpha(50)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.ios_share_rounded, size: 13, color: Color(0xFF10B981)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Export',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               InkWell(
                 onTap: () => _showUpdateBudgetDialog(context, project),
                 borderRadius: BorderRadius.circular(8),

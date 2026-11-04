@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../core/services/cache_retention_service.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
@@ -63,7 +64,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: settings.preferredCurrency,
+                    initialValue: settings.preferredCurrency,
                     items: AppConstants.supportedCurrencies.map((curr) {
                       final symbol = AppConstants.currencySymbols[curr] ?? '';
                       return DropdownMenuItem<String>(value: curr, child: Text('$curr ($symbol)'));
@@ -264,6 +265,14 @@ class SettingsScreen extends ConsumerWidget {
                 onChanged: (val) => ref.read(settingsProvider.notifier).toggleTheme(val),
               ),
             ),
+
+            const SizedBox(height: 24),
+
+            // Document Retention & Storage Cleanup
+            Text('Storage & Document Retention', style: AppTextStyles.titleSmall),
+            const SizedBox(height: 8),
+            const _StorageRetentionCard(),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -353,6 +362,185 @@ class SettingsScreen extends ConsumerWidget {
               }
             },
             child: const Text('Add Rate'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StorageRetentionCard extends StatefulWidget {
+  const _StorageRetentionCard();
+
+  @override
+  State<_StorageRetentionCard> createState() => _StorageRetentionCardState();
+}
+
+class _StorageRetentionCardState extends State<_StorageRetentionCard> {
+  int _retentionDays = 30;
+  String _cacheSize = 'Calculating...';
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStorageData();
+  }
+
+  Future<void> _loadStorageData() async {
+    final days = await CacheRetentionService.getRetentionDays();
+    final size = await CacheRetentionService.getFormattedCacheSize();
+    if (mounted) {
+      setState(() {
+        _retentionDays = days;
+        _cacheSize = size;
+      });
+    }
+  }
+
+  Future<void> _updateRetention(int days) async {
+    await CacheRetentionService.setRetentionDays(days);
+    setState(() => _retentionDays = days);
+    if (mounted) {
+      NotificationBanner.showSuccess(
+        context,
+        'Document retention policy set to ${CacheRetentionService.getRetentionLabel(days)}.',
+      );
+    }
+  }
+
+  Future<void> _clearCache() async {
+    setState(() => _isLoading = true);
+    final count = await CacheRetentionService.clearAllCache();
+    final size = await CacheRetentionService.getFormattedCacheSize();
+    if (mounted) {
+      setState(() {
+        _cacheSize = size;
+        _isLoading = false;
+      });
+      NotificationBanner.showSuccess(context, 'Purged $count cached files. Current cache: $_cacheSize');
+    }
+  }
+
+  Future<void> _runCleanup() async {
+    setState(() => _isLoading = true);
+    final count = await CacheRetentionService.cleanupExpiredFiles();
+    final size = await CacheRetentionService.getFormattedCacheSize();
+    if (mounted) {
+      setState(() {
+        _cacheSize = size;
+        _isLoading = false;
+      });
+      NotificationBanner.showSuccess(context, 'Cleanup complete: $count expired files removed.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.cleaning_services_rounded, size: 20, color: AppColors.getPrimary(context)),
+              const SizedBox(width: 10),
+              Text('Automatic Cache & Export Purge', style: AppTextStyles.labelMedium),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Automatically deletes temporary receipt images, downloaded reports (PDF/Excel/Word), and local cached documents to safeguard device storage.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<int>(
+            initialValue: _retentionDays,
+            decoration: const InputDecoration(
+              labelText: 'Retention Schedule',
+              border: OutlineInputBorder(),
+              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            ),
+            items: CacheRetentionService.retentionOptions.map((days) {
+              return DropdownMenuItem<int>(
+                value: days,
+                child: Text(CacheRetentionService.getRetentionLabel(days)),
+              );
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) {
+                _updateRetention(val);
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.storage_rounded, size: 16, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Temporary Cache Size:',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                    ),
+                  ],
+                ),
+                Text(
+                  _cacheSize,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.getPrimary(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.auto_delete_outlined, size: 16),
+                  label: const Text('Clean Expired', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  onPressed: _isLoading ? null : _runCleanup,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE11D48),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.delete_forever_rounded, size: 16),
+                  label: const Text('Clear All Cache', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  onPressed: _isLoading ? null : _clearCache,
+                ),
+              ),
+            ],
           ),
         ],
       ),

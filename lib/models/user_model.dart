@@ -9,6 +9,8 @@ class UserModel {
   final String? designation;
   final String? phone;
   final String? avatarUrl;
+  final double? homeLatitude;
+  final double? homeLongitude;
   final bool isActive;
   final bool isApproved;
   final List<String> assignedProjectIds;
@@ -22,6 +24,8 @@ class UserModel {
     this.designation,
     this.phone,
     this.avatarUrl,
+    this.homeLatitude,
+    this.homeLongitude,
     this.isActive = true,
     this.isApproved = true,
     this.assignedProjectIds = const [],
@@ -36,6 +40,8 @@ class UserModel {
     String? designation,
     String? phone,
     String? avatarUrl,
+    double? homeLatitude,
+    double? homeLongitude,
     bool clearAvatarUrl = false,
     bool? isActive,
     bool? isApproved,
@@ -50,6 +56,8 @@ class UserModel {
       designation: designation ?? this.designation,
       phone: phone ?? this.phone,
       avatarUrl: clearAvatarUrl ? null : (avatarUrl ?? this.avatarUrl),
+      homeLatitude: homeLatitude ?? this.homeLatitude,
+      homeLongitude: homeLongitude ?? this.homeLongitude,
       isActive: isActive ?? this.isActive,
       isApproved: isApproved ?? this.isApproved,
       assignedProjectIds: assignedProjectIds ?? this.assignedProjectIds,
@@ -75,9 +83,13 @@ class UserModel {
       designation: json['designation']?.toString(),
       phone: json['phone']?.toString(),
       avatarUrl: (json['avatar_url'] ?? json['avatarUrl'])?.toString(),
+      homeLatitude: _asDouble(json['home_latitude'] ?? json['homeLatitude']),
+      homeLongitude: _asDouble(json['home_longitude'] ?? json['homeLongitude']),
       isActive: json['is_active'] ?? json['isActive'] ?? true,
       isApproved: json['is_approved'] ?? json['isApproved'] ?? true,
-      assignedProjectIds: parseProjectIds(json['assigned_project_ids'] ?? json['assignedProjectIds']),
+      assignedProjectIds: parseProjectIds(
+        json['assigned_project_ids'] ?? json['assignedProjectIds'],
+      ),
     );
   }
 
@@ -94,6 +106,8 @@ class UserModel {
         'avatar_url': avatarUrl,
         'avatarUrl': avatarUrl,
       },
+      if (homeLatitude != null) 'home_latitude': homeLatitude,
+      if (homeLongitude != null) 'home_longitude': homeLongitude,
       'is_active': isActive,
       'is_approved': isApproved,
       'assigned_project_ids': assignedProjectIds,
@@ -110,3 +124,6 @@ class UserModel {
   @override
   int get hashCode => id.isNotEmpty ? id.hashCode : email.hashCode;
 }
+
+double? _asDouble(dynamic value) =>
+    value is num ? value.toDouble() : double.tryParse(value?.toString() ?? '');

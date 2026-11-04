@@ -28,6 +28,14 @@ void main() {
       expect(result['data'], [1, 2, 3]);
     });
 
+    test('API requests preserve the configured Coolify hostname', () {
+      final apiClient = ApiClient(
+        baseUrl: 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1',
+      );
+
+      expect(apiClient.buildHeaders()['Host'], isNull);
+    });
+
     test('ApiClient throws UnauthorizedException on 401', () async {
       final mockClient = MockClient((request) async {
         return http.Response(jsonEncode({'message': 'Invalid token'}), 401);

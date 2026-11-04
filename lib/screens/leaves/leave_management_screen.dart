@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
+import '../../core/widgets/app_back_button.dart';
 import '../../models/leave_model.dart';
 import '../../state/auth_provider.dart';
 import '../../state/leave_provider.dart';
@@ -39,6 +40,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
       backgroundColor:
           isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
       appBar: AppBar(
+        leading: const AppBackButton(),
         title: Text(
           'Leave Management',
           style: TextStyle(
@@ -98,7 +100,13 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
               const SizedBox(height: 8),
               Text(
                 'Approved requests only. Remaining balances appear when your leave policy is configured.',
-                style: TextStyle(fontSize: 10, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                style: TextStyle(
+                  fontSize: 10,
+                  color:
+                      isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                ),
               ),
               const SizedBox(height: 8),
 

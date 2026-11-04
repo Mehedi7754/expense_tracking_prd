@@ -243,6 +243,16 @@ class EmployeeDailyAttendance {
   bool get isHoliday => status == 'holiday';
   bool get isNonWorkingDay => status == 'weekend' || status == 'holiday';
 
+  bool get hasLocationRecords => morning != null || afternoon != null;
+
+  String get locationSummary {
+    if (!hasLocationRecords) return 'No check-in location recorded';
+    final sessions = <String>[];
+    if (morning != null) sessions.add('AM ${morning!.workModeLabel}');
+    if (afternoon != null) sessions.add('PM ${afternoon!.workModeLabel}');
+    return sessions.join(' · ');
+  }
+
   factory EmployeeDailyAttendance.fromJson(Map<String, dynamic> json) {
     return EmployeeDailyAttendance(
       userId: json['userId']?.toString() ?? json['user_id']?.toString() ?? '',

@@ -70,23 +70,11 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // Verify the 4 short 2-word metrics exist
-      expect(find.text('TOTAL BUDGET'), findsOneWidget);
+      // Verify the 4 direct financial metrics exist
+      expect(find.text('BUDGET'), findsOneWidget);
       expect(find.text('TOTAL SPENT'), findsOneWidget);
-      expect(find.text('NEEDED TO FINISH'), findsOneWidget);
-      expect(find.text('AFTER-TAX PROFIT'), findsOneWidget);
-
-      // Verify Needed to Finish can be tapped to open dialog
-      await tester.tap(find.text('NEEDED TO FINISH'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(AlertDialog), findsOneWidget);
-      expect(find.text('Needed to Finish'), findsOneWidget);
-      expect(find.text('Save'), findsOneWidget);
-
-      // Dismiss dialog
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
+      expect(find.text('REMAINING'), findsOneWidget);
+      expect(find.text('BUDGET USED'), findsOneWidget);
 
       // Verify Update Budget button opens dialog
       await tester.tap(find.text('Budget'));

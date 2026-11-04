@@ -1,5 +1,11 @@
 import 'client_model.dart';
 
+double? _asNullableDouble(dynamic val) {
+  if (val == null) return null;
+  final parsed = val is num ? val.toDouble() : double.tryParse(val.toString());
+  return parsed != null && parsed.isFinite ? parsed : null;
+}
+
 double _asDouble(dynamic val, [double fallback = 0.0]) {
   if (val == null) return fallback;
   if (val is num) return val.toDouble();
@@ -360,7 +366,8 @@ class ProjectModel {
   final AssignmentType assignmentType;
   final double grossProjectValue; // Contract Value in ৳
   final TaxStatus taxStatus;
-  final double taxRate; // e.g. 0.10 for 10%
+  final double taxRate; // e.g. 0.10 for 10% (VAT)
+  final double incomeTaxRate; // e.g. 0.05 for 5% (Income Tax / IT)
   final double expectedNetRevenue;
   final double advanceReceived;
   final double amountReceived;
@@ -384,6 +391,8 @@ class ProjectModel {
   final String? progressUpdatedById;
   final String? createdById;
   final String? imageUrl; // Project Cover Image / Banner
+  final double? siteLatitude;
+  final double? siteLongitude;
   final List<ProjectProgressNote> progressNotes;
 
   const ProjectModel({
@@ -398,6 +407,7 @@ class ProjectModel {
     required this.grossProjectValue,
     this.taxStatus = TaxStatus.included,
     this.taxRate = 0.10,
+    this.incomeTaxRate = 0.0,
     required this.expectedNetRevenue,
     this.advanceReceived = 0.0,
     this.amountReceived = 0.0,
@@ -419,6 +429,8 @@ class ProjectModel {
     this.progressUpdatedById,
     this.createdById,
     this.imageUrl,
+    this.siteLatitude,
+    this.siteLongitude,
     this.progressNotes = const [],
   });
 
@@ -434,13 +446,32 @@ class ProjectModel {
   // Backward compatibility getter
   double get expectedRevenue => expectedNetRevenue;
 
-  /// Tax deduction amount for the project (Gross Project Value * Tax Rate when tax is included)
-  double get calculatedTax {
+  /// VAT deduction amount for the project (Gross Project Value * Tax Rate when tax is included)
+  double get calculatedVat {
     if (taxStatus == TaxStatus.included && taxRate > 0) {
-      if (grossProjectValue > expectedNetRevenue && expectedNetRevenue > 0) {
-        return grossProjectValue - expectedNetRevenue;
-      }
       return grossProjectValue * taxRate;
+    }
+    return 0.0;
+  }
+
+  /// Income Tax (IT) deduction amount for the project (Gross Project Value * Income Tax Rate when tax is included)
+  double get calculatedIncomeTax {
+    if (taxStatus == TaxStatus.included && incomeTaxRate > 0) {
+      return grossProjectValue * incomeTaxRate;
+    }
+    return 0.0;
+  }
+
+  /// Total Tax (VAT + IT) deduction amount for the project
+  double get calculatedTax {
+    if (taxStatus == TaxStatus.included) {
+      final totalRate = taxRate + incomeTaxRate;
+      if (totalRate > 0) {
+        if (grossProjectValue > expectedNetRevenue && expectedNetRevenue > 0) {
+          return grossProjectValue - expectedNetRevenue;
+        }
+        return grossProjectValue * totalRate;
+      }
     }
     return 0.0;
   }
@@ -457,6 +488,7 @@ class ProjectModel {
     double? grossProjectValue,
     TaxStatus? taxStatus,
     double? taxRate,
+    double? incomeTaxRate,
     double? expectedNetRevenue,
     double? advanceReceived,
     double? amountReceived,
@@ -478,6 +510,9 @@ class ProjectModel {
     String? progressUpdatedById,
     String? createdById,
     String? imageUrl,
+    double? siteLatitude,
+    double? siteLongitude,
+    bool clearSiteLocation = false,
     bool clearImageUrl = false,
     List<ProjectProgressNote>? progressNotes,
   }) {
@@ -493,6 +528,7 @@ class ProjectModel {
       grossProjectValue: grossProjectValue ?? this.grossProjectValue,
       taxStatus: taxStatus ?? this.taxStatus,
       taxRate: taxRate ?? this.taxRate,
+      incomeTaxRate: incomeTaxRate ?? this.incomeTaxRate,
       expectedNetRevenue: expectedNetRevenue ?? this.expectedNetRevenue,
       advanceReceived: advanceReceived ?? this.advanceReceived,
       amountReceived: amountReceived ?? this.amountReceived,
@@ -514,6 +550,8 @@ class ProjectModel {
       progressUpdatedById: progressUpdatedById ?? this.progressUpdatedById,
       createdById: createdById ?? this.createdById,
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
+      siteLatitude: clearSiteLocation ? null : (siteLatitude ?? this.siteLatitude),
+      siteLongitude: clearSiteLocation ? null : (siteLongitude ?? this.siteLongitude),
       progressNotes: progressNotes ?? this.progressNotes,
     );
   }
@@ -579,6 +617,11 @@ class ProjectModel {
     final directMembers = parseTeamMemberIds(json['team_member_ids'] ?? json['teamMemberIds']);
     final mergedMembers = {...directMembers, ...metaMembers}.toList();
 
+    final parsedIncomeTax = _asDouble(
+      json['income_tax_rate'] ?? json['incomeTaxRate'] ?? rawCatMap['_meta_income_tax_rate'],
+      0.0,
+    );
+
     final categoryBudgetsMap = <String, double>{};
     if (rawCatBudgets is Map) {
       for (final entry in rawCatBudgets.entries) {
@@ -602,6 +645,7 @@ class ProjectModel {
       grossProjectValue: (_asDouble(json['gross_project_value'] ?? json['grossProjectValue'])).clamp(0.0, double.infinity),
       taxStatus: TaxStatus.fromString(taxStatusStr),
       taxRate: (_asDouble(json['tax_rate'] ?? json['taxRate'], 0.10)).clamp(0.0, 1.0),
+      incomeTaxRate: parsedIncomeTax.clamp(0.0, 1.0),
       expectedNetRevenue: (_asDouble(json['expected_net_revenue'] ?? json['expectedNetRevenue'])).clamp(0.0, double.infinity),
       advanceReceived: (_asDouble(json['advance_received'] ?? json['advanceReceived'])).clamp(0.0, double.infinity),
       amountReceived: (_asDouble(json['amount_received'] ?? json['amountReceived'])).clamp(0.0, double.infinity),
@@ -631,6 +675,8 @@ class ProjectModel {
       progressUpdatedById: json['progress_updated_by_id']?.toString(),
       createdById: json['created_by_id']?.toString() ?? json['createdById']?.toString() ?? json['created_by']?.toString(),
       imageUrl: (json['image_url'] ?? json['imageUrl'])?.toString(),
+      siteLatitude: _asNullableDouble(json['site_latitude'] ?? json['siteLatitude'] ?? rawCatMap['_meta_site_latitude']),
+      siteLongitude: _asNullableDouble(json['site_longitude'] ?? json['siteLongitude'] ?? rawCatMap['_meta_site_longitude']),
       progressNotes: parseNotes(json['progress_notes'] ?? json['progressNotes']),
     );
   }
@@ -665,6 +711,7 @@ class ProjectModel {
       'gross_project_value': grossProjectValue,
       'tax_status': taxStatus.toApiValue,
       'tax_rate': taxRate,
+      'income_tax_rate': incomeTaxRate,
       'expected_net_revenue': expectedNetRevenue,
       'advance_received': advanceReceived,
       'amount_received': amountReceived,
@@ -672,9 +719,12 @@ class ProjectModel {
       'budget': budget,
       'category_budgets': {
         ...categoryBudgets,
+        if (incomeTaxRate > 0) '_meta_income_tax_rate': incomeTaxRate,
         if (progressPercentage > 0) '_meta_progress': progressPercentage,
         if (progressUpdatedAt != null) '_meta_progress_updated_at': progressUpdatedAt!.toIso8601String(),
         if (validTeamMembers.isNotEmpty) '_meta_team_members': validTeamMembers,
+        if (siteLatitude != null) '_meta_site_latitude': siteLatitude,
+        if (siteLongitude != null) '_meta_site_longitude': siteLongitude,
       },
       'estimated_remaining_cost': estimatedRemainingCost,
       'office_benefit_rate': officeBenefitRate,
@@ -695,6 +745,8 @@ class ProjectModel {
       if (createdById != null && createdById!.isNotEmpty) 'created_by_id': createdById,
       'image_url': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
       'imageUrl': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
+      'siteLatitude': siteLatitude,
+      'siteLongitude': siteLongitude,
       'progress_notes': progressNotes.map((n) => n.toJson()).toList(),
       'progressNotes': progressNotes.map((n) => n.toJson()).toList(),
     };

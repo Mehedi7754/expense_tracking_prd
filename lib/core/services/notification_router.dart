@@ -98,6 +98,11 @@ class NotificationRouter {
           ? RoutePaths.salaryDashboard
           : RoutePaths.mySalary;
     }
+    if (type == 'employee_registration' ||
+        type == 'user_registration' ||
+        type == 'employee_account_pending') {
+      return RoutePaths.userManagement;
+    }
     if (projectId != null && projectId.isNotEmpty) {
       return RoutePaths.projectDetail(projectId);
     }

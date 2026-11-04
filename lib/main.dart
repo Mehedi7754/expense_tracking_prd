@@ -6,6 +6,7 @@ import 'core/constants/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/cache_retention_service.dart';
 import 'state/settings_provider.dart';
 import 'state/auth_provider.dart';
 import 'models/user_role.dart';
@@ -19,6 +20,9 @@ Future<void> main() async {
   // Initialize OS-level push notification & FCM service asynchronously without blocking startup
   PushNotificationService.instance.initialize().catchError((_) {});
   FcmService.instance.initialize().catchError((_) {});
+
+  // Trigger background cleanup of expired cache and document exports
+  CacheRetentionService.cleanupExpiredFiles().catchError((_) => 0);
 
   runApp(
     const ProviderScope(

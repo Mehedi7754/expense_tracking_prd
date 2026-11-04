@@ -191,6 +191,9 @@ class ChatMessageNotifier extends Notifier<AsyncValue<List<ChatMessageModel>>> {
     String? projectId,
     String? projectName,
     String? projectCode,
+    String? fileUrl,
+    String? fileName,
+    String? fileMimeType,
   }) async {
     final auth = ref.read(authProvider);
     final currentUserId = auth.currentUser?.id;
@@ -202,6 +205,9 @@ class ChatMessageNotifier extends Notifier<AsyncValue<List<ChatMessageModel>>> {
       senderName: 'You',
       content: content,
       imageUrl: imageUrl,
+      fileUrl: fileUrl,
+      fileName: fileName,
+      fileMimeType: fileMimeType,
       projectId: projectId,
       projectName: projectName,
       projectCode: projectCode,
@@ -221,6 +227,9 @@ class ChatMessageNotifier extends Notifier<AsyncValue<List<ChatMessageModel>>> {
         content: content,
         imageUrl: imageUrl,
         projectId: projectId,
+        fileUrl: fileUrl,
+        fileName: fileName,
+        fileMimeType: fileMimeType,
         currentUserId: currentUserId,
       );
 

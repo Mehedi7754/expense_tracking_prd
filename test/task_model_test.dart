@@ -22,4 +22,25 @@ void main() {
     expect(task.status, TaskStatus.todo);
     expect(task.assigneeIds, ['user-1', 'user-2']);
   });
+
+  test('task assignment check supports primary and multiple assignees', () {
+    final task = TaskModel.fromJson({
+      'id': 'task-2',
+      'project_id': 'project-1',
+      'title': 'Review report',
+      'description': '',
+      'assignee_id': 'user-1',
+      'assignee_name': 'Alex',
+      'assignees': [
+        {'id': 'user-1', 'name': 'Alex'},
+        {'id': 'user-2', 'name': 'Sam'},
+      ],
+      'due_date': '2026-11-10',
+      'status': 'todo',
+    });
+
+    expect(task.isAssignedTo('user-1'), isTrue);
+    expect(task.isAssignedTo('user-2'), isTrue);
+    expect(task.isAssignedTo('user-3'), isFalse);
+  });
 }

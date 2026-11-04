@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/location_service.dart';
+import '../../core/widgets/location_pin_picker.dart';
+import 'package:latlong2/latlong.dart';
 import '../../state/attendance_settings_provider.dart';
 import '../../state/user_management_provider.dart';
 
@@ -142,15 +144,24 @@ class _AttendanceSettingsScreenState
   }
 
   Future<void> _saveDeductions() async {
+    final lat = double.tryParse(_officeLatCtrl.text.trim());
+    final lng = double.tryParse(_officeLngCtrl.text.trim());
+    final radius = double.tryParse(_radiusCtrl.text.trim());
+    if (lat == null || !lat.isFinite || lat < -90 || lat > 90 ||
+        lng == null || !lng.isFinite || lng < -180 || lng > 180 ||
+        radius == null || !radius.isFinite || radius < 25 || radius > 1000) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Enter valid office coordinates and a radius from 25 to 1000 m.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
     setState(() => _saving = true);
     final fullVal = double.tryParse(_fullDayCtrl.text) ?? _fullDayDeductionAmount;
     final halfVal = double.tryParse(_halfDayCtrl.text) ?? _halfDayDeductionAmount;
     final graceVal = int.tryParse(_gracePeriodCtrl.text) ?? _gracePeriodMinutes;
     final currentSettings = ref.read(attendanceSettingsProvider).value ?? const AttendanceSettingsState();
 
-    final lat = double.tryParse(_officeLatCtrl.text) ?? currentSettings.officeLatitude;
-    final lng = double.tryParse(_officeLngCtrl.text) ?? currentSettings.officeLongitude;
-    final radius = double.tryParse(_radiusCtrl.text) ?? _geofenceRadius;
     final officeName = _officeNameCtrl.text.trim().isNotEmpty ? _officeNameCtrl.text.trim() : currentSettings.officeName;
     final officeAddress = _officeAddressCtrl.text.trim().isNotEmpty ? _officeAddressCtrl.text.trim() : currentSettings.officeAddress;
 
@@ -168,8 +179,19 @@ class _AttendanceSettingsScreenState
       isGeofenceEnforced: _isGeofenceEnforced,
     );
 
-    await ref.read(attendanceSettingsProvider.notifier).updateSettings(updated);
-    setState(() => _saving = false);
+    try {
+      await ref.read(attendanceSettingsProvider.notifier).updateSettings(updated);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not save office location to the server. Try again.'),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      return;
+    }
+    if (mounted) setState(() => _saving = false);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1294,6 +1316,27 @@ class _AttendanceSettingsScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final lat = double.tryParse(_officeLatCtrl.text) ?? 23.8103;
+                          final lng = double.tryParse(_officeLngCtrl.text) ?? 90.4125;
+                          final pin = await LocationPinPicker.show(
+                            context,
+                            initialLocation: LatLng(lat, lng),
+                            radiusMeters: _geofenceRadius,
+                            title: 'Pin office location',
+                          );
+                          if (pin != null && mounted) {
+                            setState(() {
+                              _officeLatCtrl.text = pin.latitude.toStringAsFixed(6);
+                              _officeLngCtrl.text = pin.longitude.toStringAsFixed(6);
+                            });
+                          }
+                        },
+                        icon: const Icon(Icons.location_on_outlined),
+                        label: const Text('Select office pin on map'),
+                      ),
+                      const SizedBox(height: 12),
                       // Office Name & Address Inputs
                       Text(
                         'Office Name & Facility Title',
@@ -1623,6 +1666,18 @@ class _AttendanceSettingsScreenState
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                          onPressed: _saving ? null : _saveDeductions,
+                          icon: _saving
+                              ? const SizedBox(width: 16, height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.save_outlined, size: 18),
+                          label: const Text('Save office location & radius'),
                         ),
                       ),
                     ],

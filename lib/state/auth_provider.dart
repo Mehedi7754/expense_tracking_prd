@@ -98,10 +98,14 @@ class AuthNotifier extends Notifier<AuthState> {
         ref.read(expenseProvider.notifier).fetchExpenses();
         ref.read(userManagementProvider.notifier).fetchUsers();
         if (user.role == UserRole.projectMember) {
-          ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: user.id, force: true);
+          ref
+              .read(attendanceProvider.notifier)
+              .fetchAttendanceRecords(userId: user.id, force: true);
         } else {
           ref.read(attendanceProvider.notifier).fetchDailyOverview();
-          ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: user.id);
+          ref
+              .read(attendanceProvider.notifier)
+              .fetchAttendanceRecords(userId: user.id);
         }
         ref.read(salaryProvider.notifier).fetchOrgSalaryReport();
         FcmService.instance.syncTokenWithBackend();
@@ -156,6 +160,17 @@ class AuthNotifier extends Notifier<AuthState> {
           .read(userManagementProvider.notifier)
           .findOrAddMemberByEmail(user.email, name: user.name);
 
+      // If user is inactive / pending verification, do NOT persist session or set authenticated
+      if (!user.isActive) {
+        state = state.copyWith(
+          currentUser: null,
+          isAuthenticated: false,
+          isLoading: false,
+          clearError: true,
+        );
+        return true;
+      }
+
       final token =
           ref.read(apiClientProvider).authToken ?? 'reg_token_${user.id}';
       await _persistSession(user, token);
@@ -201,7 +216,8 @@ class AuthNotifier extends Notifier<AuthState> {
       } catch (apiError) {
         // High-resilience fallback: only for network/server connectivity issues or test environments.
         // If the server actively rejects credentials with 401 Unauthorized, rethrow so the user is informed.
-        final isAuthFailure = apiError is UnauthorizedException ||
+        final isAuthFailure =
+            apiError is UnauthorizedException ||
             (apiError is ApiException &&
                 (apiError.statusCode == 401 ||
                     apiError.message.toLowerCase().contains('invalid email') ||
@@ -266,10 +282,14 @@ class AuthNotifier extends Notifier<AuthState> {
       // Invalidate attendance & salary cache and fetch fresh real overview
       ref.read(attendanceProvider.notifier).invalidateCache();
       if (authUser.role == UserRole.projectMember) {
-        ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: authUser.id, force: true);
+        ref
+            .read(attendanceProvider.notifier)
+            .fetchAttendanceRecords(userId: authUser.id, force: true);
       } else {
         ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
-        ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: authUser.id, force: true);
+        ref
+            .read(attendanceProvider.notifier)
+            .fetchAttendanceRecords(userId: authUser.id, force: true);
       }
       ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true);
 
@@ -285,7 +305,8 @@ class AuthNotifier extends Notifier<AuthState> {
       return true;
     } on ApiException catch (e) {
       final msg = e.message.toLowerCase();
-      final isInvalidCreds = e is UnauthorizedException ||
+      final isInvalidCreds =
+          e is UnauthorizedException ||
           e.statusCode == 401 ||
           msg.contains('invalid email') ||
           msg.contains('invalid credentials') ||
@@ -296,11 +317,13 @@ class AuthNotifier extends Notifier<AuthState> {
       return false;
     } catch (e) {
       final errStr = e.toString().toLowerCase();
-      final isInvalidCreds = errStr.contains('invalid email') ||
+      final isInvalidCreds =
+          errStr.contains('invalid email') ||
           errStr.contains('invalid credentials') ||
           errStr.contains('invalid password') ||
           errStr.contains('unauthorized');
-      final displayMessage = isInvalidCreds ? 'Invalid credentials' : 'Login error: $e';
+      final displayMessage =
+          isInvalidCreds ? 'Invalid credentials' : 'Login error: $e';
       state = state.copyWith(isLoading: false, errorMessage: displayMessage);
       return false;
     }
@@ -327,7 +350,8 @@ class AuthNotifier extends Notifier<AuthState> {
   void switchRole(UserRole role) {
     UserModel targetUser;
     final liveUsers = ref.read(userManagementProvider);
-    final matching = liveUsers.where((u) => u.role == role && u.isActive).toList();
+    final matching =
+        liveUsers.where((u) => u.role == role && u.isActive).toList();
     if (matching.isNotEmpty) {
       targetUser = matching.first;
     } else {
@@ -396,6 +420,31 @@ class AuthNotifier extends Notifier<AuthState> {
         await userNotifier.updateUser(updated);
       } catch (_) {}
     }
+  }
+
+  Future<void> updateHomeLocation({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final current = state.currentUser;
+    if (current == null) throw StateError('No authenticated user');
+    if (!latitude.isFinite ||
+        latitude < -90 ||
+        latitude > 90 ||
+        !longitude.isFinite ||
+        longitude < -180 ||
+        longitude > 180) {
+      throw ArgumentError('Home location coordinates are invalid');
+    }
+    final updated = await ref.read(authRepositoryProvider).updateProfile({
+      'homeLatitude': latitude,
+      'homeLongitude': longitude,
+    });
+    state = state.copyWith(currentUser: updated);
+    await _persistSession(updated, ref.read(apiClientProvider).authToken);
+    try {
+      await ref.read(userManagementProvider.notifier).updateUser(updated);
+    } catch (_) {}
   }
 
   /// Updates avatar: uploads image to backend and stores the returned URL.

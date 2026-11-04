@@ -19,20 +19,26 @@ class AttendanceRepository {
     String? notes,
     String? userId,
     String? workMode,
+    String? fieldProjectId,
     String? earlyDepartureReason,
   }) async {
     final localDateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     final finalNotesBuffer = StringBuffer();
-    if (workMode == 'field' && !(notes?.toLowerCase().contains('work mode') ?? false)) {
+    if (workMode == 'field' &&
+        !(notes?.toLowerCase().contains('work mode') ?? false)) {
       finalNotesBuffer.write('[Work Mode: Field] ');
-    } else if (workMode == 'home' && !(notes?.toLowerCase().contains('work mode') ?? false)) {
+    } else if (workMode == 'home' &&
+        !(notes?.toLowerCase().contains('work mode') ?? false)) {
       finalNotesBuffer.write('[Work Mode: Home] ');
-    } else if (workMode == 'home_office' && !(notes?.toLowerCase().contains('work mode') ?? false)) {
+    } else if (workMode == 'home_office' &&
+        !(notes?.toLowerCase().contains('work mode') ?? false)) {
       finalNotesBuffer.write('[Work Mode: Home Office] ');
     }
 
-    if (earlyDepartureReason != null && earlyDepartureReason.isNotEmpty && !(notes?.toLowerCase().contains('early departure') ?? false)) {
+    if (earlyDepartureReason != null &&
+        earlyDepartureReason.isNotEmpty &&
+        !(notes?.toLowerCase().contains('early departure') ?? false)) {
       finalNotesBuffer.write('[Early Departure: $earlyDepartureReason] ');
     }
 
@@ -48,11 +54,18 @@ class AttendanceRepository {
         'latitude': latitude,
         'longitude': longitude,
         'date': localDateStr,
-        if (addressText != null && addressText.isNotEmpty) 'addressText': addressText,
-        if (sessionType != null && sessionType.isNotEmpty) 'sessionType': sessionType,
-        if (deviceInfo != null && deviceInfo.isNotEmpty) 'deviceInfo': deviceInfo,
+        if (addressText != null && addressText.isNotEmpty)
+          'addressText': addressText,
+        if (sessionType != null && sessionType.isNotEmpty)
+          'sessionType': sessionType,
+        if (deviceInfo != null && deviceInfo.isNotEmpty)
+          'deviceInfo': deviceInfo,
         if (resolvedNotes.isNotEmpty) 'notes': resolvedNotes,
         if (workMode != null && workMode.isNotEmpty) 'work_mode': workMode,
+        if (workMode == 'field' &&
+            fieldProjectId != null &&
+            fieldProjectId.isNotEmpty)
+          'field_project_id': fieldProjectId,
       },
     );
 
@@ -74,7 +87,8 @@ class AttendanceRepository {
     if (date != null && date.isNotEmpty) queryParams['date'] = date;
     if (month != null) queryParams['month'] = month.toString();
     if (year != null) queryParams['year'] = year.toString();
-    if (sessionType != null && sessionType.isNotEmpty) queryParams['sessionType'] = sessionType;
+    if (sessionType != null && sessionType.isNotEmpty)
+      queryParams['sessionType'] = sessionType;
 
     String url = ApiEndpoints.attendance;
     if (queryParams.isNotEmpty) {
@@ -85,13 +99,19 @@ class AttendanceRepository {
     final response = await _client.get(url);
     if (response is List) {
       return response
-          .map((item) => AttendanceRecordModel.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) =>
+                AttendanceRecordModel.fromJson(item as Map<String, dynamic>),
+          )
           .toList();
     }
     return const [];
   }
 
-  Future<DailyAttendanceOverview> getDailyOverview([String? date, List<UserModel>? explicitUsers]) async {
+  Future<DailyAttendanceOverview> getDailyOverview([
+    String? date,
+    List<UserModel>? explicitUsers,
+  ]) async {
     String url = ApiEndpoints.attendanceOverview;
     if (date != null && date.isNotEmpty) {
       url = '$url?date=$date';
@@ -116,7 +136,8 @@ class AttendanceRepository {
     required int month,
     required int year,
   }) async {
-    final url = '${ApiEndpoints.attendanceSummary}?userId=$userId&month=$month&year=$year';
+    final url =
+        '${ApiEndpoints.attendanceSummary}?userId=$userId&month=$month&year=$year';
     final response = await _client.get(url);
     if (response is Map<String, dynamic>) {
       return AttendanceSummaryModel.fromJson(response);
@@ -184,21 +205,21 @@ class AttendanceRepository {
       if (afternoonEndHour != null) 'afternoonEndHour': afternoonEndHour,
       if (weekendDays != null) 'weekendDays': weekendDays,
       if (deductionType != null) 'deductionType': deductionType,
-      if (fullDayDeductionAmount != null) 'fullDayDeductionAmount': fullDayDeductionAmount,
-      if (halfDayDeductionAmount != null) 'halfDayDeductionAmount': halfDayDeductionAmount,
+      if (fullDayDeductionAmount != null)
+        'fullDayDeductionAmount': fullDayDeductionAmount,
+      if (halfDayDeductionAmount != null)
+        'halfDayDeductionAmount': halfDayDeductionAmount,
       if (shifts != null) 'shifts': shifts,
       if (userShifts != null) 'userShifts': userShifts,
       if (officeLatitude != null) 'officeLatitude': officeLatitude,
       if (officeLongitude != null) 'officeLongitude': officeLongitude,
       if (officeName != null) 'officeName': officeName,
       if (officeAddress != null) 'officeAddress': officeAddress,
-      if (geofenceRadiusMeters != null) 'geofenceRadiusMeters': geofenceRadiusMeters,
+      if (geofenceRadiusMeters != null)
+        'geofenceRadiusMeters': geofenceRadiusMeters,
       if (isGeofenceEnforced != null) 'isGeofenceEnforced': isGeofenceEnforced,
     };
-    final response = await _client.post(
-      '/attendance/settings',
-      body: body,
-    );
+    final response = await _client.post('/attendance/settings', body: body);
     return response != null;
   }
 }

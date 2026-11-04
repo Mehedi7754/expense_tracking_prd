@@ -35,6 +35,7 @@ class EditExpenseScreen extends ConsumerStatefulWidget {
 class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _amountController;
+  late TextEditingController _customVatController;
   late TextEditingController _customTaxController;
   late TextEditingController _noteController;
 
@@ -47,6 +48,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   bool _isSaving = false;
   bool _initialized = false;
 
+  double _selectedVatRate = 0.0;
+  bool _isCustomVat = false;
+
   double _selectedTaxRate = 0.0;
   bool _isCustomTax = false;
 
@@ -54,6 +58,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   void initState() {
     super.initState();
     _amountController = TextEditingController();
+    _customVatController = TextEditingController();
     _customTaxController = TextEditingController();
     _noteController = TextEditingController();
   }
@@ -62,15 +67,22 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     if (_initialized) return;
     _initialized = true;
 
-    final initialTotal = expense.totalCost;
-    _amountController.text = initialTotal.toStringAsFixed(initialTotal.truncateToDouble() == initialTotal ? 0 : 2);
+    final initialBase = expense.baseCost;
+    _amountController.text = initialBase.toStringAsFixed(initialBase.truncateToDouble() == initialBase ? 0 : 2);
     _noteController.text = expense.note;
     _selectedCurrency = expense.currency;
     _selectedDate = expense.date;
     _receiptImagePath = expense.receiptPhotoUrl;
 
+    _selectedVatRate = expense.vatRate;
+    final defaultVatRates = [0.0, 5.0, 7.5, 10.0, 15.0];
+    if (expense.vatRate > 0 && !defaultVatRates.contains(expense.vatRate)) {
+      _isCustomVat = true;
+      _customVatController.text = expense.vatRate.toStringAsFixed(1);
+    }
+
     _selectedTaxRate = expense.taxRate;
-    final defaultRates = [0.0, 5.0, 7.5, 10.0, 15.0];
+    final defaultRates = [0.0, 2.0, 3.0, 5.0, 7.5, 10.0];
     if (expense.taxRate > 0 && !defaultRates.contains(expense.taxRate)) {
       _isCustomTax = true;
       _customTaxController.text = expense.taxRate.toStringAsFixed(1);
@@ -94,12 +106,22 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   @override
   void dispose() {
     _amountController.dispose();
+    _customVatController.dispose();
     _customTaxController.dispose();
     _noteController.dispose();
     super.dispose();
   }
 
   double get _enteredAmount => double.tryParse(_amountController.text.trim()) ?? 0.0;
+
+  double get _vatRate {
+    if (_isCustomVat) {
+      return double.tryParse(_customVatController.text.trim()) ?? 0.0;
+    }
+    return _selectedVatRate;
+  }
+
+  double get _vatAmount => _vatRate > 0 ? (_enteredAmount * (_vatRate / 100.0)) : 0.0;
 
   double get _taxRate {
     if (_isCustomTax) {
@@ -110,7 +132,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
   double get _taxAmount => _taxRate > 0 ? (_enteredAmount * (_taxRate / 100.0)) : 0.0;
 
-  double get _netCost => _taxRate > 0 ? (_enteredAmount + _taxAmount) : _enteredAmount;
+  double get _netCost => _enteredAmount + _vatAmount + _taxAmount;
 
   double get _baseCost => _enteredAmount;
 
@@ -161,6 +183,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
           taskTitle: _selectedTask?.title,
           amount: _netCost,
           baseCost: _baseCost,
+          vatRate: _vatRate,
+          vatAmount: _vatAmount,
           taxRate: _taxRate,
           taxAmount: _taxAmount,
           currency: _selectedCurrency,
@@ -338,6 +362,138 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 const SizedBox(height: 14),
 
                 // Tax Rate Selection Card
+                // VAT Rate Selection Card (Segmented VAT)
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSurface : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.receipt_long_rounded, size: 16, color: const Color(0xFF8B5CF6)),
+                              const SizedBox(width: 6),
+                              Text(
+                                'VAT (Value Added Tax)',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_vatRate > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withAlpha(25),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                '+৳${CurrencyFormatter.format(_vatAmount).replaceAll('৳', '').trim()} VAT',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF7C3AED),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ...[0.0, 5.0, 7.5, 10.0, 15.0].map((rate) {
+                            final isSelected = !_isCustomVat && _selectedVatRate == rate;
+                            return ChoiceChip(
+                              label: Text(rate == 0.0 ? '0% (No VAT)' : '${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 1)}%'),
+                              selected: isSelected,
+                              onSelected: (val) {
+                                setState(() {
+                                  _isCustomVat = false;
+                                  _selectedVatRate = rate;
+                                });
+                              },
+                              selectedColor: const Color(0xFF8B5CF6),
+                              labelStyle: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                              ),
+                              backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? const Color(0xFF8B5CF6)
+                                      : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                                ),
+                              ),
+                            );
+                          }),
+                          ChoiceChip(
+                            label: const Text('Custom %'),
+                            selected: _isCustomVat,
+                            onSelected: (val) {
+                              setState(() {
+                                _isCustomVat = true;
+                              });
+                            },
+                            selectedColor: const Color(0xFF8B5CF6),
+                            labelStyle: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: _isCustomVat ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                            ),
+                            backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(
+                                color: _isCustomVat
+                                    ? const Color(0xFF8B5CF6)
+                                    : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_isCustomVat) ...[
+                        const SizedBox(height: 10),
+                        TextFormField(
+                          controller: _customVatController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: InputDecoration(
+                            labelText: 'Custom VAT Percentage (%)',
+                            hintText: 'e.g. 7.5',
+                            suffixText: '%',
+                            isDense: true,
+                            filled: true,
+                            fillColor: isDark ? AppColors.darkBackground : Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+                            ),
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Tax / AIT Rate Selection Card (Segmented Tax)
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -356,7 +512,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                               Icon(Icons.percent_rounded, size: 16, color: AppColors.getPrimary(context)),
                               const SizedBox(width: 6),
                               Text(
-                                'Tax / VAT Rate',
+                                'Tax / AIT (Advance Income Tax)',
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -373,7 +529,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(
-                                '+${CurrencyFormatter.format(_taxAmount)} Tax',
+                                '+৳${CurrencyFormatter.format(_taxAmount).replaceAll('৳', '').trim()} Tax',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
@@ -388,7 +544,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          ...ref.watch(settingsProvider).availableTaxRates.map((rate) {
+                          ...[0.0, 2.0, 3.0, 5.0, 7.5, 10.0].map((rate) {
                             final isSelected = !_isCustomTax && _selectedTaxRate == rate;
                             return ChoiceChip(
                               label: Text(rate == 0.0 ? '0% (No Tax)' : '${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 1)}%'),
@@ -449,7 +605,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: InputDecoration(
                             labelText: 'Custom Tax Percentage (%)',
-                            hintText: 'e.g. 8.5',
+                            hintText: 'e.g. 4.5',
                             suffixText: '%',
                             isDense: true,
                             filled: true,
@@ -468,7 +624,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Cost Breakdown Card
+                // Segmented Cost Breakdown Card (Base + VAT + Tax = Total)
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -483,23 +639,23 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Cost Breakdown',
+                            'Expenditure Breakdown',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
-                          if (_taxRate > 0)
+                          if (_vatRate > 0 || _taxRate > 0)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF10B981).withAlpha(20),
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Text(
-                                '${_taxRate.toStringAsFixed(_taxRate.truncateToDouble() == _taxRate ? 0 : 1)}% Tax Applied',
-                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+                              child: const Text(
+                                'Tax Segmented',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
                               ),
                             ),
                         ],
@@ -508,33 +664,37 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Invoice Amount:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                          Text('Base Invoice Cost:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
                           Text(CurrencyFormatter.format(_enteredAmount), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         ],
                       ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Tax Rate:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
-                          Text('${_taxRate.toStringAsFixed(_taxRate.truncateToDouble() == _taxRate ? 0 : 1)}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Tax / VAT Amount:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
-                          Text('+ ${CurrencyFormatter.format(_taxAmount, includeDecimals: _taxAmount % 1 != 0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _taxAmount > 0 ? const Color(0xFF0284C7) : null)),
-                        ],
-                      ),
+                      if (_vatRate > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('VAT (${_vatRate.toStringAsFixed(_vatRate.truncateToDouble() == _vatRate ? 0 : 1)}%):', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                            Text('+ ${CurrencyFormatter.format(_vatAmount)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF8B5CF6))),
+                          ],
+                        ),
+                      ],
+                      if (_taxRate > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Tax / AIT (${_taxRate.toStringAsFixed(_taxRate.truncateToDouble() == _taxRate ? 0 : 1)}%):', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                            Text('+ ${CurrencyFormatter.format(_taxAmount)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0284C7))),
+                          ],
+                        ),
+                      ],
                       Divider(color: isDark ? AppColors.darkBorder : const Color(0xFFF1F5F9), height: 16),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Expense Added to Project:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                          const Text('Total Expense Added to Project:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                           Text(
-                            CurrencyFormatter.format(_netCost, includeDecimals: _netCost % 1 != 0 || _taxAmount % 1 != 0),
+                            CurrencyFormatter.format(_netCost),
                             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                           ),
                         ],

@@ -8,12 +8,14 @@ class NavItemData {
   final IconData icon;
   final IconData activeIcon;
   final int badgeCount;
+  final bool isMenu;
 
   const NavItemData({
     required this.label,
     required this.icon,
     required this.activeIcon,
     this.badgeCount = 0,
+    this.isMenu = false,
   });
 }
 
@@ -25,6 +27,8 @@ class AppBottomNavBar extends StatelessWidget {
   final int pendingApprovalsCount;
   final int unreadNotificationsCount;
   final int unreadChatCount;
+  final bool menuOpen;
+  final VoidCallback? onMenuTap;
 
   const AppBottomNavBar({
     super.key,
@@ -35,6 +39,8 @@ class AppBottomNavBar extends StatelessWidget {
     this.pendingApprovalsCount = 0,
     this.unreadNotificationsCount = 0,
     this.unreadChatCount = 0,
+    this.menuOpen = false,
+    this.onMenuTap,
   });
 
   List<NavItemData> _getAllItems() {
@@ -46,9 +52,10 @@ class AppBottomNavBar extends StatelessWidget {
           activeIcon: CupertinoIcons.doc_text_fill,
         ),
         const NavItemData(
-          label: 'Attendance',
-          icon: CupertinoIcons.clock,
-          activeIcon: CupertinoIcons.clock_fill,
+          label: 'Menu',
+          icon: CupertinoIcons.line_horizontal_3,
+          activeIcon: CupertinoIcons.line_horizontal_3_decrease,
+          isMenu: true,
         ),
         const NavItemData(
           label: 'Home',
@@ -121,9 +128,10 @@ class AppBottomNavBar extends StatelessWidget {
         activeIcon: CupertinoIcons.plus_circle_fill,
       ),
       const NavItemData(
-        label: 'Attendance',
-        icon: CupertinoIcons.clock,
-        activeIcon: CupertinoIcons.clock_fill,
+        label: 'Menu',
+        icon: CupertinoIcons.line_horizontal_3,
+        activeIcon: CupertinoIcons.line_horizontal_3_decrease,
+        isMenu: true,
       ),
     ];
   }
@@ -144,67 +152,88 @@ class AppBottomNavBar extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         CurvedDockBar(
-          index: currentIndex.clamp(0, items.length - 1),
+          index: (menuOpen
+                  ? items.indexWhere((item) => item.isMenu)
+                  : currentIndex)
+              .clamp(0, items.length - 1),
           height: 60.0,
           color: dockColor,
           buttonBackgroundColor: buttonBg,
           backgroundColor: Colors.transparent,
-            animationDuration: const Duration(milliseconds: 320),
-            animationCurve: Curves.easeInOutCubic,
-            letIndexChange: (index) {
-              if (index == 3) {
-                if (onAddTap != null) {
-                  onAddTap!();
-                }
-                return false;
+          animationDuration: const Duration(milliseconds: 320),
+          animationCurve: Curves.easeInOutCubic,
+          letIndexChange: (index) {
+            if (index == 3) {
+              if (onAddTap != null) {
+                onAddTap!();
               }
-              return true;
-            },
-            onTap: onTap,
-            items: items.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final item = entry.value;
-              final isSelected = idx == currentIndex;
+              return false;
+            }
+            return true;
+          },
+          onTap: (index) {
+            if (items[index].isMenu) {
+              onMenuTap?.call();
+            } else {
+              onTap(index);
+            }
+          },
+          items:
+              items.asMap().entries.map((entry) {
+                final idx = entry.key;
+                final item = entry.value;
+                final isSelected = item.isMenu ? menuOpen : idx == currentIndex;
 
-              return Tooltip(
-                message: item.label,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      isSelected ? item.activeIcon : item.icon,
-                      color: isSelected ? activeIconColor : inactiveIconColor,
-                      size: isSelected ? 22 : 20,
-                    ),
-                    if (item.badgeCount > 0)
-                      Positioned(
-                        top: isSelected ? -2 : -4,
-                        right: isSelected ? -5 : -7,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEF4444),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
-                          child: Text(
-                            item.badgeCount > 99 ? '99+' : '${item.badgeCount}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w800,
+                return Tooltip(
+                  message:
+                      item.isMenu
+                          ? (menuOpen ? 'Close menu' : 'Menu')
+                          : item.label,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        isSelected ? item.activeIcon : item.icon,
+                        color: isSelected ? activeIconColor : inactiveIconColor,
+                        size: isSelected ? 22 : 20,
+                      ),
+                      if (item.badgeCount > 0)
+                        Positioned(
+                          top: isSelected ? -2 : -4,
+                          right: isSelected ? -5 : -7,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4.5,
+                              vertical: 1,
                             ),
-                            textAlign: TextAlign.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 15,
+                              minHeight: 15,
+                            ),
+                            child: Text(
+                              item.badgeCount > 99
+                                  ? '99+'
+                                  : '${item.badgeCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-          if (bottomInset > 0)
+                    ],
+                  ),
+                );
+              }).toList(),
+        ),
+        if (bottomInset > 0)
           Container(
             height: bottomInset,
             width: double.infinity,

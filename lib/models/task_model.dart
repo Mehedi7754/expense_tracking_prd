@@ -72,6 +72,9 @@ class TaskModel {
     this.budgetLine,
   });
 
+  bool isAssignedTo(String userId) =>
+      userId.isNotEmpty && (assigneeIds.contains(userId) || assigneeId == userId);
+
   TaskModel copyWith({
     String? id,
     String? projectId,

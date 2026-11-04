@@ -101,6 +101,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     required double grossProjectValue,
     TaxStatus taxStatus = TaxStatus.included,
     double taxRate = 0.10,
+    double incomeTaxRate = 0.0,
     double advanceReceived = 0.0,
     double amountReceived = 0.0,
     required double budget,
@@ -112,13 +113,15 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     required List<String> teamMemberIds,
     String? createdById,
     String? imageUrl,
+    double? siteLatitude,
+    double? siteLongitude,
   }) async {
     final uniqueMicro = DateTime.now().microsecondsSinceEpoch % 1000000;
     final generatedId =
         'PRJ-${DateTime.now().year}-${uniqueMicro.toString().padLeft(6, '0')}';
     final netRevenue =
         taxStatus == TaxStatus.included
-            ? grossProjectValue * (1 - taxRate)
+            ? grossProjectValue * (1 - (taxRate + incomeTaxRate).clamp(0.0, 1.0))
             : grossProjectValue;
     final receivable = grossProjectValue - amountReceived;
 
@@ -140,6 +143,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
       grossProjectValue: grossProjectValue,
       taxStatus: taxStatus,
       taxRate: taxRate,
+      incomeTaxRate: incomeTaxRate,
       expectedNetRevenue: netRevenue,
       advanceReceived: advanceReceived,
       amountReceived: amountReceived,
@@ -154,6 +158,8 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
       createdById: createdById,
       status: ProjectStatus.ongoing,
       imageUrl: imageUrl,
+      siteLatitude: siteLatitude,
+      siteLongitude: siteLongitude,
     );
 
     // Optimistic local update & instant persistence so it's NEVER lost on restart

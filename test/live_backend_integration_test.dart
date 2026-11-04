@@ -10,7 +10,7 @@ import 'package:expense_tracking_prd/repositories/expense_repository.dart';
 import 'package:expense_tracking_prd/repositories/project_repository.dart';
 
 void main() {
-  const liveBaseUrl = 'http://xqeqm4yyv7fqxryrkm6phk55.163.227.239.97.sslip.io/api/v1';
+  const liveBaseUrl = 'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1';
 
   setUpAll(() {
     AppEnv.initializeForTesting({

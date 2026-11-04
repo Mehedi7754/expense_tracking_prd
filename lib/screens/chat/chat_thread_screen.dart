@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/config/app_env.dart';
 import '../../core/routing/route_paths.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/image_utils.dart';
@@ -30,6 +34,9 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isSending = false;
   String? _selectedImageBase64;
+  String? _selectedFileDataUri;
+  String? _selectedFileName;
+  String? _selectedFileMimeType;
   ProjectModel? _selectedProject;
 
   @override
@@ -54,7 +61,11 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source, imageQuality: 70, maxWidth: 1200);
+      final picked = await picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1200,
+      );
       if (picked == null) return;
 
       final bytes = await picked.readAsBytes();
@@ -64,8 +75,58 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
       });
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
+      }
+    }
+  }
+
+  Future<void> _pickDocument() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const [
+          'pdf',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'csv',
+          'txt',
+        ],
+      );
+      if (files.isEmpty) return;
+      final file = files.single;
+      final bytes = await file.readAsBytes();
+      if (bytes.isEmpty) {
+        throw Exception('The selected document could not be read.');
+      }
+      if (bytes.length > 10 * 1024 * 1024) {
+        throw Exception('Documents must be 10 MB or smaller.');
+      }
+      final extension = file.extension?.toLowerCase() ?? '';
+      const mimeByExtension = {
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx':
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'xls': 'application/vnd.ms-excel',
+        'xlsx':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'csv': 'text/csv',
+        'txt': 'text/plain',
+      };
+      setState(() {
+        _selectedFileDataUri =
+            'data:${mimeByExtension[extension]};base64,${base64Encode(bytes)}';
+        _selectedFileName = file.name;
+        _selectedFileMimeType = mimeByExtension[extension];
+      });
+    } catch (error) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
+          SnackBar(content: Text('Could not attach document: $error')),
         );
       }
     }
@@ -82,16 +143,20 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
         String query = '';
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            final filtered = projects.where((p) {
-              if (query.isEmpty) return true;
-              return p.name.toLowerCase().contains(query) || p.projectId.toLowerCase().contains(query);
-            }).toList();
+            final filtered =
+                projects.where((p) {
+                  if (query.isEmpty) return true;
+                  return p.name.toLowerCase().contains(query) ||
+                      p.projectId.toLowerCase().contains(query);
+                }).toList();
 
             return Container(
               height: MediaQuery.of(ctx).size.height * 0.65,
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
@@ -102,7 +167,8 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                       width: 36,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                        color:
+                            isDark ? Colors.white24 : const Color(0xFFCBD5E1),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -116,11 +182,17 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                   Container(
                     height: 40,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                      color:
+                          isDark
+                              ? const Color(0xFF0F172A)
+                              : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: TextField(
-                      onChanged: (val) => setModalState(() => query = val.trim().toLowerCase()),
+                      onChanged:
+                          (val) => setModalState(
+                            () => query = val.trim().toLowerCase(),
+                          ),
                       decoration: const InputDecoration(
                         hintText: 'Search project by name or code...',
                         hintStyle: TextStyle(fontSize: 13),
@@ -146,18 +218,38 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                               child: AppImageHelper.buildImage(
                                 path: p.imageUrl,
                                 fit: BoxFit.cover,
-                                placeholder: () => Container(
-                                  color: const Color(0xFF2563EB).withValues(alpha: 0.1),
-                                  child: const Center(
-                                    child: Icon(CupertinoIcons.folder_fill, color: Color(0xFF2563EB), size: 18),
-                                  ),
-                                ),
+                                placeholder:
+                                    () => Container(
+                                      color: const Color(
+                                        0xFF2563EB,
+                                      ).withValues(alpha: 0.1),
+                                      child: const Center(
+                                        child: Icon(
+                                          CupertinoIcons.folder_fill,
+                                          color: Color(0xFF2563EB),
+                                          size: 18,
+                                        ),
+                                      ),
+                                    ),
                               ),
                             ),
                           ),
-                          title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                          subtitle: Text('${p.projectId} • ${CurrencyFormatter.format(p.budget)}', style: const TextStyle(fontSize: 12)),
-                          trailing: const Icon(CupertinoIcons.plus_circle, color: Color(0xFF2563EB), size: 20),
+                          title: Text(
+                            p.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${p.projectId} • ${CurrencyFormatter.format(p.budget)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          trailing: const Icon(
+                            CupertinoIcons.plus_circle,
+                            color: Color(0xFF2563EB),
+                            size: 20,
+                          ),
                           onTap: () {
                             setState(() {
                               _selectedProject = p;
@@ -179,16 +271,48 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
 
   Future<void> _handleSendMessage() async {
     final text = _textController.text.trim();
-    if (text.isEmpty && _selectedImageBase64 == null && _selectedProject == null) return;
+    if (text.isEmpty &&
+        _selectedImageBase64 == null &&
+        _selectedFileDataUri == null &&
+        _selectedProject == null)
+      return;
 
     setState(() => _isSending = true);
 
     String? uploadedUrl;
+    String? uploadedFileUrl;
+    final selectedFileDataUri = _selectedFileDataUri;
+    final selectedFileName = _selectedFileName;
+    final selectedFileMimeType = _selectedFileMimeType;
     if (_selectedImageBase64 != null) {
       try {
         final repo = ref.read(chatRepositoryProvider);
         uploadedUrl = await repo.uploadPhoto(_selectedImageBase64!);
-      } catch (_) {}
+      } catch (error) {
+        if (mounted) {
+          setState(() => _isSending = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Photo upload failed: $error')),
+          );
+        }
+        return;
+      }
+    }
+    if (selectedFileDataUri != null) {
+      try {
+        final result = await ref
+            .read(chatRepositoryProvider)
+            .uploadAttachment(selectedFileDataUri);
+        uploadedFileUrl = result['url'];
+      } catch (error) {
+        if (mounted) {
+          setState(() => _isSending = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Document upload failed: $error')),
+          );
+        }
+        return;
+      }
     }
 
     final proj = _selectedProject;
@@ -199,20 +323,33 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
     _textController.clear();
     setState(() {
       _selectedImageBase64 = null;
+      _selectedFileDataUri = null;
+      _selectedFileName = null;
+      _selectedFileMimeType = null;
       _selectedProject = null;
     });
 
     final notifier = ref.read(chatMessagesProvider(widget.channelId).notifier);
-    await notifier.sendMessage(
+    final sent = await notifier.sendMessage(
       content: text,
       imageUrl: uploadedUrl,
       projectId: projId,
       projectName: projName,
       projectCode: projCode,
+      fileUrl: uploadedFileUrl,
+      fileName: selectedFileName,
+      fileMimeType: selectedFileMimeType,
     );
 
     if (mounted) {
       setState(() => _isSending = false);
+      if (!sent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Message could not be sent. Please try again.'),
+          ),
+        );
+      }
       _scrollToBottom();
     }
   }
@@ -237,7 +374,8 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
     final isProject = activeChannel?.isProject ?? false;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
+      backgroundColor:
+          isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
       appBar: AppBar(
         elevation: 0.5,
         backgroundColor: isDark ? AppColors.darkSurface : Colors.white,
@@ -257,16 +395,21 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                   child: AppImageHelper.buildImage(
                     path: activeChannel?.projectImageUrl,
                     fit: BoxFit.cover,
-                    placeholder: () => Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                    placeholder:
+                        () => Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                            ),
+                          ),
+                          child: const Center(
+                            child: Icon(
+                              CupertinoIcons.folder_badge_person_crop,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: const Center(
-                        child: Icon(CupertinoIcons.folder_badge_person_crop, color: Colors.white, size: 20),
-                      ),
-                    ),
                   ),
                 ),
               )
@@ -287,7 +430,11 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, letterSpacing: -0.2),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      letterSpacing: -0.2,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -306,11 +453,13 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                       Text(
                         isProject
                             ? (activeChannel?.projectCode ?? 'Team Room')
-                            : (activeChannel?.otherUser?.role.toUpperCase() ?? 'ACTIVE NOW'),
+                            : (activeChannel?.otherUser?.role.toUpperCase() ??
+                                'ACTIVE NOW'),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                          color:
+                              isDark ? Colors.white54 : const Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -323,9 +472,15 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
         actions: [
           if (isProject && activeChannel?.projectId != null)
             IconButton(
-              icon: const Icon(CupertinoIcons.info_circle, color: Color(0xFF2563EB)),
+              icon: const Icon(
+                CupertinoIcons.info_circle,
+                color: Color(0xFF2563EB),
+              ),
               tooltip: 'Project Details',
-              onPressed: () => context.push(RoutePaths.projectDetail(activeChannel!.projectId!)),
+              onPressed:
+                  () => context.push(
+                    RoutePaths.projectDetail(activeChannel!.projectId!),
+                  ),
             ),
           const SizedBox(width: 8),
         ],
@@ -336,37 +491,63 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
           Expanded(
             child: messagesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 36),
-                    const SizedBox(height: 8),
-                    Text('Error loading messages: $err'),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () => ref.read(chatMessagesProvider(widget.channelId).notifier).fetchMessages(),
-                      child: const Text('Retry'),
+              error:
+                  (err, _) => Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.redAccent,
+                          size: 36,
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Error loading messages: $err'),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed:
+                              () =>
+                                  ref
+                                      .read(
+                                        chatMessagesProvider(
+                                          widget.channelId,
+                                        ).notifier,
+                                      )
+                                      .fetchMessages(),
+                          child: const Text('Retry'),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
               data: (messages) {
                 if (messages.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(CupertinoIcons.chat_bubble_2, size: 48, color: const Color(0xFF2563EB).withValues(alpha: 0.4)),
+                        Icon(
+                          CupertinoIcons.chat_bubble_2,
+                          size: 48,
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.4),
+                        ),
                         const SizedBox(height: 12),
                         const Text(
                           'No messages yet',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'Say hello to start the conversation!',
-                          style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color:
+                                isDark
+                                    ? Colors.white54
+                                    : const Color(0xFF64748B),
+                          ),
                         ),
                       ],
                     ),
@@ -375,23 +556,34 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
 
                 // Auto-scroll when messages arrive
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (_scrollController.hasClients && _scrollController.position.pixels == 0) {
-                    _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+                  if (_scrollController.hasClients &&
+                      _scrollController.position.pixels == 0) {
+                    _scrollController.jumpTo(
+                      _scrollController.position.maxScrollExtent,
+                    );
                   }
                 });
 
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   itemCount: messages.length,
                   itemBuilder: (ctx, index) {
                     final msg = messages[index];
-                    final showDateHeader = index == 0 ||
-                        !_isSameDay(messages[index - 1].createdAt, msg.createdAt);
+                    final showDateHeader =
+                        index == 0 ||
+                        !_isSameDay(
+                          messages[index - 1].createdAt,
+                          msg.createdAt,
+                        );
 
                     return Column(
                       children: [
-                        if (showDateHeader) _buildDateHeader(msg.createdAt, isDark),
+                        if (showDateHeader)
+                          _buildDateHeader(msg.createdAt, isDark),
                         _buildMessageBubble(ctx, msg, isDark, isProject),
                       ],
                     );
@@ -444,142 +636,403 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
     );
   }
 
-  Widget _buildMessageBubble(BuildContext context, ChatMessageModel msg, bool isDark, bool isProject) {
+  Future<void> _showMessageActions(ChatMessageModel message) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder:
+          (sheetContext) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (message.content.trim().isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.alternate_email_rounded),
+                    title: const Text('Mention'),
+                    subtitle: Text(
+                      'Reply to ${message.senderName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () => Navigator.pop(sheetContext, 'mention'),
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.forward_rounded),
+                  title: const Text('Forward'),
+                  onTap: () => Navigator.pop(sheetContext, 'forward'),
+                ),
+                if (message.content.trim().isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.copy_rounded),
+                    title: const Text('Copy message'),
+                    onTap: () => Navigator.pop(sheetContext, 'copy'),
+                  ),
+                if (message.hasFile)
+                  ListTile(
+                    leading: const Icon(Icons.description_outlined),
+                    title: const Text('Open document'),
+                    onTap: () => Navigator.pop(sheetContext, 'open'),
+                  ),
+              ],
+            ),
+          ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'copy') {
+      await Clipboard.setData(ClipboardData(text: message.content));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Message copied')));
+    } else if (action == 'mention') {
+      setState(
+        () =>
+            _textController.text =
+                '@${message.senderName} ${_textController.text}',
+      );
+      _textController.selection = TextSelection.collapsed(
+        offset: _textController.text.length,
+      );
+    } else if (action == 'forward') {
+      await _forwardMessage(message);
+    } else if (action == 'open' && message.fileUrl != null) {
+      await _openDocument(message.fileUrl!);
+    }
+  }
+
+  Future<void> _openDocument(String url) async {
+    final uri = Uri.tryParse(AppEnv.resolveUrl(url));
+    if (uri == null ||
+        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open this document.')),
+        );
+    }
+  }
+
+  Future<void> _forwardMessage(ChatMessageModel message) async {
+    await ref.read(chatChannelsProvider.notifier).fetchChannels(silent: true);
+    final channels = ref
+        .read(chatChannelsProvider)
+        .when(
+          data: (value) => value,
+          error: (_, _) => const <ChatChannelModel>[],
+          loading: () => const <ChatChannelModel>[],
+        );
+    final destinations =
+        channels.where((channel) => channel.id != widget.channelId).toList();
+    final destination = await showModalBottomSheet<ChatChannelModel>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder:
+          (sheetContext) => SafeArea(
+            child: SizedBox(
+              height: MediaQuery.of(sheetContext).size.height * 0.6,
+              child:
+                  destinations.isEmpty
+                      ? const Center(
+                        child: Text('No other conversations available'),
+                      )
+                      : ListView.builder(
+                        itemCount: destinations.length,
+                        itemBuilder: (context, index) {
+                          final channel = destinations[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              child: Icon(
+                                channel.isProject
+                                    ? Icons.folder_outlined
+                                    : Icons.person_outline,
+                              ),
+                            ),
+                            title: Text(
+                              channel.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              channel.isProject
+                                  ? 'Project conversation'
+                                  : 'Direct conversation',
+                            ),
+                            onTap: () => Navigator.pop(sheetContext, channel),
+                          );
+                        },
+                      ),
+            ),
+          ),
+    );
+    if (destination == null || !mounted) return;
+    final text =
+        message.content.isEmpty
+            ? ''
+            : 'Forwarded from ${message.senderName}: ${message.content}';
+    final sent = await ref
+        .read(chatMessagesProvider(destination.id).notifier)
+        .sendMessage(
+          content: text,
+          imageUrl: message.imageUrl,
+          projectId: message.projectId,
+          projectName: message.projectName,
+          projectCode: message.projectCode,
+          fileUrl: message.fileUrl,
+          fileName: message.fileName,
+          fileMimeType: message.fileMimeType,
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          sent
+              ? 'Message forwarded to ${destination.title}'
+              : 'Could not forward message.',
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(
+    BuildContext context,
+    ChatMessageModel msg,
+    bool isDark,
+    bool isProject,
+  ) {
     final isMe = msg.isMe;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isMe && isProject) ...[
-            AppAvatar(
-              imageUrl: msg.senderAvatarUrl,
-              name: msg.senderName,
-              size: 28,
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                if (!isMe && isProject)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 2),
-                    child: Text(
-                      msg.senderName,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: isDark ? Colors.white70 : const Color(0xFF475569),
+    return GestureDetector(
+      onLongPress: () => _showMessageActions(msg),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          mainAxisAlignment:
+              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (!isMe && isProject) ...[
+              AppAvatar(
+                imageUrl: msg.senderAvatarUrl,
+                name: msg.senderName,
+                size: 28,
+              ),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Column(
+                crossAxisAlignment:
+                    isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (!isMe && isProject)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 2),
+                      child: Text(
+                        msg.senderName,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color:
+                              isDark ? Colors.white70 : const Color(0xFF475569),
+                        ),
                       ),
                     ),
-                  ),
-                Container(
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.76),
-                  decoration: BoxDecoration(
-                    color: isMe
-                        ? const Color(0xFF2563EB)
-                        : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(18),
-                      topRight: const Radius.circular(18),
-                      bottomLeft: Radius.circular(isMe ? 18 : 4),
-                      bottomRight: Radius.circular(isMe ? 4 : 18),
+                  Container(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.76,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
+                    decoration: BoxDecoration(
+                      color:
+                          isMe
+                              ? const Color(0xFF2563EB)
+                              : (isDark
+                                  ? const Color(0xFF1E293B)
+                                  : Colors.white),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
+                        bottomLeft: Radius.circular(isMe ? 18 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 18),
                       ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(18),
-                      topRight: const Radius.circular(18),
-                      bottomLeft: Radius.circular(isMe ? 18 : 4),
-                      bottomRight: Radius.circular(isMe ? 4 : 18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.2 : 0.05,
+                          ),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Image attachment if present
-                        if (msg.hasImage)
-                          GestureDetector(
-                            onTap: () => _openPhotoViewer(context, msg.imageUrl!),
-                            child: Hero(
-                              tag: 'chat_img_${msg.id}',
-                              child: Container(
-                                constraints: const BoxConstraints(maxHeight: 260),
-                                width: double.infinity,
-                                child: AppImageHelper.buildImage(
-                                  path: msg.imageUrl,
-                                  fit: BoxFit.cover,
-                                  placeholder: () => Container(
-                                    height: 180,
-                                    color: Colors.black12,
-                                    child: const Center(child: CircularProgressIndicator()),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(18),
+                        topRight: const Radius.circular(18),
+                        bottomLeft: Radius.circular(isMe ? 18 : 4),
+                        bottomRight: Radius.circular(isMe ? 4 : 18),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Image attachment if present
+                          if (msg.hasImage)
+                            GestureDetector(
+                              onTap:
+                                  () =>
+                                      _openPhotoViewer(context, msg.imageUrl!),
+                              child: Hero(
+                                tag: 'chat_img_${msg.id}',
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 260,
+                                  ),
+                                  width: double.infinity,
+                                  child: AppImageHelper.buildImage(
+                                    path: msg.imageUrl,
+                                    fit: BoxFit.cover,
+                                    placeholder:
+                                        () => Container(
+                                          height: 180,
+                                          color: Colors.black12,
+                                          child: const Center(
+                                            child: CircularProgressIndicator(),
+                                          ),
+                                        ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        // Project reference card if present
-                        if (msg.hasProject)
-                          _buildEmbeddedProjectCard(context, msg, isMe, isDark),
-                        // Text message content
-                        if (msg.content.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            child: Text(
-                              msg.content,
-                              style: TextStyle(
-                                fontSize: 14.5,
-                                height: 1.35,
-                                color: isMe
-                                    ? Colors.white
-                                    : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                          // Project reference card if present
+                          if (msg.hasProject)
+                            _buildEmbeddedProjectCard(
+                              context,
+                              msg,
+                              isMe,
+                              isDark,
+                            ),
+                          if (msg.hasFile) _buildDocumentCard(msg, isMe),
+                          // Text message content
+                          if (msg.content.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                              child: Text(
+                                msg.content,
+                                style: TextStyle(
+                                  fontSize: 14.5,
+                                  height: 1.35,
+                                  color:
+                                      isMe
+                                          ? Colors.white
+                                          : (isDark
+                                              ? Colors.white
+                                              : const Color(0xFF0F172A)),
+                                ),
                               ),
                             ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // Time & Status
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          DateFormat.jm().format(msg.createdAt),
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color:
+                                isDark
+                                    ? Colors.white38
+                                    : const Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
                           ),
+                        ),
+                        if (isMe) ...[
+                          const SizedBox(width: 4),
+                          const Icon(
+                            CupertinoIcons.checkmark_alt,
+                            size: 13,
+                            color: Color(0xFF2563EB),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                // Time & Status
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        DateFormat.jm().format(msg.createdAt),
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (isMe) ...[
-                        const SizedBox(width: 4),
-                        const Icon(
-                          CupertinoIcons.checkmark_alt,
-                          size: 13,
-                          color: Color(0xFF2563EB),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentCard(ChatMessageModel message, bool isMe) {
+    final fileName =
+        message.fileName?.trim().isNotEmpty == true
+            ? message.fileName!
+            : 'Shared document';
+    final extension =
+        fileName.contains('.')
+            ? fileName.split('.').last.toUpperCase()
+            : 'FILE';
+    return InkWell(
+      onTap: () => _openDocument(message.fileUrl!),
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color:
+              isMe
+                  ? Colors.white.withValues(alpha: 0.14)
+                  : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              extension == 'PDF'
+                  ? Icons.picture_as_pdf_outlined
+                  : Icons.description_outlined,
+              color: isMe ? Colors.white : const Color(0xFF2563EB),
+            ),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    fileName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: isMe ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  ),
+                  Text(
+                    '$extension · Tap to open',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isMe ? Colors.white70 : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.open_in_new_rounded,
+              size: 17,
+              color: isMe ? Colors.white70 : const Color(0xFF64748B),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -594,20 +1047,23 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
       margin: const EdgeInsets.all(8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isMe
-            ? Colors.white.withValues(alpha: 0.15)
-            : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
+        color:
+            isMe
+                ? Colors.white.withValues(alpha: 0.15)
+                : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isMe
-              ? Colors.white.withValues(alpha: 0.25)
-              : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+          color:
+              isMe
+                  ? Colors.white.withValues(alpha: 0.25)
+                  : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (msg.projectImageUrl != null && msg.projectImageUrl!.trim().isNotEmpty) ...[
+          if (msg.projectImageUrl != null &&
+              msg.projectImageUrl!.trim().isNotEmpty) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: SizedBox(
@@ -627,7 +1083,10 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isMe ? Colors.white24 : const Color(0xFF2563EB).withValues(alpha: 0.1),
+                  color:
+                      isMe
+                          ? Colors.white24
+                          : const Color(0xFF2563EB).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -642,7 +1101,10 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
               const Spacer(),
               if (msg.projectStatus != null)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1.5,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF10B981).withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
@@ -664,7 +1126,10 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 13.5,
-              color: isMe ? Colors.white : (isDark ? Colors.white : const Color(0xFF0F172A)),
+              color:
+                  isMe
+                      ? Colors.white
+                      : (isDark ? Colors.white : const Color(0xFF0F172A)),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -712,8 +1177,10 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
   }
 
   Widget _buildComposer(bool isDark) {
-    final hasContent = _textController.text.trim().isNotEmpty ||
+    final hasContent =
+        _textController.text.trim().isNotEmpty ||
         _selectedImageBase64 != null ||
+        _selectedFileDataUri != null ||
         _selectedProject != null;
 
     return SafeArea(
@@ -723,7 +1190,9 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
         decoration: BoxDecoration(
           color: isDark ? AppColors.darkSurface : Colors.white,
           border: Border(
-            top: BorderSide(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
+            top: BorderSide(
+              color: isDark ? Colors.white10 : const Color(0xFFE2E8F0),
+            ),
           ),
         ),
         child: Column(
@@ -731,7 +1200,9 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Attachments Preview Strip
-            if (_selectedImageBase64 != null || _selectedProject != null)
+            if (_selectedImageBase64 != null ||
+                _selectedFileName != null ||
+                _selectedProject != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -747,7 +1218,8 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                               child: AppImageHelper.buildImage(
                                 path: _selectedImageBase64,
                                 fit: BoxFit.cover,
-                                placeholder: () => Container(color: Colors.black12),
+                                placeholder:
+                                    () => Container(color: Colors.black12),
                               ),
                             ),
                           ),
@@ -755,33 +1227,101 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                             top: 2,
                             right: 2,
                             child: GestureDetector(
-                              onTap: () => setState(() => _selectedImageBase64 = null),
+                              onTap:
+                                  () => setState(
+                                    () => _selectedImageBase64 = null,
+                                  ),
                               child: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: const BoxDecoration(
                                   color: Colors.black87,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                    if (_selectedImageBase64 != null && _selectedProject != null)
-                      const SizedBox(width: 8),
-                    if (_selectedProject != null)
+                    if (_selectedFileName != null) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                          color:
+                              isDark
+                                  ? const Color(0xFF0F172A)
+                                  : const Color(0xFFF1F5F9),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (_selectedProject!.imageUrl != null && _selectedProject!.imageUrl!.isNotEmpty)
+                            const Icon(
+                              Icons.description_outlined,
+                              size: 18,
+                              color: Color(0xFF2563EB),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                _selectedFileName!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, size: 16),
+                              constraints: const BoxConstraints.tightFor(
+                                width: 26,
+                                height: 26,
+                              ),
+                              padding: EdgeInsets.zero,
+                              onPressed:
+                                  () => setState(() {
+                                    _selectedFileDataUri = null;
+                                    _selectedFileName = null;
+                                    _selectedFileMimeType = null;
+                                  }),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    if (_selectedImageBase64 != null &&
+                        _selectedProject != null)
+                      const SizedBox(width: 8),
+                    if (_selectedProject != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFF2563EB,
+                          ).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(
+                              0xFF2563EB,
+                            ).withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_selectedProject!.imageUrl != null &&
+                                _selectedProject!.imageUrl!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(right: 6),
                                 child: ClipRRect(
@@ -792,23 +1332,40 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                                     child: AppImageHelper.buildImage(
                                       path: _selectedProject!.imageUrl,
                                       fit: BoxFit.cover,
-                                      placeholder: () => const Icon(CupertinoIcons.folder_fill, size: 16, color: Color(0xFF2563EB)),
+                                      placeholder:
+                                          () => const Icon(
+                                            CupertinoIcons.folder_fill,
+                                            size: 16,
+                                            color: Color(0xFF2563EB),
+                                          ),
                                     ),
                                   ),
                                 ),
                               )
                             else ...[
-                              const Icon(CupertinoIcons.folder_fill, size: 16, color: Color(0xFF2563EB)),
+                              const Icon(
+                                CupertinoIcons.folder_fill,
+                                size: 16,
+                                color: Color(0xFF2563EB),
+                              ),
                               const SizedBox(width: 6),
                             ],
                             Text(
                               _selectedProject!.name,
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(width: 6),
                             GestureDetector(
-                              onTap: () => setState(() => _selectedProject = null),
-                              child: const Icon(Icons.close, size: 14, color: Color(0xFF2563EB)),
+                              onTap:
+                                  () => setState(() => _selectedProject = null),
+                              child: const Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Color(0xFF2563EB),
+                              ),
                             ),
                           ],
                         ),
@@ -822,18 +1379,46 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
               children: [
                 // Attach image button
                 IconButton(
-                  icon: const Icon(CupertinoIcons.photo_camera_solid, color: Color(0xFF2563EB), size: 22),
+                  icon: const Icon(
+                    CupertinoIcons.photo_camera_solid,
+                    color: Color(0xFF2563EB),
+                    size: 22,
+                  ),
                   tooltip: 'Attach Photo',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   onPressed: () => _showImageSourcePicker(context),
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.attach_file_rounded,
+                    color: Color(0xFF0F766E),
+                    size: 22,
+                  ),
+                  tooltip: 'Share document',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
+                  onPressed: _isSending ? null : _pickDocument,
                 ),
                 // Mention project button
                 IconButton(
-                  icon: const Icon(CupertinoIcons.number_square_fill, color: Color(0xFF4F46E5), size: 22),
+                  icon: const Icon(
+                    CupertinoIcons.number_square_fill,
+                    color: Color(0xFF4F46E5),
+                    size: 22,
+                  ),
                   tooltip: 'Mention Project',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   onPressed: () => _openProjectPicker(context),
                 ),
                 const SizedBox(width: 6),
@@ -841,7 +1426,10 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      color:
+                          isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -855,11 +1443,14 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                         hintText: 'Type a message...',
                         hintStyle: TextStyle(
                           fontSize: 13.5,
-                          color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                          color:
+                              isDark ? Colors.white38 : const Color(0xFF94A3B8),
                         ),
                         border: InputBorder.none,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ),
@@ -868,23 +1459,32 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
                 // Send button
                 _isSending
                     ? const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    : Container(
-                        decoration: BoxDecoration(
-                          color: hasContent ? const Color(0xFF2563EB) : (isDark ? Colors.white12 : const Color(0xFFCBD5E1)),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(CupertinoIcons.arrow_up, color: Colors.white, size: 20),
-                          onPressed: hasContent ? _handleSendMessage : null,
-                        ),
+                      padding: EdgeInsets.all(8.0),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
+                    )
+                    : Container(
+                      decoration: BoxDecoration(
+                        color:
+                            hasContent
+                                ? const Color(0xFF2563EB)
+                                : (isDark
+                                    ? Colors.white12
+                                    : const Color(0xFFCBD5E1)),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          CupertinoIcons.arrow_up,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: hasContent ? _handleSendMessage : null,
+                      ),
+                    ),
               ],
             ),
           ],
@@ -909,16 +1509,28 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(CupertinoIcons.camera_fill, color: Color(0xFF2563EB)),
-                title: const Text('Take Photo with Camera', style: TextStyle(fontWeight: FontWeight.w700)),
+                leading: const Icon(
+                  CupertinoIcons.camera_fill,
+                  color: Color(0xFF2563EB),
+                ),
+                title: const Text(
+                  'Take Photo with Camera',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage(ImageSource.camera);
                 },
               ),
               ListTile(
-                leading: const Icon(CupertinoIcons.photo_fill_on_rectangle_fill, color: Color(0xFF4F46E5)),
-                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700)),
+                leading: const Icon(
+                  CupertinoIcons.photo_fill_on_rectangle_fill,
+                  color: Color(0xFF4F46E5),
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   _pickImage(ImageSource.gallery);
@@ -934,26 +1546,30 @@ class _ChatThreadScreenState extends ConsumerState<ChatThreadScreen> {
   void _openPhotoViewer(BuildContext context, String imageUrl) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.black,
-            iconTheme: const IconThemeData(color: Colors.white),
-            elevation: 0,
-          ),
-          body: Center(
-            child: InteractiveViewer(
-              panEnabled: true,
-              minScale: 0.5,
-              maxScale: 4.0,
-              child: AppImageHelper.buildImage(
-                path: imageUrl,
-                fit: BoxFit.contain,
-                placeholder: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
+        builder:
+            (_) => Scaffold(
+              backgroundColor: Colors.black,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                iconTheme: const IconThemeData(color: Colors.white),
+                elevation: 0,
+              ),
+              body: Center(
+                child: InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: AppImageHelper.buildImage(
+                    path: imageUrl,
+                    fit: BoxFit.contain,
+                    placeholder:
+                        () => const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
       ),
     );
   }

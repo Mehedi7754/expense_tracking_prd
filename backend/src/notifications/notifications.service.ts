@@ -121,18 +121,26 @@ export class NotificationsService {
   }
 
   async delete(id: string, userId: string) {
-    await this.db.query(
-      'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
-      [id, userId],
-    );
+    const userRes = await this.db.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    const role = userRes.rows[0]?.role;
+    const isPrivileged = role === 'main_admin' || role === 'admin' || role === 'finance' || role === 'project_manager';
+    if (isPrivileged) {
+      await this.db.query('DELETE FROM notifications WHERE id = $1', [id]);
+    } else {
+      await this.db.query('DELETE FROM notifications WHERE id = $1 AND user_id = $2', [id, userId]);
+    }
     return { success: true };
   }
 
   async deleteAll(userId: string) {
-    await this.db.query(
-      'DELETE FROM notifications WHERE user_id = $1',
-      [userId],
-    );
+    const userRes = await this.db.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    const role = userRes.rows[0]?.role;
+    const isPrivileged = role === 'main_admin' || role === 'admin' || role === 'finance' || role === 'project_manager';
+    if (isPrivileged) {
+      await this.db.query('DELETE FROM notifications', []);
+    } else {
+      await this.db.query('DELETE FROM notifications WHERE user_id = $1', [userId]);
+    }
     return { success: true };
   }
 }

@@ -46,9 +46,11 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
     final task = match.first;
     final isCompleted = task.status == TaskStatus.completed;
-    final role = ref.watch(authProvider).currentUser?.role;
+    final currentUser = ref.watch(authProvider).currentUser;
+    final role = currentUser?.role;
     final canManage = role == UserRole.mainAdmin || role == UserRole.projectManager;
-    final canUpdateStatus = canManage || role == UserRole.projectMember;
+    final canUpdateStatus = canManage ||
+        (role == UserRole.projectMember && task.isAssignedTo(currentUser?.id ?? ''));
 
     // Expenses linked to this task (PRD Section 4.4)
     final linkedExpenses = allExpenses.where((e) => e.taskId == task.id).toList();
@@ -148,21 +150,17 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
 
               const SizedBox(height: 20),
 
-              // Mark Complete Toggle Button (PRD Section 4.4)
-          if (canUpdateStatus) SizedBox(
+              if (canUpdateStatus) SizedBox(
                 width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: Icon(
-                    isCompleted ? Icons.restart_alt_rounded : Icons.check_circle_outline_rounded,
-                    color: isCompleted ? AppColors.textSecondary : AppColors.emerald,
-                  ),
-                  label: Text(isCompleted ? 'Mark as In Progress' : 'Mark Task Complete'),
-                  onPressed: _updating ? null : () async {
+                child: PopupMenuButton<TaskStatus>(
+                  enabled: !_updating,
+                  onSelected: (status) async {
+                    if (status == task.status) return;
                     setState(() => _updating = true);
                     try {
-                      await ref.read(taskProvider.notifier).toggleTaskComplete(task.id);
+                      await ref.read(taskProvider.notifier).updateTaskStatus(task.id, status);
                       if (!context.mounted) return;
-                      NotificationBanner.showSuccess(context, isCompleted ? 'Task reopened.' : 'Task marked complete!');
+                      NotificationBanner.showSuccess(context, 'Task updated to ${status.displayName}.');
                     } catch (_) {
                       if (!context.mounted) return;
                       NotificationBanner.showError(context, 'Task status could not be saved. Please retry.');
@@ -170,6 +168,21 @@ class _TaskDetailScreenState extends ConsumerState<TaskDetailScreen> {
                       if (mounted) setState(() => _updating = false);
                     }
                   },
+                  itemBuilder: (_) => TaskStatus.values.map((status) => PopupMenuItem(
+                    value: status,
+                    child: Row(children: [
+                      if (status == task.status) const Icon(Icons.check_rounded, size: 16),
+                      if (status == task.status) const SizedBox(width: 8),
+                      Text(status.displayName),
+                    ]),
+                  )).toList(),
+                  child: OutlinedButton.icon(
+                    icon: _updating
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Icon(isCompleted ? Icons.check_circle_rounded : Icons.sync_rounded),
+                    label: Text(_updating ? 'Saving…' : 'Status: ${task.status.displayName} · Update'),
+                    onPressed: null,
+                  ),
                 ),
               ),
 

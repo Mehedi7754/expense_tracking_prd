@@ -201,7 +201,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         ),
                       ),
 
-                      if (expense.hasTax) ...[
+                      if (expense.hasVat || expense.hasTax) ...[
                         const SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
@@ -228,12 +228,12 @@ class ExpenseDetailScreen extends ConsumerWidget {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF0284C7).withAlpha(25),
+                                      color: const Color(0xFF10B981).withAlpha(25),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: Text(
-                                      '${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}% Tax',
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF0284C7)),
+                                    child: const Text(
+                                      'Itemized',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
                                     ),
                                   ),
                                 ],
@@ -242,32 +242,57 @@ class ExpenseDetailScreen extends ConsumerWidget {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text('Base Cost:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
+                                  Flexible(
+                                    child: Text(
+                                      'Base Cost:',
+                                      style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(CurrencyFormatter.format(expense.baseCost, currency: expense.currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                                 ],
                               ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Tax Rate:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
-                                  Text('${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Tax Amount:', style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B))),
-                                  Text('+ ${CurrencyFormatter.format(expense.taxAmount, currency: expense.currency)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0284C7))),
-                                ],
-                              ),
+                              if (expense.hasVat) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        'VAT (${expense.vatRate.toStringAsFixed(expense.vatRate.truncateToDouble() == expense.vatRate ? 0 : 1)}%):',
+                                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text('+ ${CurrencyFormatter.format(expense.vatAmount, currency: expense.currency)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF8B5CF6))),
+                                  ],
+                                ),
+                              ],
+                              if (expense.hasTax) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        'Tax / AIT (${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}%):',
+                                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text('+ ${CurrencyFormatter.format(expense.taxAmount, currency: expense.currency)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0284C7))),
+                                  ],
+                                ),
+                              ],
                               Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1), height: 12),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Expanded(
-                                    child: Text('Total Cost:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    child: Text('Total Gross Cost:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(CurrencyFormatter.format(expense.totalCost, currency: expense.currency), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),

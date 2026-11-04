@@ -85,6 +85,26 @@ void main() {
       expect(channel.subtitle, '📷 Site layout blueprint');
     });
 
+    test(
+      'ChatChannelModel shows a shared document in the conversation preview',
+      () {
+        final channel = ChatChannelModel.fromJson({
+          'id': 'chan-doc',
+          'type': 'direct',
+          'last_message': {
+            'id': 'msg-doc',
+            'content': '',
+            'file_name': 'budget.xlsx',
+            'sender_id': 'user-1',
+            'sender_name': 'Taylor',
+            'created_at': '2026-11-02T10:00:00.000Z',
+          },
+        });
+
+        expect(channel.subtitle, '📄 budget.xlsx');
+      },
+    );
+
     test('ChatMessageModel with project mention and photo attachment', () {
       final json = {
         'id': 'msg-99',
@@ -129,36 +149,57 @@ void main() {
       expect(message.hasProject, false);
     });
 
-    test('Chat Notification routing encodes and maps to ChatThreadScreen path', () {
-      // Chat notification payload must NOT route to notifications activity page
-      final chatData = {
-        'type': 'chat',
-        'channelId': 'channel-99',
-      };
-      final chatPayload = NotificationRouter.encode(chatData);
+    test(
+      'Chat Notification routing encodes and maps to ChatThreadScreen path',
+      () {
+        // Chat notification payload must NOT route to notifications activity page
+        final chatData = {'type': 'chat', 'channelId': 'channel-99'};
+        final chatPayload = NotificationRouter.encode(chatData);
 
-      final decodedData = Uri.splitQueryString(chatPayload);
-      final route = NotificationRouter.resolve(decodedData);
-      expect(route, RoutePaths.chatThread('channel-99'));
-      expect(route.contains('/chat/'), true);
-      expect(route.contains('notifications'), false);
+        final decodedData = Uri.splitQueryString(chatPayload);
+        final route = NotificationRouter.resolve(decodedData);
+        expect(route, RoutePaths.chatThread('channel-99'));
+        expect(route.contains('/chat/'), true);
+        expect(route.contains('notifications'), false);
+      },
+    );
+
+    test('Task assignment notifications deep-link to the assigned task', () {
+      final payload = NotificationRouter.encode({
+        'type': 'task_assigned',
+        'taskId': 'task-42',
+      });
+      final route = NotificationRouter.resolve(Uri.splitQueryString(payload));
+      expect(route, '/tasks/task-42');
     });
 
-    test('ChatChannelModel.copyWith preserves projectImageUrl and other properties', () {
-      final channel = ChatChannelModel(
-        id: 'chan-001',
-        type: 'project',
-        projectName: 'Bridge Metro',
-        projectImageUrl: '/uploads/projects/bridge.jpg',
-        unreadCount: 5,
-        updatedAt: DateTime.now(),
-      );
-
-      final updated = channel.copyWith(unreadCount: 0);
-      expect(updated.id, 'chan-001');
-      expect(updated.unreadCount, 0);
-      expect(updated.projectName, 'Bridge Metro');
-      expect(updated.projectImageUrl, '/uploads/projects/bridge.jpg');
+    test('Task status notifications support relatedTaskId payloads', () {
+      final payload = NotificationRouter.encode({
+        'type': 'task_status_updated',
+        'relatedTaskId': 'task-84',
+      });
+      final route = NotificationRouter.resolve(Uri.splitQueryString(payload));
+      expect(route, '/tasks/task-84');
     });
+
+    test(
+      'ChatChannelModel.copyWith preserves projectImageUrl and other properties',
+      () {
+        final channel = ChatChannelModel(
+          id: 'chan-001',
+          type: 'project',
+          projectName: 'Bridge Metro',
+          projectImageUrl: '/uploads/projects/bridge.jpg',
+          unreadCount: 5,
+          updatedAt: DateTime.now(),
+        );
+
+        final updated = channel.copyWith(unreadCount: 0);
+        expect(updated.id, 'chan-001');
+        expect(updated.unreadCount, 0);
+        expect(updated.projectName, 'Bridge Metro');
+        expect(updated.projectImageUrl, '/uploads/projects/bridge.jpg');
+      },
+    );
   });
 }

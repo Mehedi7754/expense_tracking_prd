@@ -342,15 +342,8 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
   }
 
   Future<void> updateSettings(AttendanceSettingsState newSettings) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kAttendanceSettingsKey, jsonEncode(newSettings.toJson()));
-    await prefs.setInt(_kOldMorningEndKey, newSettings.morningEndHour);
-
-    state = AsyncValue.data(newSettings);
-
-    try {
       final repo = ref.read(attendanceRepositoryProvider);
-      await repo.updateAttendanceSettings(
+      final saved = await repo.updateAttendanceSettings(
         morningStartHour: newSettings.morningStartHour,
         morningEndHour: newSettings.morningEndHour,
         afternoonStartHour: newSettings.afternoonStartHour,
@@ -368,10 +361,14 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
         geofenceRadiusMeters: newSettings.geofenceRadiusMeters,
         isGeofenceEnforced: newSettings.isGeofenceEnforced,
       );
+      if (!saved) throw StateError('Attendance settings were not saved');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kAttendanceSettingsKey, jsonEncode(newSettings.toJson()));
+      await prefs.setInt(_kOldMorningEndKey, newSettings.morningEndHour);
+      state = AsyncValue.data(newSettings);
       // Immediately refresh attendance state & daily overview so UI reflects real-time off-days & shift changes
       ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
       ref.read(attendanceProvider.notifier).fetchAttendanceRecords(force: true);
-    } catch (_) {}
   }
 
   Future<void> setGeofenceSettings({

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../core/routing/route_paths.dart';
 import '../core/services/realtime_sync_service.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
+import '../core/widgets/quick_access_dock_menu.dart';
 import '../models/expense_model.dart';
 import '../models/user_role.dart';
 import '../state/auth_provider.dart';
@@ -29,6 +30,7 @@ class MainShellScreen extends ConsumerStatefulWidget {
 
 class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   int _currentIndex = 2;
+  bool _quickMenuOpen = false;
   UserRole? _lastRole;
 
   @override
@@ -44,11 +46,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final user = authState.currentUser;
 
     if (user == null || !authState.isAuthenticated) {
-      return const Scaffold(
-        body: Center(
-          child: SizedBox.shrink(),
-        ),
-      );
+      return const Scaffold(body: Center(child: SizedBox.shrink()));
     }
 
     // Start real-time notification & app data sync loop
@@ -67,12 +65,14 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     }
 
     final expenses = ref.watch(expenseProvider);
-    final pendingCount = expenses.where((e) => e.status == ExpenseStatus.pending).length;
+    final pendingCount =
+        expenses.where((e) => e.status == ExpenseStatus.pending).length;
 
     final notifications = ref.watch(notificationProvider);
-    final unreadNotifsCount = notifications.where((n) {
-      return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
-    }).length;
+    final unreadNotifsCount =
+        notifications.where((n) {
+          return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
+        }).length;
 
     final unreadChatCount = ref.watch(chatUnreadCountProvider);
 
@@ -80,27 +80,61 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
     return Scaffold(
       extendBody: true,
-      body: IndexedStack(
-        index: _currentIndex.clamp(0, screens.length - 1),
-        children: screens,
-      ),
-      bottomNavigationBar: AppBottomNavBar(
-        role: role,
-        currentIndex: _currentIndex,
-        pendingApprovalsCount: pendingCount,
-        unreadNotificationsCount: unreadNotifsCount,
-        unreadChatCount: unreadChatCount,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-          if (role == UserRole.projectMember && index == 1) {
-            ref.read(attendanceProvider.notifier).fetchAttendanceRecords(userId: user.id, force: true);
-          } else if (role != UserRole.projectMember && role != UserRole.viewer && index == 1) {
-            ref.read(expenseProvider.notifier).fetchExpenses(force: true);
-          } else if (role != UserRole.projectMember && role != UserRole.viewer && index == 4) {
-            ref.read(attendanceProvider.notifier).fetchDailyOverview(force: true);
-          }
-        },
-        onAddTap: () => _handleCenterAction(context, role),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          IndexedStack(
+            index: _currentIndex.clamp(0, screens.length - 1),
+            children: screens,
+          ),
+          QuickAccessDockMenu(
+            role: role,
+            expanded: _quickMenuOpen,
+            onClose: () {
+              if (_quickMenuOpen) setState(() => _quickMenuOpen = false);
+            },
+            onNavigate: (path) {
+              setState(() => _quickMenuOpen = false);
+              context.push(path);
+            },
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: AppBottomNavBar(
+              role: role,
+              currentIndex: _currentIndex,
+              menuOpen: _quickMenuOpen,
+              onMenuTap: () => setState(() => _quickMenuOpen = !_quickMenuOpen),
+              pendingApprovalsCount: pendingCount,
+              unreadNotificationsCount: unreadNotifsCount,
+              unreadChatCount: unreadChatCount,
+              onTap: (index) {
+                setState(() {
+                  _quickMenuOpen = false;
+                  _currentIndex = index;
+                });
+                if (role == UserRole.projectMember && index == 1) {
+                  ref
+                      .read(attendanceProvider.notifier)
+                      .fetchAttendanceRecords(userId: user.id, force: true);
+                } else if (role != UserRole.projectMember &&
+                    role != UserRole.viewer &&
+                    index == 1) {
+                  ref.read(expenseProvider.notifier).fetchExpenses(force: true);
+                } else if (role != UserRole.projectMember &&
+                    role != UserRole.viewer &&
+                    index == 4) {
+                  ref
+                      .read(attendanceProvider.notifier)
+                      .fetchDailyOverview(force: true);
+                }
+              },
+              onAddTap: () => _handleCenterAction(context, role),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -147,13 +181,31 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
+                    color:
+                        isDark
+                            ? const Color(0xFF312E81)
+                            : const Color(0xFFEEF2FF),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.task_alt_rounded, color: Color(0xFF4F46E5), size: 22),
+                  child: const Icon(
+                    Icons.task_alt_rounded,
+                    color: Color(0xFF4F46E5),
+                    size: 22,
+                  ),
                 ),
-                title: Text(role == UserRole.projectMember ? 'My Tasks' : 'Task Management', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text('View assignments and update task status', style: TextStyle(fontSize: 12)),
+                title: Text(
+                  role == UserRole.projectMember
+                      ? 'My Tasks'
+                      : 'Task Management',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                subtitle: const Text(
+                  'View assignments and update task status',
+                  style: TextStyle(fontSize: 12),
+                ),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -168,14 +220,30 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
+                      color:
+                          isDark
+                              ? const Color(0xFF312E81)
+                              : const Color(0xFFEEF2FF),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.fact_check_rounded, color: Color(0xFF4F46E5), size: 22),
+                    child: const Icon(
+                      Icons.fact_check_rounded,
+                      color: Color(0xFF4F46E5),
+                      size: 22,
+                    ),
                   ),
-                  title: const Text('Expense Approvals Queue', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                  subtitle: const Text('Review & batch approve employee cost claims', style: TextStyle(fontSize: 12)),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  title: const Text(
+                    'Expense Approvals Queue',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Review & batch approve employee cost claims',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     context.push(RoutePaths.approvalsQueue);
@@ -190,14 +258,30 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
+                      color:
+                          isDark
+                              ? const Color(0xFF312E81)
+                              : const Color(0xFFEEF2FF),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.business_center_rounded, color: Color(0xFF4F46E5), size: 22),
+                    child: const Icon(
+                      Icons.business_center_rounded,
+                      color: Color(0xFF4F46E5),
+                      size: 22,
+                    ),
                   ),
-                  title: const Text('Create New Project', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                  subtitle: const Text('Setup scope, requirements, budget & team', style: TextStyle(fontSize: 12)),
-                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  title: const Text(
+                    'Create New Project',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    'Setup scope, requirements, budget & team',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     context.push(RoutePaths.addProject);
@@ -211,13 +295,26 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+                    color:
+                        isDark
+                            ? const Color(0xFF064E3B)
+                            : const Color(0xFFECFDF5),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.receipt_long_rounded, color: Color(0xFF10B981), size: 22),
+                  child: const Icon(
+                    Icons.receipt_long_rounded,
+                    color: Color(0xFF10B981),
+                    size: 22,
+                  ),
                 ),
-                title: const Text('Submit Expense Claim', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text('Record project expenditure with receipt', style: TextStyle(fontSize: 12)),
+                title: const Text(
+                  'Submit Expense Claim',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+                subtitle: const Text(
+                  'Record project expenditure with receipt',
+                  style: TextStyle(fontSize: 12),
+                ),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -231,13 +328,26 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
+                    color:
+                        isDark
+                            ? const Color(0xFF1E3A8A)
+                            : const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.chat_bubble_rounded, color: Color(0xFF2563EB), size: 22),
+                  child: const Icon(
+                    Icons.chat_bubble_rounded,
+                    color: Color(0xFF2563EB),
+                    size: 22,
+                  ),
                 ),
-                title: const Text('Team Messenger & Chat', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text('Direct messaging and project team rooms', style: TextStyle(fontSize: 12)),
+                title: const Text(
+                  'Team Messenger & Chat',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+                subtitle: const Text(
+                  'Direct messaging and project team rooms',
+                  style: TextStyle(fontSize: 12),
+                ),
                 trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
                 onTap: () {
                   Navigator.pop(ctx);
