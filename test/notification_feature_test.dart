@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:expense_tracking_prd/models/notification_model.dart';
+import 'package:expense_tracking_prd/core/services/notification_router.dart';
 import 'package:expense_tracking_prd/screens/notifications/notifications_screen.dart';
 import 'package:expense_tracking_prd/state/notification_provider.dart';
 
@@ -46,9 +47,46 @@ void main() {
         equals(NotificationType.salaryReady),
       );
       expect(
+        NotificationType.fromString('employee_registration'),
+        equals(NotificationType.userRegistration),
+      );
+      expect(
+        NotificationType.fromString('user_registration'),
+        equals(NotificationType.userRegistration),
+      );
+      expect(
         NotificationType.fromString('unknown_type'),
         equals(NotificationType.general),
       );
+    });
+
+    test('NotificationRouter routes employee registration directly to pending approvals filter', () {
+      expect(
+        NotificationRouter.resolve({'type': 'employee_registration'}),
+        equals('/admin/users?filter=pending'),
+      );
+      expect(
+        NotificationRouter.resolve({'type': 'user_registration'}),
+        equals('/admin/users?filter=pending'),
+      );
+      expect(
+        NotificationRouter.resolve({'type': 'userRegistration'}),
+        equals('/admin/users?filter=pending'),
+      );
+      expect(
+        NotificationRouter.resolve({'route': '/admin/users?filter=pending'}),
+        equals('/admin/users?filter=pending'),
+      );
+
+      final encoded = NotificationRouter.encode({
+        'type': 'employee_registration',
+        'route': '/admin/users?filter=pending',
+        'notificationId': 'notif_999',
+      });
+      final decoded = Uri.splitQueryString(encoded);
+      expect(decoded['type'], equals('employee_registration'));
+      expect(decoded['route'], equals('/admin/users?filter=pending'));
+      expect(NotificationRouter.resolve(decoded), equals('/admin/users?filter=pending'));
     });
 
     test('NotificationModel serialization and deserialization works correctly', () {
