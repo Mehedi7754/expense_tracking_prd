@@ -57,6 +57,31 @@ async function bootstrap() {
     };
     // Direct fastify route for root /uploads/* (non-prefixed requests)
     fastify.get('/uploads/:category/:filename', serveUpload);
+
+    // Fallback handler for requests made without the /api/v1 prefix (e.g. /auth/login, /auth/register, /health)
+    fastify.setNotFoundHandler(async (req: any, reply: any) => {
+      const url = req.raw.url || '';
+      if (!url.startsWith('/api/v1/') && !url.startsWith('/uploads/')) {
+        const normalizedPath = url.startsWith('/api/') ? url.slice(4) : url;
+        const targetUrl = '/api/v1' + (normalizedPath.startsWith('/') ? normalizedPath : '/' + normalizedPath);
+        try {
+          const res = await fastify.inject({
+            method: req.method,
+            url: targetUrl,
+            headers: req.headers,
+            payload: req.body,
+          });
+          if (res.statusCode !== 404) {
+            return reply.code(res.statusCode).headers(res.headers).send(res.body);
+          }
+        } catch (_) {}
+      }
+      return reply.code(404).send({
+        message: `Cannot ${req.method} ${url}`,
+        error: 'Not Found',
+        statusCode: 404,
+      });
+    });
   } catch (_) {}
 
   const port = Number(process.env.PORT) || 8080;
