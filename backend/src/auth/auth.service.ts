@@ -74,10 +74,20 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Admin accounts (main_admin / admin / admin@gw.com) are NEVER pending approval
+    const normalizedRole = (userRow.role || '').toLowerCase();
+    const isSuperAdmin = normalizedRole === 'main_admin' || normalizedRole === 'admin' || userRow.email.toLowerCase() === 'admin@gw.com';
+
     if (userRow.is_active !== true) {
-      throw new UnauthorizedException(
-        'Your account is pending administrator approval. Please wait for an administrator to activate your profile.',
-      );
+      if (isSuperAdmin) {
+        // Auto-activate super admin
+        this.db.query('UPDATE users SET is_active = TRUE WHERE id = $1', [userRow.id]).catch(() => {});
+        userRow.is_active = true;
+      } else {
+        throw new UnauthorizedException(
+          'Your account is pending administrator approval. Please wait for an administrator to activate your profile.',
+        );
+      }
     }
 
     const payload = { sub: userRow.id, email: userRow.email, role: userRow.role };
