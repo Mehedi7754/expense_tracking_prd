@@ -26,11 +26,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        AppUpdateService.instance.checkForUpdate(context);
-      }
-    });
   }
 
   @override
