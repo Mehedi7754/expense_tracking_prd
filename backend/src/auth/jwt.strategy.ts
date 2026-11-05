@@ -30,7 +30,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
-       WHERE u.id = $1 AND (u.is_active = TRUE OR u.role IN ('main_admin', 'admin') OR LOWER(u.email::text) = 'admin@gw.com')
+       WHERE u.id = $1 AND (u.is_active = TRUE OR u.role IN ('main_admin', 'admin'))
        GROUP BY u.id`,
       [payload.sub],
     );

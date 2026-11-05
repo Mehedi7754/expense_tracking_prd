@@ -74,13 +74,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Admin accounts (main_admin / admin / admin@gw.com) are NEVER pending approval
-    const normalizedRole = (userRow.role || '').toLowerCase();
-    const isSuperAdmin = normalizedRole === 'main_admin' || normalizedRole === 'admin' || userRow.email.toLowerCase() === 'admin@gw.com';
+    // Admin roles (main_admin / admin) do not require approval
+    const roleClean = (userRow.role || '').toLowerCase().replace(/_/g, '');
+    const isAdminRole = roleClean === 'mainadmin' || roleClean === 'admin';
 
     if (userRow.is_active !== true) {
-      if (isSuperAdmin) {
-        // Auto-activate super admin
+      if (isAdminRole) {
+        // Auto-activate admin
         this.db.query('UPDATE users SET is_active = TRUE WHERE id = $1', [userRow.id]).catch(() => {});
         userRow.is_active = true;
       } else {

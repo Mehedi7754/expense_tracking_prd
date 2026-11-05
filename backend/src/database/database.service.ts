@@ -310,22 +310,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         this.logger.warn(`Failed to backfill pending employee notifications: ${e.message}`);
       }
 
-      // Ensure main_admin admin@gw.com is active and valid with password123
-      try {
-        const adminHash = '$2b$10$EpRnTzVlqHNP0.fUbXUwSOyuiXe/QLSUG6xNekdHgTGmrpHEfI2Cm'; // bcrypt hash for password123
-        await this.pool.query(`
-          INSERT INTO users (email, password_hash, full_name, role, department, designation, phone, is_active)
-          VALUES ('admin@gw.com', $1, 'System Administrator', 'main_admin', 'Corporate Governance', 'System Administrator', '+880 1711-000000', TRUE)
-          ON CONFLICT (email)
-          DO UPDATE SET
-            password_hash = $1,
-            role = 'main_admin',
-            is_active = TRUE;
-        `, [adminHash]);
-        this.logger.log('Default super admin (admin@gw.com) verified and activated.');
-      } catch (adminErr: any) {
-        this.logger.warn(`Could not seed default admin: ${adminErr.message}`);
-      }
     } catch (err: any) {
       this.logger.error(`Database connection failed: ${err.message}`, err.stack);
       throw err;
