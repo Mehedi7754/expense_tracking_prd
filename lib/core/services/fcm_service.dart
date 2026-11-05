@@ -10,28 +10,33 @@ import '../network/api_client.dart';
 import '../network/api_endpoints.dart';
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // If the message contains a notification payload, Google Play Services / Android OS
-  // has ALREADY automatically rendered it into the system tray!
-  // Showing it again via PushNotificationService causes an immediate duplicate.
-  if (message.notification != null) {
-    debugPrint('[FCM] Notification already rendered by Android system tray: ${message.messageId}');
-    return;
-  }
-
-  // Only handle data-only messages in background isolate
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is initialized in this background isolate.
   try {
     await Firebase.initializeApp();
   } catch (_) {}
 
+  // Always initialize PushNotificationService so we can show the notification
+  // on the correct Android channel with proper priority/sound/vibration.
+  // Note: even when message.notification != null, Android may show a default
+  // notification but it won't use the app's custom channel — we show our own
+  // to ensure the channel, icon, and routing payload are correct.
+  try {
+    await PushNotificationService.instance.initialize(isBackground: true);
+  } catch (_) {}
+
   final data = message.data;
-  final title = data['title'] ?? 'GW SpendWise Alert';
-  final body = data['body'] ?? data['message'] ?? '';
+  final notification = message.notification;
+
+  // Extract title/body from notification payload first, then fall back to data fields
+  final title = notification?.title ?? data['title'] ?? 'GW SpendWise Alert';
+  final body = notification?.body ?? data['body'] ?? data['message'] ?? '';
   final type = data['type']?.toString().toLowerCase() ?? 'general';
   final notifId = message.messageId ?? data['notificationId']?.toString();
 
+  debugPrint('[FCM-BG] Background message: type=$type, title=$title, id=$notifId');
+
   try {
-    await PushNotificationService.instance.initialize(isBackground: true);
     if (type.contains('chat')) {
       await PushNotificationService.instance.showChatAlert(
         title: title,
@@ -72,7 +77,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       );
     }
   } catch (e) {
-    debugPrint('[FCM] Background notification display error: $e');
+    debugPrint('[FCM-BG] Background notification display error: $e');
   }
 }
 
@@ -92,8 +97,12 @@ class FcmService {
     if (_initialized) return;
 
     try {
-      await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      // Firebase.initializeApp() was already called in main() before runApp.
+      // Try again here safely in case initialize() is called independently.
+      try {
+        await Firebase.initializeApp();
+      } catch (_) {}
+      // onBackgroundMessage is already registered in main() — do NOT re-register here.
 
       final messaging = FirebaseMessaging.instance;
 

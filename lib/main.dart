@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config/app_env.dart';
@@ -13,11 +15,29 @@ import 'models/user_role.dart';
 import 'core/services/notification_router.dart';
 import 'state/attendance_settings_provider.dart';
 
+/// Top-level FCM background message handler.
+/// MUST be a top-level function (not inside a class) so FCM can invoke it
+/// in a separate isolate when the app is killed/closed.
+@pragma('vm:entry-point')
+Future<void> _fcmBackgroundHandler(RemoteMessage message) =>
+    firebaseMessagingBackgroundHandler(message);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppEnv.initialize();
 
-  // Initialize OS-level push notification & FCM service asynchronously without blocking startup
+  // CRITICAL: Initialize Firebase FIRST so the background message handler works
+  // when the app is cold-started by an FCM notification (app is killed/closed).
+  try {
+    await Firebase.initializeApp();
+  } catch (_) {}
+
+  // CRITICAL: Register the background message handler at the TOP LEVEL before runApp.
+  // FCM requires this to be called before the app starts so Android can invoke it
+  // in a separate isolate when the app is killed/closed.
+  FirebaseMessaging.onBackgroundMessage(_fcmBackgroundHandler);
+
+  // Initialize OS-level push notification & FCM service (foreground + token sync)
   PushNotificationService.instance.initialize().catchError((_) {});
   FcmService.instance.initialize().catchError((_) {});
 
