@@ -9,6 +9,7 @@ class AppUpdateService {
   AppUpdateService._();
   static final AppUpdateService instance = AppUpdateService._();
   static bool _hasCheckedThisSession = false;
+  static bool _isDialogShowing = false;
 
   Future<void> checkForUpdate(BuildContext context, {bool force = false}) async {
     if (_hasCheckedThisSession && !force) return;
@@ -53,6 +54,8 @@ class AppUpdateService {
   }
 
   void showUpdateDialog(BuildContext context, Map<String, dynamic> releaseInfo) {
+    if (_isDialogShowing) return;
+    _isDialogShowing = true;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final versionName = releaseInfo['versionName'] ?? 'Latest';
     final notes = releaseInfo['releaseNotes']?.toString() ?? 'A new version is available with bug fixes and improvements.';
@@ -158,6 +161,8 @@ class AppUpdateService {
           ),
         ),
       ),
-    );
+    ).then((_) {
+      _isDialogShowing = false;
+    });
   }
 }
