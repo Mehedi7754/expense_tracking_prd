@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, Sse } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { NotificationsService } from './notifications.service';
 import { FcmService } from './fcm.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -10,6 +11,11 @@ export class NotificationsController {
     private readonly notificationsService: NotificationsService,
     private readonly fcmService: FcmService,
   ) {}
+
+  @Sse('stream')
+  streamNotifications(@Request() req: any): Observable<{ data: any }> {
+    return this.notificationsService.getNotificationStream(req.user.id);
+  }
 
   @Get()
   async getNotifications(@Request() req: any) {

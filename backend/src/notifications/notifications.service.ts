@@ -1,15 +1,53 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Subject, Observable, interval, merge } from 'rxjs';
+import { map, filter } from 'rxjs/operators';
 import { DatabaseService } from '../database/database.service';
 import { FcmService } from './fcm.service';
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+  private readonly notificationSubject = new Subject<{ data: any }>();
 
   constructor(
     private readonly db: DatabaseService,
     private readonly fcm: FcmService,
   ) {}
+
+  getNotificationStream(userId: string): Observable<{ data: any }> {
+    const keepAlive$ = interval(25000).pipe(
+      map(() => ({ data: { type: 'ping' } }))
+    );
+
+    return new Observable<{ data: any }>((subscriber) => {
+      let isPrivileged = false;
+      this.db.query('SELECT role FROM users WHERE id = $1', [userId])
+        .then((res) => {
+          const role = (res.rows[0]?.role || '').toLowerCase().trim();
+          isPrivileged =
+            ['main_admin', 'admin', 'finance', 'project_manager', 'super_admin'].includes(role) ||
+            role.includes('admin') ||
+            role.includes('manager');
+        })
+        .catch((err) => {
+          this.logger.error('Error fetching role in notification stream:', err);
+        });
+
+      const subscription = merge(
+        this.notificationSubject.asObservable().pipe(
+          filter((msg) => {
+            if (!msg.data || msg.data.type === 'ping') return true;
+            if (isPrivileged) return true;
+            if (!msg.data.userId || msg.data.userId === userId) return true;
+            return false;
+          }),
+        ),
+        keepAlive$,
+      ).subscribe(subscriber);
+
+      return () => subscription.unsubscribe();
+    });
+  }
 
   async findAll(userId: string) {
     const userRes = await this.db.query(
@@ -93,6 +131,31 @@ export class NotificationsService {
       savedNotification = res.rows[0];
     } catch (dbErr) {
       this.logger.error('Database error creating notification row:', dbErr);
+    }
+
+    // Broadcast immediately to connected admin & web client SSE streams (0ms latency)
+    if (savedNotification) {
+      try {
+        const item = {
+          id: savedNotification.id,
+          userId: savedNotification.user_id,
+          actorId: savedNotification.actor_id,
+          actorName: data.actorName || savedNotification.actor_name,
+          actorAvatarUrl: data.actorAvatarUrl || savedNotification.actor_avatar_url,
+          title: savedNotification.title,
+          message: savedNotification.message,
+          fullExplanation: savedNotification.full_explanation || savedNotification.message,
+          type: savedNotification.type,
+          isRead: false,
+          createdAt: savedNotification.created_at || new Date().toISOString(),
+          relatedProjectId: savedNotification.related_project_id,
+          relatedExpenseId: savedNotification.related_expense_id,
+          relatedTaskId: savedNotification.related_task_id,
+        };
+        this.notificationSubject.next({ data: item });
+      } catch (broadcastErr) {
+        this.logger.error('Error broadcasting notification over SSE stream:', broadcastErr);
+      }
     }
 
     // Dispatch real-time FCM Push Notification (arrives even if app is closed)

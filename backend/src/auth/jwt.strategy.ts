@@ -15,7 +15,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new Error('SECURITY: JWT_SECRET environment variable is not configured. Server cannot start without a valid secret.');
     }
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        ExtractJwt.fromUrlQueryParameter('token'),
+      ]),
       ignoreExpiration: false,
       secretOrKey: jwtSecret,
     });
