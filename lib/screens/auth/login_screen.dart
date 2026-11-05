@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/routing/route_paths.dart';
+import '../../core/services/app_update_service.dart';
 import '../../core/services/location_service.dart';
 import '../../state/auth_provider.dart';
 import 'widgets/password_reset_modal.dart';
@@ -21,6 +22,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _obscurePassword = true;
   bool _rememberMe = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppUpdateService.instance.checkForUpdate(context);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -504,37 +515,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     ),
                             ),
                           ),
-                          const SizedBox(height: 16),
 
-                          // Register / Create Account Button for New Employees
-                          Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'New employee? ',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: textSecondary,
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    context.push(RoutePaths.register);
-                                  },
-                                  child: const Text(
-                                    'Register here',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF4F46E5),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
                       ),
                     ),

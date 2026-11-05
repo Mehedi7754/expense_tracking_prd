@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/routing/route_paths.dart';
+import '../core/services/app_update_service.dart';
 import '../core/services/realtime_sync_service.dart';
 import '../core/widgets/app_bottom_nav_bar.dart';
 import '../core/widgets/home_location_setup_modal.dart';
@@ -59,6 +60,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     super.initState();
     // Auth flow (login/restoreSession) already triggers fetches.
     // TTL cache in each notifier prevents redundant calls on tab switches.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppUpdateService.instance.checkForUpdate(context);
+      }
+    });
   }
 
   @override
