@@ -37,6 +37,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS home_latitude NUMERIC(10, 7);');
       await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS home_longitude NUMERIC(10, 7);');
       await this.pool.query("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_employee_code_unique ON users (LOWER(employee_code)) WHERE employee_code IS NOT NULL AND employee_code <> '';");
+      await this.pool.query('ALTER TABLE users ALTER COLUMN department DROP NOT NULL;').catch(() => {});
+      await this.pool.query('ALTER TABLE users ALTER COLUMN designation DROP NOT NULL;').catch(() => {});
+      await this.pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;').catch(() => {});
 
       // Persistent file storage for uploads
       await this.pool.query(`

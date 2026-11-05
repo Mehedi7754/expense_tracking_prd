@@ -132,8 +132,8 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const department = (dto.department || '').trim() || null;
-    const designation = (dto.designation || '').trim() || null;
+    const department = (dto.department || '').trim() || 'General';
+    const designation = (dto.designation || '').trim() || 'Employee';
     const phone = (dto.phone || '').trim() || null;
 
     // Strict security: Role is ALWAYS forced to 'project_member' and is_active is ALWAYS FALSE
