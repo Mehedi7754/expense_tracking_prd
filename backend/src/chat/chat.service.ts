@@ -174,7 +174,6 @@ export class ChatService {
           OR (
             c.type = 'direct' 
             AND other_u.id IS NOT NULL 
-            AND other_u.is_active = TRUE
             AND (SELECT COUNT(*) FROM chat_participants cp_cnt WHERE cp_cnt.channel_id = c.id) >= 2
           )
         )
@@ -267,6 +266,7 @@ export class ChatService {
     }
 
     return {
+      id: channelId,
       channelId,
       type: 'direct',
       otherUser: {
@@ -324,6 +324,7 @@ export class ChatService {
     }
 
     return {
+      id: channelId,
       channelId,
       type: 'project',
       projectId: project.id,
