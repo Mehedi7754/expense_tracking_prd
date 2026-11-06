@@ -137,7 +137,7 @@ export class ExpensesService {
     }
 
     if (query.projectId) {
-      sql += ` AND (e.project_id = $${idx} OR p.project_code = $${idx})`;
+      sql += ` AND (e.project_id::text = $${idx} OR p.project_code = $${idx} OR p.id::text = $${idx})`;
       params.push(query.projectId);
       idx++;
     }
