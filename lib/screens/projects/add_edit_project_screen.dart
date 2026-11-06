@@ -60,6 +60,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now().add(const Duration(days: 180));
   final Set<String> _selectedTeamMemberIds = {};
+  final Map<String, ProjectMember> _memberAssignments = {};
   final _memberSearchController = TextEditingController();
   String _memberSearchQuery = '';
   String? _imageUrl;
@@ -81,6 +82,24 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         if (currentUser != null && mounted) {
           setState(() {
             _selectedTeamMemberIds.add(currentUser.id);
+            _memberAssignments[currentUser.id] = ProjectMember(
+              userId: currentUser.id,
+              roleInProject: 'Owner',
+              fullName: currentUser.name,
+              email: currentUser.email,
+              permissions: const ProjectPermissions(
+                canViewBudget: true,
+                canRecordRevenue: true,
+                canViewExpenses: true,
+                canCreateExpenses: true,
+                canApproveExpenses: true,
+                canManageTasks: true,
+                canUpdateProgress: true,
+                canManageTeam: true,
+                canEditProject: true,
+                canViewAttendance: true,
+              ),
+            );
           });
         }
       }
@@ -143,6 +162,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     _startDate = project.startDate;
     _endDate = project.endDate;
     _selectedTeamMemberIds.addAll(project.teamMemberIds);
+    for (final m in project.members) {
+      _memberAssignments[m.userId] = m;
+    }
   }
 
   @override
@@ -260,6 +282,26 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     final totalBudget =
         _calculatedTotalBudget < 0 ? 0.0 : _calculatedTotalBudget;
 
+    final assignedMemberList = _selectedTeamMemberIds.map((id) {
+      return _memberAssignments[id] ??
+          ProjectMember(
+            userId: id,
+            roleInProject: 'Site Engineer',
+            permissions: const ProjectPermissions(
+              canViewBudget: false,
+              canRecordRevenue: false,
+              canViewExpenses: true,
+              canCreateExpenses: true,
+              canApproveExpenses: false,
+              canManageTasks: true,
+              canUpdateProgress: true,
+              canManageTeam: false,
+              canEditProject: false,
+              canViewAttendance: true,
+            ),
+          );
+    }).toList();
+
     if (isEditing) {
       final existing = ref
           .read(projectProvider)
@@ -285,6 +327,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         startDate: _startDate,
         endDate: _endDate,
         teamMemberIds: _selectedTeamMemberIds.toList(),
+        members: assignedMemberList,
         imageUrl: _imageUrl,
         siteLatitude: _siteLatitude,
         siteLongitude: _siteLongitude,
@@ -324,6 +367,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             startDate: _startDate,
             endDate: _endDate,
             teamMemberIds: members,
+            members: assignedMemberList,
             createdById: currentUser?.id,
             imageUrl: _imageUrl,
             siteLatitude: _siteLatitude,
@@ -1548,11 +1592,16 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                   final u = filteredCandidates[index];
                                   final isAssigned = _selectedTeamMemberIds
                                       .contains(u.id);
+                                  final assignedMember = _memberAssignments[u.id];
+                                  final roleTitle = assignedMember?.roleInProject.isNotEmpty == true
+                                      ? assignedMember!.roleInProject
+                                      : 'Site Engineer';
+                                  final canApprove = assignedMember?.permissions.canApproveExpenses ?? false;
 
                                   return Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
-                                      vertical: 8,
+                                      vertical: 10,
                                     ),
                                     decoration: BoxDecoration(
                                       color:
@@ -1563,7 +1612,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                               : (isDark
                                                   ? const Color(0xFF0F172A)
                                                   : const Color(0xFFF8FAFC)),
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(14),
                                       border: Border.all(
                                         color:
                                             isAssigned
@@ -1573,135 +1622,273 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                                     : const Color(0xFFE2E8F0)),
                                       ),
                                     ),
-                                    child: Row(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        CircleAvatar(
-                                          radius: 16,
-                                          backgroundColor:
-                                              isAssigned
-                                                  ? const Color(0xFF4F46E5)
-                                                  : const Color(0xFF94A3B8),
-                                          child: Text(
-                                            u.name.isNotEmpty
-                                                ? u.name
-                                                    .substring(0, 1)
-                                                    .toUpperCase()
-                                                : 'U',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white,
+                                        Row(
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 16,
+                                              backgroundColor:
+                                                  isAssigned
+                                                      ? const Color(0xFF4F46E5)
+                                                      : const Color(0xFF94A3B8),
+                                              child: Text(
+                                                u.name.isNotEmpty
+                                                    ? u.name
+                                                        .substring(0, 1)
+                                                        .toUpperCase()
+                                                    : 'U',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Flexible(
-                                                    child: Text(
-                                                      u.name.isNotEmpty
-                                                          ? u.name
-                                                          : u.email,
+                                                  Row(
+                                                    children: [
+                                                      Flexible(
+                                                        child: Text(
+                                                          u.name.isNotEmpty
+                                                              ? u.name
+                                                              : u.email,
+                                                          style: TextStyle(
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color:
+                                                                isDark
+                                                                    ? Colors.white
+                                                                    : const Color(
+                                                                      0xFF1E293B,
+                                                                    ),
+                                                          ),
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 6,
+                                                              vertical: 2,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color:
+                                                              (isDark
+                                                                  ? Colors
+                                                                      .grey
+                                                                      .shade800
+                                                                  : Colors
+                                                                      .grey
+                                                                      .shade200),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                6,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          u.role.displayName
+                                                              .split(' ')
+                                                              .first,
+                                                          style: const TextStyle(
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  if (u.email.isNotEmpty)
+                                                    Text(
+                                                      u.email,
                                                       style: TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.w700,
+                                                        fontSize: 11,
                                                         color:
                                                             isDark
-                                                                ? Colors.white
+                                                                ? AppColors
+                                                                    .darkTextSecondary
                                                                 : const Color(
-                                                                  0xFF1E293B,
+                                                                  0xFF64748B,
                                                                 ),
                                                       ),
                                                       overflow:
                                                           TextOverflow.ellipsis,
                                                     ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            IconButton(
+                                              icon: Icon(
+                                                isAssigned
+                                                    ? Icons.check_circle_rounded
+                                                    : Icons
+                                                        .add_circle_outline_rounded,
+                                                color:
+                                                    isAssigned
+                                                        ? const Color(0xFF10B981)
+                                                        : const Color(0xFF4F46E5),
+                                                size: 24,
+                                              ),
+                                              onPressed: () {
+                                                setState(() {
+                                                  if (isAssigned) {
+                                                    _selectedTeamMemberIds.remove(
+                                                      u.id,
+                                                    );
+                                                  } else {
+                                                    _selectedTeamMemberIds.add(
+                                                      u.id,
+                                                    );
+                                                    if (!_memberAssignments.containsKey(u.id)) {
+                                                      _memberAssignments[u.id] = ProjectMember(
+                                                        userId: u.id,
+                                                        roleInProject: 'Site Engineer',
+                                                        fullName: u.name,
+                                                        email: u.email,
+                                                        permissions: const ProjectPermissions(
+                                                          canViewBudget: false,
+                                                          canRecordRevenue: false,
+                                                          canViewExpenses: true,
+                                                          canCreateExpenses: true,
+                                                          canApproveExpenses: false,
+                                                          canManageTasks: true,
+                                                          canUpdateProgress: true,
+                                                          canManageTeam: false,
+                                                          canEditProject: false,
+                                                          canViewAttendance: true,
+                                                        ),
+                                                      );
+                                                    }
+                                                  }
+                                                });
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        if (isAssigned) ...[
+                                          const SizedBox(height: 8),
+                                          Container(
+                                            padding: const EdgeInsets.only(top: 8),
+                                            decoration: BoxDecoration(
+                                              border: Border(
+                                                top: BorderSide(
+                                                  color: isDark
+                                                      ? const Color(0xFF334155)
+                                                      : const Color(0xFFE0E7FF),
+                                                ),
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                InkWell(
+                                                  onTap: () => _showMemberRoleBottomSheet(context, u),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 3,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF4F46E5).withAlpha(20),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(
+                                                        color: const Color(0xFF4F46E5).withAlpha(50),
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          roleTitle,
+                                                          style: const TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: Color(0xFF4F46E5),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        const Icon(
+                                                          Icons.tune_rounded,
+                                                          size: 12,
+                                                          color: Color(0xFF4F46E5),
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
+                                                ),
+                                                if (canApprove) ...[
                                                   const SizedBox(width: 6),
                                                   Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 6,
-                                                          vertical: 2,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color:
-                                                          (isDark
-                                                              ? Colors
-                                                                  .grey
-                                                                  .shade800
-                                                              : Colors
-                                                                  .grey
-                                                                  .shade200),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            6,
-                                                          ),
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 3,
                                                     ),
-                                                    child: Text(
-                                                      u.role.displayName
-                                                          .split(' ')
-                                                          .first,
-                                                      style: const TextStyle(
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.w600,
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFF10B981).withAlpha(20),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(
+                                                        color: const Color(0xFF10B981).withAlpha(60),
                                                       ),
+                                                    ),
+                                                    child: const Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.verified_user_rounded,
+                                                          size: 11,
+                                                          color: Color(0xFF10B981),
+                                                        ),
+                                                        SizedBox(width: 3),
+                                                        Text(
+                                                          'Approver',
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.w700,
+                                                            color: Color(0xFF10B981),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
                                                 ],
-                                              ),
-                                              if (u.email.isNotEmpty)
-                                                Text(
-                                                  u.email,
-                                                  style: TextStyle(
-                                                    fontSize: 11,
-                                                    color:
-                                                        isDark
-                                                            ? AppColors
-                                                                .darkTextSecondary
-                                                            : const Color(
-                                                              0xFF64748B,
-                                                            ),
+                                                const Spacer(),
+                                                InkWell(
+                                                  onTap: () => _showMemberRoleBottomSheet(context, u),
+                                                  child: const Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.shield_outlined,
+                                                        size: 13,
+                                                        color: Color(0xFF4F46E5),
+                                                      ),
+                                                      SizedBox(width: 3),
+                                                      Text(
+                                                        'Edit Access',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          fontWeight: FontWeight.w700,
+                                                          color: Color(0xFF4F46E5),
+                                                        ),
+                                                      ),
+                                                    ],
                                                   ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
                                                 ),
-                                            ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        IconButton(
-                                          icon: Icon(
-                                            isAssigned
-                                                ? Icons.check_circle_rounded
-                                                : Icons
-                                                    .add_circle_outline_rounded,
-                                            color:
-                                                isAssigned
-                                                    ? const Color(0xFF10B981)
-                                                    : const Color(0xFF4F46E5),
-                                            size: 24,
-                                          ),
-                                          onPressed: () {
-                                            setState(() {
-                                              if (isAssigned) {
-                                                _selectedTeamMemberIds.remove(
-                                                  u.id,
-                                                );
-                                              } else {
-                                                _selectedTeamMemberIds.add(
-                                                  u.id,
-                                                );
-                                              }
-                                            });
-                                          },
-                                        ),
+                                        ],
                                       ],
                                     ),
                                   );
@@ -2774,6 +2961,624 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
               ],
             ),
           ),
+    );
+  }
+
+  void _showMemberRoleBottomSheet(BuildContext context, UserModel u) {
+    final existingMember = _memberAssignments[u.id];
+    final roleController = TextEditingController(
+      text: existingMember?.roleInProject.isNotEmpty == true
+          ? existingMember!.roleInProject
+          : 'Site Engineer',
+    );
+    final perms = existingMember?.permissions ??
+        const ProjectPermissions(
+          canViewBudget: false,
+          canRecordRevenue: false,
+          canViewExpenses: true,
+          canCreateExpenses: true,
+          canApproveExpenses: false,
+          canManageTasks: true,
+          canUpdateProgress: true,
+          canManageTeam: false,
+          canEditProject: false,
+          canViewAttendance: true,
+        );
+
+    bool canViewBudget = perms.canViewBudget;
+    bool canRecordRevenue = perms.canRecordRevenue;
+    bool canViewExpenses = perms.canViewExpenses;
+    bool canCreateExpenses = perms.canCreateExpenses;
+    bool canApproveExpenses = perms.canApproveExpenses;
+    bool canManageTasks = perms.canManageTasks;
+    bool canUpdateProgress = perms.canUpdateProgress;
+    bool canManageTeam = perms.canManageTeam;
+    bool canEditProject = perms.canEditProject;
+    bool canViewAttendance = perms.canViewAttendance;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            void applyPreset(String roleName, ProjectPermissions p) {
+              setSheetState(() {
+                roleController.text = roleName;
+                canViewBudget = p.canViewBudget;
+                canRecordRevenue = p.canRecordRevenue;
+                canViewExpenses = p.canViewExpenses;
+                canCreateExpenses = p.canCreateExpenses;
+                canApproveExpenses = p.canApproveExpenses;
+                canManageTasks = p.canManageTasks;
+                canUpdateProgress = p.canUpdateProgress;
+                canManageTeam = p.canManageTeam;
+                canEditProject = p.canEditProject;
+                canViewAttendance = p.canViewAttendance;
+              });
+            }
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkSurface : Colors.white,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color:
+                            isDark ? Colors.white24 : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 16, 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Role & Access: ${u.name}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 17,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Set custom role title & 10 granular permissions',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color:
+                                      isDark
+                                          ? AppColors.darkTextSecondary
+                                          : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      children: [
+                        const Text(
+                          'Project Role Title',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TextField(
+                          controller: roleController,
+                          decoration: InputDecoration(
+                            hintText:
+                                'e.g. Site Lead, Field Auditor, Site Engineer',
+                            prefixIcon: const Icon(
+                              Icons.badge_outlined,
+                              size: 18,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            filled: true,
+                            fillColor:
+                                isDark
+                                    ? AppColors.darkBackground
+                                    : const Color(0xFFF8FAFC),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color:
+                                    isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFCBD5E1),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color:
+                                    isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Quick Role Presets',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            _buildRolePresetChip(
+                              'Site Lead',
+                              () => applyPreset(
+                                'Site Lead',
+                                const ProjectPermissions(
+                                  canViewBudget: true,
+                                  canRecordRevenue: true,
+                                  canViewExpenses: true,
+                                  canCreateExpenses: true,
+                                  canApproveExpenses: true,
+                                  canManageTasks: true,
+                                  canUpdateProgress: true,
+                                  canManageTeam: true,
+                                  canEditProject: true,
+                                  canViewAttendance: true,
+                                ),
+                              ),
+                              isSelected:
+                                  roleController.text.trim().toLowerCase() ==
+                                  'site lead',
+                              isDark: isDark,
+                            ),
+                            _buildRolePresetChip(
+                              'Field Auditor',
+                              () => applyPreset(
+                                'Field Auditor',
+                                const ProjectPermissions(
+                                  canViewBudget: true,
+                                  canRecordRevenue: false,
+                                  canViewExpenses: true,
+                                  canCreateExpenses: false,
+                                  canApproveExpenses: true,
+                                  canManageTasks: false,
+                                  canUpdateProgress: false,
+                                  canManageTeam: false,
+                                  canEditProject: false,
+                                  canViewAttendance: true,
+                                ),
+                              ),
+                              isSelected:
+                                  roleController.text.trim().toLowerCase() ==
+                                  'field auditor',
+                              isDark: isDark,
+                            ),
+                            _buildRolePresetChip(
+                              'Site Engineer',
+                              () => applyPreset(
+                                'Site Engineer',
+                                const ProjectPermissions(
+                                  canViewBudget: false,
+                                  canRecordRevenue: false,
+                                  canViewExpenses: true,
+                                  canCreateExpenses: true,
+                                  canApproveExpenses: false,
+                                  canManageTasks: true,
+                                  canUpdateProgress: true,
+                                  canManageTeam: false,
+                                  canEditProject: false,
+                                  canViewAttendance: true,
+                                ),
+                              ),
+                              isSelected:
+                                  roleController.text.trim().toLowerCase() ==
+                                  'site engineer',
+                              isDark: isDark,
+                            ),
+                            _buildRolePresetChip(
+                              'Field Crew',
+                              () => applyPreset(
+                                'Field Crew',
+                                const ProjectPermissions(
+                                  canViewBudget: false,
+                                  canRecordRevenue: false,
+                                  canViewExpenses: true,
+                                  canCreateExpenses: true,
+                                  canApproveExpenses: false,
+                                  canManageTasks: false,
+                                  canUpdateProgress: false,
+                                  canManageTeam: false,
+                                  canEditProject: false,
+                                  canViewAttendance: true,
+                                ),
+                              ),
+                              isSelected:
+                                  roleController.text.trim().toLowerCase() ==
+                                  'field crew',
+                              isDark: isDark,
+                            ),
+                            _buildRolePresetChip(
+                              'Observer',
+                              () => applyPreset(
+                                'Observer',
+                                const ProjectPermissions(
+                                  canViewBudget: true,
+                                  canRecordRevenue: false,
+                                  canViewExpenses: true,
+                                  canCreateExpenses: false,
+                                  canApproveExpenses: false,
+                                  canManageTasks: false,
+                                  canUpdateProgress: false,
+                                  canManageTeam: false,
+                                  canEditProject: false,
+                                  canViewAttendance: true,
+                                ),
+                              ),
+                              isSelected:
+                                  roleController.text.trim().toLowerCase() ==
+                                  'observer',
+                              isDark: isDark,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        const Row(
+                          children: [
+                            Text(
+                              'Granular Permissions Matrix',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                            SizedBox(width: 6),
+                            Text(
+                              '(10 Controls)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Color(0xFF64748B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Highlighted: Expense Approval
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color:
+                                canApproveExpenses
+                                    ? const Color(0xFF10B981).withAlpha(20)
+                                    : (isDark
+                                        ? const Color(0xFF1E293B)
+                                        : const Color(0xFFF8FAFC)),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color:
+                                  canApproveExpenses
+                                      ? const Color(0xFF10B981)
+                                      : (isDark
+                                          ? const Color(0xFF334155)
+                                          : const Color(0xFFE2E8F0)),
+                              width: canApproveExpenses ? 1.5 : 1.0,
+                            ),
+                          ),
+                          child: SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 2,
+                            ),
+                            title: Row(
+                              children: [
+                                const Icon(
+                                  Icons.verified_user_rounded,
+                                  size: 18,
+                                  color: Color(0xFF10B981),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Approve Expense Claims',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF10B981),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'AUTHORITY',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: const Text(
+                              'Can review and approve/reject claims submitted for this project.',
+                              style: TextStyle(fontSize: 11),
+                            ),
+                            value: canApproveExpenses,
+                            activeThumbColor: const Color(0xFF10B981),
+                            onChanged:
+                                (val) => setSheetState(
+                                  () => canApproveExpenses = val,
+                                ),
+                          ),
+                        ),
+
+                        _buildPermSwitchTile(
+                          'View Budget & Revenue',
+                          'Access project budget overview and revenue numbers',
+                          canViewBudget,
+                          (v) => setSheetState(() => canViewBudget = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'Record Revenue',
+                          'Add revenue entries and client milestone billing',
+                          canRecordRevenue,
+                          (v) => setSheetState(() => canRecordRevenue = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'View Expenses',
+                          'Browse project expenses submitted by all members',
+                          canViewExpenses,
+                          (v) => setSheetState(() => canViewExpenses = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'Create Expenses',
+                          'Submit expense claims against this project',
+                          canCreateExpenses,
+                          (v) => setSheetState(() => canCreateExpenses = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'Manage Tasks',
+                          'Create, assign, edit, and close project tasks',
+                          canManageTasks,
+                          (v) => setSheetState(() => canManageTasks = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'Update Progress',
+                          'Update percentage completion and post site notes',
+                          canUpdateProgress,
+                          (v) => setSheetState(() => canUpdateProgress = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'Manage Team',
+                          'Add/remove members and adjust project-level roles',
+                          canManageTeam,
+                          (v) => setSheetState(() => canManageTeam = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'Edit Project Details',
+                          'Edit project information, site coordinates, and timeline',
+                          canEditProject,
+                          (v) => setSheetState(() => canEditProject = v),
+                          isDark,
+                        ),
+                        _buildPermSwitchTile(
+                          'View Attendance',
+                          'View member geofence check-ins and attendance logs',
+                          canViewAttendance,
+                          (v) => setSheetState(() => canViewAttendance = v),
+                          isDark,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface : Colors.white,
+                      border: Border(
+                        top: BorderSide(
+                          color:
+                              isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4F46E5),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        icon: const Icon(Icons.check_rounded, size: 20),
+                        label: const Text(
+                          'Apply Project Access',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        onPressed: () {
+                          final updatedPerms = ProjectPermissions(
+                            canViewBudget: canViewBudget,
+                            canRecordRevenue: canRecordRevenue,
+                            canViewExpenses: canViewExpenses,
+                            canCreateExpenses: canCreateExpenses,
+                            canApproveExpenses: canApproveExpenses,
+                            canManageTasks: canManageTasks,
+                            canUpdateProgress: canUpdateProgress,
+                            canManageTeam: canManageTeam,
+                            canEditProject: canEditProject,
+                            canViewAttendance: canViewAttendance,
+                          );
+
+                          setState(() {
+                            _selectedTeamMemberIds.add(u.id);
+                            _memberAssignments[u.id] = ProjectMember(
+                              userId: u.id,
+                              roleInProject:
+                                  roleController.text.trim().isNotEmpty
+                                      ? roleController.text.trim()
+                                      : 'Site Engineer',
+                              permissions: updatedPerms,
+                              fullName: u.name,
+                              email: u.email,
+                            );
+                          });
+
+                          Navigator.pop(modalCtx);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildRolePresetChip(
+    String label,
+    VoidCallback onTap, {
+    required bool isSelected,
+    required bool isDark,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? const Color(0xFF4F46E5).withAlpha(25)
+                  : (isDark
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF1F5F9)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color:
+                isSelected
+                    ? const Color(0xFF4F46E5)
+                    : (isDark
+                        ? const Color(0xFF334155)
+                        : const Color(0xFFCBD5E1)),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color:
+                isSelected
+                    ? const Color(0xFF4F46E5)
+                    : (isDark ? Colors.white70 : const Color(0xFF475569)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPermSwitchTile(
+    String title,
+    String desc,
+    bool value,
+    ValueChanged<bool> onChanged,
+    bool isDark,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: SwitchListTile(
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+        ),
+        subtitle: Text(
+          desc,
+          style: TextStyle(
+            fontSize: 10,
+            color:
+                isDark
+                    ? AppColors.darkTextSecondary
+                    : const Color(0xFF64748B),
+          ),
+        ),
+        value: value,
+        activeThumbColor: const Color(0xFF4F46E5),
+        onChanged: onChanged,
+      ),
     );
   }
 }

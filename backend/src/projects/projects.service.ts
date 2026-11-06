@@ -302,17 +302,61 @@ export class ProjectsService {
 
       const created = projRes.rows[0];
 
-      // Insert team members safely
-      const rawMembers: string[] = data.teamMemberIds || data.team_member_ids || [];
-      const teamMembers = [...rawMembers];
-      // Ensure the project creator is always added as a project member
-      if (validCreatedBy && uuidRegex.test(validCreatedBy) && !teamMembers.includes(validCreatedBy)) {
-        teamMembers.unshift(validCreatedBy);
+      // Support structured member assignments with custom role and permissions
+      const memberList: Array<{ userId: string; roleInProject: string; permissions: any }> = [];
+      const rawMemberList = data.members || data.teamMembers || data.team_members || [];
+      if (Array.isArray(rawMemberList)) {
+        for (const item of rawMemberList) {
+          if (!item) continue;
+          if (typeof item === 'string') {
+            memberList.push({ userId: item, roleInProject: 'Member', permissions: {} });
+          } else if (typeof item === 'object') {
+            const uid = item.userId || item.user_id || item.id;
+            if (uid) {
+              memberList.push({
+                userId: uid,
+                roleInProject: (item.roleInProject || item.role_in_project || item.role || 'Member').trim(),
+                permissions: item.permissions || item,
+              });
+            }
+          }
+        }
+      }
+
+      // Also include any bare teamMemberIds / team_member_ids if not already in memberList
+      const rawIds: string[] = data.teamMemberIds || data.team_member_ids || [];
+      for (const rawId of rawIds) {
+        if (typeof rawId === 'string' && !memberList.some((m) => m.userId === rawId)) {
+          memberList.push({ userId: rawId, roleInProject: 'Member', permissions: {} });
+        }
+      }
+
+      // Ensure the project creator is always in memberList as Owner with full permissions if not specified
+      if (validCreatedBy && uuidRegex.test(validCreatedBy)) {
+        const creatorEntry = memberList.find((m) => m.userId === validCreatedBy);
+        if (!creatorEntry) {
+          memberList.unshift({
+            userId: validCreatedBy,
+            roleInProject: 'Owner',
+            permissions: {
+              canViewBudget: true,
+              canRecordRevenue: true,
+              canViewExpenses: true,
+              canCreateExpenses: true,
+              canApproveExpenses: true,
+              canManageTasks: true,
+              canUpdateProgress: true,
+              canManageTeam: true,
+              canEditProject: true,
+              canViewAttendance: true,
+            },
+          });
+        }
       }
 
       const insertedMembers: string[] = [];
-      for (const rawMember of teamMembers) {
-        let memberId = rawMember;
+      for (const m of memberList) {
+        let memberId = m.userId;
         if (typeof memberId === 'string' && memberId.includes('@')) {
           const uRes = await client.query('SELECT id FROM users WHERE email = $1', [memberId.trim().toLowerCase()]);
           if (uRes.rows.length) {
@@ -321,11 +365,48 @@ export class ProjectsService {
         }
         if (uuidRegex.test(memberId)) {
           try {
+            const perms = m.permissions || {};
+            const isOwner = memberId === validCreatedBy;
+            const roleInProject = m.roleInProject || (isOwner ? 'Owner' : 'Member');
             await client.query(
-              `INSERT INTO project_members (project_id, user_id, role_in_project)
-               VALUES ($1, $2, $3)
-               ON CONFLICT DO NOTHING`,
-              [created.id, memberId, memberId === validCreatedBy ? 'Owner' : 'Member'],
+              `INSERT INTO project_members (
+                project_id, user_id, role_in_project,
+                can_view_budget, can_record_revenue, can_view_expenses, can_create_expenses,
+                can_approve_expenses, can_manage_tasks, can_update_progress, can_manage_team,
+                can_edit_project, can_view_attendance
+              ) VALUES (
+                $1, $2, $3,
+                $4, $5, $6, $7,
+                $8, $9, $10, $11,
+                $12, $13
+              )
+              ON CONFLICT (project_id, user_id) DO UPDATE SET
+                role_in_project = EXCLUDED.role_in_project,
+                can_view_budget = EXCLUDED.can_view_budget,
+                can_record_revenue = EXCLUDED.can_record_revenue,
+                can_view_expenses = EXCLUDED.can_view_expenses,
+                can_create_expenses = EXCLUDED.can_create_expenses,
+                can_approve_expenses = EXCLUDED.can_approve_expenses,
+                can_manage_tasks = EXCLUDED.can_manage_tasks,
+                can_update_progress = EXCLUDED.can_update_progress,
+                can_manage_team = EXCLUDED.can_manage_team,
+                can_edit_project = EXCLUDED.can_edit_project,
+                can_view_attendance = EXCLUDED.can_view_attendance`,
+              [
+                created.id,
+                memberId,
+                roleInProject,
+                perms.canViewBudget ?? perms.can_view_budget ?? true,
+                perms.canRecordRevenue ?? perms.can_record_revenue ?? isOwner,
+                perms.canViewExpenses ?? perms.can_view_expenses ?? true,
+                perms.canCreateExpenses ?? perms.can_create_expenses ?? true,
+                perms.canApproveExpenses ?? perms.can_approve_expenses ?? isOwner,
+                perms.canManageTasks ?? perms.can_manage_tasks ?? isOwner,
+                perms.canUpdateProgress ?? perms.can_update_progress ?? isOwner,
+                perms.canManageTeam ?? perms.can_manage_team ?? isOwner,
+                perms.canEditProject ?? perms.can_edit_project ?? isOwner,
+                perms.canViewAttendance ?? perms.can_view_attendance ?? true,
+              ],
             );
             insertedMembers.push(memberId);
           } catch (_) {

@@ -872,6 +872,7 @@ class ProjectModel {
       'end_date': endDate.toIso8601String(),
       'team_member_ids': validTeamMembers,
       'teamMemberIds': validTeamMembers,
+      if (members.isNotEmpty) 'members': members.map((m) => m.toJson()).toList(),
       'status': status.toApiValue,
       'revenue_entries': revenueEntries.map((e) => e.toJson()).toList(),
       'is_closed': isClosed,

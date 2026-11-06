@@ -111,6 +111,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     required DateTime startDate,
     required DateTime endDate,
     required List<String> teamMemberIds,
+    List<ProjectMember> members = const [],
     String? createdById,
     String? imageUrl,
     double? siteLatitude,
@@ -128,6 +129,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     final effectiveTeamMembers =
         <String>{
           ...teamMemberIds,
+          ...members.map((m) => m.userId),
           if (createdById != null && createdById.isNotEmpty) createdById,
         }.toList();
 
@@ -155,6 +157,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
       startDate: startDate,
       endDate: endDate,
       teamMemberIds: effectiveTeamMembers,
+      members: members,
       createdById: createdById,
       status: ProjectStatus.ongoing,
       imageUrl: imageUrl,
