@@ -92,11 +92,22 @@ class ProjectCostCard extends StatelessWidget {
     final totalTaxIncurred = validExpenses.fold<double>(0.0, (sum, e) => sum + e.taxAmount);
     final projectTax = project.calculatedTax;
     final costIncurred = directCost + totalTaxIncurred + projectTax;
-    final totalBudget = project.grossProjectValue > 0 ? project.grossProjectValue : project.budget;
+    final totalBudget = project.budget > 0 ? project.budget : (project.grossProjectValue > 0 ? project.grossProjectValue : 1.0);
     final budgetRatio = totalBudget > 0 ? (costIncurred / totalBudget) : 0.0;
     final isOverBudget = costIncurred > totalBudget && totalBudget > 0;
     final isApproachingBudget = budgetRatio >= 0.80 && !isOverBudget;
     final isCompleted = project.status == ProjectStatus.completed;
+
+    final double effectiveProgress = isCompleted
+        ? 1.0
+        : (budgetRatio > 0
+            ? budgetRatio.clamp(0.0, 1.0)
+            : (project.progressPercentage.clamp(0.0, 100.0) / 100.0));
+    final double effectivePercentage = isCompleted
+        ? 100.0
+        : (budgetRatio > 0
+            ? (budgetRatio * 100.0).clamp(0.0, 100.0)
+            : project.progressPercentage.clamp(0.0, 100.0));
 
     // Pick Palette
     final int hash = project.id.hashCode.abs();
@@ -261,9 +272,7 @@ class ProjectCostCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: GFProgressBar(
-                              percentage: ((isCompleted || project.progressPercentage >= 100.0)
-                                  ? 1.0
-                                  : (project.progressPercentage.clamp(0.0, 100.0) / 100.0)).clamp(0.0, 1.0),
+                              percentage: effectiveProgress,
                               lineHeight: 5,
                               backgroundColor: trackColor,
                               progressBarColor: accentColor,
@@ -271,9 +280,7 @@ class ProjectCostCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            (isCompleted || project.progressPercentage >= 100.0)
-                                ? '100%'
-                                : '${project.progressPercentage.clamp(0.0, 100.0).toStringAsFixed(0)}%',
+                            '${effectivePercentage.toStringAsFixed(0)}%',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
