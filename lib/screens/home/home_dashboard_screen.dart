@@ -563,10 +563,12 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
         else
           ...filteredProjects.map((p) {
             final pExp = expenses.where((e) => e.projectId == p.id).toList();
-            final canDeleteProject = ref.watch(authProvider).currentUser?.role.canCreateProject ?? false;
+            final currentUser = ref.watch(authProvider).currentUser;
+            final canDeleteProject = currentUser?.role.canCreateProject ?? false;
             return ProjectCostCard(
               project: p,
               projectExpenses: pExp,
+              currentUserId: currentUser?.id,
               onTap: () => context.push(RoutePaths.projectDetail(p.id)),
               onDelete: canDeleteProject ? () => _showDeleteProjectDialog(context, ref, p) : null,
             );
@@ -753,7 +755,92 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           ),
         ),
 
-        const SizedBox(height: 18),
+        const SizedBox(height: 12),
+
+        // 2.1 Project Approvals Queue (if member has approval rights on assigned projects)
+        Builder(
+          builder: (context) {
+            final allExpenses = ref.watch(expenseProvider);
+            final approvableProjects = assignedProjects.where((p) => p.canMemberApproveExpenses(user.id)).toList();
+            if (approvableProjects.isEmpty) return const SizedBox.shrink();
+
+            final pendingApprovalExpenses = allExpenses.where((e) =>
+              e.status == ExpenseStatus.pending && approvableProjects.any((p) => p.id == e.projectId)
+            ).toList();
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.25) : const Color(0xFFECFDF5),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.4 : 0.6),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.05 : 0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.fact_check_rounded, color: Color(0xFF10B981), size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Project Approvals (${pendingApprovalExpenses.length} Pending)',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            color: isDark ? Colors.white : const Color(0xFF064E3B),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'You have approval authority for ${approvableProjects.length} assigned project${approvableProjects.length > 1 ? "s" : ""}.',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF047857),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      visualDensity: VisualDensity.compact,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => context.push(RoutePaths.approvalsQueue),
+                    child: const Text('Review', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 12),
 
         // Assigned Projects Section
         Padding(
@@ -791,10 +878,18 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
           )
         else
           ...assignedProjects.map((p) {
-            final pExp = userExpenses.where((e) => e.projectId == p.id).toList();
+            final allExpenses = ref.watch(expenseProvider);
+            final canViewAll = p.canMemberViewExpenses(user.id) || p.canMemberApproveExpenses(user.id);
+            final pExp = canViewAll
+                ? allExpenses.where((e) => e.projectId == p.id).toList()
+                : userExpenses.where((e) => e.projectId == p.id).toList();
+            final canViewFin = p.canMemberViewBudget(user.id) || p.canMemberApproveExpenses(user.id);
+
             return ProjectCostCard(
               project: p,
               projectExpenses: pExp,
+              currentUserId: user.id,
+              showFinancials: canViewFin,
               onTap: () => context.push(RoutePaths.projectDetail(p.id)),
             );
           }),

@@ -9,6 +9,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/utils/image_utils.dart';
 import '../../core/widgets/app_avatar.dart';
+import '../../core/widgets/approve_reject_dialog.dart';
 import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/project_progress_badge.dart';
@@ -42,6 +43,18 @@ class ProjectDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
+  String _expenseFilter = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(projectProvider.notifier).fetchProjects(force: true);
+        ref.read(expenseProvider.notifier).fetchExpenses(force: true);
+      }
+    });
+  }
 
   void _showUpdateBudgetDialog(BuildContext context, ProjectModel project) {
     final currentBudget = project.grossProjectValue > 0 ? project.grossProjectValue : project.budget;
@@ -499,19 +512,29 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final project = projectList.first;
     List<ExpenseModel> projectExpenses = allExpenses.where((e) => e.projectId == project.id).toList();
 
-    final canEdit = role.canCreateProject;
-    final canClose = role == UserRole.mainAdmin || role == UserRole.finance;
-    final canUpdateProgress = role.canUpdateProjectProgress;
-    final canViewFinancials = role == UserRole.mainAdmin || role == UserRole.finance || role == UserRole.projectManager;
+    final userId = user?.id ?? '';
+    final isOwnerOrAdmin = role == UserRole.mainAdmin || project.createdById == userId;
+    final isFinance = role == UserRole.finance;
+    final isProjectManager = role == UserRole.projectManager;
 
-    if (!canViewFinancials) {
-      projectExpenses = projectExpenses.where((e) => e.employeeId == user?.id).toList();
+    final canEdit = role.canCreateProject || project.canMemberEditProject(userId);
+    final canClose = isOwnerOrAdmin || isFinance;
+    final canUpdateProgress = role.canUpdateProjectProgress || project.canMemberUpdateProgress(userId);
+    final canViewBudget = isOwnerOrAdmin || isFinance || isProjectManager || project.canMemberViewBudget(userId);
+    final canRecordRevenue = isOwnerOrAdmin || isFinance || project.canMemberRecordRevenue(userId);
+    final canApproveExpenses = role.canApproveExpenses || project.canMemberApproveExpenses(userId);
+    final canViewAllExpenses = isOwnerOrAdmin || isFinance || isProjectManager || project.canMemberViewExpenses(userId) || canApproveExpenses;
+    final canManageTasks = isOwnerOrAdmin || isProjectManager || project.canMemberManageTasks(userId);
+    final canManageTeam = isOwnerOrAdmin || isProjectManager || project.canMemberManageTeam(userId);
+
+    if (!canViewAllExpenses) {
+      projectExpenses = projectExpenses.where((e) => e.employeeId == userId).toList();
     }
 
     final List<Widget> tabs = [];
     final List<Widget> tabViews = [];
 
-    if (canViewFinancials) {
+    if (canViewBudget) {
       tabs.add(const Tab(text: 'Financial Overview'));
       tabViews.add(_buildOverviewTab(context, project, projectExpenses, canUpdateProgress, canEdit));
       
@@ -520,11 +543,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     }
 
     tabs.add(const Tab(text: 'Expenses & Receipts'));
-    tabViews.add(_buildExpensesTab(context, project, projectExpenses));
+    tabViews.add(_buildExpensesTab(context, project, projectExpenses, canApproveExpenses));
 
-    if (canViewFinancials) {
+    if (canRecordRevenue || canClose || canViewBudget) {
       tabs.add(const Tab(text: 'Revenue & Closing'));
-      tabViews.add(_buildRevenueAndClosingTab(context, project, projectExpenses, canClose));
+      tabViews.add(_buildRevenueAndClosingTab(context, project, projectExpenses, canClose, canRecordRevenue: canRecordRevenue));
     }
 
     return DefaultTabController(
@@ -594,7 +617,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 ReportExportBottomSheet.show(context, initialProject: project);
               },
             ),
-            if (canEdit)
+            if (canEdit || canManageTeam || isOwnerOrAdmin)
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
                 tooltip: 'Project Options',
@@ -628,47 +651,52 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       ],
                     ),
                   ),
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
-                        SizedBox(width: 8),
-                        Text('Edit Project'),
-                      ],
+                  if (canEdit)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 18, color: Color(0xFF2563EB)),
+                          SizedBox(width: 8),
+                          Text('Edit Project'),
+                        ],
+                      ),
                     ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'members',
-                    child: Row(
-                      children: [
-                        Icon(Icons.person_add_alt_1_outlined, size: 18, color: Color(0xFF4F46E5)),
-                        SizedBox(width: 8),
-                        Text('Assign Members'),
-                      ],
+                  if (canManageTeam)
+                    const PopupMenuItem(
+                      value: 'members',
+                      child: Row(
+                        children: [
+                          Icon(Icons.person_add_alt_1_outlined, size: 18, color: Color(0xFF4F46E5)),
+                          SizedBox(width: 8),
+                          Text('Assign Members'),
+                        ],
+                      ),
                     ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'image',
-                    child: Row(
-                      children: [
-                        Icon(Icons.add_photo_alternate_outlined, size: 18, color: Color(0xFF059669)),
-                        SizedBox(width: 8),
-                        Text('Change Image'),
-                      ],
+                  if (canEdit)
+                    const PopupMenuItem(
+                      value: 'image',
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_photo_alternate_outlined, size: 18, color: Color(0xFF059669)),
+                          SizedBox(width: 8),
+                          Text('Change Image'),
+                        ],
+                      ),
                     ),
-                  ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
-                        SizedBox(width: 8),
-                        Text('Delete Project', style: TextStyle(color: Colors.redAccent)),
-                      ],
+                  if (isOwnerOrAdmin) ...[
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded, size: 18, color: Colors.redAccent),
+                          SizedBox(width: 8),
+                          Text('Delete Project', style: TextStyle(color: Colors.redAccent)),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             const SizedBox(width: 4),
@@ -683,11 +711,129 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
         body: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 850),
-            child: TabBarView(
-              children: tabViews,
+            child: Column(
+              children: [
+                _buildProjectRoleRibbon(project, userId, isDark),
+                Expanded(
+                  child: TabBarView(
+                    children: tabViews,
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildProjectRoleRibbon(ProjectModel project, String userId, bool isDark) {
+    final memberRole = project.getMemberRoleInProject(userId);
+    final isOwner = project.createdById == userId;
+    if (memberRole == null && !isOwner) return const SizedBox.shrink();
+
+    final activeBadges = <String>[];
+    if (project.canMemberApproveExpenses(userId)) activeBadges.add('Approve Expenses');
+    if (project.canMemberViewBudget(userId)) activeBadges.add('View Budget');
+    if (project.canMemberManageTasks(userId)) activeBadges.add('Manage Tasks');
+    if (project.canMemberEditProject(userId)) activeBadges.add('Edit Project');
+    if (project.canMemberCreateExpenses(userId)) activeBadges.add('Submit Expenses');
+    if (project.canMemberRecordRevenue(userId)) activeBadges.add('Record Revenue');
+    if (project.canMemberManageTeam(userId)) activeBadges.add('Manage Team');
+    if (project.canMemberUpdateProgress(userId)) activeBadges.add('Update Progress');
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+          width: 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.badge_rounded, size: 15, color: Color(0xFF2563EB)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Text(
+                      'Your Project Role: ',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        memberRole ?? 'Owner',
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (activeBadges.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: activeBadges.map((badge) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF10B981)),
+                      const SizedBox(width: 3),
+                      Text(
+                        badge,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF10B981),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -2103,9 +2249,27 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   // ==================== TAB 3: EXPENSES & RECEIPTS ====================
-  Widget _buildExpensesTab(BuildContext context, ProjectModel project, List<ExpenseModel> expenses) {
+  Widget _buildExpensesTab(
+    BuildContext context,
+    ProjectModel project,
+    List<ExpenseModel> expenses,
+    bool canApproveExpenses,
+  ) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    final pendingCount = expenses.where((e) => e.status == ExpenseStatus.pending).length;
+    final approvedCount = expenses.where((e) => e.status == ExpenseStatus.approved).length;
+    final rejectedCount = expenses.where((e) => e.status == ExpenseStatus.rejected).length;
+
+    List<ExpenseModel> displayedExpenses = expenses;
+    if (_expenseFilter == 'pending') {
+      displayedExpenses = expenses.where((e) => e.status == ExpenseStatus.pending).toList();
+    } else if (_expenseFilter == 'approved') {
+      displayedExpenses = expenses.where((e) => e.status == ExpenseStatus.approved).toList();
+    } else if (_expenseFilter == 'rejected') {
+      displayedExpenses = expenses.where((e) => e.status == ExpenseStatus.rejected).toList();
+    }
 
     if (expenses.isEmpty) {
       return const EmptyStateWidget(
@@ -2117,153 +2281,270 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     final allUsers = ref.watch(userManagementProvider);
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: expenses.length,
-      itemBuilder: (ctx, i) {
-        final exp = expenses[i];
-        final submitterAvatar = (exp.employeeAvatar != null && exp.employeeAvatar!.isNotEmpty)
-            ? exp.employeeAvatar
-            : allUsers.where((u) => u.id == exp.employeeId || u.name.toLowerCase() == exp.employeeName.toLowerCase()).firstOrNull?.avatarUrl;
-
-        return InkWell(
-          onTap: () => context.push(RoutePaths.expenseDetail(exp.id)),
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(6),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    AppAvatar(
-                      imageUrl: submitterAvatar,
-                      name: exp.employeeName,
-                      size: 40,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            exp.employeeName,
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, letterSpacing: -0.2),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${exp.categoryName} • ${DateFormatter.formatShort(exp.date)}',
-                            style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      CurrencyFormatter.format(exp.amount),
-                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF4F46E5)),
-                    ),
-                  ],
-                ),
-                if (exp.note.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(exp.note, style: const TextStyle(fontSize: 13)),
-                ],
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        StatusChip.fromExpenseStatus(exp.status),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: (exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withAlpha(20),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            exp.hasReceipt ? 'Receipt' : 'No Receipt',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                            ),
-                          ),
-                        ),
-                        if (!exp.hasReceipt)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withAlpha(20),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              exp.justificationStatus.displayName,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.orange),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (exp.hasTax) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      'Inc. ${exp.taxRate.toStringAsFixed(exp.taxRate.truncateToDouble() == exp.taxRate ? 0 : 1)}% Tax',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF0284C7), fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ],
-              ),
-              if (exp.status == ExpenseStatus.rejected) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFCA5A5)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.cancel_rounded, size: 14, color: Color(0xFFDC2626)),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Rejected: ${exp.rejectionReason != null && exp.rejectionReason!.isNotEmpty ? exp.rejectionReason : "No reason provided"}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF991B1B),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Row(
+            children: [
+              _buildExpenseFilterChip('all', 'All (${expenses.length})', isDark),
+              const SizedBox(width: 8),
+              _buildExpenseFilterChip('pending', 'Pending ($pendingCount)', isDark, color: const Color(0xFFF59E0B)),
+              const SizedBox(width: 8),
+              _buildExpenseFilterChip('approved', 'Approved ($approvedCount)', isDark, color: const Color(0xFF10B981)),
+              const SizedBox(width: 8),
+              _buildExpenseFilterChip('rejected', 'Rejected ($rejectedCount)', isDark, color: const Color(0xFFEF4444)),
             ],
           ),
         ),
-      );
-      },
+        Expanded(
+          child: displayedExpenses.isEmpty
+              ? EmptyStateWidget(
+                  icon: Icons.receipt_long_rounded,
+                  title: 'No Expenses Found',
+                  message: 'No expenses matching the "$_expenseFilter" filter.',
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: displayedExpenses.length,
+                  itemBuilder: (ctx, i) {
+                    final exp = displayedExpenses[i];
+                    final submitterAvatar = (exp.employeeAvatar != null && exp.employeeAvatar!.isNotEmpty)
+                        ? exp.employeeAvatar
+                        : allUsers.where((u) => u.id == exp.employeeId || u.name.toLowerCase() == exp.employeeName.toLowerCase()).firstOrNull?.avatarUrl;
+
+                    return InkWell(
+                      onTap: () => context.push(RoutePaths.expenseDetail(exp.id)),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.darkSurface : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(6),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                AppAvatar(
+                                  imageUrl: submitterAvatar,
+                                  name: exp.employeeName,
+                                  size: 40,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        exp.employeeName,
+                                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, letterSpacing: -0.2),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${exp.categoryName} • ${DateFormatter.formatShort(exp.date)}',
+                                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  CurrencyFormatter.format(exp.amount),
+                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Color(0xFF4F46E5)),
+                                ),
+                              ],
+                            ),
+                            if (exp.note.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(exp.note, style: const TextStyle(fontSize: 13)),
+                            ],
+                            const SizedBox(height: 10),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      StatusChip.fromExpenseStatus(exp.status),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444)).withAlpha(20),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          exp.hasReceipt ? 'Receipt' : 'No Receipt',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: exp.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                          ),
+                                        ),
+                                      ),
+                                      if (!exp.hasReceipt)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange.withAlpha(20),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            exp.justificationStatus.displayName,
+                                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.orange),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                if (exp.hasTax) ...[
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Inc. ${exp.taxRate.toStringAsFixed(exp.taxRate.truncateToDouble() == exp.taxRate ? 0 : 1)}% Tax',
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFF0284C7), fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (exp.status == ExpenseStatus.rejected) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.cancel_rounded, size: 14, color: Color(0xFFDC2626)),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        'Rejected: ${exp.rejectionReason != null && exp.rejectionReason!.isNotEmpty ? exp.rejectionReason : "No reason provided"}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF991B1B),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (canApproveExpenses && exp.status == ExpenseStatus.pending) ...[
+                              const SizedBox(height: 12),
+                              const Divider(height: 1),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFFEF4444),
+                                      side: const BorderSide(color: Color(0xFFFCA5A5)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      visualDensity: VisualDensity.compact,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    icon: const Icon(Icons.close_rounded, size: 14),
+                                    label: const Text('Reject', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                    onPressed: () async {
+                                      final reason = await ApproveRejectDialog.showRejectDialog(
+                                        context,
+                                        title: 'Reject Claim',
+                                        subtitle: 'Provide a reason for rejecting this claim by ${exp.employeeName}.',
+                                      );
+                                      if (reason != null && mounted) {
+                                        await ref.read(expenseProvider.notifier).rejectExpense(exp.id, reason);
+                                        if (mounted) {
+                                          NotificationBanner.showWarning(context, 'Expense claim rejected.');
+                                        }
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF10B981),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      visualDensity: VisualDensity.compact,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    icon: const Icon(Icons.check_rounded, size: 14),
+                                    label: const Text('Approve', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                    onPressed: () async {
+                                      final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
+                                        context,
+                                        title: 'Approve Expense Claim',
+                                        message: 'Approve ${CurrencyFormatter.format(exp.amount)} claim by ${exp.employeeName}?',
+                                      );
+                                      if (confirm && mounted) {
+                                        await ref.read(expenseProvider.notifier).approveExpense(exp.id);
+                                        if (mounted) {
+                                          NotificationBanner.showSuccess(context, 'Claim approved for ${exp.employeeName}.');
+                                        }
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExpenseFilterChip(String key, String label, bool isDark, {Color? color}) {
+    final isSelected = _expenseFilter == key;
+    final activeColor = color ?? const Color(0xFF4F46E5);
+    return InkWell(
+      onTap: () => setState(() => _expenseFilter = key),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.15)
+              : (isDark ? AppColors.darkSurface : Colors.white),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? activeColor : (isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? activeColor : (isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+          ),
+        ),
+      ),
     );
   }
 
@@ -2272,8 +2553,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     BuildContext context,
     ProjectModel project,
     List<ExpenseModel> expenses,
-    bool canClose,
-  ) {
+    bool canClose, {
+    bool canRecordRevenue = false,
+  }) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -2300,17 +2582,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      visualDensity: VisualDensity.compact,
+                  if (canRecordRevenue)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 16),
+                      label: const Text('Add Revenue', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      onPressed: () => _showAddRevenueDialog(context, project),
                     ),
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text('Add Revenue', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    onPressed: () => _showAddRevenueDialog(context, project),
-                  ),
                 ],
               ),
               const Divider(height: 20),

@@ -27,6 +27,7 @@ class ProjectCostCard extends StatelessWidget {
   final VoidCallback? onDelete;
   final EdgeInsetsGeometry? margin;
   final bool showFinancials;
+  final String? currentUserId;
 
   const ProjectCostCard({
     super.key,
@@ -36,6 +37,7 @@ class ProjectCostCard extends StatelessWidget {
     this.onDelete,
     this.margin,
     this.showFinancials = true,
+    this.currentUserId,
   });
 
   static const List<_CardPalette> _curatedPalettes = [
@@ -262,6 +264,65 @@ class ProjectCostCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                            ),
+                          ],
+                          if (currentUserId != null) ...[
+                            Builder(
+                              builder: (context) {
+                                final assignedRole = project.getMemberRoleInProject(currentUserId!);
+                                final canApprove = project.canMemberApproveExpenses(currentUserId!);
+                                if (assignedRole == null && !canApprove) return const SizedBox.shrink();
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (assignedRole != null && assignedRole.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: accentColor.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(5),
+                                          border: Border.all(color: accentColor.withValues(alpha: 0.28), width: 0.8),
+                                        ),
+                                        child: Text(
+                                          assignedRole,
+                                          style: TextStyle(
+                                            fontSize: 9.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: accentColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    if (canApprove) ...[
+                                      const SizedBox(width: 4),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(5),
+                                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3), width: 0.8),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.verified_user_rounded, size: 9, color: Color(0xFF10B981)),
+                                            SizedBox(width: 2),
+                                            Text(
+                                              'Approver',
+                                              style: TextStyle(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF10B981),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ],

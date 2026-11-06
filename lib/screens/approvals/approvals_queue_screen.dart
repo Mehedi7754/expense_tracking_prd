@@ -11,6 +11,9 @@ import '../../core/widgets/empty_state_widget.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
 import '../../models/user_model.dart';
+import '../../models/user_role.dart';
+import '../../state/auth_provider.dart';
+import '../../state/project_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/user_management_provider.dart';
 import '../../core/widgets/app_avatar.dart';
@@ -35,6 +38,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         ref.read(expenseProvider.notifier).fetchExpenses(force: true);
+        ref.read(projectProvider.notifier).fetchProjects(force: true);
       }
     });
     // Active fast-poll while on Approvals Queue for instant responsiveness
@@ -92,7 +96,17 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
 
     final allExpenses = ref.watch(expenseProvider);
     final allUsers = ref.watch(userManagementProvider);
-    final pendingExpenses = allExpenses.where((e) => e.status == ExpenseStatus.pending).toList();
+    final allProjects = ref.watch(projectProvider);
+    final currentUser = ref.watch(authProvider).currentUser;
+    final userRole = currentUser?.role ?? UserRole.projectMember;
+    final userId = currentUser?.id ?? '';
+
+    final pendingExpenses = allExpenses.where((e) {
+      if (e.status != ExpenseStatus.pending) return false;
+      if (userRole.canApproveExpenses) return true;
+      final proj = allProjects.where((p) => p.id == e.projectId).firstOrNull;
+      return proj != null && proj.canMemberApproveExpenses(userId);
+    }).toList();
 
     // Filter logic
     final filtered = pendingExpenses.where((e) {

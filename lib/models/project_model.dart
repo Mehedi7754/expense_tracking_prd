@@ -549,16 +549,69 @@ class ProjectModel {
     }
   }
 
+  String? getMemberRoleInProject(String userId) {
+    if (createdById == userId) return 'Owner';
+    return getMember(userId)?.roleInProject;
+  }
+
+  bool canMemberViewBudget(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canViewBudget ?? false;
+  }
+
+  bool canMemberRecordRevenue(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canRecordRevenue ?? false;
+  }
+
+  bool canMemberViewExpenses(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canViewExpenses ?? false;
+  }
+
+  bool canMemberCreateExpenses(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canCreateExpenses ?? true;
+  }
+
   bool canMemberApproveExpenses(String userId) {
     if (createdById == userId) return true;
     final m = getMember(userId);
     return m?.permissions.canApproveExpenses ?? false;
   }
 
+  bool canMemberManageTasks(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canManageTasks ?? false;
+  }
+
+  bool canMemberUpdateProgress(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canUpdateProgress ?? false;
+  }
+
   bool canMemberManageTeam(String userId) {
     if (createdById == userId) return true;
     final m = getMember(userId);
     return m?.permissions.canManageTeam ?? false;
+  }
+
+  bool canMemberEditProject(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canEditProject ?? false;
+  }
+
+  bool canMemberViewAttendance(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canViewAttendance ?? false;
   }
 
   // Visual status indicators based on progress:
