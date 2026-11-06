@@ -772,7 +772,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                           ),
                           const SizedBox(height: 6),
                           _buildFinancialPreviewRow(
-                            'Total Agreed Budget',
+                            'Total Project Budget',
                             _calculatedTotalBudget,
                             isDark,
                             emphasized: true,
