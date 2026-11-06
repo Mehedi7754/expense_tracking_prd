@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Param,
   Body,
@@ -27,6 +28,44 @@ export class ProjectsController {
   @Get(':id')
   async getProject(@Param('id') id: string, @Request() req: any) {
     return this.projectsService.findOne(id, req.user);
+  }
+
+  @Get(':id/members')
+  async getMembers(@Param('id') id: string) {
+    return this.projectsService.getProjectMembers(id);
+  }
+
+  @Get(':id/my-permissions')
+  async getMyPermissions(@Param('id') id: string, @Request() req: any) {
+    return this.projectsService.getMyProjectPermissions(id, req.user);
+  }
+
+  @Post(':id/members')
+  async addMember(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    return this.projectsService.addOrUpdateProjectMember(id, body, req.user);
+  }
+
+  @Patch(':id/members/:userId')
+  async updateMember(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() body: any,
+    @Request() req: any,
+  ) {
+    return this.projectsService.addOrUpdateProjectMember(id, { ...body, userId }, req.user);
+  }
+
+  @Delete(':id/members/:userId')
+  async removeMember(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Request() req: any,
+  ) {
+    return this.projectsService.removeProjectMember(id, userId, req.user);
   }
 
   @Roles('main_admin', 'project_manager')

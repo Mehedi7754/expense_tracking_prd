@@ -491,8 +491,28 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
       try {
         final repo = ref.read(projectRepositoryProvider);
         await repo.updateProject(updatedProj!);
+        await repo.removeProjectMember(projectId, memberId);
       } catch (_) {}
     }
+  }
+
+  /// Updates a member's custom project role and granular permissions.
+  Future<void> updateMemberRoleAndPermissions(
+    String projectId, {
+    required String userId,
+    required String roleInProject,
+    required ProjectPermissions permissions,
+  }) async {
+    final repo = ref.read(projectRepositoryProvider);
+    try {
+      await repo.addOrUpdateProjectMember(
+        projectId,
+        userId: userId,
+        roleInProject: roleInProject,
+        permissions: permissions,
+      );
+    } catch (_) {}
+    await fetchProjects(force: true);
   }
 
   /// Deletes a project from local state and remote backend database.

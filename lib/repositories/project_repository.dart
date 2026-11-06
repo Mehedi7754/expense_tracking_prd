@@ -96,6 +96,42 @@ class ProjectRepository {
   Future<void> deleteProject(String projectId) async {
     await _client.delete(ApiEndpoints.projectById(projectId));
   }
+
+  Future<List<ProjectMember>> getProjectMembers(String projectId) async {
+    final response = await _client.get(ApiEndpoints.projectMembers(projectId));
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(ProjectMember.fromJson)
+          .toList();
+    } else if (response is Map<String, dynamic> && response['data'] is List) {
+      return (response['data'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(ProjectMember.fromJson)
+          .toList();
+    }
+    return const [];
+  }
+
+  Future<void> addOrUpdateProjectMember(
+    String projectId, {
+    required String userId,
+    required String roleInProject,
+    required ProjectPermissions permissions,
+  }) async {
+    await _client.post(
+      ApiEndpoints.projectMembers(projectId),
+      body: {
+        'userId': userId,
+        'roleInProject': roleInProject,
+        'permissions': permissions.toJson(),
+      },
+    );
+  }
+
+  Future<void> removeProjectMember(String projectId, String userId) async {
+    await _client.delete(ApiEndpoints.projectMemberById(projectId, userId));
+  }
 }
 
 final projectRepositoryProvider = Provider<ProjectRepository>((ref) {

@@ -126,14 +126,25 @@ export class ExpensesService {
     const params: any[] = [];
     let idx = 1;
 
-    // PRD Access control: regular member only sees their own expenses unless project manager/admin/finance
-    if (user.role === 'project_member') {
-      sql += ` AND (e.employee_id = $${idx} OR EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.project_id AND pm.user_id = $${idx} AND pm.role_in_project ILIKE '%Manager%'))`;
-      params.push(user.id);
-      idx++;
-    } else if (user.role === 'project_manager') {
-      sql += ` AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.project_id AND pm.user_id = $${idx++})`;
-      params.push(user.id);
+    // Access control: regular member sees their own expenses OR expenses for projects where they have can_approve_expenses or can_view_expenses
+    const isGlobalAdminOrFinance = ['main_admin', 'admin', 'finance', 'finance_manager'].includes(user.role);
+    if (!isGlobalAdminOrFinance) {
+      if (user.role === 'project_manager') {
+        sql += ` AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.project_id AND pm.user_id = $${idx++})`;
+        params.push(user.id);
+      } else {
+        sql += ` AND (
+          e.employee_id = $${idx} 
+          OR EXISTS (
+            SELECT 1 FROM project_members pm 
+            WHERE pm.project_id = e.project_id 
+              AND pm.user_id = $${idx} 
+              AND (pm.can_approve_expenses = TRUE OR pm.can_view_expenses = TRUE OR pm.role_in_project ILIKE '%Manager%' OR pm.role_in_project ILIKE '%Lead%')
+          )
+        )`;
+        params.push(user.id);
+        idx++;
+      }
     }
 
     if (query.projectId) {
@@ -324,11 +335,16 @@ export class ExpensesService {
       console.error('Failed to log audit for expense create:', e);
     }
 
-    // Notify all admins and project managers about the new submission
+    // Notify all admins, project managers, and project members with can_approve_expenses
     try {
       const recipientsRes = await this.db.query(
-        `SELECT id, email FROM users WHERE role IN ('main_admin', 'project_manager') AND is_active = TRUE AND id != $1`,
-        [employeeId],
+        `SELECT DISTINCT u.id, u.email 
+         FROM users u
+         LEFT JOIN project_members pm ON pm.user_id = u.id AND pm.project_id = $2
+         WHERE u.is_active = TRUE 
+           AND u.id != $1
+           AND (u.role IN ('main_admin', 'project_manager') OR pm.can_approve_expenses = TRUE)`,
+        [employeeId, validProjectId],
       );
       const submitterRes = await this.db.query(
         `SELECT id, full_name, email, avatar_url FROM users WHERE id = $1`,
@@ -481,10 +497,21 @@ export class ExpensesService {
     return { success: true, id };
   }
 
-  async approve(id: string, reviewerId: string, note?: string) {
+  async approve(id: string, reviewerId: string, note?: string, user?: any) {
     const exp = await this.findOne(id);
     if (exp.employeeId === reviewerId) {
       throw new ForbiddenException('Anti-fraud rule: You cannot approve your own expense report');
+    }
+
+    const isGlobalAdmin = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'project_manager';
+    if (!isGlobalAdmin) {
+      const pmRes = await this.db.query(
+        'SELECT can_approve_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',
+        [exp.projectId, reviewerId]
+      );
+      if (!pmRes.rows.length || !pmRes.rows[0].can_approve_expenses) {
+        throw new ForbiddenException('You do not have approval permission for this project');
+      }
     }
 
     const projRes = await this.db.query('SELECT is_closed, status FROM projects WHERE id = $1', [exp.projectId]);
@@ -539,8 +566,22 @@ export class ExpensesService {
     return this.findOne(id);
   }
 
-  async reject(id: string, reviewerId: string, reason: string) {
+  async reject(id: string, reviewerId: string, reason: string, user?: any) {
     const exp = await this.findOne(id);
+    if (exp.employeeId === reviewerId) {
+      throw new ForbiddenException('Anti-fraud rule: You cannot reject your own expense report');
+    }
+
+    const isGlobalAdmin = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'project_manager';
+    if (!isGlobalAdmin) {
+      const pmRes = await this.db.query(
+        'SELECT can_approve_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',
+        [exp.projectId, reviewerId]
+      );
+      if (!pmRes.rows.length || !pmRes.rows[0].can_approve_expenses) {
+        throw new ForbiddenException('You do not have approval permission for this project');
+      }
+    }
 
     await this.db.query(
       `UPDATE expenses

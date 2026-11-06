@@ -51,24 +51,22 @@ export class ExpensesController {
     return this.expensesService.delete(id, req.user);
   }
 
-  @Roles('main_admin', 'project_manager')
   @Post(':id/approve')
   async approveExpense(
     @Param('id') id: string,
     @Body('note') note: string,
     @Request() req: any,
   ) {
-    return this.expensesService.approve(id, req.user.id, note);
+    return this.expensesService.approve(id, req.user.id, note, req.user);
   }
 
-  @Roles('main_admin', 'project_manager')
   @Post(':id/reject')
   async rejectExpense(
     @Param('id') id: string,
     @Body('reason') reason: string,
     @Request() req: any,
   ) {
-    return this.expensesService.reject(id, req.user.id, reason);
+    return this.expensesService.reject(id, req.user.id, reason, req.user);
   }
 
   @Post(':id/comments')

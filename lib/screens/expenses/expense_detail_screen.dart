@@ -13,6 +13,7 @@ import '../../core/widgets/app_avatar.dart';
 import '../../models/expense_model.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
+import '../../state/project_provider.dart';
 import '../../state/user_management_provider.dart';
 
 class ExpenseDetailScreen extends ConsumerWidget {
@@ -77,7 +78,10 @@ class ExpenseDetailScreen extends ConsumerWidget {
 
     final expense = expenseList.first;
     final isEmployeeOwner = user?.id == expense.employeeId;
-    final isReviewer = user != null && user.role.canApproveExpenses;
+    final projects = ref.watch(projectProvider);
+    final relatedProject = projects.where((p) => p.id == expense.projectId || p.projectId == expense.projectId).firstOrNull;
+    final hasProjectApproval = user != null && relatedProject != null && relatedProject.canMemberApproveExpenses(user.id);
+    final isReviewer = user != null && (user.role.canApproveExpenses || hasProjectApproval);
 
     final isPending = expense.status == ExpenseStatus.pending;
     final isDark = Theme.of(context).brightness == Brightness.dark;

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ProjectsService {
@@ -23,9 +24,10 @@ export class ProjectsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
-  private mapProjectRow(p: any, revenues: any[] = [], members: any[] = []) {
+  private mapProjectRow(p: any, revenues: any[] = [], members: any[] = [], detailedMembers: any[] = []) {
     const memberIds = (members || []).map((m) => m.user_id || m);
     if (p.created_by && !memberIds.includes(p.created_by)) {
       memberIds.push(p.created_by);
@@ -60,6 +62,7 @@ export class ProjectsService {
       closingSummary: p.closing_summary,
       createdById: p.created_by,
       teamMemberIds: memberIds,
+      members: detailedMembers && detailedMembers.length > 0 ? detailedMembers : undefined,
       imageUrl: p.image_url || null,
       siteLatitude: p.site_latitude == null ? null : Number(p.site_latitude),
       siteLongitude: p.site_longitude == null ? null : Number(p.site_longitude),
@@ -135,7 +138,33 @@ export class ProjectsService {
            FROM project_members pm
            WHERE pm.project_id = p.id),
           '[]'::json
-        ) AS team_members
+        ) AS team_members,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'userId', pm.user_id,
+            'fullName', u.full_name,
+            'email', u.email,
+            'avatarUrl', u.avatar_url,
+            'roleInProject', pm.role_in_project,
+            'assignedAt', pm.assigned_at,
+            'permissions', json_build_object(
+              'canViewBudget', pm.can_view_budget,
+              'canRecordRevenue', pm.can_record_revenue,
+              'canViewExpenses', pm.can_view_expenses,
+              'canCreateExpenses', pm.can_create_expenses,
+              'canApproveExpenses', pm.can_approve_expenses,
+              'canManageTasks', pm.can_manage_tasks,
+              'canUpdateProgress', pm.can_update_progress,
+              'canManageTeam', pm.can_manage_team,
+              'canEditProject', pm.can_edit_project,
+              'canViewAttendance', pm.can_view_attendance
+            )
+          ))
+          FROM project_members pm
+          LEFT JOIN users u ON u.id = pm.user_id
+          WHERE pm.project_id = p.id),
+          '[]'::json
+        ) AS detailed_members
       FROM projects p
       WHERE p.id::text = $1 OR p.project_code = $1 OR LOWER(p.name) = LOWER($1)`,
       [id],
@@ -146,7 +175,7 @@ export class ProjectsService {
     }
 
     const row = res.rows[0];
-    const project = this.mapProjectRow(row, row.revenues, row.team_members);
+    const project = this.mapProjectRow(row, row.revenues, row.team_members, row.detailed_members);
 
     if (user && user.role !== 'main_admin' && user.role !== 'finance_manager' && user.role !== 'finance') {
       const isCreator = row.created_by === user.id;
@@ -602,6 +631,257 @@ export class ProjectsService {
       message: `Project ${id} deleted successfully`, 
       deletedCount: res.rowCount,
       deletedProjects: deleted 
+    };
+  }
+
+  async getProjectMembers(projectId: string) {
+    const rawTarget = (projectId || '').trim();
+    const pRes = await this.db.query('SELECT id FROM projects WHERE id::text = $1 OR project_code = $1', [rawTarget]);
+    if (!pRes.rows.length) {
+      throw new NotFoundException(`Project not found: ${projectId}`);
+    }
+    const actualId = pRes.rows[0].id;
+
+    const res = await this.db.query(`
+      SELECT 
+        pm.user_id as "userId",
+        pm.project_id as "projectId",
+        pm.role_in_project as "roleInProject",
+        pm.assigned_at as "assignedAt",
+        pm.can_view_budget as "canViewBudget",
+        pm.can_record_revenue as "canRecordRevenue",
+        pm.can_view_expenses as "canViewExpenses",
+        pm.can_create_expenses as "canCreateExpenses",
+        pm.can_approve_expenses as "canApproveExpenses",
+        pm.can_manage_tasks as "canManageTasks",
+        pm.can_update_progress as "canUpdateProgress",
+        pm.can_manage_team as "canManageTeam",
+        pm.can_edit_project as "canEditProject",
+        pm.can_view_attendance as "canViewAttendance",
+        u.full_name as "fullName",
+        u.email,
+        u.avatar_url as "avatarUrl",
+        u.role as "systemRole",
+        u.department,
+        u.designation,
+        u.phone
+      FROM project_members pm
+      JOIN users u ON u.id = pm.user_id
+      WHERE pm.project_id = $1
+      ORDER BY pm.assigned_at ASC
+    `, [actualId]);
+
+    return res.rows.map(r => ({
+      userId: r.userId,
+      projectId: r.projectId,
+      fullName: r.fullName,
+      email: r.email,
+      avatarUrl: r.avatarUrl,
+      systemRole: r.systemRole,
+      department: r.department,
+      designation: r.designation,
+      phone: r.phone,
+      roleInProject: r.roleInProject || 'Member',
+      assignedAt: r.assignedAt,
+      permissions: {
+        canViewBudget: Boolean(r.canViewBudget),
+        canRecordRevenue: Boolean(r.canRecordRevenue),
+        canViewExpenses: Boolean(r.canViewExpenses),
+        canCreateExpenses: Boolean(r.canCreateExpenses),
+        canApproveExpenses: Boolean(r.canApproveExpenses),
+        canManageTasks: Boolean(r.canManageTasks),
+        canUpdateProgress: Boolean(r.canUpdateProgress),
+        canManageTeam: Boolean(r.canManageTeam),
+        canEditProject: Boolean(r.canEditProject),
+        canViewAttendance: Boolean(r.canViewAttendance),
+      }
+    }));
+  }
+
+  async addOrUpdateProjectMember(projectId: string, dto: any, actorUser: any) {
+    const rawTarget = (projectId || '').trim();
+    const pRes = await this.db.query('SELECT id, name FROM projects WHERE id::text = $1 OR project_code = $1', [rawTarget]);
+    if (!pRes.rows.length) {
+      throw new NotFoundException(`Project not found: ${projectId}`);
+    }
+    const actualId = pRes.rows[0].id;
+    const targetUserId = dto.userId || dto.user_id;
+    if (!targetUserId) throw new BadRequestException('userId is required');
+
+    const isGlobalAdmin = actorUser?.role === 'main_admin' || actorUser?.role === 'admin' || actorUser?.role === 'project_manager';
+    if (!isGlobalAdmin) {
+      const actorPm = await this.db.query(
+        'SELECT can_manage_team FROM project_members WHERE project_id = $1 AND user_id = $2',
+        [actualId, actorUser?.id]
+      );
+      if (!actorPm.rows.length || !actorPm.rows[0].can_manage_team) {
+        throw new ForbiddenException('You do not have permission to manage members for this project');
+      }
+    }
+
+    const perms = dto.permissions || {};
+    const roleInProject = (dto.roleInProject || dto.role_in_project || dto.role || 'Member').trim();
+
+    await this.db.query(`
+      INSERT INTO project_members (
+        project_id, user_id, role_in_project,
+        can_view_budget, can_record_revenue, can_view_expenses, can_create_expenses,
+        can_approve_expenses, can_manage_tasks, can_update_progress, can_manage_team,
+        can_edit_project, can_view_attendance
+      ) VALUES (
+        $1, $2, $3,
+        $4, $5, $6, $7,
+        $8, $9, $10, $11,
+        $12, $13
+      )
+      ON CONFLICT (project_id, user_id) DO UPDATE SET
+        role_in_project = EXCLUDED.role_in_project,
+        can_view_budget = EXCLUDED.can_view_budget,
+        can_record_revenue = EXCLUDED.can_record_revenue,
+        can_view_expenses = EXCLUDED.can_view_expenses,
+        can_create_expenses = EXCLUDED.can_create_expenses,
+        can_approve_expenses = EXCLUDED.can_approve_expenses,
+        can_manage_tasks = EXCLUDED.can_manage_tasks,
+        can_update_progress = EXCLUDED.can_update_progress,
+        can_manage_team = EXCLUDED.can_manage_team,
+        can_edit_project = EXCLUDED.can_edit_project,
+        can_view_attendance = EXCLUDED.can_view_attendance
+    `, [
+      actualId,
+      targetUserId,
+      roleInProject,
+      perms.canViewBudget ?? perms.can_view_budget ?? true,
+      perms.canRecordRevenue ?? perms.can_record_revenue ?? false,
+      perms.canViewExpenses ?? perms.can_view_expenses ?? true,
+      perms.canCreateExpenses ?? perms.can_create_expenses ?? true,
+      perms.canApproveExpenses ?? perms.can_approve_expenses ?? false,
+      perms.canManageTasks ?? perms.can_manage_tasks ?? false,
+      perms.canUpdateProgress ?? perms.can_update_progress ?? false,
+      perms.canManageTeam ?? perms.can_manage_team ?? false,
+      perms.canEditProject ?? perms.can_edit_project ?? false,
+      perms.canViewAttendance ?? perms.can_view_attendance ?? true,
+    ]);
+
+    try {
+      await this.notificationsService.create({
+        userId: targetUserId,
+        title: 'Project Role Updated',
+        message: `You were assigned the role "${roleInProject}" on project ${pRes.rows[0].name}${perms.canApproveExpenses ? ' with expense claim approval authority' : ''}.`,
+        type: 'project_assigned',
+        relatedProjectId: actualId,
+        actorId: actorUser?.id,
+        actorName: actorUser?.fullName || actorUser?.name || 'Administrator',
+      });
+    } catch (_) {}
+
+    return this.getProjectMembers(actualId);
+  }
+
+  async removeProjectMember(projectId: string, userId: string, actorUser: any) {
+    const rawTarget = (projectId || '').trim();
+    const pRes = await this.db.query('SELECT id FROM projects WHERE id::text = $1 OR project_code = $1', [rawTarget]);
+    if (!pRes.rows.length) throw new NotFoundException(`Project not found: ${projectId}`);
+    const actualId = pRes.rows[0].id;
+
+    const isGlobalAdmin = actorUser?.role === 'main_admin' || actorUser?.role === 'admin' || actorUser?.role === 'project_manager';
+    if (!isGlobalAdmin) {
+      const actorPm = await this.db.query(
+        'SELECT can_manage_team FROM project_members WHERE project_id = $1 AND user_id = $2',
+        [actualId, actorUser?.id]
+      );
+      if (!actorPm.rows.length || !actorPm.rows[0].can_manage_team) {
+        throw new ForbiddenException('You do not have permission to manage members for this project');
+      }
+    }
+
+    await this.db.query('DELETE FROM project_members WHERE project_id = $1 AND user_id = $2', [actualId, userId]);
+    return { success: true, userId, projectId: actualId };
+  }
+
+  async getMyProjectPermissions(projectId: string, user: any) {
+    if (!user) throw new ForbiddenException();
+    if (user.role === 'main_admin' || user.role === 'admin') {
+      return {
+        isSystemAdmin: true,
+        roleInProject: 'System Administrator',
+        permissions: {
+          canViewBudget: true,
+          canRecordRevenue: true,
+          canViewExpenses: true,
+          canCreateExpenses: true,
+          canApproveExpenses: true,
+          canManageTasks: true,
+          canUpdateProgress: true,
+          canManageTeam: true,
+          canEditProject: true,
+          canViewAttendance: true,
+        }
+      };
+    }
+
+    const rawTarget = (projectId || '').trim();
+    const pRes = await this.db.query('SELECT id, created_by FROM projects WHERE id::text = $1 OR project_code = $1', [rawTarget]);
+    if (!pRes.rows.length) throw new NotFoundException(`Project not found: ${projectId}`);
+    const actualId = pRes.rows[0].id;
+
+    if (pRes.rows[0].created_by === user.id) {
+      return {
+        isSystemAdmin: false,
+        isCreator: true,
+        roleInProject: 'Project Creator',
+        permissions: {
+          canViewBudget: true,
+          canRecordRevenue: true,
+          canViewExpenses: true,
+          canCreateExpenses: true,
+          canApproveExpenses: true,
+          canManageTasks: true,
+          canUpdateProgress: true,
+          canManageTeam: true,
+          canEditProject: true,
+          canViewAttendance: true,
+        }
+      };
+    }
+
+    const pm = await this.db.query('SELECT * FROM project_members WHERE project_id = $1 AND user_id = $2', [actualId, user.id]);
+    if (!pm.rows.length) {
+      return {
+        isSystemAdmin: false,
+        isMember: false,
+        roleInProject: 'Non-Member',
+        permissions: {
+          canViewBudget: false,
+          canRecordRevenue: false,
+          canViewExpenses: false,
+          canCreateExpenses: false,
+          canApproveExpenses: false,
+          canManageTasks: false,
+          canUpdateProgress: false,
+          canManageTeam: false,
+          canEditProject: false,
+          canViewAttendance: false,
+        }
+      };
+    }
+
+    const r = pm.rows[0];
+    return {
+      isSystemAdmin: false,
+      isMember: true,
+      roleInProject: r.role_in_project || 'Member',
+      permissions: {
+        canViewBudget: Boolean(r.can_view_budget),
+        canRecordRevenue: Boolean(r.can_record_revenue),
+        canViewExpenses: Boolean(r.can_view_expenses),
+        canCreateExpenses: Boolean(r.can_create_expenses),
+        canApproveExpenses: Boolean(r.can_approve_expenses),
+        canManageTasks: Boolean(r.can_manage_tasks),
+        canUpdateProgress: Boolean(r.can_update_progress),
+        canManageTeam: Boolean(r.can_manage_team),
+        canEditProject: Boolean(r.can_edit_project),
+        canViewAttendance: Boolean(r.can_view_attendance),
+      }
     };
   }
 }

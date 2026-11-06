@@ -41,6 +41,22 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query('ALTER TABLE users ALTER COLUMN designation DROP NOT NULL;').catch(() => {});
       await this.pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;').catch(() => {});
 
+      // Auto-migrate project_members custom roles and granular permissions
+      await this.pool.query(`
+        ALTER TABLE project_members ALTER COLUMN role_in_project TYPE VARCHAR(100);
+        ALTER TABLE project_members ALTER COLUMN role_in_project SET DEFAULT 'Member';
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_view_budget BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_record_revenue BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_view_expenses BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_create_expenses BOOLEAN NOT NULL DEFAULT TRUE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_approve_expenses BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_manage_tasks BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_update_progress BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_manage_team BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_edit_project BOOLEAN NOT NULL DEFAULT FALSE;
+        ALTER TABLE project_members ADD COLUMN IF NOT EXISTS can_view_attendance BOOLEAN NOT NULL DEFAULT TRUE;
+      `).catch((e) => this.logger.warn(`Project members migration note: ${e.message}`));
+
       // Persistent file storage for uploads
       await this.pool.query(`
         CREATE TABLE IF NOT EXISTS app_uploaded_files (

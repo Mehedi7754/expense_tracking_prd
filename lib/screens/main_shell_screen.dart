@@ -15,6 +15,7 @@ import '../state/expense_provider.dart';
 import '../state/notification_provider.dart';
 import '../state/attendance_provider.dart';
 import '../state/chat_provider.dart';
+import '../state/project_provider.dart';
 import 'approvals/approvals_queue_screen.dart';
 import 'attendance/attendance_dashboard_screen.dart';
 import 'attendance/my_attendance_screen.dart';
@@ -175,6 +176,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
 
   void _handleCenterAction(BuildContext context, UserModel user) {
     final role = user.role;
+    final hasProjectApproval = ref.read(projectProvider).any((p) => p.canMemberApproveExpenses(user.id));
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -455,7 +457,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   ),
                   const Divider(height: 16),
                 ],
-              if (role.canApproveExpenses) ...[
+              if (role.canApproveExpenses || hasProjectApproval) ...[
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: Container(

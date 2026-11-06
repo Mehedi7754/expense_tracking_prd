@@ -112,6 +112,111 @@ class ProjectProgressNote {
   }
 }
 
+class ProjectPermissions {
+  final bool canViewBudget;
+  final bool canRecordRevenue;
+  final bool canViewExpenses;
+  final bool canCreateExpenses;
+  final bool canApproveExpenses;
+  final bool canManageTasks;
+  final bool canUpdateProgress;
+  final bool canManageTeam;
+  final bool canEditProject;
+  final bool canViewAttendance;
+
+  const ProjectPermissions({
+    this.canViewBudget = true,
+    this.canRecordRevenue = false,
+    this.canViewExpenses = true,
+    this.canCreateExpenses = true,
+    this.canApproveExpenses = false,
+    this.canManageTasks = false,
+    this.canUpdateProgress = false,
+    this.canManageTeam = false,
+    this.canEditProject = false,
+    this.canViewAttendance = true,
+  });
+
+  factory ProjectPermissions.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const ProjectPermissions();
+    return ProjectPermissions(
+      canViewBudget: json['canViewBudget'] ?? json['can_view_budget'] ?? true,
+      canRecordRevenue: json['canRecordRevenue'] ?? json['can_record_revenue'] ?? false,
+      canViewExpenses: json['canViewExpenses'] ?? json['can_view_expenses'] ?? true,
+      canCreateExpenses: json['canCreateExpenses'] ?? json['can_create_expenses'] ?? true,
+      canApproveExpenses: json['canApproveExpenses'] ?? json['can_approve_expenses'] ?? false,
+      canManageTasks: json['canManageTasks'] ?? json['can_manage_tasks'] ?? false,
+      canUpdateProgress: json['canUpdateProgress'] ?? json['can_update_progress'] ?? false,
+      canManageTeam: json['canManageTeam'] ?? json['can_manage_team'] ?? false,
+      canEditProject: json['canEditProject'] ?? json['can_edit_project'] ?? false,
+      canViewAttendance: json['canViewAttendance'] ?? json['can_view_attendance'] ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'canViewBudget': canViewBudget,
+      'canRecordRevenue': canRecordRevenue,
+      'canViewExpenses': canViewExpenses,
+      'canCreateExpenses': canCreateExpenses,
+      'canApproveExpenses': canApproveExpenses,
+      'canManageTasks': canManageTasks,
+      'canUpdateProgress': canUpdateProgress,
+      'canManageTeam': canManageTeam,
+      'canEditProject': canEditProject,
+      'canViewAttendance': canViewAttendance,
+    };
+  }
+}
+
+class ProjectMember {
+  final String userId;
+  final String roleInProject;
+  final ProjectPermissions permissions;
+  final String? fullName;
+  final String? email;
+  final String? avatarUrl;
+  final DateTime? assignedAt;
+
+  const ProjectMember({
+    required this.userId,
+    this.roleInProject = 'Member',
+    this.permissions = const ProjectPermissions(),
+    this.fullName,
+    this.email,
+    this.avatarUrl,
+    this.assignedAt,
+  });
+
+  factory ProjectMember.fromJson(Map<String, dynamic> json) {
+    final userMap = json['user'] is Map<String, dynamic> ? json['user'] as Map<String, dynamic> : null;
+    return ProjectMember(
+      userId: (json['userId'] ?? json['user_id'] ?? userMap?['id'] ?? '').toString(),
+      roleInProject: (json['roleInProject'] ?? json['role_in_project'] ?? 'Member').toString(),
+      permissions: ProjectPermissions.fromJson(
+        json['permissions'] is Map<String, dynamic> ? json['permissions'] as Map<String, dynamic> : json,
+      ),
+      fullName: (json['fullName'] ?? json['full_name'] ?? userMap?['name'] ?? userMap?['full_name'] ?? json['name'])?.toString(),
+      email: (json['email'] ?? userMap?['email'])?.toString(),
+      avatarUrl: (json['avatarUrl'] ?? json['avatar_url'] ?? userMap?['avatarUrl'] ?? userMap?['avatar_url'])?.toString(),
+      assignedAt: json['assignedAt'] != null || json['assigned_at'] != null
+          ? DateTime.tryParse((json['assignedAt'] ?? json['assigned_at']).toString())
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'roleInProject': roleInProject,
+      'permissions': permissions.toJson(),
+      'fullName': fullName,
+      'email': email,
+      'avatarUrl': avatarUrl,
+    };
+  }
+}
+
 enum ProjectStatus {
   proposal,
   approved,
@@ -379,6 +484,7 @@ class ProjectModel {
   final DateTime startDate;
   final DateTime endDate;
   final List<String> teamMemberIds;
+  final List<ProjectMember> members;
   final ProjectStatus status;
   final List<RevenueEntry> revenueEntries;
   final bool isClosed;
@@ -419,6 +525,7 @@ class ProjectModel {
     required this.startDate,
     required this.endDate,
     required this.teamMemberIds,
+    this.members = const [],
     this.status = ProjectStatus.ongoing,
     this.revenueEntries = const [],
     this.isClosed = false,
@@ -433,6 +540,26 @@ class ProjectModel {
     this.siteLongitude,
     this.progressNotes = const [],
   });
+
+  ProjectMember? getMember(String userId) {
+    try {
+      return members.firstWhere((m) => m.userId == userId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool canMemberApproveExpenses(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canApproveExpenses ?? false;
+  }
+
+  bool canMemberManageTeam(String userId) {
+    if (createdById == userId) return true;
+    final m = getMember(userId);
+    return m?.permissions.canManageTeam ?? false;
+  }
 
   // Visual status indicators based on progress:
   // Not Started (0%), In Progress (1%-74%), Near Completion (75%-99%), Completed (100%)
@@ -500,6 +627,7 @@ class ProjectModel {
     DateTime? startDate,
     DateTime? endDate,
     List<String>? teamMemberIds,
+    List<ProjectMember>? members,
     ProjectStatus? status,
     List<RevenueEntry>? revenueEntries,
     bool? isClosed,
@@ -540,6 +668,7 @@ class ProjectModel {
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
       teamMemberIds: teamMemberIds ?? this.teamMemberIds,
+      members: members ?? this.members,
       status: status ?? this.status,
       revenueEntries: revenueEntries ?? this.revenueEntries,
       isClosed: isClosed ?? this.isClosed,
@@ -593,6 +722,16 @@ class ProjectModel {
         return raw
             .whereType<Map<String, dynamic>>()
             .map(ProjectProgressNote.fromJson)
+            .toList();
+      }
+      return const [];
+    }
+
+    List<ProjectMember> parseMembers(dynamic raw) {
+      if (raw is List) {
+        return raw
+            .whereType<Map<String, dynamic>>()
+            .map(ProjectMember.fromJson)
             .toList();
       }
       return const [];
@@ -661,6 +800,7 @@ class ProjectModel {
           ? DateTime.tryParse(json['end_date'].toString()) ?? DateTime.now()
           : DateTime.now(),
       teamMemberIds: mergedMembers,
+      members: parseMembers(json['members']),
       status: ProjectStatus.fromString(statusStr),
       revenueEntries: parseRevenues(json['revenue_entries'] ?? json['revenueEntries']),
       isClosed: json['is_closed'] ?? json['isClosed'] ?? false,

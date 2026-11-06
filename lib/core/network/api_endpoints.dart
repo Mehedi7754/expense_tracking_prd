@@ -35,8 +35,9 @@ class ApiEndpoints {
   static String get projects => resolve(AppEnv.endpointProjects);
   static String projectById(String id) => resolve('${AppEnv.endpointProjects}/$id');
   static String projectRevenues(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/revenues');
-  static String addProjectRevenue(String id) => resolve('${AppEnv.endpointProjects}/$id/revenue');
   static String projectMembers(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/members');
+  static String projectMemberById(String projectId, String userId) => resolve('${AppEnv.endpointProjects}/$projectId/members/$userId');
+  static String myProjectPermissions(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/my-permissions');
   static String closeProject(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/close');
   static String reopenProject(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/reopen');
   static String get projectCostBreakdown => resolve(AppEnv.endpointProjectCostBreakdown);
