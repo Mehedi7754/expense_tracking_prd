@@ -104,7 +104,33 @@ export class ProjectsService {
            FROM project_members pm
            WHERE pm.project_id = p.id),
           '[]'::json
-        ) AS team_members
+        ) AS team_members,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'userId', pm.user_id,
+            'fullName', u.full_name,
+            'email', u.email,
+            'avatarUrl', u.avatar_url,
+            'roleInProject', pm.role_in_project,
+            'assignedAt', pm.assigned_at,
+            'permissions', json_build_object(
+              'canViewBudget', pm.can_view_budget,
+              'canRecordRevenue', pm.can_record_revenue,
+              'canViewExpenses', pm.can_view_expenses,
+              'canCreateExpenses', pm.can_create_expenses,
+              'canApproveExpenses', pm.can_approve_expenses,
+              'canManageTasks', pm.can_manage_tasks,
+              'canUpdateProgress', pm.can_update_progress,
+              'canManageTeam', pm.can_manage_team,
+              'canEditProject', pm.can_edit_project,
+              'canViewAttendance', pm.can_view_attendance
+            )
+          ))
+          FROM project_members pm
+          LEFT JOIN users u ON u.id = pm.user_id
+          WHERE pm.project_id = p.id),
+          '[]'::json
+        ) AS detailed_members
       FROM projects p
     `;
 
@@ -117,7 +143,7 @@ export class ProjectsService {
     queryText += ` ORDER BY p.created_at DESC `;
 
     const res = await this.db.query(queryText, params);
-    return res.rows.map((row) => this.mapProjectRow(row, row.revenues, row.team_members));
+    return res.rows.map((row) => this.mapProjectRow(row, row.revenues, row.team_members, row.detailed_members));
   }
 
   async findOne(id: string, user?: any) {
