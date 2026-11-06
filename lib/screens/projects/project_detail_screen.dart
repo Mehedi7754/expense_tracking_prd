@@ -733,106 +733,88 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     if (memberRole == null && !isOwner) return const SizedBox.shrink();
 
     final activeBadges = <String>[];
-    if (project.canMemberApproveExpenses(userId)) activeBadges.add('Approve Expenses');
-    if (project.canMemberViewBudget(userId)) activeBadges.add('View Budget');
-    if (project.canMemberManageTasks(userId)) activeBadges.add('Manage Tasks');
-    if (project.canMemberEditProject(userId)) activeBadges.add('Edit Project');
-    if (project.canMemberCreateExpenses(userId)) activeBadges.add('Submit Expenses');
-    if (project.canMemberRecordRevenue(userId)) activeBadges.add('Record Revenue');
-    if (project.canMemberManageTeam(userId)) activeBadges.add('Manage Team');
-    if (project.canMemberUpdateProgress(userId)) activeBadges.add('Update Progress');
+    if (project.canMemberApproveExpenses(userId)) activeBadges.add('Approve');
+    if (project.canMemberViewBudget(userId)) activeBadges.add('Budget');
+    if (project.canMemberManageTasks(userId)) activeBadges.add('Tasks');
+    if (project.canMemberEditProject(userId)) activeBadges.add('Edit');
+    if (project.canMemberCreateExpenses(userId)) activeBadges.add('Expenses');
+    if (project.canMemberRecordRevenue(userId)) activeBadges.add('Revenue');
+    if (project.canMemberManageTeam(userId)) activeBadges.add('Team');
+    if (project.canMemberUpdateProgress(userId)) activeBadges.add('Progress');
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(14),
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-          width: 1.0,
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          width: 0.8,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.badge_rounded, size: 15, color: Color(0xFF2563EB)),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Row(
-                  children: [
-                    Text(
-                      'Your Project Role: ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        memberRole ?? 'Owner',
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (activeBadges.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: activeBadges.map((badge) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(5),
-                    border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
-                      width: 0.8,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF10B981)),
-                      const SizedBox(width: 3),
-                      Text(
-                        badge,
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF10B981),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2563EB),
+              borderRadius: BorderRadius.circular(6),
             ),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.shield_outlined, size: 12, color: Colors.white),
+                const SizedBox(width: 4),
+                Text(
+                  memberRole ?? 'Project Owner',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: activeBadges.map((badge) {
+                  return Container(
+                    margin: const EdgeInsets.only(right: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.2 : 0.12),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.28),
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.check_rounded, size: 10, color: Color(0xFF10B981)),
+                        const SizedBox(width: 2.5),
+                        Text(
+                          badge,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
         ],
       ),
     );

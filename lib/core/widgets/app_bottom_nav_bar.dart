@@ -68,10 +68,10 @@ class AppBottomNavBar extends StatelessWidget {
           activeIcon: CupertinoIcons.plus_circle_fill,
         ),
         NavItemData(
-          label: 'Chat',
-          icon: CupertinoIcons.chat_bubble_2,
-          activeIcon: CupertinoIcons.chat_bubble_2_fill,
-          badgeCount: unreadChatCount,
+          label: 'Approvals',
+          icon: CupertinoIcons.checkmark_seal,
+          activeIcon: CupertinoIcons.checkmark_seal_fill,
+          badgeCount: pendingApprovalsCount,
         ),
       ];
     }
@@ -97,11 +97,11 @@ class AppBottomNavBar extends StatelessWidget {
           icon: CupertinoIcons.plus_circle,
           activeIcon: CupertinoIcons.plus_circle_fill,
         ),
-        NavItemData(
-          label: 'Chat',
-          icon: CupertinoIcons.chat_bubble_2,
-          activeIcon: CupertinoIcons.chat_bubble_2_fill,
-          badgeCount: unreadChatCount,
+        const NavItemData(
+          label: 'Menu',
+          icon: CupertinoIcons.line_horizontal_3,
+          activeIcon: CupertinoIcons.line_horizontal_3_decrease,
+          isMenu: true,
         ),
       ];
     }

@@ -768,73 +768,181 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
               e.status == ExpenseStatus.pending && approvableProjects.any((p) => p.id == e.projectId)
             ).toList();
 
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.25) : const Color(0xFFECFDF5),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.4 : 0.6),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.05 : 0.08),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
+            final hasPending = pendingApprovalExpenses.isNotEmpty;
+
+            if (hasPending) {
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF1E1B4B), const Color(0xFF312E81)]
+                        : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFF6366F1).withValues(alpha: isDark ? 0.4 : 0.6),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
-                    child: const Icon(Icons.fact_check_rounded, color: Color(0xFF10B981), size: 22),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => context.push(RoutePaths.approvalsQueue),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF4F46E5),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(CupertinoIcons.checkmark_seal_fill, color: Colors.white, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Project Approvals',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                        color: isDark ? Colors.white : const Color(0xFF1E1B4B),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFEF4444),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${pendingApprovalExpenses.length} Pending',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Claims awaiting your sign-off across ${approvableProjects.length} project${approvableProjects.length > 1 ? "s" : ""}.',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark ? const Color(0xFFC7D2FE) : const Color(0xFF4338CA),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4F46E5),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              visualDensity: VisualDensity.compact,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            onPressed: () => context.push(RoutePaths.approvalsQueue),
+                            child: const Text('Review →', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+              );
+            }
+
+            // Clean, minimal status strip when 0 claims are pending
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  width: 1.0,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => context.push(RoutePaths.approvalsQueue),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
                       children: [
-                        Text(
-                          'Project Approvals (${pendingApprovalExpenses.length} Pending)',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
-                            color: isDark ? Colors.white : const Color(0xFF064E3B),
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.verified_user_rounded, color: Color(0xFF10B981), size: 14),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Project Approver Authority Active',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'You have approval authority for ${approvableProjects.length} assigned project${approvableProjects.length > 1 ? "s" : ""}.',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF047857),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
                           ),
+                          child: const Text(
+                            '0 Pending',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF10B981),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_forward_ios_rounded,
+                          size: 11,
+                          color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      visualDensity: VisualDensity.compact,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => context.push(RoutePaths.approvalsQueue),
-                    child: const Text('Review', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                  ),
-                ],
+                ),
               ),
             );
           },

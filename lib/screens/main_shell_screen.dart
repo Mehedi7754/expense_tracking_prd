@@ -19,7 +19,6 @@ import '../state/project_provider.dart';
 import 'approvals/approvals_queue_screen.dart';
 import 'attendance/attendance_dashboard_screen.dart';
 import 'attendance/my_attendance_screen.dart';
-import 'chat/chat_list_screen.dart';
 import 'expenses/my_expenses_screen.dart';
 import 'home/home_dashboard_screen.dart';
 import 'projects/projects_list_screen.dart';
@@ -95,9 +94,14 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       _currentIndex = 2;
     }
 
+    final allProjects = ref.watch(projectProvider);
     final expenses = ref.watch(expenseProvider);
-    final pendingCount =
-        expenses.where((e) => e.status == ExpenseStatus.pending).length;
+    final pendingCount = expenses.where((e) {
+      if (e.status != ExpenseStatus.pending) return false;
+      if (role.canApproveExpenses) return true;
+      final proj = allProjects.where((p) => p.id == e.projectId).firstOrNull;
+      return proj != null && proj.canMemberApproveExpenses(user.id);
+    }).length;
 
     final notifications = ref.watch(notificationProvider);
     final unreadNotifsCount =
@@ -154,16 +158,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                   ref
                       .read(attendanceProvider.notifier)
                       .fetchAttendanceRecords(userId: user.id, force: true);
-                } else if (role != UserRole.projectMember &&
-                    role != UserRole.viewer &&
-                    index == 1) {
+                } else if (index == 4 ||
+                    (role != UserRole.projectMember &&
+                        role != UserRole.viewer &&
+                        index == 1)) {
                   ref.read(expenseProvider.notifier).fetchExpenses(force: true);
-                } else if (role != UserRole.projectMember &&
-                    role != UserRole.viewer &&
-                    index == 4) {
-                  ref
-                      .read(attendanceProvider.notifier)
-                      .fetchDailyOverview(force: true);
+                  ref.read(projectProvider.notifier).fetchProjects(force: true);
                 }
               },
               onAddTap: () => _handleCenterAction(context, user),
@@ -792,7 +792,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           MyAttendanceScreen(),
           HomeDashboardScreen(),
           HomeDashboardScreen(),
-          ChatListScreen(hasBottomDock: true),
+          ApprovalsQueueScreen(),
         ];
 
       case UserRole.projectManager:
@@ -812,7 +812,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ReportsScreen(),
           HomeDashboardScreen(),
           HomeDashboardScreen(),
-          ChatListScreen(hasBottomDock: true),
+          ApprovalsQueueScreen(),
         ];
     }
   }

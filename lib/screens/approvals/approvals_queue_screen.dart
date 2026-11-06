@@ -224,7 +224,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                         : 'No pending claims match your search/filter.',
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 24, top: 4),
+                    padding: const EdgeInsets.only(bottom: 120, top: 4),
                     itemCount: filtered.length,
                     itemBuilder: (ctx, i) {
                       final exp = filtered[i];
