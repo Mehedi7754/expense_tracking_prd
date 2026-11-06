@@ -12,6 +12,9 @@ class NotificationRouter {
   /// Whether the logged-in user manages attendance (admin/manager/finance).
   static bool canManageAttendance = false;
 
+  /// Whether the logged-in user is the system main admin.
+  static bool isMainAdmin = false;
+
   static void attach(GoRouter router) {
     _router = router;
     final p = _pending;
@@ -96,7 +99,11 @@ class NotificationRouter {
         type == 'newuser' ||
         type.contains('registration') ||
         type == 'employee_account_pending') {
-      return '${RoutePaths.userManagement}?filter=pending';
+      // Only admins should be routed to user management for registration notifications
+      if (isMainAdmin) {
+        return '${RoutePaths.userManagement}?filter=pending';
+      }
+      return RoutePaths.notifications;
     }
     if (projectId != null && projectId.isNotEmpty) {
       return RoutePaths.projectDetail(projectId);

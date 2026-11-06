@@ -69,6 +69,7 @@ class GWProjectApp extends ConsumerWidget {
       _lastRole = role;
       final isEmployee = role == UserRole.projectMember || role == UserRole.projectManager;
       NotificationRouter.canManageAttendance = role?.canManageAttendanceAndSalary ?? false;
+      NotificationRouter.isMainAdmin = role == UserRole.mainAdmin;
       final attSettings = ref.read(attendanceSettingsProvider).value;
       PushNotificationService.instance.syncAttendanceReminders(
         isEmployee: isEmployee,

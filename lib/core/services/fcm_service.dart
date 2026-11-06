@@ -61,12 +61,22 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         payload: NotificationRouter.encode(data),
       );
     } else if (type.contains('registration') || type.contains('employee')) {
-      await PushNotificationService.instance.showEmployeeRegistrationAlert(
-        title: title,
-        body: body,
-        notificationId: notifId,
-        payload: NotificationRouter.encode(data),
-      );
+      // Registration notifications are ADMIN-ONLY: check stored user role
+      bool isAdmin = false;
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final userJson = prefs.getString('gw_session_user_data') ?? '';
+        isAdmin = userJson.contains('"role":"mainAdmin"') ||
+            userJson.contains('"role": "mainAdmin"');
+      } catch (_) {}
+      if (isAdmin) {
+        await PushNotificationService.instance.showEmployeeRegistrationAlert(
+          title: title,
+          body: body,
+          notificationId: notifId,
+          payload: NotificationRouter.encode(data),
+        );
+      }
     } else {
       await PushNotificationService.instance.showImmediate(
         title: title,
@@ -178,12 +188,22 @@ class FcmService {
             payload: NotificationRouter.encode(data),
           );
         } else if (type.contains('registration') || type.contains('employee')) {
-          await PushNotificationService.instance.showEmployeeRegistrationAlert(
-            title: title,
-            body: body,
-            notificationId: notifId,
-            payload: NotificationRouter.encode(data),
-          );
+          // Registration notifications are ADMIN-ONLY: check stored user role
+          bool isAdmin = false;
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final userJson = prefs.getString('gw_session_user_data') ?? '';
+            isAdmin = userJson.contains('"role":"mainAdmin"') ||
+                userJson.contains('"role": "mainAdmin"');
+          } catch (_) {}
+          if (isAdmin) {
+            await PushNotificationService.instance.showEmployeeRegistrationAlert(
+              title: title,
+              body: body,
+              notificationId: notifId,
+              payload: NotificationRouter.encode(data),
+            );
+          }
         } else {
           await PushNotificationService.instance.showImmediate(
             title: title,

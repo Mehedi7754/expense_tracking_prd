@@ -63,6 +63,9 @@ class PushNotificationService {
     }
   }
 
+  /// Track already-shown attendance reminder IDs to prevent duplicates
+  final Set<String> _shownAttendanceIds = <String>{};
+
   /// Attendance reminders are for employees ONLY. Admin/finance/viewer never get them.
   Future<void> syncAttendanceReminders({
     required bool isEmployee,
@@ -75,6 +78,10 @@ class PushNotificationService {
       await _plugin.cancel(2);
       return;
     }
+    // Cancel existing before re-scheduling to prevent duplicates from multiple calls
+    await _plugin.cancel(1);
+    await _plugin.cancel(2);
+
     String fmtH(int h) => '${(h % 12 == 0 ? 12 : h % 12).toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
     await scheduleDailyAttendanceReminder(
       id: 1,
@@ -91,6 +98,45 @@ class PushNotificationService {
       minute: 0,
     );
   }
+
+  /// Show attendance-specific notification with dedup guard.
+  /// Also skips showing on weekends to avoid bothering employees on days off.
+  Future<void> showAttendanceReminder({
+    required String title,
+    required String body,
+    String? notificationId,
+    String? payload,
+  }) async {
+    if (!_initialized || kIsWeb) return;
+
+    // Skip showing reminder pop-ups on weekends (Friday & Saturday = BD weekend)
+    final now = DateTime.now();
+    if (now.weekday == DateTime.friday || now.weekday == DateTime.saturday) {
+      debugPrint('[PushNotificationService] Skipping attendance reminder on weekend');
+      return;
+    }
+
+    // Dedup: same notification ID should not fire more than once
+    if (notificationId != null && notificationId.isNotEmpty) {
+      if (_shownAttendanceIds.contains(notificationId)) {
+        debugPrint('[PushNotificationService] Duplicate attendance notif suppressed: $notificationId');
+        return;
+      }
+      _shownAttendanceIds.add(notificationId);
+      if (_shownAttendanceIds.length > 100) {
+        _shownAttendanceIds.remove(_shownAttendanceIds.first);
+      }
+    }
+
+    await showImmediate(
+      title: title,
+      body: body,
+      channel: _channelAttendance,
+      notificationId: notificationId,
+      payload: payload ?? 'type=attendance',
+    );
+  }
+
 
   Future<void> _createAndroidChannels({bool requestPermission = true}) async {
     final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
@@ -229,21 +275,6 @@ class PushNotificationService {
     );
   }
 
-  /// Show attendance-specific notification (high importance channel).
-  Future<void> showAttendanceReminder({
-    required String title,
-    required String body,
-    String? notificationId,
-    String? payload,
-  }) async {
-    await showImmediate(
-      title: title,
-      body: body,
-      channel: _channelAttendance,
-      notificationId: notificationId,
-      payload: payload ?? 'type=attendance',
-    );
-  }
 
   /// Show chat message notification with preview on isolated chat channel.
   Future<void> showChatAlert({
@@ -314,10 +345,15 @@ class PushNotificationService {
     await _plugin.cancelAll();
   }
 
+  /// Returns next scheduled time at [hour]:[minute], skipping BD weekends (Fri & Sat).
   tz.TZDateTime _nextInstanceOfTime(int hour, int minute) {
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
     if (scheduled.isBefore(now)) {
+      scheduled = scheduled.add(const Duration(days: 1));
+    }
+    // Skip Friday (5) and Saturday (6) — Bangladesh weekend
+    while (scheduled.weekday == DateTime.friday || scheduled.weekday == DateTime.saturday) {
       scheduled = scheduled.add(const Duration(days: 1));
     }
     return scheduled;

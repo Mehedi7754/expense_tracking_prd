@@ -165,13 +165,24 @@ class _AddEditTaskScreenState extends ConsumerState<AddEditTaskScreen> {
   @override
   Widget build(BuildContext context) {
     final role = ref.watch(authProvider).currentUser?.role;
-    if (role != UserRole.mainAdmin && role != UserRole.projectManager) {
+    final currentUser = ref.watch(authProvider).currentUser;
+    final userId = currentUser?.id ?? '';
+    final allProjects = ref.watch(projectProvider);
+
+    // Check if user has global task management role OR project-level canManageTasks permission
+    final bool hasGlobalTaskAccess =
+        role == UserRole.mainAdmin || role == UserRole.projectManager;
+    final bool hasProjectTaskAccess = allProjects.any(
+      (p) => p.canMemberManageTasks(userId),
+    );
+
+    if (!hasGlobalTaskAccess && !hasProjectTaskAccess) {
       return Scaffold(
         appBar: AppBar(title: const Text('Tasks')),
         body: const Center(child: Text('You do not have permission to manage tasks.')),
       );
     }
-    final allProjects = ref.watch(projectProvider);
+
     final allUsers = ref.watch(userManagementProvider).where((user) => const {
       UserRole.mainAdmin,
       UserRole.projectManager,

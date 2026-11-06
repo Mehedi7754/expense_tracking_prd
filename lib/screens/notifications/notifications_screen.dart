@@ -82,9 +82,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final isDark = AppColors.isDark(context);
 
     // Filter notifications: Super Admin and Finance see all alerts; others see their own or broadcast
+    // Registration notifications are ADMIN-ONLY — never shown to employees/project members
     final userNotifs =
         notifications.where((n) {
           if (user == null) return true;
+          // Registration notifications: only mainAdmin can see these
+          if (n.type == NotificationType.userRegistration) {
+            return user.role == UserRole.mainAdmin;
+          }
           if (user.role == UserRole.mainAdmin ||
               user.role == UserRole.finance) {
             return true;
