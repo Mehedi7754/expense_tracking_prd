@@ -24,7 +24,18 @@ export class AttendanceController {
   @HttpCode(HttpStatus.OK)
   @Post('check-in')
   async checkIn(@Body() dto: CheckInDto, @Request() req: any) {
-    return this.attendanceService.checkIn(req.user.id, dto);
+    const isManagerOrAdmin =
+      req.user.role === 'main_admin' ||
+      req.user.role === 'project_manager' ||
+      req.user.role === 'finance_manager' ||
+      req.user.role === 'finance';
+
+    const targetUserId =
+      isManagerOrAdmin && (dto.userId || dto.user_id)
+        ? (dto.userId || dto.user_id)
+        : req.user.id;
+
+    return this.attendanceService.checkIn(targetUserId, dto);
   }
 
   @Get()

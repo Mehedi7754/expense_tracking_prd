@@ -305,14 +305,23 @@ export class AttendanceService {
 
     let recordId: string;
 
+    const statusVal = dto.status || 'present';
     if (existing.rows.length > 0) {
-      throw new ConflictException(`You have already checked in for the ${session} session on ${targetDate}.`);
+      const res = await this.db.query(
+        `UPDATE attendance_records
+         SET login_time = clock_timestamp(), latitude = $2, longitude = $3, address_text = $4, device_info = $5, status = $6, notes = $7, work_mode = $8
+         WHERE id = $1
+         RETURNING id`,
+        [existing.rows[0].id, dto.latitude, dto.longitude, address, deviceInfo, statusVal, notes, workMode],
+      );
+      recordId = res.rows[0].id;
+      this.logger.log(`Updated attendance check-in for user ${userId} (${session}) on ${targetDate}`);
     } else {
       const res = await this.db.query(
         `INSERT INTO attendance_records (user_id, date, session_type, login_time, latitude, longitude, address_text, device_info, status, notes, work_mode)
-         VALUES ($1, $2, $3, clock_timestamp(), $4, $5, $6, $7, 'present', $8, $9)
+         VALUES ($1, $2, $3, clock_timestamp(), $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
-        [userId, targetDate, session, dto.latitude, dto.longitude, address, deviceInfo, notes, workMode],
+        [userId, targetDate, session, dto.latitude, dto.longitude, address, deviceInfo, statusVal, notes, workMode],
       );
       recordId = res.rows[0].id;
       this.logger.log(`Created new attendance check-in for user ${userId} (${session}) on ${targetDate} at [${dto.latitude}, ${dto.longitude}]`);
