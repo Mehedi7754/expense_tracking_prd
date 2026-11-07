@@ -16,7 +16,7 @@ export class UsersService {
 
   async findAll(query?: string) {
     let sql = `
-      SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+      SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active, u.created_at,
              COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
       FROM users u
       LEFT JOIN project_members pm ON pm.user_id = u.id
@@ -47,12 +47,14 @@ export class UsersService {
       is_approved: r.is_active,
       assignedProjectIds: r.assigned_project_ids || [],
       assigned_project_ids: r.assigned_project_ids || [],
+      createdAt: r.created_at,
+      created_at: r.created_at,
     }));
   }
 
   async findByEmail(email: string) {
     const res = await this.db.query(
-      `SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+      `SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active, u.created_at,
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
@@ -79,12 +81,14 @@ export class UsersService {
       is_approved: r.is_active,
       assignedProjectIds: r.assigned_project_ids || [],
       assigned_project_ids: r.assigned_project_ids || [],
+      createdAt: r.created_at,
+      created_at: r.created_at,
     };
   }
 
   async findOne(id: string) {
     const res = await this.db.query(
-      `SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active,
+      `SELECT u.id, u.employee_code, u.email, u.full_name, u.role, u.department, u.designation, u.phone, u.avatar_url, u.is_active, u.created_at,
               COALESCE(ARRAY_AGG(pm.project_id) FILTER (WHERE pm.project_id IS NOT NULL), '{}') AS assigned_project_ids
        FROM users u
        LEFT JOIN project_members pm ON pm.user_id = u.id
@@ -110,6 +114,8 @@ export class UsersService {
       is_approved: r.is_active,
       assignedProjectIds: r.assigned_project_ids || [],
       assigned_project_ids: r.assigned_project_ids || [],
+      createdAt: r.created_at,
+      created_at: r.created_at,
     };
   }
 
