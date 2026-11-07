@@ -656,6 +656,15 @@ class ProjectModel {
     return 0.0;
   }
 
+  /// Office Benefit calculated as a percentage of Gross Contract Value (Gross Project Value)
+  double get calculatedOfficeBenefit {
+    final budgeted = categoryBudgets['officebenefit'] ?? categoryBudgets['office_benefit'];
+    if (budgeted != null && budgeted > 0) {
+      return budgeted;
+    }
+    return grossProjectValue * officeBenefitRate;
+  }
+
   ProjectModel copyWith({
     String? id,
     String? projectId,

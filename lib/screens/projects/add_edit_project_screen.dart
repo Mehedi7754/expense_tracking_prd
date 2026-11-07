@@ -226,7 +226,8 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   }
 
   double get _calculatedOfficeBenefit {
-    return _calculatedDirectBudget * _officeBenefitRate;
+    final gross = double.tryParse(_grossValueController.text.trim()) ?? 0.0;
+    return gross * _officeBenefitRate;
   }
 
   double get _calculatedTotalBudget {
@@ -799,7 +800,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                           ),
                           const SizedBox(height: 6),
                           _buildFinancialPreviewRow(
-                            'Office Benefit (${(_officeBenefitRate * 100).toInt()}%)',
+                            'Office Benefit (${(_officeBenefitRate * 100).toInt()}% of Gross Contract)',
                             _calculatedOfficeBenefit,
                             isDark,
                           ),
@@ -1107,7 +1108,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  'Markup Margin (${(_officeBenefitRate * 100).toInt()}%)',
+                                  'Office Benefit (${(_officeBenefitRate * 100).toInt()}% of Gross Contract)',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color:

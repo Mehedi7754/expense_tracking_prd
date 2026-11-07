@@ -196,7 +196,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   ) {
     final validExpenses = expenses.where((e) => e.status == ExpenseStatus.approved);
     final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
-    final officeBenefit = directCost * project.officeBenefitRate;
+    final officeBenefit = project.grossProjectValue * project.officeBenefitRate;
     final totalCost = directCost + officeBenefit;
     final totalRevenue = project.amountReceived;
     final profit = project.grossProjectValue - totalCost;
@@ -235,7 +235,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               _buildSummaryRow('Contract Value:', CurrencyFormatter.format(project.grossProjectValue)),
               _buildSummaryRow('Total Revenue Received:', CurrencyFormatter.format(totalRevenue)),
               _buildSummaryRow('Direct Expenditure:', CurrencyFormatter.format(directCost)),
-              _buildSummaryRow('Office Benefit (30%):', CurrencyFormatter.format(officeBenefit)),
+              _buildSummaryRow('Office Benefit (${(project.officeBenefitRate * 100).toInt()}%):', CurrencyFormatter.format(officeBenefit)),
               _buildSummaryRow('Net Project Cost:', CurrencyFormatter.format(totalCost)),
               _buildSummaryRow('Project Profit:', CurrencyFormatter.format(profit), isBold: true),
               _buildSummaryRow('Profit Margin:', '${profitMargin.toStringAsFixed(1)}%', isBold: true),
