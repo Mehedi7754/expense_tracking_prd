@@ -278,6 +278,10 @@ export class AttendanceService {
       if (currentHour > morningStart || (currentHour === morningStart && currentMinute > gracePeriod)) {
         isLate = true;
       }
+    } else if (session === 'afternoon') {
+      if (currentHour > afternoonStart || (currentHour === afternoonStart && currentMinute > gracePeriod)) {
+        isLate = true;
+      }
     }
 
     const currentTotalMinutes = currentHour * 60 + currentMinute;
@@ -290,7 +294,7 @@ export class AttendanceService {
     notes = `${notes}${fieldSiteNote}`.trim();
     if (isEarly) {
       notes = notes ? `${notes} [Checked out before time]` : '[Checked out before time]';
-    } else if (isLate) {
+    } else if (isLate && !notes.toLowerCase().includes('late')) {
       notes = notes ? `${notes} [Late check-in]` : '[Late check-in]';
     }
 
@@ -305,7 +309,7 @@ export class AttendanceService {
 
     let recordId: string;
 
-    const statusVal = dto.status || 'present';
+    const statusVal = dto.status === 'late' || isLate ? 'late' : (dto.status || 'present');
     if (existing.rows.length > 0) {
       const res = await this.db.query(
         `UPDATE attendance_records
