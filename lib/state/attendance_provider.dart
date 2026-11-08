@@ -463,26 +463,26 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
     return '${hh.toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
   }
 
-  /// Session for "now" based on the divider or employee's shift.
+  /// Session for "now" based on break time window or employee's shift.
   static String resolveSession(AttendanceSettingsState? s, {String? userId}) {
     if (s != null && userId != null) {
       final shift = s.getShiftForUser(userId);
-      return DateTime.now().hour < shift.morningEndHour
+      return DateTime.now().hour < shift.breakEndHour
           ? 'morning'
           : 'afternoon';
     }
-    final divider = s?.morningEndHour ?? 13;
-    return DateTime.now().hour < divider ? 'morning' : 'afternoon';
+    final breakEnd = s?.breakEndHour ?? s?.afternoonStartHour ?? 14;
+    return DateTime.now().hour < breakEnd ? 'morning' : 'afternoon';
   }
 
   /// Returns null when check-in is allowed; otherwise a reason.
-  /// Evaluates specific shift timings. Afternoon check-out is permitted anytime.
+  /// Evaluates shift start timings without locking midday cutoff.
   static String? checkInWindowError(
     String session,
     AttendanceSettingsState? s, {
     String? userId,
   }) {
-    // Afternoon session is check-out / departure; employees can check out at any time.
+    // Afternoon session is check-out / departure / afternoon punch; employees can punch at any time.
     if (session == 'afternoon') {
       return null;
     }
@@ -492,20 +492,20 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       final h = DateTime.now().hour;
 
       if (session == 'morning') {
-        if (h < shift.morningStartHour)
+        if (h < shift.morningStartHour) {
           return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';
-        if (h >= shift.morningEndHour)
-          return 'Morning check-in for ${shift.name} is locked after ${_fmt(shift.morningEndHour)}.';
+        }
       }
       return null;
     }
 
-    final divider = s?.morningEndHour ?? 13;
+    final start = s?.morningStartHour ?? 9;
     final h = DateTime.now().hour;
 
     if (session == 'morning') {
-      if (h >= divider)
-        return 'Morning check-in is locked after ${_fmt(divider)}.';
+      if (h < start) {
+        return 'Morning check-in opens at ${_fmt(start)}.';
+      }
     }
     return null;
   }

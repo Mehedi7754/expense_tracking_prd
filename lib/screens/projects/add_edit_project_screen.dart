@@ -1792,7 +1792,12 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                             ),
                                             child: Row(
                                               children: [
-                                                InkWell(
+                                                Expanded(
+                                                  child: SingleChildScrollView(
+                                                    scrollDirection: Axis.horizontal,
+                                                    child: Row(
+                                                      children: [
+                                                        InkWell(
                                                   onTap: () => _showMemberRoleBottomSheet(context, u),
                                                   borderRadius: BorderRadius.circular(8),
                                                   child: Container(
@@ -1863,7 +1868,11 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                                     ),
                                                   ),
                                                 ],
-                                                const Spacer(),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
                                                 InkWell(
                                                   onTap: () => _showMemberRoleBottomSheet(context, u),
                                                   child: const Row(

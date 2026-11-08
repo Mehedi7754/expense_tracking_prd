@@ -61,6 +61,7 @@ void main() {
     });
 
     test('NotificationRouter routes employee registration directly to pending approvals filter', () {
+      NotificationRouter.isMainAdmin = true;
       expect(
         NotificationRouter.resolve({'type': 'employee_registration'}),
         equals('/admin/users?filter=pending'),
@@ -87,6 +88,12 @@ void main() {
       expect(decoded['type'], equals('employee_registration'));
       expect(decoded['route'], equals('/admin/users?filter=pending'));
       expect(NotificationRouter.resolve(decoded), equals('/admin/users?filter=pending'));
+
+      NotificationRouter.isMainAdmin = false;
+      expect(
+        NotificationRouter.resolve({'type': 'employee_registration'}),
+        equals('/notifications'),
+      );
     });
 
     test('NotificationModel serialization and deserialization works correctly', () {

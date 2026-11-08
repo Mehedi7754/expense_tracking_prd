@@ -30,9 +30,15 @@ export interface ShiftDefinition {
   id: string;
   name: string;
   morningStartHour: number;
-  morningEndHour: number;
-  afternoonStartHour: number;
+  morningStartMinute?: number;
+  breakStartHour?: number;
+  breakStartMinute?: number;
+  breakEndHour?: number;
+  breakEndMinute?: number;
   afternoonEndHour: number;
+  afternoonEndMinute?: number;
+  morningEndHour?: number;
+  afternoonStartHour?: number;
   weekendDays?: number[];
   isDefault?: boolean;
 }
@@ -58,9 +64,15 @@ export class AttendanceService {
 
   private officeTimingSettings = {
     morningStartHour: 9,
+    morningStartMinute: 0,
+    breakStartHour: 13,
+    breakStartMinute: 0,
+    breakEndHour: 14,
+    breakEndMinute: 0,
     morningEndHour: 13,
-    afternoonStartHour: 13,
+    afternoonStartHour: 14,
     afternoonEndHour: 18,
+    afternoonEndMinute: 0,
     weekendDays: [5, 6],
     deductionType: 'rate_based',
     fullDayDeductionAmount: 1.0,
@@ -71,8 +83,10 @@ export class AttendanceService {
         id: 'shift_default',
         name: 'General Office Shift',
         morningStartHour: 9,
+        breakStartHour: 13,
+        breakEndHour: 14,
         morningEndHour: 13,
-        afternoonStartHour: 13,
+        afternoonStartHour: 14,
         afternoonEndHour: 18,
         weekendDays: [5, 6],
         isDefault: true,
@@ -81,8 +95,10 @@ export class AttendanceService {
         id: 'shift_morning',
         name: 'Early Morning Shift',
         morningStartHour: 7,
+        breakStartHour: 11,
+        breakEndHour: 12,
         morningEndHour: 11,
-        afternoonStartHour: 11,
+        afternoonStartHour: 12,
         afternoonEndHour: 15,
         weekendDays: [5, 6],
         isDefault: false,
@@ -91,8 +107,10 @@ export class AttendanceService {
         id: 'shift_evening',
         name: 'Evening Shift',
         morningStartHour: 14,
+        breakStartHour: 18,
+        breakEndHour: 19,
         morningEndHour: 18,
-        afternoonStartHour: 18,
+        afternoonStartHour: 19,
         afternoonEndHour: 22,
         weekendDays: [7],
         isDefault: false,
@@ -147,13 +165,26 @@ export class AttendanceService {
       if (settings.weekendDays && defaultShift) {
         defaultShift.weekendDays = settings.weekendDays;
       }
-      if (settings.morningEndHour !== undefined && !settings.shifts) {
-        defaultShift.morningEndHour = settings.morningEndHour;
-        defaultShift.afternoonStartHour = settings.morningEndHour;
-      } else if (settings.shifts && defaultShift) {
+      if (settings.breakStartHour !== undefined && !settings.shifts) {
+        defaultShift.breakStartHour = settings.breakStartHour;
+        defaultShift.morningEndHour = settings.breakStartHour;
+      }
+      if (settings.breakEndHour !== undefined && !settings.shifts) {
+        defaultShift.breakEndHour = settings.breakEndHour;
+        defaultShift.afternoonStartHour = settings.breakEndHour;
+      }
+      if (settings.morningStartHour !== undefined && !settings.shifts) {
+        defaultShift.morningStartHour = settings.morningStartHour;
+      }
+      if (settings.afternoonEndHour !== undefined && !settings.shifts) {
+        defaultShift.afternoonEndHour = settings.afternoonEndHour;
+      }
+      if (settings.shifts && defaultShift) {
         this.officeTimingSettings.morningStartHour = defaultShift.morningStartHour;
-        this.officeTimingSettings.morningEndHour = defaultShift.morningEndHour;
-        this.officeTimingSettings.afternoonStartHour = defaultShift.afternoonStartHour;
+        this.officeTimingSettings.breakStartHour = defaultShift.breakStartHour ?? defaultShift.morningEndHour ?? 13;
+        this.officeTimingSettings.breakEndHour = defaultShift.breakEndHour ?? defaultShift.afternoonStartHour ?? 14;
+        this.officeTimingSettings.morningEndHour = this.officeTimingSettings.breakStartHour;
+        this.officeTimingSettings.afternoonStartHour = this.officeTimingSettings.breakEndHour;
         this.officeTimingSettings.afternoonEndHour = defaultShift.afternoonEndHour;
         if (defaultShift.weekendDays) {
           this.officeTimingSettings.weekendDays = defaultShift.weekendDays;
@@ -189,8 +220,10 @@ export class AttendanceService {
       id: 'shift_default',
       name: 'General Office Shift',
       morningStartHour: 9,
+      breakStartHour: 13,
+      breakEndHour: 14,
       morningEndHour: 13,
-      afternoonStartHour: 13,
+      afternoonStartHour: 14,
       afternoonEndHour: 18,
       weekendDays: [5, 6],
       isDefault: true,
@@ -207,10 +240,22 @@ export class AttendanceService {
       this.logger.log(`Privileged user ${userId} (${user.role}) is recording check-in.`);
     }
 
-    const workMode = dto.workMode || dto.work_mode || 'office';
+    const dhakaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
+    const targetDateForCheck = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
+    const assignedLocationInfo = await this.getAssignedWorkLocation(userId, targetDateForCheck);
+
+    let workMode = dto.workMode || dto.work_mode;
+    if (!workMode) {
+      workMode = assignedLocationInfo?.workLocation || 'office';
+    }
+
     let fieldSiteNote = '';
+    if (assignedLocationInfo && assignedLocationInfo.workLocation) {
+      fieldSiteNote += ` [Assigned: ${assignedLocationInfo.workLocation.toUpperCase()}${assignedLocationInfo.notes ? ` - ${assignedLocationInfo.notes}` : ''}]`;
+    }
+
     if (workMode === 'field') {
-      const fieldProjectId = dto.fieldProjectId || dto.field_project_id;
+      const fieldProjectId = dto.fieldProjectId || dto.field_project_id || assignedLocationInfo?.projectId;
       if (!fieldProjectId) {
         throw new BadRequestException('Select a project with a saved field site before checking in.');
       }
@@ -249,13 +294,12 @@ export class AttendanceService {
     }
 
     // 2. Resolve local office hour (Bangladesh Standard Time: UTC+6) and assigned user shift
-    const dhakaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
     const currentHour = dhakaNow.getHours();
     const userShift = this.getShiftForUser(userId);
 
     const morningStart = userShift.morningStartHour ?? 9;
-    const morningEnd = userShift.morningEndHour ?? 13;
-    const afternoonStart = userShift.afternoonStartHour ?? userShift.morningEndHour ?? 13;
+    const breakStart = userShift.breakStartHour ?? userShift.morningEndHour ?? 13;
+    const breakEnd = userShift.breakEndHour ?? userShift.afternoonStartHour ?? 14;
     const afternoonEnd = userShift.afternoonEndHour ?? 18;
 
     let session: 'morning' | 'afternoon';
@@ -265,8 +309,7 @@ export class AttendanceService {
     } else if (explicit === 'afternoon') {
       session = 'afternoon';
     } else {
-      const divider = userShift.morningEndHour ?? 13;
-      session = currentHour < divider ? 'morning' : 'afternoon';
+      session = currentHour < breakEnd ? 'morning' : 'afternoon';
     }
 
     const currentMinute = dhakaNow.getMinutes();
@@ -279,7 +322,7 @@ export class AttendanceService {
         isLate = true;
       }
     } else if (session === 'afternoon') {
-      if (currentHour > afternoonStart || (currentHour === afternoonStart && currentMinute > gracePeriod)) {
+      if (currentHour > breakEnd || (currentHour === breakEnd && currentMinute > gracePeriod)) {
         isLate = true;
       }
     }
@@ -292,10 +335,21 @@ export class AttendanceService {
     const deviceInfo = dto.deviceInfo || '';
     let notes = dto.notes || '';
     notes = `${notes}${fieldSiteNote}`.trim();
-    if (isEarly) {
-      notes = notes ? `${notes} [Checked out before time]` : '[Checked out before time]';
-    } else if (isLate && !notes.toLowerCase().includes('late')) {
-      notes = notes ? `${notes} [Late check-in]` : '[Late check-in]';
+
+    const hasExplicitStatus = Boolean(dto.status);
+    let statusVal = 'present';
+    if (hasExplicitStatus) {
+      statusVal = dto.status!;
+    } else {
+      statusVal = isLate ? 'late' : 'present';
+    }
+
+    if (!hasExplicitStatus) {
+      if (isEarly) {
+        notes = notes ? `${notes} [Checked out before time]` : '[Checked out before time]';
+      } else if (isLate && !notes.toLowerCase().includes('late')) {
+        notes = notes ? `${notes} [Late check-in]` : '[Late check-in]';
+      }
     }
 
     const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
@@ -309,11 +363,11 @@ export class AttendanceService {
 
     let recordId: string;
 
-    const statusVal = dto.status === 'late' || isLate ? 'late' : (dto.status || 'present');
     if (existing.rows.length > 0) {
       const res = await this.db.query(
         `UPDATE attendance_records
-         SET login_time = clock_timestamp(), latitude = $2, longitude = $3, address_text = $4, device_info = $5, status = $6, notes = $7, work_mode = $8
+         SET login_time = CASE WHEN date = CURRENT_DATE THEN clock_timestamp() ELSE login_time END,
+             latitude = $2, longitude = $3, address_text = $4, device_info = $5, status = $6, notes = $7, work_mode = $8
          WHERE id = $1
          RETURNING id`,
         [existing.rows[0].id, dto.latitude, dto.longitude, address, deviceInfo, statusVal, notes, workMode],
@@ -323,7 +377,7 @@ export class AttendanceService {
     } else {
       const res = await this.db.query(
         `INSERT INTO attendance_records (user_id, date, session_type, login_time, latitude, longitude, address_text, device_info, status, notes, work_mode)
-         VALUES ($1, $2, $3, clock_timestamp(), $4, $5, $6, $7, $8, $9, $10)
+         VALUES ($1, $2, $3, CASE WHEN $2 = CURRENT_DATE THEN clock_timestamp() ELSE ($2::text || ' ' || (CASE WHEN $3 = 'morning' THEN '09:00:00+06' ELSE '14:00:00+06' END))::timestamptz END, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
         [userId, targetDate, session, dto.latitude, dto.longitude, address, deviceInfo, statusVal, notes, workMode],
       );
@@ -551,11 +605,23 @@ export class AttendanceService {
     let halfDayCount = 0;
     let missingCount = 0;
 
+    const workLocsRes = await this.db.query(
+      `SELECT user_id, work_location, project_id, notes
+       FROM employee_work_locations
+       WHERE date = $1`,
+      [targetDate],
+    );
+    const locByUser: Record<string, any> = {};
+    for (const wl of workLocsRes.rows) {
+      locByUser[wl.user_id] = wl;
+    }
+
     const employees = usersRes.rows.map((user: any) => {
       const shift = this.getShiftForUser(user.id);
       const shiftWeekends = shift?.weekendDays || this.officeTimingSettings.weekendDays || [5, 6];
       const isWeekend = shiftWeekends.includes(dayOfWeek);
       const rec = byUser[user.id];
+      const assignedLoc = locByUser[user.id];
 
       let status = 'missing';
       if (isWeekend) {
@@ -584,6 +650,9 @@ export class AttendanceService {
         avatarUrl: user.avatarUrl || '',
         date: targetDate,
         status,
+        assignedWorkLocation: assignedLoc?.work_location || 'office',
+        assignedLocationProjectId: assignedLoc?.project_id || null,
+        assignedLocationNotes: assignedLoc?.notes || null,
         morning: rec?.morning || null,
         afternoon: rec?.afternoon || null,
       };
@@ -723,5 +792,335 @@ export class AttendanceService {
       deductionType,
       totalDeductionUnits,
     };
+  }
+
+  async overrideAttendance(dto: {
+    userIds: string[];
+    startDate?: string;
+    endDate?: string;
+    dates?: string[];
+    status?: string;
+    sessionType?: string;
+    workMode?: string;
+    skipWeekends?: boolean;
+    skipHolidays?: boolean;
+    notes?: string;
+    adminId?: string;
+    adminName?: string;
+    adminRole?: string;
+  }) {
+    if ((!dto.dates || dto.dates.length === 0) && (!dto.startDate || !dto.endDate)) {
+      throw new BadRequestException('Either a date range (startDate, endDate) or a dates array is required.');
+    }
+
+    // Resolve date list (YYYY-MM-DD)
+    const targetDates: string[] = [];
+    if (dto.dates && Array.isArray(dto.dates) && dto.dates.length > 0) {
+      for (const d of dto.dates) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d) && !targetDates.includes(d)) {
+          targetDates.push(d);
+        }
+      }
+    } else if (dto.startDate && dto.endDate) {
+      const cur = new Date(dto.startDate + 'T00:00:00Z');
+      const end = new Date(dto.endDate + 'T00:00:00Z');
+      if (isNaN(cur.getTime()) || isNaN(end.getTime()) || cur > end) {
+        throw new BadRequestException('Invalid startDate or endDate format/range.');
+      }
+      while (cur <= end) {
+        const yyyy = cur.getUTCFullYear();
+        const mm = String(cur.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(cur.getUTCDate()).padStart(2, '0');
+        targetDates.push(`${yyyy}-${mm}-${dd}`);
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+    }
+
+    if (targetDates.length === 0) {
+      throw new BadRequestException('No valid dates provided for attendance override.');
+    }
+
+    // Resolve employees
+    let employees: { id: string; full_name: string; email: string }[] = [];
+    const isAll = !dto.userIds || dto.userIds.length === 0 || dto.userIds.includes('all');
+    if (isAll) {
+      const uRes = await this.db.query(
+        `SELECT id, full_name, email FROM users WHERE is_active = TRUE AND role NOT IN ('main_admin')`,
+      );
+      employees = uRes.rows;
+    } else {
+      const uRes = await this.db.query(
+        `SELECT id, full_name, email FROM users WHERE id = ANY($1)`,
+        [dto.userIds],
+      );
+      employees = uRes.rows;
+    }
+
+    if (employees.length === 0) {
+      throw new BadRequestException('No valid employees found for override.');
+    }
+
+    // Fetch official holidays
+    let holidaysRes: any = { rows: [] };
+    try {
+      holidaysRes = await this.db.query(`SELECT date::text AS date, name FROM holidays`);
+    } catch (_) {}
+    const holidayMap = new Map<string, string>();
+    for (const h of holidaysRes.rows) {
+      const datePart = (h.date || '').split('T')[0];
+      if (datePart) holidayMap.set(datePart, h.name || 'Public Holiday');
+    }
+
+    // Timing settings & shifts
+    const timingSettings = await this.getTimingSettings();
+    const skipWeekends = dto.skipWeekends !== false;
+    const skipHolidays = dto.skipHolidays !== false;
+
+    // Normalizing status
+    const rawStatus = (dto.status || 'present').toLowerCase().trim();
+    let normalizedStatus: string = 'present';
+    if (rawStatus === 'late') normalizedStatus = 'late';
+    else if (rawStatus === 'half_day' || rawStatus === 'halfday') normalizedStatus = 'half_day';
+    else if (rawStatus === 'absent' || rawStatus === 'confirmed_absent') normalizedStatus = 'confirmed_absent';
+    else if (rawStatus === 'missing') normalizedStatus = 'missing';
+
+    const workMode = (dto.workMode || 'office').toLowerCase().trim();
+    const sessionType = (dto.sessionType || 'all').toLowerCase().trim();
+    const sessions = sessionType === 'all' ? ['morning', 'afternoon'] : [sessionType];
+
+    let updatedCount = 0;
+    let skippedWeekendsCount = 0;
+    let skippedHolidaysCount = 0;
+    const adminTag = dto.adminName ? ` by ${dto.adminName}` : '';
+    const overrideNote = dto.notes?.trim()
+      ? `[Admin Override${adminTag}: ${dto.notes.trim()}]`
+      : `[Admin Override${adminTag}]`;
+
+    for (const emp of employees) {
+      const shift = this.getShiftForUser(emp.id);
+      const shiftWeekend = shift.weekendDays || timingSettings.weekendDays || [5, 6];
+
+      for (const dateStr of targetDates) {
+        // Check date day of week (1=Mon..7=Sun)
+        const dateObj = new Date(dateStr + 'T12:00:00Z');
+        const dayOfWeek = dateObj.getUTCDay() === 0 ? 7 : dateObj.getUTCDay();
+
+        // 1. Off-day / Weekend safeguard
+        if (skipWeekends && shiftWeekend.includes(dayOfWeek)) {
+          skippedWeekendsCount++;
+          continue;
+        }
+
+        // 2. Holiday safeguard
+        if (skipHolidays && holidayMap.has(dateStr)) {
+          skippedHolidaysCount++;
+          continue;
+        }
+
+        // Upsert records for each session
+        for (const session of sessions) {
+          const defaultHour = session === 'morning' ? (shift.morningStartHour ?? 9) : (shift.breakEndHour ?? 14);
+          const loginTime = `${dateStr}T${String(defaultHour).padStart(2, '0')}:00:00+06:00`;
+
+          await this.db.query(
+            `INSERT INTO attendance_records (
+               user_id, date, session_type, status, work_mode, notes, login_time, address_text, updated_at
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'Admin Overridden Record', clock_timestamp())
+             ON CONFLICT (user_id, date, session_type) DO UPDATE
+             SET status = EXCLUDED.status,
+                 work_mode = EXCLUDED.work_mode,
+                 notes = EXCLUDED.notes,
+                 login_time = EXCLUDED.login_time,
+                 updated_at = clock_timestamp()`,
+            [emp.id, dateStr, session, normalizedStatus, workMode, overrideNote, loginTime],
+          );
+          updatedCount++;
+        }
+      }
+    }
+
+    // Insert audit log
+    try {
+      await this.db.query(
+        `INSERT INTO audit_logs (user_id, user_name, user_role, action, entity_type, entity_id, details)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          dto.adminId || null,
+          dto.adminName || 'Administrator',
+          dto.adminRole || 'main_admin',
+          'ATTENDANCE_OVERRIDE',
+          'Attendance',
+          'system',
+          `Adjusted attendance for ${employees.length} employee(s) over ${targetDates.length} date(s) to status '${normalizedStatus}'. Updated: ${updatedCount}, Skipped Weekends: ${skippedWeekendsCount}, Skipped Holidays: ${skippedHolidaysCount}.`,
+        ],
+      );
+    } catch (_) {}
+
+    return {
+      success: true,
+      updatedRecords: updatedCount,
+      skippedWeekends: skippedWeekendsCount,
+      skippedHolidays: skippedHolidaysCount,
+      affectedEmployees: employees.length,
+      affectedDates: targetDates.length,
+      datesRange: `${targetDates[0]} to ${targetDates[targetDates.length - 1]}`,
+      statusApplied: normalizedStatus,
+    };
+  }
+
+  // ==========================================
+  // WORK LOCATION ASSIGNMENT SETTINGS
+  // ==========================================
+
+  async getAssignedWorkLocation(userId: string, dateStr: string): Promise<{ workLocation: 'office' | 'home' | 'field'; projectId?: string; notes?: string } | null> {
+    try {
+      const res = await this.db.query(
+        `SELECT work_location as "workLocation", project_id as "projectId", notes
+         FROM employee_work_locations
+         WHERE user_id = $1 AND date = $2
+         LIMIT 1`,
+        [userId, dateStr],
+      );
+      if (res.rows.length > 0) {
+        return res.rows[0];
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  async getWorkLocationAssignments(startDate?: string, endDate?: string, userId?: string) {
+    let sql = `SELECT w.id, w.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
+                      u.avatar_url as "avatarUrl", COALESCE(u.department, '') as department,
+                      w.date::text as "date", w.work_location as "workLocation",
+                      w.project_id as "projectId", p.name as "projectName", p.project_code as "projectCode",
+                      w.notes, w.created_at as "createdAt"
+               FROM employee_work_locations w
+               JOIN users u ON w.user_id = u.id
+               LEFT JOIN projects p ON w.project_id = p.id
+               WHERE 1=1`;
+    const params: any[] = [];
+    let idx = 1;
+
+    if (startDate) {
+      sql += ` AND w.date >= $${idx++}`;
+      params.push(startDate);
+    }
+    if (endDate) {
+      sql += ` AND w.date <= $${idx++}`;
+      params.push(endDate);
+    }
+    if (userId) {
+      sql += ` AND w.user_id = $${idx++}`;
+      params.push(userId);
+    }
+
+    sql += ` ORDER BY w.date ASC, u.full_name ASC`;
+    const res = await this.db.query(sql, params);
+    return res.rows;
+  }
+
+  async assignWorkLocations(dto: {
+    userIds: string[];
+    startDate: string;
+    endDate?: string;
+    workLocation: 'office' | 'home' | 'field';
+    projectId?: string;
+    notes?: string;
+    adminId?: string;
+    adminName?: string;
+    adminRole?: string;
+  }) {
+    if (!dto.userIds || !Array.isArray(dto.userIds) || dto.userIds.length === 0) {
+      throw new BadRequestException('Please select at least one employee.');
+    }
+    if (!dto.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(dto.startDate)) {
+      throw new BadRequestException('A valid start date (YYYY-MM-DD) is required.');
+    }
+
+    const start = new Date(`${dto.startDate}T00:00:00Z`);
+    const endStr = dto.endDate && /^\d{4}-\d{2}-\d{2}$/.test(dto.endDate) ? dto.endDate : dto.startDate;
+    const end = new Date(`${endStr}T00:00:00Z`);
+
+    if (end < start) {
+      throw new BadRequestException('End date cannot precede start date.');
+    }
+
+    const targetDates: string[] = [];
+    const cur = new Date(start);
+    while (cur <= end) {
+      targetDates.push(cur.toISOString().slice(0, 10));
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+
+    if (targetDates.length > 90) {
+      throw new BadRequestException('Cannot assign work locations across more than 90 days at once.');
+    }
+
+    const location = (dto.workLocation || 'office').toLowerCase();
+    const validLocations = ['office', 'home', 'field'];
+    if (!validLocations.includes(location)) {
+      throw new BadRequestException(`Invalid work location: ${dto.workLocation}. Must be one of: office, home, field.`);
+    }
+
+    let assignedCount = 0;
+    for (const userId of dto.userIds) {
+      for (const dateStr of targetDates) {
+        if (location === 'office' && !dto.notes && !dto.projectId) {
+          // Setting back to clean default office deletes specific override row
+          await this.db.query(
+            `DELETE FROM employee_work_locations WHERE user_id = $1 AND date = $2`,
+            [userId, dateStr],
+          );
+        } else {
+          await this.db.query(
+            `INSERT INTO employee_work_locations (
+               user_id, date, work_location, project_id, notes, assigned_by, updated_at
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, clock_timestamp())
+             ON CONFLICT (user_id, date) DO UPDATE
+             SET work_location = EXCLUDED.work_location,
+                 project_id = EXCLUDED.project_id,
+                 notes = EXCLUDED.notes,
+                 assigned_by = EXCLUDED.assigned_by,
+                 updated_at = clock_timestamp()`,
+            [userId, dateStr, location, dto.projectId || null, dto.notes || null, dto.adminId || null],
+          );
+        }
+        assignedCount++;
+      }
+    }
+
+    // Audit log
+    try {
+      await this.db.query(
+        `INSERT INTO audit_logs (user_id, user_name, user_role, action, entity_type, entity_id, details)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          dto.adminId || null,
+          dto.adminName || 'Administrator',
+          dto.adminRole || 'main_admin',
+          'WORK_LOCATION_ASSIGNED',
+          'Attendance',
+          'system',
+          `Assigned work location '${location}' for ${dto.userIds.length} employee(s) across ${targetDates.length} date(s) (${targetDates[0]} to ${targetDates[targetDates.length - 1]}). Notes: ${dto.notes || 'None'}.`,
+        ],
+      );
+    } catch (_) {}
+
+    return {
+      success: true,
+      workLocation: location,
+      assignedCount,
+      employeesCount: dto.userIds.length,
+      datesCount: targetDates.length,
+      datesRange: `${targetDates[0]} to ${targetDates[targetDates.length - 1]}`,
+      message: `Work location successfully set to ${location.toUpperCase()} for ${dto.userIds.length} employee(s).`,
+    };
+  }
+
+  async deleteWorkLocationAssignment(id: string) {
+    await this.db.query(`DELETE FROM employee_work_locations WHERE id = $1`, [id]);
+    return { success: true, message: 'Work location assignment removed, reverted to default Office.' };
   }
 }

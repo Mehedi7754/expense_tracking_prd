@@ -285,6 +285,23 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         WHEN notes ILIKE '%[Work Mode: Home]%' OR notes ILIKE '%[Work From Home]%' THEN 'home'
         ELSE 'office' END WHERE work_mode = 'office'`);
 
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS employee_work_locations (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            date DATE NOT NULL,
+            work_location VARCHAR(30) NOT NULL DEFAULT 'office',
+            project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+            notes TEXT,
+            assigned_by UUID REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            CONSTRAINT uq_user_date_work_location UNIQUE (user_id, date)
+        );
+        CREATE INDEX IF NOT EXISTS idx_emp_work_loc_user ON employee_work_locations(user_id);
+        CREATE INDEX IF NOT EXISTS idx_emp_work_loc_date ON employee_work_locations(date);
+      `);
+
       // Ensure notifications table supports broadcast/admin notifications (nullable user_id) and employee_registration type
       try {
         await this.pool.query("ALTER TABLE notifications ALTER COLUMN user_id DROP NOT NULL;");
@@ -325,6 +342,23 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       } catch (e: any) {
         this.logger.warn(`Failed to backfill pending employee notifications: ${e.message}`);
       }
+
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS app_releases (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            version_name VARCHAR(50) NOT NULL,
+            build_number INT NOT NULL,
+            release_notes TEXT DEFAULT '',
+            file_path TEXT,
+            download_url TEXT,
+            file_size_bytes BIGINT DEFAULT 0,
+            is_latest BOOLEAN DEFAULT FALSE,
+            created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+        );
+        CREATE INDEX IF NOT EXISTS idx_app_releases_latest ON app_releases(is_latest);
+        CREATE INDEX IF NOT EXISTS idx_app_releases_created ON app_releases(created_at DESC);
+      `);
 
     } catch (err: any) {
       this.logger.error(`Database connection failed: ${err.message}`, err.stack);

@@ -17,7 +17,6 @@ import '../../models/task_model.dart';
 import '../../state/category_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
-import '../../state/settings_provider.dart';
 import '../../state/task_provider.dart';
 
 class EditExpenseScreen extends ConsumerStatefulWidget {

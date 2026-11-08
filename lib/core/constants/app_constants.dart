@@ -4,8 +4,8 @@ class AppConstants {
   static const String appName = 'GW project';
   static const String appFullName = 'GW Project Financial Intelligence System';
   static const String appTagline = 'Project Cost & Profitability Management';
-  static const String appVersion = '1.0.17';
-  static const int buildNumber = 2017;
+  static const String appVersion = '1.0.18';
+  static const int buildNumber = 2018;
 
   // Receipt compliance thresholds (PRD Section 11, 12)
   static const double receiptWarningThreshold = 0.30; // 30%

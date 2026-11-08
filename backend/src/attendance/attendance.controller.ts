@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
+  Param,
   Body,
   Query,
   UseGuards,
@@ -110,5 +112,49 @@ export class AttendanceController {
     @Body() body: Record<string, any>,
   ) {
     return this.attendanceService.updateTimingSettings(body);
+  }
+
+  @Roles('main_admin', 'project_manager', 'finance')
+  @Post('override')
+  async overrideAttendance(
+    @Body() dto: any,
+    @Request() req: any,
+  ) {
+    return this.attendanceService.overrideAttendance({
+      ...dto,
+      adminId: req.user?.id,
+      adminName: req.user?.name || req.user?.email || 'Administrator',
+      adminRole: req.user?.role || 'main_admin',
+    });
+  }
+
+  @Roles('main_admin', 'project_manager', 'finance', 'project_member')
+  @Get('work-locations')
+  async getWorkLocationAssignments(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.attendanceService.getWorkLocationAssignments(startDate, endDate, userId);
+  }
+
+  @Roles('main_admin', 'project_manager', 'finance')
+  @Post('work-locations/assign')
+  async assignWorkLocations(
+    @Body() dto: any,
+    @Request() req: any,
+  ) {
+    return this.attendanceService.assignWorkLocations({
+      ...dto,
+      adminId: req.user?.id,
+      adminName: req.user?.name || req.user?.email || 'Administrator',
+      adminRole: req.user?.role || 'main_admin',
+    });
+  }
+
+  @Roles('main_admin', 'project_manager', 'finance')
+  @Delete('work-locations/:id')
+  async deleteWorkLocationAssignment(@Param('id') id: string) {
+    return this.attendanceService.deleteWorkLocationAssignment(id);
   }
 }

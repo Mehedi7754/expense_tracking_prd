@@ -35,6 +35,7 @@ describe('AttendanceService Unit & Session Logic', () => {
       mockDb.query
         .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ id: 'project-1', name: 'Survey Site', project_code: 'PRJ-1', site_latitude: 23.81, site_longitude: 90.41 }] });
 
       await expect(service.checkIn('user-emp-1', {
@@ -45,7 +46,7 @@ describe('AttendanceService Unit & Session Logic', () => {
         fieldProjectId: 'project-1',
       })).rejects.toThrow('Outside the Survey Site field site geofence');
 
-      expect(mockDb.query).toHaveBeenCalledTimes(3);
+      expect(mockDb.query).toHaveBeenCalledTimes(4);
     });
 
     it('creates attendance record for a valid check-in', async () => {
@@ -64,6 +65,8 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({ rows: [] })
       // Query 1: User role check
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 1.5: getAssignedWorkLocation
+        .mockResolvedValueOnce({ rows: [] })
         // Query 2: Check existing check-in -> none
         .mockResolvedValueOnce({ rows: [] })
         // Query 3: Insert returning id
@@ -100,11 +103,11 @@ describe('AttendanceService Unit & Session Logic', () => {
       expect(result.id).toBe('att-rec-1');
       expect(result.sessionType).toBe('morning');
       expect(result.status).toBe('present');
-      expect(mockDb.query.mock.calls[3][0]).toContain('work_mode');
-      expect(mockDb.query.mock.calls[3][1]).toContain('home_office');
+      expect(mockDb.query.mock.calls[4][0]).toContain('work_mode');
+      expect(mockDb.query.mock.calls[4][1]).toContain('home_office');
     });
 
-    it('throws ConflictException when checking in again for same session', async () => {
+    it('updates existing attendance check-in when checking in again for same session', async () => {
       const userId = 'user-emp-1';
       const checkInDto = {
         sessionType: 'morning' as const,
@@ -118,14 +121,45 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({ rows: [] })
         // Query 1: User role check
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 1.5: getAssignedWorkLocation
+        .mockResolvedValueOnce({ rows: [] })
         // Query 2: Check existing -> found
         .mockResolvedValueOnce({
           rows: [{ id: 'existing-rec' }],
-        });
+        })
+        // Query 3: Update query
+        .mockResolvedValueOnce({
+          rows: [{ id: 'existing-rec' }],
+        })
+        // Query 4: getRecordById
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'existing-rec',
+              userId: userId,
+              date: '2026-10-02',
+              sessionType: 'morning',
+              loginTime: new Date().toISOString(),
+              latitude: 23.8120,
+              longitude: 90.4140,
+              addressText: 'Updated Location, Dhaka',
+              deviceInfo: '',
+              status: 'present',
+              notes: '',
+              createdAt: new Date().toISOString(),
+              userName: 'Fahim Ahmed',
+              userEmail: 'fahim@pfis.com',
+            },
+          ],
+        })
+        // Query 5: user fullname + email query
+        .mockResolvedValueOnce({ rows: [{ full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 6: get admins for push notification
+        .mockResolvedValueOnce({ rows: [{ id: 'admin1' }] });
 
-      await expect(service.checkIn(userId, checkInDto)).rejects.toThrow(
-        'You have already checked in for the morning session on 2026-10-02.',
-      );
+      const result = await service.checkIn(userId, checkInDto);
+      expect(result.id).toBe('existing-rec');
+      expect(result.latitude).toBe(23.8120);
     });
 
     it('creates attendance check-out record on time when checking out within grace period', async () => {
@@ -146,6 +180,8 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({ rows: [] })
         // Query 1: User role check
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 1.5: getAssignedWorkLocation
+        .mockResolvedValueOnce({ rows: [] })
         // Query 2: Check existing check-in -> none
         .mockResolvedValueOnce({ rows: [] })
         // Query 3: Insert returning id
@@ -214,6 +250,8 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({ rows: [] })
         // Query 1: User role check
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
+        // Query 1.5: getAssignedWorkLocation
+        .mockResolvedValueOnce({ rows: [] })
         // Query 2: Check existing check-in -> none
         .mockResolvedValueOnce({ rows: [] })
         // Query 3: Insert returning id

@@ -67,7 +67,6 @@ void main() {
     });
 
     test('AttendanceSettingsNotifier syncs top-level cutoff hour with default shift', () async {
-      final notifier = AttendanceSettingsNotifier();
       // Test state synchronization logic
       const state = AttendanceSettingsState(morningEndHour: 13);
       final updatedShifts = state.shifts.map((s) {
@@ -86,7 +85,64 @@ void main() {
       expect(updated.afternoonStartHour, 15);
       final defaultShift = updated.shifts.firstWhere((s) => s.isDefault);
       expect(defaultShift.morningEndHour, 15);
-      expect(defaultShift.afternoonStartHour, 15);
+    });
+
+    test('Break Time Selection fields in AttendanceShift and JSON serialization', () {
+      const shift = AttendanceShift(
+        id: 'shift_break_custom',
+        name: 'Flexible Day Shift',
+        morningStartHour: 8,
+        breakStartHour: 12,
+        breakEndHour: 13,
+        afternoonEndHour: 17,
+        weekendDays: [5, 6],
+      );
+
+      expect(shift.breakStartHour, 12);
+      expect(shift.breakEndHour, 13);
+
+      final json = shift.toJson();
+      expect(json['breakStartHour'], 12);
+      expect(json['breakEndHour'], 13);
+
+      final reconstructed = AttendanceShift.fromJson(json);
+      expect(reconstructed.breakStartHour, 12);
+      expect(reconstructed.breakEndHour, 13);
+    });
+
+    testWidgets('AttendanceSettingsScreen renders Break Time Selection in dialog and Break chip in list', (WidgetTester tester) async {
+      final container = ProviderContainer(
+        overrides: [
+          attendanceSettingsProvider.overrideWith(() => _FakeAttendanceNotifier()),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: AttendanceSettingsScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Verifies break slot chip appears in default shift preview
+      expect(find.text('☕ Break'), findsWidgets);
+
+      // Drag down to reveal 'Add Custom Shift' button
+      await tester.drag(find.byType(SingleChildScrollView).first, const Offset(0, -800));
+      await tester.pumpAndSettle();
+
+      // Tap 'Add Custom Shift' to open the shift modal
+      await tester.tap(find.text('Add Custom Shift'));
+      await tester.pumpAndSettle();
+
+      // Verifies Break Time Selection header and dropdown labels are present in dialog
+      expect(find.text('Break Time Selection'), findsOneWidget);
+      expect(find.text('Break From'), findsOneWidget);
+      expect(find.text('Break To'), findsOneWidget);
     });
   });
 }

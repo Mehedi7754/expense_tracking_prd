@@ -13,6 +13,8 @@ class AttendanceRepository {
   Future<AttendanceRecordModel> checkIn({
     required double latitude,
     required double longitude,
+    String? date,
+    String? status,
     String? addressText,
     String? sessionType,
     String? deviceInfo,
@@ -22,7 +24,7 @@ class AttendanceRepository {
     String? fieldProjectId,
     String? earlyDepartureReason,
   }) async {
-    final localDateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final localDateStr = date ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
 
     final finalNotesBuffer = StringBuffer();
     if (workMode == 'field' &&
@@ -54,6 +56,8 @@ class AttendanceRepository {
         'latitude': latitude,
         'longitude': longitude,
         'date': localDateStr,
+        if (userId != null && userId.isNotEmpty) 'userId': userId,
+        if (status != null && status.isNotEmpty) 'status': status,
         if (addressText != null && addressText.isNotEmpty)
           'addressText': addressText,
         if (sessionType != null && sessionType.isNotEmpty)
@@ -185,6 +189,8 @@ class AttendanceRepository {
     required int morningEndHour,
     int? afternoonStartHour,
     int? afternoonEndHour,
+    int? breakStartHour,
+    int? breakEndHour,
     List<int>? weekendDays,
     String? deductionType,
     double? fullDayDeductionAmount,
@@ -203,6 +209,8 @@ class AttendanceRepository {
       'morningEndHour': morningEndHour,
       'afternoonStartHour': afternoonStartHour ?? morningEndHour,
       if (afternoonEndHour != null) 'afternoonEndHour': afternoonEndHour,
+      'breakStartHour': breakStartHour ?? morningEndHour,
+      'breakEndHour': breakEndHour ?? (afternoonStartHour ?? morningEndHour),
       if (weekendDays != null) 'weekendDays': weekendDays,
       if (deductionType != null) 'deductionType': deductionType,
       if (fullDayDeductionAmount != null)
@@ -221,6 +229,73 @@ class AttendanceRepository {
     };
     final response = await _client.post('/attendance/settings', body: body);
     return response != null;
+  }
+
+  Future<Map<String, dynamic>?> overrideAttendance({
+    required List<String> userIds,
+    required String startDate,
+    required String endDate,
+    String? status,
+    String? workMode,
+    bool? skipWeekends,
+    bool? skipHolidays,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{
+      'userIds': userIds,
+      'startDate': startDate,
+      'endDate': endDate,
+      if (status != null) 'status': status,
+      if (workMode != null) 'workMode': workMode,
+      if (skipWeekends != null) 'skipWeekends': skipWeekends,
+      if (skipHolidays != null) 'skipHolidays': skipHolidays,
+      if (notes != null) 'notes': notes,
+    };
+    final response = await _client.post(ApiEndpoints.attendanceOverride, body: body);
+    if (response is Map<String, dynamic>) {
+      return response;
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> assignWorkLocations({
+    required List<String> userIds,
+    required String startDate,
+    required String endDate,
+    required String workLocation,
+    String? projectId,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{
+      'userIds': userIds,
+      'startDate': startDate,
+      'endDate': endDate,
+      'workLocation': workLocation,
+      if (projectId != null && projectId.isNotEmpty) 'projectId': projectId,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+    };
+    final response = await _client.post(ApiEndpoints.attendanceWorkLocationsAssign, body: body);
+    if (response is Map<String, dynamic>) {
+      return response;
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> getWorkLocationAssignments({
+    String? startDate,
+    String? endDate,
+    String? userId,
+  }) async {
+    final params = <String>[];
+    if (startDate != null && startDate.isNotEmpty) params.add('startDate=$startDate');
+    if (endDate != null && endDate.isNotEmpty) params.add('endDate=$endDate');
+    if (userId != null && userId.isNotEmpty) params.add('userId=$userId');
+    final qs = params.isNotEmpty ? '?${params.join('&')}' : '';
+    final response = await _client.get('${ApiEndpoints.attendanceWorkLocations}$qs');
+    if (response is List) {
+      return response.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+    }
+    return [];
   }
 }
 

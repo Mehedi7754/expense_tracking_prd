@@ -7,14 +7,16 @@ import 'attendance_provider.dart';
 const _kAttendanceSettingsKey = 'gw_attendance_settings_json_v3';
 const _kOldMorningEndKey = 'gw_attendance_settings_morning_end_hour';
 
-/// Represents a configurable work shift with its own timing window, cutoff, and off-days.
+/// Represents a configurable work shift with its own timing window, break time, and off-days.
 class AttendanceShift {
   final String id;
   final String name;
-  final int morningStartHour;   // From time (Shift Start)
-  final int morningEndHour;     // Midday cutoff / Half-day switch
-  final int afternoonStartHour; // Afternoon start (matches cutoff)
-  final int afternoonEndHour;   // To time (Shift End)
+  final int morningStartHour;   // Shift Start
+  final int morningEndHour;     // Legacy fallback / Break Start
+  final int afternoonStartHour; // Legacy fallback / Break End
+  final int afternoonEndHour;   // Shift End
+  final int breakStartHour;     // Break Time From
+  final int breakEndHour;       // Break Time To
   final List<int> weekendDays;  // Specific weekly off-days for this shift: 1=Mon..7=Sun
   final bool isDefault;
 
@@ -23,8 +25,10 @@ class AttendanceShift {
     required this.name,
     this.morningStartHour = 9,
     this.morningEndHour = 13,
-    this.afternoonStartHour = 13,
+    this.afternoonStartHour = 14,
     this.afternoonEndHour = 18,
+    this.breakStartHour = 13,
+    this.breakEndHour = 14,
     this.weekendDays = const [5, 6], // Default Friday & Saturday in BD
     this.isDefault = false,
   });
@@ -36,6 +40,8 @@ class AttendanceShift {
     int? morningEndHour,
     int? afternoonStartHour,
     int? afternoonEndHour,
+    int? breakStartHour,
+    int? breakEndHour,
     List<int>? weekendDays,
     bool? isDefault,
   }) {
@@ -43,9 +49,11 @@ class AttendanceShift {
       id: id ?? this.id,
       name: name ?? this.name,
       morningStartHour: morningStartHour ?? this.morningStartHour,
-      morningEndHour: morningEndHour ?? this.morningEndHour,
-      afternoonStartHour: afternoonStartHour ?? this.afternoonStartHour,
+      morningEndHour: morningEndHour ?? (breakStartHour ?? this.morningEndHour),
+      afternoonStartHour: afternoonStartHour ?? (breakEndHour ?? this.afternoonStartHour),
       afternoonEndHour: afternoonEndHour ?? this.afternoonEndHour,
+      breakStartHour: breakStartHour ?? this.breakStartHour,
+      breakEndHour: breakEndHour ?? this.breakEndHour,
       weekendDays: weekendDays ?? this.weekendDays,
       isDefault: isDefault ?? this.isDefault,
     );
@@ -58,6 +66,8 @@ class AttendanceShift {
         'morningEndHour': morningEndHour,
         'afternoonStartHour': afternoonStartHour,
         'afternoonEndHour': afternoonEndHour,
+        'breakStartHour': breakStartHour,
+        'breakEndHour': breakEndHour,
         'weekendDays': weekendDays,
         'isDefault': isDefault,
       };
@@ -67,13 +77,20 @@ class AttendanceShift {
     if (json['weekendDays'] != null && json['weekendDays'] is List) {
       weekends = (json['weekendDays'] as List).map((e) => (e as num).toInt()).toList();
     }
+    final mEnd = (json['morningEndHour'] as num?)?.toInt() ?? 13;
+    final aStart = (json['afternoonStartHour'] as num?)?.toInt() ?? 14;
+    final bStart = (json['breakStartHour'] as num?)?.toInt() ?? mEnd;
+    final bEnd = (json['breakEndHour'] as num?)?.toInt() ?? aStart;
+
     return AttendanceShift(
       id: json['id'] as String? ?? 'shift_default',
       name: json['name'] as String? ?? 'General Shift',
       morningStartHour: (json['morningStartHour'] as num?)?.toInt() ?? 9,
-      morningEndHour: (json['morningEndHour'] as num?)?.toInt() ?? 13,
-      afternoonStartHour: (json['afternoonStartHour'] as num?)?.toInt() ?? 13,
+      morningEndHour: bStart,
+      afternoonStartHour: bEnd,
       afternoonEndHour: (json['afternoonEndHour'] as num?)?.toInt() ?? 18,
+      breakStartHour: bStart,
+      breakEndHour: bEnd,
       weekendDays: weekends,
       isDefault: json['isDefault'] as bool? ?? false,
     );
@@ -86,6 +103,8 @@ class AttendanceSettingsState {
   final int morningEndHour;
   final int afternoonStartHour;
   final int afternoonEndHour;
+  final int breakStartHour;
+  final int breakEndHour;
 
   /// Global default weekend off days (1=Mon..7=Sun)
   final List<int> weekendDays;
@@ -122,8 +141,10 @@ class AttendanceSettingsState {
   const AttendanceSettingsState({
     this.morningStartHour = 9,
     this.morningEndHour = 13,
-    this.afternoonStartHour = 13,
+    this.afternoonStartHour = 14,
     this.afternoonEndHour = 18,
+    this.breakStartHour = 13,
+    this.breakEndHour = 14,
     this.weekendDays = const [5, 6],
     this.deductionType = 'rate_based',
     this.isDeductionEnabled = true,
@@ -142,8 +163,10 @@ class AttendanceSettingsState {
         name: 'General Office Shift',
         morningStartHour: 9,
         morningEndHour: 13,
-        afternoonStartHour: 13,
+        afternoonStartHour: 14,
         afternoonEndHour: 18,
+        breakStartHour: 13,
+        breakEndHour: 14,
         weekendDays: [5, 6], // Fri & Sat
         isDefault: true,
       ),
@@ -152,8 +175,10 @@ class AttendanceSettingsState {
         name: 'Early Morning Shift',
         morningStartHour: 7,
         morningEndHour: 11,
-        afternoonStartHour: 11,
+        afternoonStartHour: 12,
         afternoonEndHour: 15,
+        breakStartHour: 11,
+        breakEndHour: 12,
         weekendDays: [5, 6],
       ),
       AttendanceShift(
@@ -161,8 +186,10 @@ class AttendanceSettingsState {
         name: 'Evening Shift',
         morningStartHour: 14,
         morningEndHour: 18,
-        afternoonStartHour: 18,
+        afternoonStartHour: 19,
         afternoonEndHour: 22,
+        breakStartHour: 18,
+        breakEndHour: 19,
         weekendDays: [7], // Sunday only
       ),
     ],
@@ -186,6 +213,8 @@ class AttendanceSettingsState {
     int? morningEndHour,
     int? afternoonStartHour,
     int? afternoonEndHour,
+    int? breakStartHour,
+    int? breakEndHour,
     List<int>? weekendDays,
     String? deductionType,
     bool? isDeductionEnabled,
@@ -203,9 +232,11 @@ class AttendanceSettingsState {
   }) {
     return AttendanceSettingsState(
       morningStartHour: morningStartHour ?? this.morningStartHour,
-      morningEndHour: morningEndHour ?? this.morningEndHour,
-      afternoonStartHour: afternoonStartHour ?? this.afternoonStartHour,
+      morningEndHour: morningEndHour ?? (breakStartHour ?? this.morningEndHour),
+      afternoonStartHour: afternoonStartHour ?? (breakEndHour ?? this.afternoonStartHour),
       afternoonEndHour: afternoonEndHour ?? this.afternoonEndHour,
+      breakStartHour: breakStartHour ?? this.breakStartHour,
+      breakEndHour: breakEndHour ?? this.breakEndHour,
       weekendDays: weekendDays ?? this.weekendDays,
       deductionType: deductionType ?? this.deductionType,
       isDeductionEnabled: isDeductionEnabled ?? this.isDeductionEnabled,
@@ -228,6 +259,8 @@ class AttendanceSettingsState {
         'morningEndHour': morningEndHour,
         'afternoonStartHour': afternoonStartHour,
         'afternoonEndHour': afternoonEndHour,
+        'breakStartHour': breakStartHour,
+        'breakEndHour': breakEndHour,
         'weekendDays': weekendDays,
         'deductionType': deductionType,
         'isDeductionEnabled': isDeductionEnabled,
@@ -256,8 +289,10 @@ class AttendanceSettingsState {
         name: 'General Office Shift',
         morningStartHour: 9,
         morningEndHour: 13,
-        afternoonStartHour: 13,
+        afternoonStartHour: 14,
         afternoonEndHour: 18,
+        breakStartHour: 13,
+        breakEndHour: 14,
         weekendDays: [5, 6],
         isDefault: true,
       ),
@@ -279,8 +314,10 @@ class AttendanceSettingsState {
 
     int morningStart = defaultShift?.morningStartHour ?? (json['morningStartHour'] as num?)?.toInt() ?? 9;
     int morningEnd = defaultShift?.morningEndHour ?? (json['morningEndHour'] as num?)?.toInt() ?? 13;
-    int afternoonStart = defaultShift?.afternoonStartHour ?? morningEnd;
+    int afternoonStart = defaultShift?.afternoonStartHour ?? (json['afternoonStartHour'] as num?)?.toInt() ?? 14;
     int afternoonEnd = defaultShift?.afternoonEndHour ?? (json['afternoonEndHour'] as num?)?.toInt() ?? 18;
+    int breakStart = defaultShift?.breakStartHour ?? (json['breakStartHour'] as num?)?.toInt() ?? morningEnd;
+    int breakEnd = defaultShift?.breakEndHour ?? (json['breakEndHour'] as num?)?.toInt() ?? afternoonStart;
     if (defaultShift != null && defaultShift.weekendDays.isNotEmpty) {
       weekend = defaultShift.weekendDays;
     }
@@ -290,6 +327,8 @@ class AttendanceSettingsState {
       morningEndHour: morningEnd,
       afternoonStartHour: afternoonStart,
       afternoonEndHour: afternoonEnd,
+      breakStartHour: breakStart,
+      breakEndHour: breakEnd,
       weekendDays: weekend,
       deductionType: json['deductionType'] as String? ?? 'rate_based',
       isDeductionEnabled: isDeductionEnabled,
@@ -348,6 +387,8 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
         morningEndHour: newSettings.morningEndHour,
         afternoonStartHour: newSettings.afternoonStartHour,
         afternoonEndHour: newSettings.afternoonEndHour,
+        breakStartHour: newSettings.breakStartHour,
+        breakEndHour: newSettings.breakEndHour,
         weekendDays: newSettings.weekendDays,
         deductionType: newSettings.deductionType,
         fullDayDeductionAmount: newSettings.fullDayDeductionAmount,
@@ -484,6 +525,8 @@ class AttendanceSettingsNotifier extends AsyncNotifier<AttendanceSettingsState> 
         morningEndHour: shift.morningEndHour,
         afternoonStartHour: shift.afternoonStartHour,
         afternoonEndHour: shift.afternoonEndHour,
+        breakStartHour: shift.breakStartHour,
+        breakEndHour: shift.breakEndHour,
         weekendDays: shift.weekendDays,
       );
     }

@@ -763,32 +763,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                _buildSectionTitle(
-                  isMainAdmin ? 'Project Portfolio' : 'Assigned Projects',
-                  isDark,
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4F46E5).withAlpha(20),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${projectsToShow.length}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF4F46E5),
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: _buildSectionTitle(
+                      isMainAdmin ? 'Project Portfolio' : 'Assigned Projects',
+                      isDark,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4F46E5).withAlpha(20),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${projectsToShow.length}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF4F46E5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
             if (isMainAdmin || allProjects.isNotEmpty)
               TextButton(

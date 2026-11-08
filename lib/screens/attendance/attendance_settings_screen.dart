@@ -208,7 +208,8 @@ class _AttendanceSettingsScreenState
     final isEditing = existingShift != null;
     final nameCtrl = TextEditingController(text: existingShift?.name ?? 'New Shift');
     int startH = existingShift?.morningStartHour ?? 9;
-    int cutoffH = existingShift?.morningEndHour ?? 13;
+    int breakStartH = existingShift?.breakStartHour ?? existingShift?.morningEndHour ?? 13;
+    int breakEndH = existingShift?.breakEndHour ?? existingShift?.afternoonStartHour ?? 14;
     int endH = existingShift?.afternoonEndHour ?? 18;
     List<int> weekendDays = List<int>.from(existingShift?.weekendDays ?? [5, 6]);
 
@@ -413,9 +414,9 @@ class _AttendanceSettingsScreenState
                   ),
                   const SizedBox(height: 12),
 
-                  // Session Cutoff Point
+                  // Break Time Selection (From & To)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(14),
@@ -423,47 +424,90 @@ class _AttendanceSettingsScreenState
                         color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Session Cutoff Time',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 12.5,
-                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                ),
+                        Row(
+                          children: [
+                            const Icon(Icons.coffee_rounded, size: 16, color: Color(0xFFF59E0B)),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Break Time Selection',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
                               ),
-                              Text(
-                                'Splits Morning & Afternoon punch sessions',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Lunch & rest break interval (replaces midday cutoff locks)',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           ),
                         ),
-                        DropdownButtonHideUnderline(
-                          child: DropdownButton<int>(
-                            value: cutoffH,
-                            style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF4F46E5), fontSize: 14),
-                            items: List.generate(24, (h) => h).map((h) {
-                              return DropdownMenuItem<int>(
-                                value: h,
-                                child: Text(_hourLabel(h)),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setDlgState(() => cutoffH = val);
-                              }
-                            },
-                          ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Break From', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFFF59E0B))),
+                                    DropdownButtonHideUnderline(
+                                      child: DropdownButton<int>(
+                                        value: breakStartH,
+                                        isExpanded: true,
+                                        style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                                        items: List.generate(24, (h) => h).map((h) => DropdownMenuItem<int>(value: h, child: Text(_hourLabel(h)))).toList(),
+                                        onChanged: (val) {
+                                          if (val != null) setDlgState(() => breakStartH = val);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Break To', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF10B981))),
+                                    DropdownButtonHideUnderline(
+                                      child: DropdownButton<int>(
+                                        value: breakEndH,
+                                        isExpanded: true,
+                                        style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A), fontSize: 13),
+                                        items: List.generate(24, (h) => h).map((h) => DropdownMenuItem<int>(value: h, child: Text(_hourLabel(h)))).toList(),
+                                        onChanged: (val) {
+                                          if (val != null) setDlgState(() => breakEndH = val);
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -551,9 +595,11 @@ class _AttendanceSettingsScreenState
                               id: isEditing ? existingShift.id : 'shift_${DateTime.now().millisecondsSinceEpoch}',
                               name: name,
                               morningStartHour: startH,
-                              morningEndHour: cutoffH,
-                              afternoonStartHour: cutoffH,
+                              morningEndHour: breakStartH,
+                              afternoonStartHour: breakEndH,
                               afternoonEndHour: endH,
+                              breakStartHour: breakStartH,
+                              breakEndHour: breakEndH,
                               weekendDays: weekendDays,
                               isDefault: isEditing ? existingShift.isDefault : false,
                             );
@@ -563,7 +609,7 @@ class _AttendanceSettingsScreenState
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Shift "${shift.name}" saved! Midday Cutoff: ${_hourLabel(cutoffH)}'),
+                                  content: Text('Shift "${shift.name}" saved! Break: ${_hourLabel(breakStartH)} – ${_hourLabel(breakEndH)}'),
                                   backgroundColor: const Color(0xFF10B981),
                                   behavior: SnackBarBehavior.floating,
                                 ),
@@ -853,7 +899,7 @@ class _AttendanceSettingsScreenState
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Text(
-                                  'Timing: ${_hourLabel(shift.morningStartHour)} → ${_hourLabel(shift.afternoonEndHour)} • Midday Cutoff: ${_hourLabel(shift.morningEndHour)}',
+                                  'Shift: ${_hourLabel(shift.morningStartHour)} → ${_hourLabel(shift.afternoonEndHour)} • Break: ${_hourLabel(shift.breakStartHour)} – ${_hourLabel(shift.breakEndHour)}',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -864,35 +910,36 @@ class _AttendanceSettingsScreenState
                               const SizedBox(height: 12),
                               LayoutBuilder(
                                 builder: (ctx, constraints) {
-                                  final isCompact = constraints.maxWidth < 360;
                                   final morning = _sessionChip(
-                                    '☀️ Morning Slot',
-                                    '${_hourLabel(shift.morningStartHour)} – ${_hourLabel(shift.morningEndHour)}',
+                                    '☀️ Morning',
+                                    '${_hourLabel(shift.morningStartHour)} – ${_hourLabel(shift.breakStartHour)}',
                                     const Color(0xFF4F46E5),
                                     isDark: isDark,
                                   );
+                                  final breakChip = _sessionChip(
+                                    '☕ Break',
+                                    '${_hourLabel(shift.breakStartHour)} – ${_hourLabel(shift.breakEndHour)}',
+                                    const Color(0xFFF59E0B),
+                                    isDark: isDark,
+                                  );
                                   final afternoon = _sessionChip(
-                                    '🌙 Afternoon Slot',
-                                    '${_hourLabel(shift.morningEndHour)} – ${_hourLabel(shift.afternoonEndHour)}',
+                                    '🌙 Afternoon',
+                                    '${_hourLabel(shift.breakEndHour)} – ${_hourLabel(shift.afternoonEndHour)}',
                                     const Color(0xFF10B981),
                                     isDark: isDark,
                                   );
 
-                                  if (isCompact) {
-                                    return Column(
-                                      children: [
-                                        morning,
-                                        const SizedBox(height: 8),
-                                        afternoon,
-                                      ],
-                                    );
-                                  }
-
-                                  return Row(
+                                  return Column(
                                     children: [
-                                      Expanded(child: morning),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: afternoon),
+                                      Row(
+                                        children: [
+                                          Expanded(child: morning),
+                                          const SizedBox(width: 8),
+                                          Expanded(child: breakChip),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      afternoon,
                                     ],
                                   );
                                 },

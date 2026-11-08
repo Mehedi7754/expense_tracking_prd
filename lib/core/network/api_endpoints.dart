@@ -102,6 +102,9 @@ class ApiEndpoints {
   static String get attendanceSummary => resolve(AppEnv.endpointAttendanceSummary);
   static String get attendanceOverview => resolve(AppEnv.endpointAttendanceOverview);
   static String get confirmAbsence => resolve('${AppEnv.endpointAttendance}/confirm-absence');
+  static String get attendanceOverride => resolve('${AppEnv.endpointAttendance}/override');
+  static String get attendanceWorkLocations => resolve('${AppEnv.endpointAttendance}/work-locations');
+  static String get attendanceWorkLocationsAssign => resolve('${AppEnv.endpointAttendance}/work-locations/assign');
 
   // Salary & Attendance Deductions
   static String get salary => resolve(AppEnv.endpointSalary);

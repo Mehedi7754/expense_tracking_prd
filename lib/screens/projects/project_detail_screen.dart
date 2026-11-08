@@ -524,7 +524,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final canRecordRevenue = isOwnerOrAdmin || isFinance || project.canMemberRecordRevenue(userId);
     final canApproveExpenses = role.canApproveExpenses || project.canMemberApproveExpenses(userId);
     final canViewAllExpenses = isOwnerOrAdmin || isFinance || isProjectManager || project.canMemberViewExpenses(userId) || canApproveExpenses;
-    final canManageTasks = isOwnerOrAdmin || isProjectManager || project.canMemberManageTasks(userId);
     final canManageTeam = isOwnerOrAdmin || isProjectManager || project.canMemberManageTeam(userId);
 
     if (!canViewAllExpenses) {
@@ -835,12 +834,6 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
     final directCost = validExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
     final totalTaxIncurred = validExpenses.fold<double>(0.0, (sum, e) => sum + e.taxAmount);
     final costIncurred = directCost + totalTaxIncurred;
-    final expectedRemaining = project.estimatedRemainingCost;
-    final projectedFinalCost = costIncurred + expectedRemaining;
-    final projectedProfit = project.grossProjectValue - projectedFinalCost;
-    final projectedMargin = project.grossProjectValue > 0
-        ? (projectedProfit / project.grossProjectValue) * 100
-        : 0.0;
 
     final unreceiptedAmount = validExpenses.where((e) => !e.hasReceipt).fold<double>(0.0, (sum, e) => sum + e.amount);
     final unreceiptedRatio = directCost > 0 ? (unreceiptedAmount / directCost) * 100 : 0.0;
@@ -1265,21 +1258,25 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
             children: [
               // Tile 3: REMAINING
               Expanded(
-                child: _buildBentoMetricTile(
-                  title: 'REMAINING',
-                  value: CurrencyFormatter.format(remainingBalance),
-                  subtitle: remainingBalance >= 0 ? 'Available balance' : 'Over budget!',
-                  icon: remainingBalance >= 0 ? Icons.savings_outlined : Icons.warning_amber_rounded,
-                  valueColor: remainingBalance >= 0
-                      ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
-                      : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
-                  iconColor: remainingBalance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
-                  bgColor: remainingBalance >= 0
-                      ? (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5))
-                      : (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2)),
-                  borderColor: remainingBalance >= 0
-                      ? (isDark ? const Color(0xFF059669).withAlpha(60) : const Color(0xFFA7F3D0))
-                      : (isDark ? const Color(0xFFDC2626).withAlpha(60) : const Color(0xFFFECACA)),
+                child: InkWell(
+                  onTap: () => _showUpdateRemainingCostDialog(context, project),
+                  borderRadius: BorderRadius.circular(14),
+                  child: _buildBentoMetricTile(
+                    title: 'REMAINING',
+                    value: CurrencyFormatter.format(remainingBalance),
+                    subtitle: remainingBalance >= 0 ? 'Available balance' : 'Over budget!',
+                    icon: remainingBalance >= 0 ? Icons.savings_outlined : Icons.warning_amber_rounded,
+                    valueColor: remainingBalance >= 0
+                        ? (isDark ? const Color(0xFF34D399) : const Color(0xFF047857))
+                        : (isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
+                    iconColor: remainingBalance >= 0 ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                    bgColor: remainingBalance >= 0
+                        ? (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5))
+                        : (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2)),
+                    borderColor: remainingBalance >= 0
+                        ? (isDark ? const Color(0xFF059669).withAlpha(60) : const Color(0xFFA7F3D0))
+                        : (isDark ? const Color(0xFFDC2626).withAlpha(60) : const Color(0xFFFECACA)),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
