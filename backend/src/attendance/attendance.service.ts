@@ -377,7 +377,7 @@ export class AttendanceService {
     } else {
       const res = await this.db.query(
         `INSERT INTO attendance_records (user_id, date, session_type, login_time, latitude, longitude, address_text, device_info, status, notes, work_mode)
-         VALUES ($1, $2, $3, CASE WHEN $2 = CURRENT_DATE THEN clock_timestamp() ELSE ($2::text || ' ' || (CASE WHEN $3 = 'morning' THEN '09:00:00+06' ELSE '14:00:00+06' END))::timestamptz END, $4, $5, $6, $7, $8, $9, $10)
+         VALUES ($1, $2, $3, CASE WHEN $2 = CURRENT_DATE THEN clock_timestamp() ELSE ($2::text || ' ' || (CASE WHEN $3::text = 'morning' THEN '09:00:00+06' ELSE '14:00:00+06' END))::timestamptz END, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
         [userId, targetDate, session, dto.latitude, dto.longitude, address, deviceInfo, statusVal, notes, workMode],
       );
