@@ -55,10 +55,11 @@ export class AttendanceService {
 
   getDhakaDateStr(date?: Date): string {
     const d = date || new Date();
-    const dhakaDate = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
-    const yyyy = dhakaDate.getFullYear();
-    const mm = String(dhakaDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(dhakaDate.getDate()).padStart(2, '0');
+    const tz = this.officeTimingSettings.timezone || 'Asia/Dhaka';
+    const localDate = new Date(d.toLocaleString('en-US', { timeZone: tz }));
+    const yyyy = localDate.getFullYear();
+    const mm = String(localDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(localDate.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   }
 
@@ -78,6 +79,7 @@ export class AttendanceService {
     fullDayDeductionAmount: 1.0,
     halfDayDeductionAmount: 0.5,
     gracePeriodMinutes: 15,
+    timezone: 'Asia/Dhaka',
     shifts: [
       {
         id: 'shift_default',
@@ -240,7 +242,8 @@ export class AttendanceService {
       this.logger.log(`Privileged user ${userId} (${user.role}) is recording check-in.`);
     }
 
-    const dhakaNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }));
+    const tz = this.officeTimingSettings.timezone || 'Asia/Dhaka';
+    const dhakaNow = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
     const targetDateForCheck = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
     const assignedLocationInfo = await this.getAssignedWorkLocation(userId, targetDateForCheck);
 
@@ -395,7 +398,12 @@ export class AttendanceService {
       const empName = userRes.rows[0]?.full_name || 'Team member';
       const empEmail = userRes.rows[0]?.email || '';
       const empAvatar = userRes.rows[0]?.avatar_url || null;
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const recordedAt = new Date(fetched.loginTime);
+      const notifTz = this.officeTimingSettings.timezone || 'Asia/Dhaka';
+      const timeStr = recordedAt.toLocaleTimeString('en-US', {
+        timeZone: notifTz, hour: '2-digit', minute: '2-digit',
+      });
+      const dateStr = recordedAt.toLocaleDateString('en-US', { timeZone: notifTz });
       
       const statusTag = isLate ? '⚠️ LATE' : '✅ ON TIME';
       const checkoutTag = isEarly ? '⚠️ BEFORE TIME' : '✅ ON TIME';
@@ -452,8 +460,8 @@ export class AttendanceService {
                 : `${empName} checked out at ${timeStr}.`)
             : `${empName} recorded attendance for ${session} session at ${timeStr}.`,
           fullExplanation: isCheckOut
-            ? `${empName} checked out on ${new Date().toLocaleDateString()} at ${timeStr}. Shift: ${userShift.name} (Scheduled end: ${afternoonEnd}:00, ${isEarly ? 'Early departure' : 'On time'}). Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`
-            : `${empName} logged in for the ${session} session on ${new Date().toLocaleDateString()} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
+            ? `${empName} checked out on ${dateStr} at ${timeStr}. Shift: ${userShift.name} (Scheduled end: ${afternoonEnd}:00, ${isEarly ? 'Early departure' : 'On time'}). Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`
+            : `${empName} logged in for the ${session} session on ${dateStr} at ${timeStr}. Location coordinates: [${dto.latitude ?? 'N/A'}, ${dto.longitude ?? 'N/A'}]. Address: ${address || 'Office Premises'}.`,
           type: isCheckOut
             ? (isEarly ? 'attendance_early' : 'attendance_reminder')
             : (isLate ? 'attendance_late' : 'attendance_reminder'),
