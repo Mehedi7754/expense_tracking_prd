@@ -323,52 +323,63 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     }
 
 
-    final created = await ref.read(expenseProvider.notifier).submitExpense(
-          employeeId: user.id,
-          employeeName: user.name,
-          projectId: _selectedProject!.id,
-          projectName: _selectedProject!.name,
-          amount: _netCost,
-          baseCost: _baseCost,
-          vatRate: _vatRate,
-          vatAmount: _vatAmount,
-          taxRate: _taxRate,
-          taxAmount: _taxAmount,
-          officeBenefitRate: 0.0,
-          currency: 'BDT',
-          categoryId: 'cat_$_selectedCategory',
-          categoryName: _getCategoryDisplayName(_selectedCategory),
-          categoryIcon: _getCategoryIconName(_selectedCategory),
-          note: _noteController.text.trim(),
-          date: _selectedDate,
-          hasReceipt: _hasReceipt,
-          receiptPhotoUrl: _serverReceiptUrl ?? localReceiptPath,
-          equipmentDetails: equipDetails,
-          transportationDetails: transDetails,
-          foodDetails: foodDetails,
-          accommodationDetails: accommDetails,
-          officeCostDetails: officeDetails,
+    try {
+      final created = await ref.read(expenseProvider.notifier).submitExpense(
+            employeeId: user.id,
+            employeeName: user.name,
+            projectId: _selectedProject!.id,
+            projectName: _selectedProject!.name,
+            amount: _netCost,
+            baseCost: _baseCost,
+            vatRate: _vatRate,
+            vatAmount: _vatAmount,
+            taxRate: _taxRate,
+            taxAmount: _taxAmount,
+            officeBenefitRate: 0.0,
+            currency: 'BDT',
+            categoryId: 'cat_$_selectedCategory',
+            categoryName: _getCategoryDisplayName(_selectedCategory),
+            categoryIcon: _getCategoryIconName(_selectedCategory),
+            note: _noteController.text.trim(),
+            date: _selectedDate,
+            hasReceipt: _hasReceipt,
+            receiptPhotoUrl: _serverReceiptUrl ?? localReceiptPath,
+            equipmentDetails: equipDetails,
+            transportationDetails: transDetails,
+            foodDetails: foodDetails,
+            accommodationDetails: accommDetails,
+            officeCostDetails: officeDetails,
+          );
+
+      // If receipt hasn't finished remote uploading yet, enqueue background upload
+      final effectiveReceipt = _serverReceiptUrl ?? localReceiptPath;
+      if (effectiveReceipt != null &&
+          effectiveReceipt.isNotEmpty &&
+          !effectiveReceipt.startsWith('http') &&
+          !effectiveReceipt.startsWith('/uploads')) {
+        BackgroundReceiptUploader.instance.enqueue(
+          expenseId: created.id,
+          localFilePath: effectiveReceipt,
+          ref: ref,
         );
+      }
 
-    // If receipt hasn't finished remote uploading yet, enqueue background upload
-    final effectiveReceipt = _serverReceiptUrl ?? localReceiptPath;
-    if (effectiveReceipt != null &&
-        effectiveReceipt.isNotEmpty &&
-        !effectiveReceipt.startsWith('http') &&
-        !effectiveReceipt.startsWith('/uploads')) {
-      BackgroundReceiptUploader.instance.enqueue(
-        expenseId: created.id,
-        localFilePath: effectiveReceipt,
-        ref: ref,
-      );
-    }
-
-    if (mounted) {
-      NotificationBanner.showSuccess(
-        context,
-        _hasReceipt ? 'Expense submitted successfully!' : 'Expense claim submitted for approval',
-      );
-      context.pop();
+      if (mounted) {
+        NotificationBanner.showSuccess(
+          context,
+          _hasReceipt ? 'Expense submitted successfully!' : 'Expense claim submitted for approval',
+        );
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        final errorMsg = e.toString().replaceFirst(RegExp(r'^Exception:\s*'), '');
+        NotificationBanner.showError(
+          context,
+          'Failed to submit expense: $errorMsg',
+        );
+      }
     }
   }
 

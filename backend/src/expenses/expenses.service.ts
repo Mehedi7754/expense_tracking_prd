@@ -234,6 +234,19 @@ export class ExpensesService {
     }
     const validProjectId = project.id;
 
+    if (!isAdmin && user?.role !== 'finance_manager' && user?.role !== 'finance') {
+      const memberCheck = await this.db.query(
+        'SELECT can_create_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',
+        [validProjectId, user.id],
+      );
+      if (!memberCheck.rows.length) {
+        throw new ForbiddenException('You are not assigned to this project');
+      }
+      if (memberCheck.rows[0].can_create_expenses === false) {
+        throw new ForbiddenException('You do not have permission to submit expenses for this project');
+      }
+    }
+
     let categoryId = data.categoryId || data.category_id;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!categoryId || !uuidRegex.test(categoryId)) {

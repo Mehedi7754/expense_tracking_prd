@@ -271,8 +271,11 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       );
 
       return saved;
-    } catch (_) {
-      return newExpense;
+    } catch (e) {
+      // Revert optimistic insert on network/server rejection
+      state = state.where((exp) => exp.id != newExpense.id).toList();
+      await _persistExpenses();
+      rethrow;
     }
   }
 
