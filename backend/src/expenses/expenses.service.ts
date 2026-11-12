@@ -202,9 +202,14 @@ export class ExpensesService {
 
     if (user && user.role !== 'main_admin' && user.role !== 'finance_manager' && user.role !== 'finance') {
       const isOwner = expense.employeeId === user.id;
-      const isAssigned = (user.assignedProjectIds || []).includes(expense.projectId);
-      if (!isOwner && !isAssigned) {
-        throw new ForbiddenException('You do not have permission to view this expense report');
+      if (!isOwner) {
+        const pmCheck = await this.db.query(
+          'SELECT can_view_expenses, can_approve_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',
+          [expense.projectId, user.id],
+        );
+        if (!pmCheck.rows.length) {
+          throw new ForbiddenException('You do not have permission to view this expense report');
+        }
       }
     }
 
@@ -413,11 +418,19 @@ export class ExpensesService {
       if (existing.status !== 'pending' && existing.status !== 'draft') {
         throw new ForbiddenException('Cannot edit an expense that has already been approved or rejected');
       }
-      delete data.status;
     }
 
-    if (!isAdminOrFinance && data.status === 'approved' && existing.employeeId === user?.id) {
-      throw new ForbiddenException('Anti-fraud rule: You cannot approve your own expense report');
+    if (data.status !== undefined) {
+      if (data.status === 'approved') {
+        return this.approve(id, user.id, data.approvalNote || data.note || 'Approved via update', user);
+      }
+      if (data.status === 'rejected') {
+        const rejectionReason = data.rejectionReason || data.reason || data.note;
+        return this.reject(id, user.id, rejectionReason, user);
+      }
+      if (!isAdminOrFinance && !isProjectManager) {
+        throw new ForbiddenException('You do not have permission to change expense status');
+      }
     }
 
     const fields: string[] = [];
@@ -580,6 +593,11 @@ export class ExpensesService {
   }
 
   async reject(id: string, reviewerId: string, reason: string, user?: any) {
+    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+      throw new BadRequestException('A reason is mandatory when rejecting an expense claim');
+    }
+    const cleanReason = reason.trim();
+
     const exp = await this.findOne(id);
     if (exp.employeeId === reviewerId) {
       throw new ForbiddenException('Anti-fraud rule: You cannot reject your own expense report');
@@ -604,7 +622,7 @@ export class ExpensesService {
            justification_reviewed_by = $2,
            justification_reviewed_at = NOW()
        WHERE id = $3`,
-      [reason || 'Rejected by reviewer', reviewerId, id],
+      [cleanReason, reviewerId, id],
     );
 
     try {
@@ -618,13 +636,13 @@ export class ExpensesService {
         action: 'EXPENSE_REJECTED',
         entityType: 'Expense',
         entityId: id,
-        details: { reason, amount: exp.amount },
+        details: { reason: cleanReason, amount: exp.amount },
       });
 
       await this.notificationsService.create({
         userId: exp.employeeId,
         title: 'Expense Rejected',
-        message: `Your expense report for ${exp.categoryName} (${exp.amount} ${exp.currency}) was rejected. Reason: ${reason || 'None specified'}`,
+        message: `Your expense report for ${exp.categoryName} (${exp.amount} ${exp.currency}) was rejected. Reason: ${cleanReason}`,
         type: 'expense_rejected',
         relatedProjectId: exp.projectId,
         relatedExpenseId: id,

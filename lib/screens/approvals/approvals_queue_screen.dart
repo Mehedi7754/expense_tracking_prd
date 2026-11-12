@@ -103,8 +103,10 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
 
     final pendingExpenses = allExpenses.where((e) {
       if (e.status != ExpenseStatus.pending) return false;
+      // Anti-fraud rule: users cannot approve their own expense claim
+      if (e.employeeId == userId) return false;
       if (userRole.canApproveExpenses) return true;
-      final proj = allProjects.where((p) => p.id == e.projectId).firstOrNull;
+      final proj = allProjects.where((p) => p.id == e.projectId || p.projectId == e.projectId).firstOrNull;
       return proj != null && proj.canMemberApproveExpenses(userId);
     }).toList();
 
