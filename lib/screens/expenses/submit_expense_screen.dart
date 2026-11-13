@@ -30,6 +30,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
+  late final TextEditingController _dateController =
+      TextEditingController(text: DateFormatter.formatDayMonthYear(_selectedDate));
 
   // VAT calculation state (Segmented VAT)
   double _selectedVatRate = 0.0;
@@ -85,6 +87,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
   @override
   void dispose() {
+    _dateController.dispose();
     _otherCategoryNameController.dispose();
     _amountController.dispose();
     _customVatController.dispose();
@@ -868,28 +871,62 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             const SizedBox(height: 14),
 
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
-                  child: InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate,
-                        firstDate: DateTime(2025),
-                        lastDate: DateTime.now(),
-                      );
-                      if (picked != null) setState(() => _selectedDate = picked);
-                    },
-                    child: InputDecorator(
-                      decoration: const InputDecoration(
-                        labelText: 'Expense Date',
-                        suffixIcon: Icon(Icons.calendar_month_rounded, size: 18),
-                      ),
-                      child: Text(
-                        DateFormatter.formatShort(_selectedDate),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  child: TextFormField(
+                    controller: _dateController,
+                    keyboardType: TextInputType.datetime,
+                    decoration: InputDecoration(
+                      labelText: 'Expense Date (DD/MM/YYYY) *',
+                      hintText: 'e.g. 12/05/2026',
+                      prefixIcon: const Icon(Icons.edit_calendar_rounded, size: 20),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_month_rounded, size: 20, color: Color(0xFF2563EB)),
+                        tooltip: 'Choose date from calendar',
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2035),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              _selectedDate = picked;
+                              _dateController.text = DateFormatter.formatDayMonthYear(picked);
+                            });
+                          }
+                        },
                       ),
                     ),
+                    onChanged: (val) {
+                      final trimmed = val.trim();
+                      final parts = trimmed.split(RegExp(r'[-/.]'));
+                      if (parts.length == 3) {
+                        final d = int.tryParse(parts[0]);
+                        final m = int.tryParse(parts[1]);
+                        final y = int.tryParse(parts[2]);
+                        if (d != null && m != null && y != null && y >= 1990 && y <= 2040 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+                          try {
+                            final parsed = DateTime(y, m, d);
+                            setState(() => _selectedDate = parsed);
+                          } catch (_) {}
+                        }
+                      }
+                    },
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Please enter expense date';
+                      final parts = v.trim().split(RegExp(r'[-/.]'));
+                      if (parts.length != 3) return 'Format: DD/MM/YYYY';
+                      final d = int.tryParse(parts[0]);
+                      final m = int.tryParse(parts[1]);
+                      final y = int.tryParse(parts[2]);
+                      if (d == null || m == null || y == null || y < 1990 || y > 2040 || m < 1 || m > 12 || d < 1 || d > 31) {
+                        return 'Invalid date value';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ],

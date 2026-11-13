@@ -610,6 +610,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
               },
             ),
             IconButton(
+              icon: Badge(
+                isLabelVisible: project.progressNotes.isNotEmpty,
+                label: Text('${project.progressNotes.length}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                backgroundColor: const Color(0xFF0D9488),
+                child: const Icon(Icons.speaker_notes_rounded, color: Color(0xFF0D9488)),
+              ),
+              tooltip: 'Project Notes & Updates',
+              onPressed: () => context.push(RoutePaths.projectNotes(project.id)),
+            ),
+            IconButton(
               icon: const Icon(Icons.ios_share_rounded, color: Color(0xFF10B981)),
               tooltip: 'Export Financial Report',
               onPressed: () {
@@ -811,6 +821,37 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                     ),
                   );
                 }).toList(),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          InkWell(
+            onTap: () => context.push(RoutePaths.projectNotes(project.id)),
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF0D9488).withValues(alpha: isDark ? 0.25 : 0.12),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.35),
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.comment_outlined, size: 11, color: Color(0xFF0D9488)),
+                  const SizedBox(width: 3),
+                  Text(
+                    'Notes (${project.progressNotes.length})',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0D9488),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
