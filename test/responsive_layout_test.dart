@@ -546,9 +546,9 @@ void main() {
 
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
-    expect(find.text('Project Progress'), findsOneWidget);
-    expect(find.text('Project Members'), findsOneWidget);
-    expect(find.text('Cost Incurred'), findsOneWidget);
+    expect(find.text('Overall Progress'), findsWidgets);
+    expect(find.text('TOTAL SPENT'), findsOneWidget);
+    expect(find.text('Financial Overview'), findsWidgets);
   });
 
   testWidgets('ExpenseDetailScreen renders long equipment type without overflow on 360px mobile width', (WidgetTester tester) async {
