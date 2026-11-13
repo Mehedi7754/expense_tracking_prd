@@ -89,13 +89,20 @@ class AttendanceRecordModel {
     return match?.group(1)?.trim();
   }
 
+  bool get isOffice =>
+      workMode.toLowerCase() == 'office' ||
+      notes.toLowerCase().contains('[work mode: office]') ||
+      (!isFieldDuty && !isHomeOffice && !isHome);
+
   bool get isInsideGeofence =>
-      notes.toLowerCase().contains('[geofence: inside') ||
-      notes.toLowerCase().contains('in geofence');
+      isOffice &&
+      (notes.toLowerCase().contains('[geofence: inside') ||
+       notes.toLowerCase().contains('in geofence'));
 
   bool get isOutsideGeofence =>
-      notes.toLowerCase().contains('[geofence: outside') ||
-      notes.toLowerCase().contains('outside geofence');
+      isOffice &&
+      (notes.toLowerCase().contains('[geofence: outside') ||
+       notes.toLowerCase().contains('outside geofence'));
 
   String? get geofenceDistanceText {
     final match = RegExp(r'\[Geofence:\s*(?:Inside|Outside)\s*\(([^)]+)\)\]', caseSensitive: false).firstMatch(notes);
@@ -107,18 +114,21 @@ class AttendanceRecordModel {
       final site = fieldSite;
       return site != null && site.isNotEmpty ? 'On Field ($site)' : 'On Field';
     }
-    if (isHomeOffice) {
+    if (isHomeOffice || isHome) {
       return 'Home Office';
     }
-    if (isOutsideGeofence) {
-      final dist = geofenceDistanceText;
-      return dist != null ? 'Office (Outside • $dist)' : 'Office (Outside Range)';
+    if (isOffice) {
+      if (isOutsideGeofence) {
+        final dist = geofenceDistanceText;
+        return dist != null ? 'Office (Outside • $dist)' : 'Office (Outside Range)';
+      }
+      if (isInsideGeofence) {
+        final dist = geofenceDistanceText;
+        return dist != null ? 'Office (In Range • $dist)' : 'Office (In Range)';
+      }
+      return 'Office';
     }
-    if (isInsideGeofence) {
-      final dist = geofenceDistanceText;
-      return dist != null ? 'Office (In Range • $dist)' : 'Office (In Range)';
-    }
-    return 'Office';
+    return workModeLabel;
   }
 
   String get formattedTime => DateFormat('hh:mm a').format(loginTime.toLocal());

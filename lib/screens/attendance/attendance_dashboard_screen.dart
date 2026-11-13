@@ -1711,7 +1711,7 @@ class _AttendanceDashboardScreenState
                     final client = record.fieldClient;
                     modeSubtitle =
                         'Site: ${site ?? "Site Not Specified"}${client != null ? " • Client: $client" : ""}';
-                  } else if (record.isHomeOffice) {
+                  } else if (record.isHomeOffice || record.isHome) {
                     bannerBg =
                         isDark
                             ? const Color(0xFF4C1D95).withAlpha(100)

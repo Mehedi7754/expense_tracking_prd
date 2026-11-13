@@ -27,6 +27,7 @@ class ApprovalsQueueScreen extends ConsumerStatefulWidget {
 
 class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
   String _activeFilter = 'all'; // all, highAmount, noReceipt, hasReceipt
+  String? _selectedEmployeeId;
   String _searchQuery = '';
   bool _isBatchMode = false;
   final Set<String> _selectedExpenseIds = {};
@@ -39,6 +40,7 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
       if (mounted) {
         ref.read(expenseProvider.notifier).fetchExpenses(force: true);
         ref.read(projectProvider.notifier).fetchProjects(force: true);
+        ref.read(userManagementProvider.notifier).fetchUsers();
       }
     });
     // Active fast-poll while on Approvals Queue for instant responsiveness
@@ -110,8 +112,19 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
       return proj != null && proj.canMemberApproveExpenses(userId);
     }).toList();
 
+    // Distinct employees in pending expenses
+    final Map<String, String> claimants = {};
+    for (final exp in pendingExpenses) {
+      if (exp.employeeId.isNotEmpty) {
+        claimants[exp.employeeId] = exp.employeeName;
+      }
+    }
+
     // Filter logic
     final filtered = pendingExpenses.where((e) {
+      if (_selectedEmployeeId != null && e.employeeId != _selectedEmployeeId) {
+        return false;
+      }
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final match = e.employeeName.toLowerCase().contains(q) ||
@@ -213,7 +226,90 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
             ),
           ),
 
-          const SizedBox(height: 4),
+          // Employee Filter Chips Row
+          if (claimants.isNotEmpty)
+            SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      selected: _selectedEmployeeId == null,
+                      label: Text(
+                        'All Staff (${pendingExpenses.length})',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: _selectedEmployeeId == null ? FontWeight.w700 : FontWeight.w500,
+                          color: _selectedEmployeeId == null
+                              ? Colors.white
+                              : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                        ),
+                      ),
+                      selectedColor: const Color(0xFF4F46E5),
+                      backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      side: BorderSide(
+                        color: _selectedEmployeeId == null
+                            ? const Color(0xFF4F46E5)
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                        width: 1,
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      onSelected: (val) {
+                        setState(() => _selectedEmployeeId = null);
+                      },
+                    ),
+                  ),
+                  ...claimants.entries.map((entry) {
+                    final empId = entry.key;
+                    final empName = entry.value;
+                    final isSelected = _selectedEmployeeId == empId;
+                    final count = pendingExpenses.where((e) => e.employeeId == empId).length;
+                    final user = allUsers.where((u) => u.id == empId).firstOrNull;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ChoiceChip(
+                        avatar: AppAvatar(
+                          imageUrl: user?.avatarUrl,
+                          name: empName,
+                          size: 20,
+                        ),
+                        selected: isSelected,
+                        label: Text(
+                          '$empName ($count)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? Colors.white
+                                : (isDark ? Colors.white70 : const Color(0xFF475569)),
+                          ),
+                        ),
+                        selectedColor: const Color(0xFF4F46E5),
+                        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                        side: BorderSide(
+                          color: isSelected
+                              ? const Color(0xFF4F46E5)
+                              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          width: 1,
+                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        onSelected: (val) {
+                          setState(() {
+                            _selectedEmployeeId = isSelected ? null : empId;
+                          });
+                        },
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 6),
 
           // Minimalist Approval Cards List
           Expanded(

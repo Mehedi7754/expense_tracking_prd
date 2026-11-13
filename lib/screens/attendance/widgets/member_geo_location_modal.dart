@@ -824,7 +824,7 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                 final site = record.fieldSite;
                 final client = record.fieldClient;
                 modeSubtitle = 'Site: ${site ?? "Not specified"}${client != null ? " • Client: $client" : ""}';
-              } else if (record.isHomeOffice) {
+              } else if (record.isHomeOffice || record.isHome) {
                 bannerBg = isDark ? const Color(0xFF4C1D95).withAlpha(100) : const Color(0xFFF3E8FF);
                 bannerBorder = isDark ? const Color(0xFF6B21A8).withAlpha(120) : const Color(0xFFE9D5FF);
                 bannerFg = isDark ? const Color(0xFFD8B4FE) : const Color(0xFF6B21A8);
