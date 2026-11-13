@@ -497,35 +497,41 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
   }
 
   /// Returns null when check-in is allowed; otherwise a reason.
+  /// Returns null when check-in is allowed; otherwise a reason.
   /// Evaluates shift start timings without locking midday cutoff.
   static String? checkInWindowError(
     String session,
     AttendanceSettingsState? s, {
     String? userId,
   }) {
-    // Afternoon session is check-out / departure / afternoon punch; employees can punch at any time.
-    if (session == 'afternoon') {
-      return null;
-    }
+    final h = DateTime.now().hour;
 
     if (s != null && userId != null) {
       final shift = s.getShiftForUser(userId);
-      final h = DateTime.now().hour;
 
       if (session == 'morning') {
         if (h < shift.morningStartHour) {
           return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';
+        }
+      } else if (session == 'afternoon') {
+        final breakStart = shift.breakStartHour;
+        if (h < breakStart) {
+          return 'Evening check-out is only permitted during break/afternoon hours (starting at ${_fmt(breakStart)}) until 12:00 AM midnight.';
         }
       }
       return null;
     }
 
     final start = s?.morningStartHour ?? 9;
-    final h = DateTime.now().hour;
+    final breakStart = s?.breakStartHour ?? 13;
 
     if (session == 'morning') {
       if (h < start) {
         return 'Morning check-in opens at ${_fmt(start)}.';
+      }
+    } else if (session == 'afternoon') {
+      if (h < breakStart) {
+        return 'Evening check-out is only permitted starting at ${_fmt(breakStart)} until 12:00 AM midnight.';
       }
     }
     return null;

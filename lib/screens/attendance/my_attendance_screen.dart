@@ -335,6 +335,17 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
       (user?.email != null && r.userEmail == user!.email)
     ).toList();
 
+    final currentHour = DateTime.now().hour;
+    final isAdminRole = user?.role == null || !user!.role.requiresAttendanceCheckIn;
+    final settings = ref.watch(attendanceSettingsProvider).value;
+    final shift = settings?.getShiftForUser(effectiveUserId) ?? const AttendanceShift(id: 'shift_default', name: 'General Shift');
+    final startH = shift.morningStartHour;
+    final dividerH = shift.breakStartHour;
+    final endH = shift.afternoonEndHour;
+    final isWeekendToday = shift.weekendDays.contains(DateTime.now().weekday);
+
+    String fmtH(int h) => '${(h % 12 == 0 ? 12 : h % 12).toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
+
     bool isDateToday(AttendanceRecordModel r) {
       if (r.date == todayStr || r.date.startsWith(todayStr)) return true;
       final parsedDate = DateTime.tryParse(r.date);
@@ -349,20 +360,14 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     for (final r in myRecords) {
       if (isDateToday(r)) {
         if (r.isMorning) todayMorning = r;
-        if (r.isAfternoon) todayAfternoon = r;
+        // Evening / Check-out session belongs strictly to afternoon/evening hours (dividerH to midnight 12:00 AM).
+        // A punch before breakStartHour (e.g. at 01:03 AM before morning check-in) is NOT a valid afternoon checkout!
+        if (r.isAfternoon && r.loginTime.toLocal().hour >= dividerH) {
+          todayAfternoon = r;
+        }
       }
     }
 
-    final currentHour = DateTime.now().hour;
-    final isAdminRole = user?.role == null || !user!.role.requiresAttendanceCheckIn;
-    final settings = ref.watch(attendanceSettingsProvider).value;
-    final shift = settings?.getShiftForUser(effectiveUserId) ?? const AttendanceShift(id: 'shift_default', name: 'General Shift');
-    final startH = shift.morningStartHour;
-    final dividerH = shift.morningEndHour;
-    final endH = shift.afternoonEndHour;
-    final isWeekendToday = shift.weekendDays.contains(DateTime.now().weekday);
-
-    String fmtH(int h) => '${(h % 12 == 0 ? 12 : h % 12).toString().padLeft(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}';
     final isMorningSlot = !isWeekendToday && currentHour >= startH && currentHour < dividerH;
 
     String currentSlotBadge;
@@ -1007,13 +1012,15 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                         isSubmitting: attendanceState.isSubmitting,
                         icon: CupertinoIcons.sunset_fill,
                         iconColor: const Color(0xFF6366F1),
-                        isCorrectTimeSlot: todayMorning != null,
-                        isDisabled: todayMorning == null && !isAdminRole,
+                        isCorrectTimeSlot: todayMorning != null && currentHour >= dividerH,
+                        isDisabled: !isAdminRole && (todayMorning == null || currentHour < dividerH),
                         timingHint: todayAfternoon != null
                             ? 'Logged at ${todayAfternoon.formattedTime}'
                             : (todayMorning == null && !isAdminRole
                                 ? 'Check-in required first before checkout'
-                                : 'Valid until 12:00 AM midnight • Shift ends ${fmtH(endH)}'),
+                                : (currentHour < dividerH && !isAdminRole
+                                    ? 'Check-out opens at ${fmtH(dividerH)} (valid until 12:00 AM)'
+                                    : 'Valid until 12:00 AM midnight • Shift ends ${fmtH(endH)}')),
                         extraAction: (todayAfternoon == null && todayMorning != null && !isAdminRole)
                             ? InkWell(
                                 onTap: _showEarlyDepartureDialog,

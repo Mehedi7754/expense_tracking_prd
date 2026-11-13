@@ -321,6 +321,7 @@ export class AttendanceService {
 
     // 2. Resolve local office hour (Bangladesh Standard Time: UTC+6) and assigned user shift
     const currentHour = dhakaNow.getHours();
+    const currentMinute = dhakaNow.getMinutes();
     const userShift = this.getShiftForUser(userId);
 
     const morningStart = userShift.morningStartHour ?? 9;
@@ -340,28 +341,35 @@ export class AttendanceService {
 
     const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
 
-    // Enforce check-out validity: Afternoon checkout is valid only for the same day till midnight (12:00 AM).
-    // An employee cannot checkout before checking in for today.
-    // (If not checked out by midnight, the day automatically becomes half_day, and next day requires fresh check-in).
-    if (session === 'afternoon' && user?.role !== 'main_admin') {
+    // Enforce check-out validity:
+    // 1. Afternoon checkout is strictly allowed only AFTER morning check-in for the same day.
+    // 2. Afternoon checkout cannot be performed in the early morning hours before shift break/afternoon start.
+    // 3. If an employee does not check out before 12:00 AM midnight, the day automatically becomes half_day.
+    if (session === 'afternoon') {
+      if (currentHour < breakStart && user?.role !== 'main_admin') {
+        throw new BadRequestException(
+          `Check-out is only permitted during shift break/afternoon hours (starting from ${breakStart}:00) until 12:00 AM midnight.`,
+        );
+      }
+
       const morningRes = await this.db.query(
         `SELECT id FROM attendance_records
          WHERE user_id = $1 AND date = $2 AND session_type = 'morning'`,
         [userId, targetDate],
       );
-      if (morningRes.rows.length === 0) {
+      if (morningRes.rows.length === 0 && user?.role !== 'main_admin') {
         throw new BadRequestException(
           'Cannot check out before checking in for today. Please log morning check-in first.',
         );
       }
     }
 
-    const currentMinute = dhakaNow.getMinutes();
     const gracePeriod = this.officeTimingSettings.gracePeriodMinutes ?? 15;
     const isCheckOut = session === 'afternoon';
 
     let isLate = false;
     if (session === 'morning') {
+      // Early check-in before shift start is on-time/early, NEVER late!
       if (currentHour > morningStart || (currentHour === morningStart && currentMinute > gracePeriod)) {
         isLate = true;
       }
