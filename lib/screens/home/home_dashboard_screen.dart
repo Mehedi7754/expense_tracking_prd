@@ -765,7 +765,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
             if (approvableProjects.isEmpty) return const SizedBox.shrink();
 
             final pendingApprovalExpenses = allExpenses.where((e) =>
-              e.status == ExpenseStatus.pending && approvableProjects.any((p) => p.id == e.projectId)
+              e.status == ExpenseStatus.pending &&
+              e.employeeId != user.id &&
+              approvableProjects.any((p) => p.id == e.projectId || p.projectId == e.projectId)
             ).toList();
 
             final hasPending = pendingApprovalExpenses.isNotEmpty;

@@ -40,10 +40,7 @@ class ApiClient {
     String? baseUrl,
     http.Client? httpClient,
     Duration? timeout,
-  })  : baseUrl = baseUrl ??
-            (AppEnv.apiBaseUrl.isNotEmpty
-                ? AppEnv.apiBaseUrl
-                : AppEnv.defaultApiBaseUrl),
+  })  : baseUrl = baseUrl ?? AppEnv.apiBaseUrl,
         _httpClient = httpClient ?? http.Client(),
         timeout = timeout ??
             Duration(
@@ -188,20 +185,45 @@ class ApiClient {
   }
 
   Future<dynamic> _send(Future<http.Response> Function(String activeUrl) requestFn) async {
-    try {
-      final response = await requestFn(effectiveBaseUrl).timeout(timeout);
-      return _processResponse(response);
-    } on SocketException {
-      throw const NetworkException('Unable to connect to server. Please check your internet connection.');
-    } on http.ClientException {
-      throw const NetworkException('Unable to connect to server. Please check your internet connection.');
-    } on TimeoutException {
-      throw const ApiTimeoutException();
-    } on ApiException {
-      rethrow;
-    } catch (_) {
-      throw const ApiException('Unable to complete request. Please try again.');
+    final candidateUrls = AppEnv.candidateBaseUrls.isNotEmpty
+        ? AppEnv.candidateBaseUrls
+        : [effectiveBaseUrl];
+
+    // Try current effectiveBaseUrl first
+    final orderedUrls = <String>[
+      effectiveBaseUrl,
+      ...candidateUrls.where((u) => u != effectiveBaseUrl),
+    ];
+
+    Object? lastError;
+    for (int i = 0; i < orderedUrls.length; i++) {
+      final targetUrl = orderedUrls[i];
+      try {
+        final response = await requestFn(targetUrl).timeout(timeout);
+        _effectiveBaseUrl = targetUrl;
+        return _processResponse(response);
+      } on SocketException catch (e) {
+        lastError = e;
+        debugPrint('[ApiClient] Failover: $targetUrl failed with SocketException, trying next...');
+      } on http.ClientException catch (e) {
+        lastError = e;
+        debugPrint('[ApiClient] Failover: $targetUrl failed with ClientException, trying next...');
+      } on TimeoutException catch (e) {
+        lastError = e;
+        debugPrint('[ApiClient] Failover: $targetUrl timed out, trying next...');
+      } on ApiException {
+        // HTTP 4xx/5xx business/auth responses come from live server, do not failover
+        rethrow;
+      } catch (e) {
+        lastError = e;
+        debugPrint('[ApiClient] Failover: $targetUrl unexpected error: $e, trying next...');
+      }
     }
+
+    if (lastError is TimeoutException) {
+      throw const ApiTimeoutException();
+    }
+    throw const NetworkException('Unable to connect to server. Please check your internet connection.');
   }
 
   dynamic _processResponse(http.Response response) {

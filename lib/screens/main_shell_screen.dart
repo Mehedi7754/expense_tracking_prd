@@ -98,8 +98,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final expenses = ref.watch(expenseProvider);
     final pendingCount = expenses.where((e) {
       if (e.status != ExpenseStatus.pending) return false;
+      // Anti-fraud rule: users cannot approve their own expense claim
+      if (e.employeeId == user.id) return false;
       if (role.canApproveExpenses) return true;
-      final proj = allProjects.where((p) => p.id == e.projectId).firstOrNull;
+      final proj = allProjects.where((p) => p.id == e.projectId || p.projectId == e.projectId).firstOrNull;
       return proj != null && proj.canMemberApproveExpenses(user.id);
     }).length;
 

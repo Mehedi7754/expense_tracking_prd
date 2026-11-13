@@ -71,18 +71,28 @@ class AppEnv {
     return dotenv.env['ENFORCE_HTTPS']?.trim().toLowerCase() == 'true';
   }
 
-  /// The Base URL for all backend REST API requests.
-  ///
-  static const String defaultApiBaseUrl =
-      'http://ihhxbfmr3be3hilklfuvhwyg.203.96.190.78.sslip.io/api/v1';
-
-  /// The Base URL for all backend REST API requests.
+  /// Primary API Base URL read directly from .env.
   static String get apiBaseUrl {
     final url = dotenv.isInitialized ? dotenv.env['API_BASE_URL']?.trim() : null;
-    if (url == null || url.isEmpty) {
-      return defaultApiBaseUrl;
-    }
+    if (url == null || url.isEmpty) return '';
     return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+  }
+
+  /// Secondary/Fallback API Base URL read directly from .env.
+  static String get apiFallbackBaseUrl {
+    final url = dotenv.isInitialized ? dotenv.env['API_FALLBACK_BASE_URL']?.trim() : null;
+    if (url == null || url.isEmpty) return '';
+    return url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+  }
+
+  /// Ordered list of candidate backend URLs read from .env for seamless failover.
+  static List<String> get candidateBaseUrls {
+    final list = <String>[];
+    if (apiBaseUrl.isNotEmpty) list.add(apiBaseUrl);
+    if (apiFallbackBaseUrl.isNotEmpty && !list.contains(apiFallbackBaseUrl)) {
+      list.add(apiFallbackBaseUrl);
+    }
+    return list;
   }
 
   /// API request timeout in seconds.
