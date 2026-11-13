@@ -80,6 +80,11 @@ export class ProjectsController {
     return this.projectsService.update(id, body, req.user);
   }
 
+  @Post(':id/notes')
+  async addProjectNote(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    return this.projectsService.addProjectNote(id, body.note, req.user);
+  }
+
   @Roles('main_admin', 'project_manager')
   @Post(':id/revenue')
   async addRevenue(

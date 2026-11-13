@@ -172,14 +172,55 @@ export class FcmService implements OnModuleInit {
         tokens = fallbackRes.rows.map((r: any) => r.token).filter(Boolean);
       }
       this.logger.log(`Found ${tokens.length} FCM token(s) to dispatch push to.`);
+      await this.sendMulticast(tokens, title, body, data);
+    } catch (e) {
+      this.logger.error('Failed to send push to admins', e);
+    }
+  }
+
+  async sendPushToProjectMembers(
+    projectId: string,
+    title: string,
+    body: string,
+    data: Record<string, string> = {},
+    excludeUserId?: string,
+  ) {
+    if (!this.initialized) {
+      this.logger.warn('FCM not initialized, attempting reinitialization before pushing to project members.');
+      this.initFirebase();
+      if (!this.initialized) {
+        this.logger.error('FCM initialization failed; skipping push to project members.');
+        return;
+      }
+    }
+
+    try {
+      // Find all tokens for project members + project creator, excluding author
+      const res = await this.db.query(
+        `SELECT DISTINCT t.token
+         FROM user_fcm_tokens t
+         JOIN users u ON u.id = t.user_id
+         WHERE (
+           u.id IN (
+             SELECT pm.user_id FROM project_members pm WHERE pm.project_id = $1
+             UNION
+             SELECT p.created_by FROM projects p WHERE p.id = $1 AND p.created_by IS NOT NULL
+           )
+         )
+         AND ($2::text IS NULL OR u.id != $2)
+         AND (u.is_active IS TRUE OR u.is_active IS NULL)`,
+        [projectId, excludeUserId || null],
+      );
+
+      const tokens = res.rows.map((r) => r.token).filter(Boolean);
+      this.logger.log(`Found ${tokens.length} FCM token(s) for project members in project ${projectId}`);
       if (tokens.length === 0) {
-        this.logger.warn('No active FCM tokens found in user_fcm_tokens table.');
         return;
       }
 
       await this.sendMulticast(tokens, title, body, data);
     } catch (e) {
-      this.logger.error('Failed to send push to admins', e);
+      this.logger.error(`Failed to send push to project members for project ${projectId}`, e);
     }
   }
 

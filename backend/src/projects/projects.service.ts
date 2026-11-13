@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { DatabaseService } from '../database/database.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FcmService } from '../notifications/fcm.service';
 
 @Injectable()
 export class ProjectsService {
@@ -25,6 +26,7 @@ export class ProjectsService {
     private readonly db: DatabaseService,
     private readonly auditLogsService: AuditLogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly fcmService: FcmService,
   ) {}
 
   private mapProjectRow(p: any, revenues: any[] = [], members: any[] = [], detailedMembers: any[] = []) {
@@ -989,6 +991,157 @@ export class ProjectsService {
         canEditProject: Boolean(r.can_edit_project),
         canViewAttendance: Boolean(r.can_view_attendance),
       }
+    };
+  }
+
+  async addProjectNote(projectId: string, noteText: string, user: any) {
+    if (!noteText || typeof noteText !== 'string' || !noteText.trim()) {
+      throw new BadRequestException('Note text cannot be empty');
+    }
+
+    const trimmedNote = noteText.trim();
+    const rawTarget = (projectId || '').trim();
+
+    // Check project existence
+    const pRes = await this.db.query(
+      `SELECT id, project_code, name, created_by, progress_percentage, progress_notes 
+       FROM projects 
+       WHERE id::text = $1 OR project_code = $1`,
+      [rawTarget],
+    );
+
+    if (!pRes.rows.length) {
+      throw new NotFoundException(`Project not found: ${projectId}`);
+    }
+
+    const project = pRes.rows[0];
+    const actualId = project.id;
+
+    // Check permission:
+    // main_admin / admin / project_manager, project creator, or member with canUpdateProgress
+    const isAdmin = ['main_admin', 'admin', 'project_manager'].includes(user?.role);
+    const isCreator = project.created_by === user?.id;
+
+    let hasPermission = isAdmin || isCreator;
+    if (!hasPermission && user?.id) {
+      const pmRes = await this.db.query(
+        `SELECT can_update_progress FROM project_members WHERE project_id = $1 AND user_id = $2`,
+        [actualId, user.id],
+      );
+      if (pmRes.rows.length > 0 && pmRes.rows[0].can_update_progress) {
+        hasPermission = true;
+      }
+    }
+
+    if (!hasPermission) {
+      throw new ForbiddenException('You do not have permission to add notes to this project');
+    }
+
+    // Existing notes
+    let existingNotes: any[] = [];
+    if (typeof project.progress_notes === 'string') {
+      try {
+        existingNotes = JSON.parse(project.progress_notes) || [];
+      } catch (_) {
+        existingNotes = [];
+      }
+    } else if (Array.isArray(project.progress_notes)) {
+      existingNotes = [...project.progress_notes];
+    }
+
+    const nowIso = new Date().toISOString();
+    const newNoteObj = {
+      id: `note_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      note: trimmedNote,
+      progressPercentage: Number(project.progress_percentage || 0),
+      percentage: Number(project.progress_percentage || 0),
+      authorId: user.id,
+      authorName: user.fullName || user.email || 'Team Member',
+      authorRole: user.role || 'Member',
+      updated_by: user.fullName || user.email || 'Team Member',
+      createdAt: nowIso,
+      updated_at: nowIso,
+    };
+
+    // Prepend or append? Existing frontend prepends new notes or displays in chronological/reverse chronological
+    const updatedNotes = [newNoteObj, ...existingNotes];
+
+    await this.db.query(
+      `UPDATE projects 
+       SET progress_notes = $1, updated_at = NOW() 
+       WHERE id = $2`,
+      [JSON.stringify(updatedNotes), actualId],
+    );
+
+    // Audit log
+    try {
+      await this.auditLogsService.log(
+        {
+          action: 'PROJECT_NOTE_ADDED',
+          entityType: 'Project',
+          entityId: actualId,
+          details: {
+            projectId: actualId,
+            projectName: project.name,
+            note: trimmedNote,
+            author: newNoteObj.authorName,
+          },
+        },
+        user ? { id: user.id } : undefined,
+      );
+    } catch (_) {}
+
+    // Instant FCM Push Notification to all project members
+    const pushTitle = `Project Note: ${project.name}`;
+    const pushBody = `${newNoteObj.authorName}: ${trimmedNote.length > 120 ? trimmedNote.substring(0, 117) + '...' : trimmedNote}`;
+    
+    try {
+      await this.fcmService.sendPushToProjectMembers(
+        actualId,
+        pushTitle,
+        pushBody,
+        {
+          type: 'project_note',
+          projectId: actualId,
+          projectName: project.name,
+          noteId: newNoteObj.id,
+          click_action: 'FLUTTER_NOTIFICATION_CLICK',
+        },
+        user?.id,
+      );
+    } catch (pushErr) {
+      // Don't fail the request if push fails
+    }
+
+    // In-app notifications for project members (excluding the author)
+    try {
+      const membersRes = await this.db.query(
+        `SELECT DISTINCT user_id FROM (
+           SELECT user_id FROM project_members WHERE project_id = $1
+           UNION
+           SELECT created_by AS user_id FROM projects WHERE id = $1 AND created_by IS NOT NULL
+         ) t WHERE user_id IS NOT NULL AND user_id != $2`,
+        [actualId, user?.id || ''],
+      );
+
+      for (const m of membersRes.rows) {
+        await this.notificationsService.create({
+          userId: m.user_id,
+          title: pushTitle,
+          message: pushBody,
+          type: 'project_update',
+          relatedProjectId: actualId,
+          actorId: user?.id,
+          actorName: newNoteObj.authorName,
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
+    return {
+      success: true,
+      message: 'Note added successfully',
+      note: newNoteObj,
+      progressNotes: updatedNotes,
     };
   }
 }

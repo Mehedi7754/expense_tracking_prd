@@ -17,7 +17,12 @@ describe('ProjectsService Unit & Access Rules', () => {
     const mockNotifications = {
       createNotification: jest.fn().mockResolvedValue(true),
     };
-    service = new ProjectsService(mockDb, mockAudit, mockNotifications as any);
+    const mockFcm = {
+      sendPushToProjectMembers: jest.fn().mockResolvedValue(true),
+      sendPushToAdmins: jest.fn().mockResolvedValue(true),
+      sendPushToUser: jest.fn().mockResolvedValue(true),
+    };
+    service = new ProjectsService(mockDb, mockAudit, mockNotifications as any, mockFcm as any);
   });
 
   it('maps saved site coordinates and rejects incomplete or out-of-range pins', () => {
