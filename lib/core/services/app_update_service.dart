@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/app_constants.dart';
 import '../network/api_endpoints.dart';
@@ -23,17 +24,26 @@ class AppUpdateService {
       final data = jsonDecode(response.body);
       if (data == null || data is! Map<String, dynamic>) return;
 
+      PackageInfo? packageInfo;
+      try {
+        packageInfo = await PackageInfo.fromPlatform();
+      } catch (_) {}
+
+      final currentBuildNumber = int.tryParse(packageInfo?.buildNumber ?? '') ?? AppConstants.buildNumber;
+      final currentVersion = (packageInfo?.version.isNotEmpty == true ? packageInfo!.version : AppConstants.appVersion)
+          .replaceAll('v', '')
+          .trim();
+
       final latestBuildNumber = int.tryParse(data['buildNumber']?.toString() ?? '') ?? 0;
       final latestVersionName = (data['versionName']?.toString() ?? '').replaceAll('v', '').trim();
-      final currentVersion = AppConstants.appVersion.replaceAll('v', '').trim();
 
-      final isNewerBuild = latestBuildNumber > AppConstants.buildNumber;
+      final isNewerBuild = latestBuildNumber > currentBuildNumber;
       final isNewerVersion = latestVersionName.isNotEmpty &&
           latestVersionName != currentVersion &&
           _compareVersions(latestVersionName, currentVersion) > 0;
 
       if ((isNewerBuild || isNewerVersion) && context.mounted) {
-        showUpdateDialog(context, data);
+        showUpdateDialog(context, data, currentVersion: currentVersion);
       }
     } catch (e) {
       debugPrint('[AppUpdateService] Error checking for update: $e');
@@ -53,7 +63,7 @@ class AppUpdateService {
     return 0;
   }
 
-  void showUpdateDialog(BuildContext context, Map<String, dynamic> releaseInfo) {
+  void showUpdateDialog(BuildContext context, Map<String, dynamic> releaseInfo, {String? currentVersion}) {
     if (_isDialogShowing) return;
     _isDialogShowing = true;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -63,6 +73,7 @@ class AppUpdateService {
     final downloadUrl = rawUrl.startsWith('http') ? rawUrl : ApiEndpoints.resolve('/app-releases/download-latest');
     final sizeBytes = int.tryParse(releaseInfo['fileSizeBytes']?.toString() ?? '') ?? 0;
     final sizeMb = sizeBytes > 0 ? ' (${(sizeBytes / (1024 * 1024)).toStringAsFixed(1)} MB)' : '';
+    final displayCurrent = currentVersion ?? AppConstants.appVersion;
 
     showDialog(
       context: context,
@@ -107,7 +118,7 @@ class AppUpdateService {
               const SizedBox(height: 8),
               Text('GW Project $versionName', textAlign: TextAlign.center, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
               const SizedBox(height: 4),
-              Text('Current Version: v${AppConstants.appVersion}', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+              Text('Current Version: v$displayCurrent', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
               const SizedBox(height: 14),
               Container(
                 constraints: const BoxConstraints(maxHeight: 130),
