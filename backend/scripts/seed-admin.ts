@@ -11,11 +11,11 @@ async function seed() {
   const fullName = process.env.ADMIN_NAME || process.argv[4] || 'System Administrator';
 
   const pool = new Pool({
-    host: process.env.DB_HOST || '163.227.239.97',
-    port: parseInt(process.env.DB_PORT || '5437', 10),
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: parseInt(process.env.DB_PORT || '5432', 10),
     database: process.env.DB_NAME || 'spendwise_db',
     user: process.env.DB_USER || 'spendwise',
-    password: process.env.DB_PASSWORD || 'spendwise123',
+    password: process.env.DB_PASSWORD,
     connectionTimeoutMillis: 5000,
   });
 
