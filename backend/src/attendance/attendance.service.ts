@@ -338,6 +338,24 @@ export class AttendanceService {
       session = currentHour < breakEnd ? 'morning' : 'afternoon';
     }
 
+    const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
+
+    // Enforce check-out validity: Afternoon checkout is valid only for the same day till midnight (12:00 AM).
+    // An employee cannot checkout before checking in for today.
+    // (If not checked out by midnight, the day automatically becomes half_day, and next day requires fresh check-in).
+    if (session === 'afternoon' && user?.role !== 'main_admin') {
+      const morningRes = await this.db.query(
+        `SELECT id FROM attendance_records
+         WHERE user_id = $1 AND date = $2 AND session_type = 'morning'`,
+        [userId, targetDate],
+      );
+      if (morningRes.rows.length === 0) {
+        throw new BadRequestException(
+          'Cannot check out before checking in for today. Please log morning check-in first.',
+        );
+      }
+    }
+
     const currentMinute = dhakaNow.getMinutes();
     const gracePeriod = this.officeTimingSettings.gracePeriodMinutes ?? 15;
     const isCheckOut = session === 'afternoon';
@@ -377,8 +395,6 @@ export class AttendanceService {
         notes = notes ? `${notes} [Late check-in]` : '[Late check-in]';
       }
     }
-
-    const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
 
     // Check if record exists for this user, date and session
     const existing = await this.db.query(

@@ -986,11 +986,14 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                         icon: CupertinoIcons.sunrise_fill,
                         iconColor: const Color(0xFFF59E0B),
                         isCorrectTimeSlot: isMorningSlot,
+                        isDisabled: !isAdminRole && currentHour < startH,
                         timingHint: currentHour < startH
-                            ? 'Opens ${fmtH(startH)}'
-                            : (currentHour >= dividerH
-                                ? 'Ended ${fmtH(dividerH)}'
-                                : '${fmtH(startH)} - ${fmtH(dividerH)}'),
+                            ? 'Opens at ${fmtH(startH)}'
+                            : (todayMorning != null
+                                ? 'Logged at ${todayMorning.formattedTime}'
+                                : (currentHour >= dividerH
+                                    ? 'Morning window ended • Log check-in'
+                                    : '${fmtH(startH)} - ${fmtH(dividerH)}')),
                       ),
 
                       const SizedBox(height: 10),
@@ -1004,11 +1007,14 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                         isSubmitting: attendanceState.isSubmitting,
                         icon: CupertinoIcons.sunset_fill,
                         iconColor: const Color(0xFF6366F1),
-                        isCorrectTimeSlot: true,
+                        isCorrectTimeSlot: todayMorning != null,
+                        isDisabled: todayMorning == null && !isAdminRole,
                         timingHint: todayAfternoon != null
                             ? 'Logged at ${todayAfternoon.formattedTime}'
-                            : 'Available anytime • Shift ends ${fmtH(endH)}',
-                        extraAction: (todayAfternoon == null && !isAdminRole)
+                            : (todayMorning == null && !isAdminRole
+                                ? 'Check-in required first before checkout'
+                                : 'Valid until 12:00 AM midnight • Shift ends ${fmtH(endH)}'),
+                        extraAction: (todayAfternoon == null && todayMorning != null && !isAdminRole)
                             ? InkWell(
                                 onTap: _showEarlyDepartureDialog,
                                 borderRadius: BorderRadius.circular(8),
@@ -1207,6 +1213,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     required String timingHint,
     Widget? extraAction,
     bool isDark = false,
+    bool isDisabled = false,
   }) {
     final hasLogged = record != null;
 
@@ -1303,17 +1310,21 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: isSubmitting ? null : onCheckIn,
+                    onTap: (isSubmitting || isDisabled) ? null : onCheckIn,
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: isCorrectTimeSlot
-                            ? (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5))
-                            : Colors.transparent,
+                        color: isDisabled
+                            ? (isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFE2E8F0))
+                            : (isCorrectTimeSlot
+                                ? (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5))
+                                : Colors.transparent),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5),
+                          color: isDisabled
+                              ? (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1))
+                              : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5)),
                           width: 1.2,
                         ),
                       ),
@@ -1327,11 +1338,15 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  isCorrectTimeSlot ? CupertinoIcons.arrow_right_circle_fill : CupertinoIcons.clock_fill,
+                                  isDisabled
+                                      ? CupertinoIcons.lock_fill
+                                      : (isCorrectTimeSlot ? CupertinoIcons.arrow_right_circle_fill : CupertinoIcons.clock_fill),
                                   size: 13,
-                                  color: isCorrectTimeSlot
-                                      ? Colors.white
-                                      : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5)),
+                                  color: isDisabled
+                                      ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                      : (isCorrectTimeSlot
+                                          ? Colors.white
+                                          : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5))),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -1339,9 +1354,11 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
-                                    color: isCorrectTimeSlot
-                                        ? Colors.white
-                                        : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5)),
+                                    color: isDisabled
+                                        ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                        : (isCorrectTimeSlot
+                                            ? Colors.white
+                                            : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5))),
                                   ),
                                 ),
                               ],

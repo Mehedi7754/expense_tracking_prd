@@ -233,7 +233,28 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
     if (isEarlyDeparture) {
       session =
           'afternoon'; // Early departure is logged as afternoon/closing checkout
-    } else {
+    }
+
+    // A check-out (afternoon session) is only valid if morning check-in was logged for today.
+    // If not checked in for today, the previous day's attendance is closed at midnight (counted as Half Day).
+    if (session == 'afternoon') {
+      final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final hasMorningCheckIn = state.records.any((r) =>
+          r.isMorning &&
+          (r.userId.isEmpty || r.userId == userId) &&
+          (r.date == todayStr || r.date.startsWith(todayStr)));
+
+      if (!hasMorningCheckIn) {
+        state = state.copyWith(
+          isSubmitting: false,
+          errorMessage:
+              'Cannot check out before checking in for today. Today\'s morning check-in is required first.',
+        );
+        return false;
+      }
+    }
+
+    if (!isEarlyDeparture) {
       final windowError = checkInWindowError(session, settings, userId: userId);
       if (windowError != null) {
         state = state.copyWith(isSubmitting: false, errorMessage: windowError);
