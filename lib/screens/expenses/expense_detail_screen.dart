@@ -505,13 +505,23 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                       ),
                       const SizedBox(height: 10),
-                      Text(
-                        expense.note.trim().isEmpty ? 'No additional notes provided.' : expense.note,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.45,
-                          color: isDark ? AppColors.darkTextPrimary : const Color(0xFF1E293B),
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final cleanedNote = expense.note
+                              .replaceAll(RegExp(r'\[TAX_META:[^\]]+\]'), '')
+                              .trim();
+                          final displayText = cleanedNote.isEmpty
+                              ? 'No additional business notes provided.'
+                              : cleanedNote;
+                          return Text(
+                            displayText,
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.45,
+                              color: isDark ? AppColors.darkTextPrimary : const Color(0xFF1E293B),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

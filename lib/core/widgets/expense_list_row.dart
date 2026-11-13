@@ -213,18 +213,24 @@ class ExpenseListRow extends StatelessWidget {
                           color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                         ),
                       ),
-                      if (expense.note.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          expense.note,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
-                          ),
-                        ),
-                      ],
+                      Builder(
+                        builder: (context) {
+                          final cleanNote = expense.note.replaceAll(RegExp(r'\[TAX_META:[^\]]+\]'), '').trim();
+                          if (cleanNote.isEmpty) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              cleanNote,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? AppColors.darkTextMuted : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),

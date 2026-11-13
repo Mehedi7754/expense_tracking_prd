@@ -576,7 +576,7 @@ class ExpenseModel {
     final rawNote = (json['note'] ?? '').toString();
     String displayNote = rawNote;
 
-    final taxMatch = RegExp(r'\[TAX_META:vat=(\d+\.?\d*):(\d+\.?\d*)\|tax=(\d+\.?\d*):(\d+\.?\d*)\|base=(\d+\.?\d*)\]').firstMatch(rawNote);
+    final taxMatch = RegExp(r'\[TAX_META:vat=(\d+\.?\d*):(\d+\.?\d*)\|tax=(\d+\.?\d*):(\d+\.?\d*)\|base[:=](\d+\.?\d*)\]').firstMatch(rawNote);
     if (taxMatch != null) {
       if (parsedVatRate == 0) parsedVatRate = double.tryParse(taxMatch.group(1)!) ?? 0;
       parsedVatAmount ??= double.tryParse(taxMatch.group(2)!);
@@ -584,6 +584,9 @@ class ExpenseModel {
       parsedTaxAmount ??= double.tryParse(taxMatch.group(4)!);
       parsedBaseCost ??= double.tryParse(taxMatch.group(5)!);
       displayNote = rawNote.replaceAll(taxMatch.group(0)!, '').trim();
+    } else {
+      // Fallback cleanup if any other TAX_META format exists
+      displayNote = displayNote.replaceAll(RegExp(r'\[TAX_META:[^\]]+\]'), '').trim();
     }
 
     return ExpenseModel(

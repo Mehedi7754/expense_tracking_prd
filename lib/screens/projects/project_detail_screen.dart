@@ -2385,10 +2385,16 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                 ),
                               ],
                             ),
-                            if (exp.note.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(exp.note, style: const TextStyle(fontSize: 13)),
-                            ],
+                            Builder(
+                              builder: (context) {
+                                final clean = exp.note.replaceAll(RegExp(r'\[TAX_META:[^\]]+\]'), '').trim();
+                                if (clean.isEmpty) return const SizedBox.shrink();
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(clean, style: const TextStyle(fontSize: 13)),
+                                );
+                              },
+                            ),
                             const SizedBox(height: 10),
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.center,
