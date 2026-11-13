@@ -58,6 +58,13 @@ class ProjectRepository {
     return ProjectModel.fromJson(data);
   }
 
+  Future<void> addProjectNote(String projectId, String note) async {
+    await _client.post(
+      ApiEndpoints.projectNotes(projectId),
+      body: {'note': note},
+    );
+  }
+
   Future<RevenueEntry> addRevenue(String projectId, RevenueEntry entry) async {
     final response = await _client.post(
       ApiEndpoints.projectRevenues(projectId),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../models/project_model.dart';
+import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 import '../../state/project_provider.dart';
 import '../../core/widgets/notification_banner.dart';
@@ -221,6 +222,12 @@ class _ProjectNotesHistoryScreenState extends ConsumerState<ProjectNotesHistoryS
     final project = matches.first;
     final notes = project.progressNotes;
 
+    final authState = ref.watch(authProvider);
+    final user = authState.currentUser;
+    final userRole = user?.role;
+    final isOwnerOrAdmin = userRole == UserRole.mainAdmin || project.createdById == user?.id;
+    final canAddNote = isOwnerOrAdmin || (userRole?.canUpdateProjectProgress ?? false) || project.canMemberUpdateProgress(user?.id ?? '');
+
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
       appBar: AppBar(
@@ -245,24 +252,28 @@ class _ProjectNotesHistoryScreenState extends ConsumerState<ProjectNotesHistoryS
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Add Note',
-            icon: const Icon(Icons.note_add_outlined),
-            onPressed: () => _showAddNoteBottomSheet(context, project),
-          ),
-          const SizedBox(width: 4),
+          if (canAddNote) ...[
+            IconButton(
+              tooltip: 'Add Note',
+              icon: const Icon(Icons.note_add_outlined),
+              onPressed: () => _showAddNoteBottomSheet(context, project),
+            ),
+            const SizedBox(width: 4),
+          ],
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddNoteBottomSheet(context, project),
-        backgroundColor: const Color(0xFF4F46E5),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add_comment_rounded, size: 20),
-        label: const Text(
-          'Add Note',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-        ),
-      ),
+      floatingActionButton: canAddNote
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAddNoteBottomSheet(context, project),
+              backgroundColor: const Color(0xFF4F46E5),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_comment_rounded, size: 20),
+              label: const Text(
+                'Add Note',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+              ),
+            )
+          : null,
       body: notes.isEmpty
           ? Center(
               child: Padding(
@@ -270,9 +281,9 @@ class _ProjectNotesHistoryScreenState extends ConsumerState<ProjectNotesHistoryS
                 child: EmptyStateWidget(
                   icon: Icons.speaker_notes_off_outlined,
                   title: 'No Notes Recorded Yet',
-                  message: 'Updates and notes logged during progress changes will appear here for all employees.',
-                  actionLabel: 'Add First Note',
-                  onAction: () => _showAddNoteBottomSheet(context, project),
+                  message: 'Updates and notes logged for this project will appear here for all employees.',
+                  actionLabel: canAddNote ? 'Add First Note' : null,
+                  onAction: canAddNote ? () => _showAddNoteBottomSheet(context, project) : null,
                 ),
               ),
             )

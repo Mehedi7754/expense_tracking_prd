@@ -420,11 +420,16 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     await _persistProjects();
     invalidateCache();
 
-    if (updatedProj != null) {
-      try {
-        final repo = ref.read(projectRepositoryProvider);
-        await repo.updateProject(updatedProj!);
-      } catch (_) {}
+    try {
+      final repo = ref.read(projectRepositoryProvider);
+      await repo.addProjectNote(projectId, note.trim());
+    } catch (_) {
+      if (updatedProj != null) {
+        try {
+          final repo = ref.read(projectRepositoryProvider);
+          await repo.updateProject(updatedProj!);
+        } catch (_) {}
+      }
     }
   }
 
