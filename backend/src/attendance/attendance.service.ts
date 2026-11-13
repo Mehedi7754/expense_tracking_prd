@@ -294,6 +294,29 @@ export class AttendanceService {
         throw new BadRequestException(`Outside the ${site.name} field site geofence (${Math.round(distanceMeters)}m away; ${radiusMeters}m allowed).`);
       }
       fieldSiteNote = ` [Field project: ${site.name} (${site.project_code})] [Site geofence: ${Math.round(distanceMeters)}m from pin]`;
+    } else if (workMode === 'office') {
+      const isPrivileged = user?.role === 'main_admin' || user?.role === 'finance' || user?.role === 'finance_manager';
+      if (!isPrivileged && this.officeTimingSettings.isGeofenceEnforced) {
+        if (dto.latitude == null || dto.longitude == null) {
+          throw new BadRequestException('GPS coordinates are required to check in from the office.');
+        }
+        const userLat = Number(dto.latitude);
+        const userLng = Number(dto.longitude);
+        const officeLat = Number(this.officeTimingSettings.officeLatitude);
+        const officeLng = Number(this.officeTimingSettings.officeLongitude);
+        const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+        const earthRadiusMeters = 6371000;
+        const deltaLat = toRadians(officeLat - userLat);
+        const deltaLng = toRadians(officeLng - userLng);
+        const a = Math.sin(deltaLat / 2) ** 2 +
+          Math.cos(toRadians(userLat)) * Math.cos(toRadians(officeLat)) * Math.sin(deltaLng / 2) ** 2;
+        const distanceMeters = earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const radiusMeters = Number(this.officeTimingSettings.geofenceRadiusMeters) || 200;
+        if (distanceMeters > radiusMeters) {
+          throw new BadRequestException(`Outside the office geofence perimeter (${Math.round(distanceMeters)}m away; ${radiusMeters}m allowed).`);
+        }
+        fieldSiteNote = ` [Office geofence: ${Math.round(distanceMeters)}m from office]`;
+      }
     }
 
     // 2. Resolve local office hour (Bangladesh Standard Time: UTC+6) and assigned user shift

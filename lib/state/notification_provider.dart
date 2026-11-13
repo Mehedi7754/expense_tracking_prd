@@ -128,8 +128,20 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
       // Filter out locally deleted IDs/contents to prevent them from ever reappearing
       final filteredRemoteList = remoteList.where((n) => !_isDeleted(n, deletedIds, deletedHashes)).toList();
 
+      // Map existing local items to preserve read status and local additions
+      final localMap = {for (final n in state) n.id: n};
+
+      final mergedRemoteList = filteredRemoteList.map((remote) {
+        final local = localMap[remote.id];
+        // If user already marked it read locally, don't revert to unread
+        if (local != null && local.isRead && !remote.isRead) {
+          return remote.copyWith(isRead: true);
+        }
+        return remote;
+      }).toList();
+
       // Authoritative remote list with recent optimistic additions:
-      final remoteIds = filteredRemoteList.map((n) => n.id).toSet();
+      final remoteIds = mergedRemoteList.map((n) => n.id).toSet();
       final now = DateTime.now();
       final recentLocalOnly = state
           .where((n) =>
@@ -138,7 +150,7 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
               !_isDeleted(n, deletedIds, deletedHashes))
           .toList();
 
-      final merged = [...filteredRemoteList, ...recentLocalOnly];
+      final merged = [...mergedRemoteList, ...recentLocalOnly];
       merged.sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
       // Trigger OS-level push notification for newly received unread notifications
