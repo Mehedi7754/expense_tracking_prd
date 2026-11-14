@@ -32,6 +32,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS image_url TEXT;');
       await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_latitude NUMERIC(10, 7);');
       await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_longitude NUMERIC(10, 7);');
+      await this.pool.query('ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_radius_meters NUMERIC(10, 2);');
       await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;');
       await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_code VARCHAR(64);');
       await this.pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS home_latitude NUMERIC(10, 7);');

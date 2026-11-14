@@ -116,6 +116,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
     String? imageUrl,
     double? siteLatitude,
     double? siteLongitude,
+    double? siteRadiusMeters,
   }) async {
     final uniqueMicro = DateTime.now().microsecondsSinceEpoch % 1000000;
     final generatedId =
@@ -163,6 +164,7 @@ class ProjectNotifier extends Notifier<List<ProjectModel>>
       imageUrl: imageUrl,
       siteLatitude: siteLatitude,
       siteLongitude: siteLongitude,
+      siteRadiusMeters: siteRadiusMeters,
     );
 
     // Optimistic local update & instant persistence so it's NEVER lost on restart

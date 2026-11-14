@@ -674,10 +674,15 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                           availableSites.any((p) => p.id == _selectedFieldProjectId))
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            'Saved site: ${availableSites.firstWhere((p) => p.id == _selectedFieldProjectId).siteLatitude!.toStringAsFixed(6)}, '
-                            '${availableSites.firstWhere((p) => p.id == _selectedFieldProjectId).siteLongitude!.toStringAsFixed(6)}',
-                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF64748B)),
+                          child: Builder(
+                            builder: (context) {
+                              final currentSite = availableSites.firstWhere((p) => p.id == _selectedFieldProjectId);
+                              final siteRadius = currentSite.siteRadiusMeters ?? 200.0;
+                              return Text(
+                                'Saved site: ${currentSite.siteLatitude!.toStringAsFixed(6)}, ${currentSite.siteLongitude!.toStringAsFixed(6)} · ${siteRadius.toInt()} m geofence boundary',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: isDark ? Colors.white70 : const Color(0xFF4F46E5)),
+                              );
+                            },
                           ),
                         ),
                       const SizedBox(height: 8),

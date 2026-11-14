@@ -6,20 +6,34 @@ import { FcmService } from '../notifications/fcm.service';
 
 @Injectable()
 export class ProjectsService {
-  private parseSiteLocation(data: any, current?: { siteLatitude?: number | null; siteLongitude?: number | null }) {
+  private parseSiteLocation(data: any, current?: { siteLatitude?: number | null; siteLongitude?: number | null; siteRadiusMeters?: number | null }) {
     const latRaw = data.siteLatitude !== undefined ? data.siteLatitude : data.site_latitude;
     const lngRaw = data.siteLongitude !== undefined ? data.siteLongitude : data.site_longitude;
+    const radiusRaw = data.siteRadiusMeters !== undefined
+      ? data.siteRadiusMeters
+      : data.site_radius_meters !== undefined
+        ? data.site_radius_meters
+        : data.siteRadius !== undefined
+          ? data.siteRadius
+          : data.site_radius;
     const latGiven = data.siteLatitude !== undefined || data.site_latitude !== undefined;
     const lngGiven = data.siteLongitude !== undefined || data.site_longitude !== undefined;
-    if (!latGiven && !lngGiven) return null;
+    const radiusGiven = radiusRaw !== undefined;
+    if (!latGiven && !lngGiven && !radiusGiven) return null;
     const lat = latGiven ? (latRaw === null ? null : Number(latRaw)) : current?.siteLatitude ?? null;
     const lng = lngGiven ? (lngRaw === null ? null : Number(lngRaw)) : current?.siteLongitude ?? null;
+    let radius = radiusGiven
+      ? (radiusRaw === null ? null : Number(radiusRaw))
+      : current?.siteRadiusMeters ?? null;
+    if (radius !== null && (!Number.isFinite(radius) || radius <= 0)) {
+      radius = null;
+    }
     if ((lat === null) !== (lng === null) ||
         (lat !== null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) ||
         (lng !== null && (!Number.isFinite(lng) || lng < -180 || lng > 180))) {
       throw new BadRequestException('Provide a valid project site latitude and longitude together');
     }
-    return { lat, lng };
+    return { lat, lng, radius };
   }
 
   constructor(
@@ -68,6 +82,7 @@ export class ProjectsService {
       imageUrl: p.image_url || null,
       siteLatitude: p.site_latitude == null ? null : Number(p.site_latitude),
       siteLongitude: p.site_longitude == null ? null : Number(p.site_longitude),
+      siteRadiusMeters: p.site_radius_meters == null ? null : Number(p.site_radius_meters),
       progressPercentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
       progress_percentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
       progressNotes: typeof p.progress_notes === 'string' ? JSON.parse(p.progress_notes) : (p.progress_notes || []),
@@ -288,14 +303,14 @@ export class ProjectsService {
           advance_received, amount_received, amount_receivable, budget,
           category_budgets, estimated_remaining_cost, office_benefit_rate,
           start_date, end_date, status, created_by, image_url,
-          progress_percentage, progress_notes, site_latitude, site_longitude
+          progress_percentage, progress_notes, site_latitude, site_longitude, site_radius_meters
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7,
           $8, $9, $10, $11,
           $12, $13, $14, $15,
           $16, $17, $18,
           $19, $20, $21, $22, $23,
-          $24, $25, $26, $27
+          $24, $25, $26, $27, $28
         ) RETURNING *`,
         [
           projectCode,
@@ -325,6 +340,7 @@ export class ProjectsService {
           JSON.stringify(initialNotes),
           site?.lat ?? null,
           site?.lng ?? null,
+          site?.radius ?? null,
         ],
       );
 
@@ -476,8 +492,8 @@ export class ProjectsService {
     let idx = 1;
     const site = this.parseSiteLocation(data, existing);
     if (site) {
-      fields.push(`site_latitude = $${idx++}`, `site_longitude = $${idx++}`);
-      values.push(site.lat, site.lng);
+      fields.push(`site_latitude = $${idx++}`, `site_longitude = $${idx++}`, `site_radius_meters = $${idx++}`);
+      values.push(site.lat, site.lng, site.radius);
     }
 
     if (data.name !== undefined) {

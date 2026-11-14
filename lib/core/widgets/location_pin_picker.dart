@@ -6,10 +6,21 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+class LocationPinResult {
+  final LatLng location;
+  final double? radiusMeters;
+
+  const LocationPinResult({
+    required this.location,
+    this.radiusMeters,
+  });
+}
+
 /// Searchable map pin picker. The optional radius is drawn as a visible boundary.
 class LocationPinPicker extends StatefulWidget {
   final LatLng initialLocation;
   final double? radiusMeters;
+  final bool enableRadiusAdjustment;
   final String title;
 
   const LocationPinPicker({
@@ -17,6 +28,7 @@ class LocationPinPicker extends StatefulWidget {
     required this.initialLocation,
     required this.title,
     this.radiusMeters,
+    this.enableRadiusAdjustment = false,
   });
 
   static Future<LatLng?> show(
@@ -24,13 +36,34 @@ class LocationPinPicker extends StatefulWidget {
     required LatLng initialLocation,
     required String title,
     double? radiusMeters,
-  }) => Navigator.of(context).push<LatLng>(
+  }) async {
+    final res = await Navigator.of(context).push<LocationPinResult>(
+      MaterialPageRoute(
+        builder:
+            (_) => LocationPinPicker(
+              initialLocation: initialLocation,
+              title: title,
+              radiusMeters: radiusMeters,
+              enableRadiusAdjustment: false,
+            ),
+      ),
+    );
+    return res?.location;
+  }
+
+  static Future<LocationPinResult?> showWithRadius(
+    BuildContext context, {
+    required LatLng initialLocation,
+    required String title,
+    double? radiusMeters,
+  }) => Navigator.of(context).push<LocationPinResult>(
     MaterialPageRoute(
       builder:
           (_) => LocationPinPicker(
             initialLocation: initialLocation,
             title: title,
             radiusMeters: radiusMeters,
+            enableRadiusAdjustment: true,
           ),
     ),
   );
@@ -41,6 +74,7 @@ class LocationPinPicker extends StatefulWidget {
 
 class _LocationPinPickerState extends State<LocationPinPicker> {
   late LatLng _selected;
+  late double? _currentRadius;
   final MapController _mapController = MapController();
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
@@ -52,6 +86,7 @@ class _LocationPinPickerState extends State<LocationPinPicker> {
   void initState() {
     super.initState();
     _selected = widget.initialLocation;
+    _currentRadius = widget.radiusMeters;
   }
 
   @override
@@ -159,12 +194,12 @@ class _LocationPinPickerState extends State<LocationPinPicker> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.gw.project',
               ),
-              if (widget.radiusMeters != null)
+              if (_currentRadius != null)
                 CircleLayer(
                   circles: [
                     CircleMarker(
                       point: _selected,
-                      radius: widget.radiusMeters!,
+                      radius: _currentRadius!,
                       useRadiusInMeter: true,
                       color: const Color(0x334F46E5),
                       borderColor: const Color(0xFF4F46E5),
@@ -300,25 +335,64 @@ class _LocationPinPickerState extends State<LocationPinPicker> {
         SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Search or tap the map to place the pin  •  ${_selected.latitude.toStringAsFixed(6)}, ${_selected.longitude.toStringAsFixed(6)}',
+                  '${_selected.latitude.toStringAsFixed(6)}, ${_selected.longitude.toStringAsFixed(6)}',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
                   textAlign: TextAlign.center,
                 ),
-                if (widget.radiusMeters != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '${widget.radiusMeters!.toInt()} m geofence boundary',
-                      textAlign: TextAlign.center,
+                if (_currentRadius != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_currentRadius!.toInt()} m geofence radius (~${(3.14159 * _currentRadius! * _currentRadius!).round().toString()} m² area)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (widget.enableRadiusAdjustment) ...[
+                    const SizedBox(height: 6),
+                    Slider(
+                      value: _currentRadius!.clamp(50.0, 2500.0),
+                      min: 50,
+                      max: 2500,
+                      divisions: 98,
+                      label: '${_currentRadius!.toInt()} m',
+                      onChanged: (val) => setState(() => _currentRadius = val),
+                    ),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [100, 200, 350, 500, 1000, 2000].map((preset) {
+                          final isSelected = (_currentRadius! - preset).abs() < 1;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: ChoiceChip(
+                              label: Text(preset >= 1000 ? '${preset ~/ 1000} km' : '$preset m'),
+                              selected: isSelected,
+                              onSelected: (_) => setState(() => _currentRadius = preset.toDouble()),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).pop(
+                    LocationPinResult(
+                      location: _selected,
+                      radiusMeters: _currentRadius,
                     ),
                   ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: () => Navigator.of(context).pop(_selected),
                   icon: const Icon(Icons.check_rounded),
                   label: const Text('Use this location'),
                 ),

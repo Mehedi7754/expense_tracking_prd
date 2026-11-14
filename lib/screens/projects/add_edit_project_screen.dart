@@ -66,6 +66,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
   String? _imageUrl;
   double? _siteLatitude;
   double? _siteLongitude;
+  double? _siteRadiusMeters;
   bool _clearSiteLocation = false;
   bool _initialized = false;
   bool _isSaving = false;
@@ -123,6 +124,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
     _imageUrl = project.imageUrl;
     _siteLatitude = project.siteLatitude;
     _siteLongitude = project.siteLongitude;
+    _siteRadiusMeters = project.siteRadiusMeters;
 
     _grossValueController.text = project.grossProjectValue.toStringAsFixed(0);
     _advanceReceivedController.text = project.advanceReceived.toStringAsFixed(
@@ -332,6 +334,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
         imageUrl: _imageUrl,
         siteLatitude: _siteLatitude,
         siteLongitude: _siteLongitude,
+        siteRadiusMeters: _siteRadiusMeters,
         clearSiteLocation: _clearSiteLocation,
       );
       await ref.read(projectProvider.notifier).updateProject(updated);
@@ -373,6 +376,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
             imageUrl: _imageUrl,
             siteLatitude: _siteLatitude,
             siteLongitude: _siteLongitude,
+            siteRadiusMeters: _siteRadiusMeters,
           );
       if (mounted) {
         final isUploadedToServer = !created.id.startsWith('proj_');
@@ -641,24 +645,27 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                       children: [
                         OutlinedButton.icon(
                           onPressed: () async {
-                            final pin = await LocationPinPicker.show(
+                            final defaultRadius = ref
+                                    .read(attendanceSettingsProvider)
+                                    .value
+                                    ?.geofenceRadiusMeters ??
+                                200.0;
+                            final result = await LocationPinPicker.showWithRadius(
                               context,
                               initialLocation: LatLng(
                                 _siteLatitude ?? 23.8103,
                                 _siteLongitude ?? 90.4125,
                               ),
                               title: 'Pin project site',
-                              radiusMeters:
-                                  ref
-                                      .read(attendanceSettingsProvider)
-                                      .value
-                                      ?.geofenceRadiusMeters ??
-                                  200,
+                              radiusMeters: _siteRadiusMeters ?? defaultRadius,
                             );
-                            if (pin != null && mounted) {
+                            if (result != null && mounted) {
                               setState(() {
-                                _siteLatitude = pin.latitude;
-                                _siteLongitude = pin.longitude;
+                                _siteLatitude = result.location.latitude;
+                                _siteLongitude = result.location.longitude;
+                                if (result.radiusMeters != null) {
+                                  _siteRadiusMeters = result.radiusMeters;
+                                }
                                 _clearSiteLocation = false;
                               });
                             }
@@ -667,7 +674,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                           label: Text(
                             _siteLatitude == null
                                 ? 'Select on map'
-                                : 'Change pin',
+                                : 'Change pin on map',
                           ),
                         ),
                         if (_siteLatitude != null)
@@ -682,6 +689,99 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                           ),
                       ],
                     ),
+                    if (_siteLatitude != null) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Custom Site Radius',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${(_siteRadiusMeters ?? 200).toInt()} m (~${(3.14159 * (_siteRadiusMeters ?? 200) * (_siteRadiusMeters ?? 200)).round()} m²)',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF4F46E5),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Allowed circular geofence boundary around this project site for field staff check-in.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.white60 : const Color(0xFF64748B),
+                              ),
+                            ),
+                            Slider(
+                              value: (_siteRadiusMeters ?? 200.0).clamp(50.0, 2500.0),
+                              min: 50,
+                              max: 2500,
+                              divisions: 98,
+                              label: '${(_siteRadiusMeters ?? 200).toInt()} m',
+                              onChanged: (val) {
+                                setState(() {
+                                  _siteRadiusMeters = val;
+                                });
+                              },
+                            ),
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [100, 200, 350, 500, 1000, 2000].map((preset) {
+                                  final currentVal = _siteRadiusMeters ?? 200.0;
+                                  final isSelected = (currentVal - preset).abs() < 1;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: ChoiceChip(
+                                      label: Text(
+                                        preset >= 1000 ? '${preset ~/ 1000} km' : '$preset m',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                        ),
+                                      ),
+                                      selected: isSelected,
+                                      onSelected: (_) {
+                                        setState(() {
+                                          _siteRadiusMeters = preset.toDouble();
+                                        });
+                                      },
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
 

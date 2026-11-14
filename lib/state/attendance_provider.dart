@@ -335,7 +335,10 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
           site.siteLatitude!,
           site.siteLongitude!,
         );
-        final radius = settings?.geofenceRadiusMeters ?? 200;
+        final defaultRadius = settings?.geofenceRadiusMeters ?? 200.0;
+        final radius = (site.siteRadiusMeters != null && site.siteRadiusMeters! > 0)
+            ? site.siteRadiusMeters!
+            : defaultRadius;
         if (settings?.isGeofenceEnforced ?? true) {
           if (distance > radius) {
             state = state.copyWith(
@@ -346,11 +349,11 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
             return false;
           }
           extraNotesBuffer.write(
-            '[Field geofence: Inside (${distance.toStringAsFixed(0)}m)] ',
+            '[Field geofence: Inside (${distance.toStringAsFixed(0)}m, radius: ${radius.toInt()}m)] ',
           );
         } else {
           extraNotesBuffer.write(
-            '[Distance from site: ${distance.toStringAsFixed(0)}m] ',
+            '[Distance from site: ${distance.toStringAsFixed(0)}m (radius: ${radius.toInt()}m)] ',
           );
         }
         extraNotesBuffer.write(

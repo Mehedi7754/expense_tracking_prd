@@ -499,6 +499,7 @@ class ProjectModel {
   final String? imageUrl; // Project Cover Image / Banner
   final double? siteLatitude;
   final double? siteLongitude;
+  final double? siteRadiusMeters;
   final List<ProjectProgressNote> progressNotes;
 
   const ProjectModel({
@@ -538,6 +539,7 @@ class ProjectModel {
     this.imageUrl,
     this.siteLatitude,
     this.siteLongitude,
+    this.siteRadiusMeters,
     this.progressNotes = const [],
   });
 
@@ -702,6 +704,7 @@ class ProjectModel {
     String? imageUrl,
     double? siteLatitude,
     double? siteLongitude,
+    double? siteRadiusMeters,
     bool clearSiteLocation = false,
     bool clearImageUrl = false,
     List<ProjectProgressNote>? progressNotes,
@@ -743,6 +746,7 @@ class ProjectModel {
       imageUrl: clearImageUrl ? null : (imageUrl ?? this.imageUrl),
       siteLatitude: clearSiteLocation ? null : (siteLatitude ?? this.siteLatitude),
       siteLongitude: clearSiteLocation ? null : (siteLongitude ?? this.siteLongitude),
+      siteRadiusMeters: clearSiteLocation ? null : (siteRadiusMeters ?? this.siteRadiusMeters),
       progressNotes: progressNotes ?? this.progressNotes,
     );
   }
@@ -879,6 +883,7 @@ class ProjectModel {
       imageUrl: (json['image_url'] ?? json['imageUrl'])?.toString(),
       siteLatitude: _asNullableDouble(json['site_latitude'] ?? json['siteLatitude'] ?? rawCatMap['_meta_site_latitude']),
       siteLongitude: _asNullableDouble(json['site_longitude'] ?? json['siteLongitude'] ?? rawCatMap['_meta_site_longitude']),
+      siteRadiusMeters: _asNullableDouble(json['site_radius_meters'] ?? json['siteRadiusMeters'] ?? json['site_radius'] ?? json['siteRadius'] ?? rawCatMap['_meta_site_radius_meters']),
       progressNotes: parseNotes(json['progress_notes'] ?? json['progressNotes']),
     );
   }
@@ -927,6 +932,7 @@ class ProjectModel {
         if (validTeamMembers.isNotEmpty) '_meta_team_members': validTeamMembers,
         if (siteLatitude != null) '_meta_site_latitude': siteLatitude,
         if (siteLongitude != null) '_meta_site_longitude': siteLongitude,
+        if (siteRadiusMeters != null) '_meta_site_radius_meters': siteRadiusMeters,
       },
       'estimated_remaining_cost': estimatedRemainingCost,
       'office_benefit_rate': officeBenefitRate,
@@ -950,6 +956,8 @@ class ProjectModel {
       'imageUrl': (imageUrl != null && imageUrl!.isNotEmpty) ? imageUrl : null,
       'siteLatitude': siteLatitude,
       'siteLongitude': siteLongitude,
+      'siteRadiusMeters': siteRadiusMeters,
+      'site_radius_meters': siteRadiusMeters,
       'progress_notes': progressNotes.map((n) => n.toJson()).toList(),
       'progressNotes': progressNotes.map((n) => n.toJson()).toList(),
     };

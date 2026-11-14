@@ -264,7 +264,7 @@ export class AttendanceService {
       }
       const isPrivileged = user?.role === 'main_admin' || user?.role === 'finance' || user?.role === 'finance_manager';
       const siteRes = await this.db.query(
-        `SELECT p.id, p.name, p.project_code, p.site_latitude, p.site_longitude
+        `SELECT p.id, p.name, p.project_code, p.site_latitude, p.site_longitude, p.site_radius_meters
          FROM projects p
          WHERE p.id::text = $1
            AND ($3::boolean OR p.created_by = $2 OR EXISTS (
@@ -289,11 +289,14 @@ export class AttendanceService {
       const a = Math.sin(deltaLat / 2) ** 2 +
         Math.cos(toRadians(latitude)) * Math.cos(toRadians(siteLatitude)) * Math.sin(deltaLng / 2) ** 2;
       const distanceMeters = earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const radiusMeters = Number(this.officeTimingSettings.geofenceRadiusMeters) || 200;
+      const customProjectRadius = site.site_radius_meters != null ? Number(site.site_radius_meters) : null;
+      const radiusMeters = (customProjectRadius && Number.isFinite(customProjectRadius) && customProjectRadius > 0)
+        ? customProjectRadius
+        : (Number(this.officeTimingSettings.geofenceRadiusMeters) || 200);
       if (this.officeTimingSettings.isGeofenceEnforced && distanceMeters > radiusMeters) {
-        throw new BadRequestException(`Outside the ${site.name} field site geofence (${Math.round(distanceMeters)}m away; ${radiusMeters}m allowed).`);
+        throw new BadRequestException(`Outside the ${site.name} field site geofence (${Math.round(distanceMeters)}m away; ${Math.round(radiusMeters)}m allowed).`);
       }
-      fieldSiteNote = ` [Field project: ${site.name} (${site.project_code})] [Site geofence: ${Math.round(distanceMeters)}m from pin]`;
+      fieldSiteNote = ` [Field project: ${site.name} (${site.project_code})] [Site geofence: ${Math.round(distanceMeters)}m from pin (radius: ${Math.round(radiusMeters)}m)]`;
     } else if (workMode === 'office') {
       const isPrivileged = user?.role === 'main_admin' || user?.role === 'finance' || user?.role === 'finance_manager';
       if (!isPrivileged && this.officeTimingSettings.isGeofenceEnforced) {

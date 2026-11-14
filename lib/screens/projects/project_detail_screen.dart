@@ -890,21 +890,53 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           if (project.siteLatitude != null && project.siteLongitude != null)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: isDark ? AppColors.darkSurface : Colors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0)),
               ),
               child: Row(children: [
-                const Icon(Icons.location_on_outlined, size: 20, color: Color(0xFF4F46E5)),
-                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.location_on_rounded, size: 20, color: Color(0xFF4F46E5)),
+                ),
+                const SizedBox(width: 12),
                 Expanded(child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Project site', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                    Text('${project.siteLatitude!.toStringAsFixed(6)}, ${project.siteLongitude!.toStringAsFixed(6)}',
-                        style: const TextStyle(fontSize: 11)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Project Site Pin', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4F46E5).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            (project.siteRadiusMeters != null && project.siteRadiusMeters! > 0)
+                                ? '${project.siteRadiusMeters!.toInt()} m radius'
+                                : '200 m radius',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF4F46E5),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${project.siteLatitude!.toStringAsFixed(6)}, ${project.siteLongitude!.toStringAsFixed(6)}',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                    ),
                   ],
                 )),
               ]),
