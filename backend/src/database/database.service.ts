@@ -358,14 +358,20 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         );
         CREATE INDEX IF NOT EXISTS idx_app_releases_latest ON app_releases(is_latest);
         CREATE INDEX IF NOT EXISTS idx_app_releases_created ON app_releases(created_at DESC);
-
-        INSERT INTO app_releases (version_name, build_number, release_notes, download_url, file_size_bytes, is_latest)
-        SELECT '1.0.26', 2026, 'Fix attendance shift timing windows, prevent false auto-checkout, enforce break hour divider and midnight 12:00 AM half-day rule.', 'https://github.com/Mehedi7754/expense_tracking_prd/releases/download/v1.0.26/GW-Project-v1.0.26.apk', 38719000, TRUE
-        WHERE NOT EXISTS (SELECT 1 FROM app_releases WHERE build_number >= 2026);
-
-        UPDATE app_releases SET is_latest = FALSE WHERE build_number < 2026;
-        UPDATE app_releases SET is_latest = TRUE WHERE build_number = 2026;
       `);
+
+      try {
+        await this.pool.query(`
+          INSERT INTO app_releases (version_name, build_number, release_notes, file_path, download_url, file_size_bytes, is_latest)
+          SELECT '1.0.26', 2026, 'Fix attendance shift timing windows, prevent false auto-checkout, enforce break hour divider and midnight 12:00 AM half-day rule.', 'GW-Project-v1.0.26.apk', 'https://github.com/Mehedi7754/expense_tracking_prd/releases/download/v1.0.26/GW-Project-v1.0.26.apk', 38719000, TRUE
+          WHERE NOT EXISTS (SELECT 1 FROM app_releases WHERE build_number >= 2026);
+
+          UPDATE app_releases SET is_latest = FALSE WHERE build_number < 2026;
+          UPDATE app_releases SET is_latest = TRUE WHERE build_number = 2026;
+        `);
+      } catch (releaseErr: any) {
+        this.logger.warn(`Failed to auto-seed app release: ${releaseErr.message}`);
+      }
 
     } catch (err: any) {
       this.logger.error(`Database connection failed: ${err.message}`, err.stack);
