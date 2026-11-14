@@ -235,9 +235,9 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
           'afternoon'; // Early departure is logged as afternoon/closing checkout
     }
 
-    // A check-out (afternoon session) is only valid if morning check-in was logged for today.
-    // If not checked in for today, the previous day's attendance is closed at midnight (counted as Half Day).
-    if (session == 'afternoon') {
+    // Standard check-out (afternoon session) requires morning check-in for today.
+    // Early departure can be logged at any time with a reason.
+    if (session == 'afternoon' && !isEarlyDeparture) {
       final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final hasMorningCheckIn = state.records.any((r) =>
           r.isMorning &&

@@ -70,6 +70,10 @@ class AttendanceRepository {
             fieldProjectId != null &&
             fieldProjectId.isNotEmpty)
           'field_project_id': fieldProjectId,
+        if (earlyDepartureReason != null && earlyDepartureReason.isNotEmpty) ...{
+          'is_early_departure': true,
+          'early_departure_reason': earlyDepartureReason,
+        },
       },
     );
 

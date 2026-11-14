@@ -37,9 +37,13 @@ export class NotificationsService {
         this.notificationSubject.asObservable().pipe(
           filter((msg) => {
             if (!msg.data || msg.data.type === 'ping') return true;
-            if (isPrivileged) return true;
-            if (!msg.data.userId || msg.data.userId === userId) return true;
-            return false;
+            // Personal/direct notifications (like task assignments, chat, personal alerts):
+            // Strictly delivered ONLY to the recipient user!
+            if (msg.data.userId) {
+              return msg.data.userId === userId;
+            }
+            // Broadcast notifications with no specific user_id: privileged users only
+            return isPrivileged;
           }),
         ),
         keepAlive$,
@@ -60,6 +64,8 @@ export class NotificationsService {
       role.includes('admin') ||
       role.includes('manager');
 
+    // User-targeted notifications belong strictly to that user!
+    // Broadcast notifications (user_id IS NULL) are only included if the user has a privileged role (admin/manager/finance).
     const res = await this.db.query(
       isPrivileged
         ? `SELECT n.*, 
@@ -67,15 +73,16 @@ export class NotificationsService {
                   COALESCE(u_actor.avatar_url, n.actor_avatar_url) AS resolved_actor_avatar_url
            FROM notifications n
            LEFT JOIN users u_actor ON n.actor_id = u_actor.id
+           WHERE n.user_id = $1 OR n.user_id IS NULL
            ORDER BY n.created_at DESC LIMIT 500`
         : `SELECT n.*, 
                   COALESCE(u_actor.full_name, n.actor_name) AS resolved_actor_name, 
                   COALESCE(u_actor.avatar_url, n.actor_avatar_url) AS resolved_actor_avatar_url
            FROM notifications n
            LEFT JOIN users u_actor ON n.actor_id = u_actor.id
-           WHERE (n.user_id = $1 OR n.user_id IS NULL) 
+           WHERE n.user_id = $1
            ORDER BY n.created_at DESC LIMIT 500`,
-      isPrivileged ? [] : [userId],
+      [userId],
     );
     return res.rows.map((r) => ({
       id: r.id,

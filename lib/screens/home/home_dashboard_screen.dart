@@ -57,8 +57,9 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
 
     final notifications = ref.watch(notificationProvider);
     final unreadNotifsCount = notifications.where((n) {
-      if (user == null) return false;
-      return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
+      if (user == null || n.isRead) return false;
+      if (n.userId.isNotEmpty) return n.userId == user.id;
+      return role.canViewAllProjects || role.canManageUsers;
     }).length;
 
     final unreadChatCount = ref.watch(chatUnreadCountProvider);

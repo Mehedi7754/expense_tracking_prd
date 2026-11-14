@@ -1026,9 +1026,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                         title: 'Evening Session',
                         record: todayAfternoon,
                         onCheckIn: () => _handleManualCheckIn('afternoon'),
-                        onEarlyLeave: (todayAfternoon == null && (todayMorning != null || isAdminRole))
-                            ? _showEarlyDepartureDialog
-                            : null,
+                        onEarlyLeave: todayAfternoon == null ? _showEarlyDepartureDialog : null,
                         isSubmitting: attendanceState.isSubmitting,
                         icon: CupertinoIcons.sunset_fill,
                         iconColor: const Color(0xFF6366F1),

@@ -108,7 +108,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final notifications = ref.watch(notificationProvider);
     final unreadNotifsCount =
         notifications.where((n) {
-          return (n.userId == user.id || n.userId.isEmpty) && !n.isRead;
+          if (n.isRead) return false;
+          if (n.userId.isNotEmpty) return n.userId == user.id;
+          return role == UserRole.mainAdmin || role == UserRole.finance || role == UserRole.projectManager;
         }).length;
 
     final unreadChatCount = ref.watch(chatUnreadCountProvider);

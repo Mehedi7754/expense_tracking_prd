@@ -341,14 +341,25 @@ export class AttendanceService {
 
     const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
 
+    const notesLower = (dto.notes || '').toLowerCase();
+    const isEarlyDepartureReq = Boolean(
+      dto.isEarlyDeparture ||
+      dto.is_early_departure ||
+      dto.earlyDepartureReason ||
+      dto.early_departure_reason ||
+      notesLower.includes('early departure') ||
+      notesLower.includes('[early departure')
+    );
+
     // Enforce check-out validity:
-    // 1. Afternoon checkout is strictly allowed only AFTER morning check-in for the same day.
-    // 2. Afternoon checkout cannot be performed in the early morning hours before shift break/afternoon start.
+    // 1. Afternoon checkout is strictly allowed only AFTER morning check-in for the same day (unless main_admin).
+    // 2. Normal afternoon checkout opens from shift break hours (starting from breakStart:00) until 12:00 AM midnight.
+    //    HOWEVER, early leave departure can be submitted at ANY time as long as morning check-in exists.
     // 3. If an employee does not check out before 12:00 AM midnight, the day automatically becomes half_day.
     if (session === 'afternoon') {
-      if (currentHour < breakStart && user?.role !== 'main_admin') {
+      if (!isEarlyDepartureReq && currentHour < breakStart && user?.role !== 'main_admin') {
         throw new BadRequestException(
-          `Check-out is only permitted during shift break/afternoon hours (starting from ${breakStart}:00) until 12:00 AM midnight.`,
+          `Check-out is only permitted during shift break/afternoon hours (starting from ${breakStart}:00) until 12:00 AM midnight. For early exit, use Early Leave.`,
         );
       }
 
@@ -357,7 +368,7 @@ export class AttendanceService {
          WHERE user_id = $1 AND date = $2 AND session_type = 'morning'`,
         [userId, targetDate],
       );
-      if (morningRes.rows.length === 0 && user?.role !== 'main_admin') {
+      if (!isEarlyDepartureReq && morningRes.rows.length === 0 && user?.role !== 'main_admin') {
         throw new BadRequestException(
           'Cannot check out before checking in for today. Please log morning check-in first.',
         );

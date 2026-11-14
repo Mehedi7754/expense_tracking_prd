@@ -81,20 +81,27 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final allUsers = ref.watch(userManagementProvider);
     final isDark = AppColors.isDark(context);
 
-    // Filter notifications: Super Admin and Finance see all alerts; others see their own or broadcast
-    // Registration notifications are ADMIN-ONLY — never shown to employees/project members
+    // Filter notifications: Direct user notifications (with non-empty userId) are strictly for that user only.
+    // Broadcast notifications (userId is empty) are visible to Admins/Finance.
+    // Registration notifications are ADMIN-ONLY — never shown to employees/project members.
     final userNotifs =
         notifications.where((n) {
-          if (user == null) return true;
+          if (user == null) return false;
           // Registration notifications: only mainAdmin can see these
           if (n.type == NotificationType.userRegistration) {
             return user.role == UserRole.mainAdmin;
           }
+          // Direct notification with recipient: strictly for that user!
+          if (n.userId.isNotEmpty) {
+            return n.userId == user.id;
+          }
+          // System broadcast (userId empty)
           if (user.role == UserRole.mainAdmin ||
-              user.role == UserRole.finance) {
+              user.role == UserRole.finance ||
+              user.role == UserRole.projectManager) {
             return true;
           }
-          return n.userId == user.id || n.userId.isEmpty;
+          return false;
         }).toList();
 
     // Ensure notifications are strictly sorted newest first

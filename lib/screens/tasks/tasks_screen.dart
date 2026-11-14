@@ -23,6 +23,8 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   String _filter = 'all';
   String _projectFilter = 'all';
   String _priorityFilter = 'all';
+  String _dateFilter = 'all'; // 'all', 'today', 'this_week', 'overdue', 'custom'
+  DateTime? _selectedCustomDate;
   String _search = '';
   bool _loading = false;
   String? _error;
@@ -67,6 +69,33 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             if (_priorityFilter != 'all' &&
                 task.priority.toLowerCase() != _priorityFilter)
               return false;
+            if (_dateFilter != 'all') {
+              final now = DateTime.now();
+              final todayStart = DateTime(now.year, now.month, now.day);
+              final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+              final taskDate = task.dueDate;
+              if (_dateFilter == 'today') {
+                if (taskDate.isBefore(todayStart) || taskDate.isAfter(todayEnd)) {
+                  return false;
+                }
+              } else if (_dateFilter == 'this_week') {
+                final startOfWeek = todayStart.subtract(Duration(days: now.weekday % 7));
+                final endOfWeek = startOfWeek.add(const Duration(days: 7, seconds: -1));
+                if (taskDate.isBefore(startOfWeek) || taskDate.isAfter(endOfWeek)) {
+                  return false;
+                }
+              } else if (_dateFilter == 'overdue') {
+                if (task.status == TaskStatus.completed || !taskDate.isBefore(todayStart)) {
+                  return false;
+                }
+              } else if (_dateFilter == 'custom' && _selectedCustomDate != null) {
+                final customStart = DateTime(_selectedCustomDate!.year, _selectedCustomDate!.month, _selectedCustomDate!.day);
+                final customEnd = DateTime(_selectedCustomDate!.year, _selectedCustomDate!.month, _selectedCustomDate!.day, 23, 59, 59);
+                if (taskDate.isBefore(customStart) || taskDate.isAfter(customEnd)) {
+                  return false;
+                }
+              }
+            }
             final query = _search.trim().toLowerCase();
             if (query.isEmpty) return true;
             return task.title.toLowerCase().contains(query) ||
@@ -199,6 +228,19 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                   _priorityChip('high', 'High'),
                   _priorityChip('medium', 'Medium'),
                   _priorityChip('low', 'Low'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _dateChip('all', 'Any date', Icons.calendar_today_rounded),
+                  _dateChip('today', 'Due today', Icons.today_rounded),
+                  _dateChip('this_week', 'This week', Icons.date_range_rounded),
+                  _dateChip('overdue', 'Overdue', Icons.warning_amber_rounded),
+                  _customDateChip(),
                 ],
               ),
             ),
@@ -361,6 +403,81 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
           fontWeight: FontWeight.w600,
         ),
         onSelected: (_) => setState(() => _priorityFilter = value),
+      ),
+    );
+  }
+
+  Widget _dateChip(String value, String label, IconData icon) {
+    final selected = _dateFilter == value;
+    return Padding(
+      padding: const EdgeInsets.only(right: 7),
+      child: ChoiceChip(
+        avatar: Icon(
+          icon,
+          size: 14,
+          color: selected ? Colors.white : (value == 'overdue' ? AppColors.crimson : AppColors.getTextSecondary(context)),
+        ),
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        selectedColor: value == 'overdue' ? AppColors.crimson : AppColors.indigo,
+        backgroundColor: AppColors.getSurface(context),
+        side: BorderSide(
+          color: selected
+              ? (value == 'overdue' ? AppColors.crimson : AppColors.indigo)
+              : AppColors.getBorder(context),
+        ),
+        labelStyle: TextStyle(
+          color: selected ? Colors.white : (value == 'overdue' ? AppColors.crimson : AppColors.getTextSecondary(context)),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        onSelected: (_) => setState(() {
+          _dateFilter = value;
+          if (value != 'custom') _selectedCustomDate = null;
+        }),
+      ),
+    );
+  }
+
+  Widget _customDateChip() {
+    final isCustom = _dateFilter == 'custom';
+    final label = _selectedCustomDate != null
+        ? DateFormatter.formatShort(_selectedCustomDate!)
+        : 'Pick date';
+    return Padding(
+      padding: const EdgeInsets.only(right: 7),
+      child: ActionChip(
+        avatar: Icon(
+          Icons.event_available_rounded,
+          size: 14,
+          color: isCustom ? Colors.white : AppColors.getTextSecondary(context),
+        ),
+        label: Text(label),
+        backgroundColor: isCustom ? AppColors.indigo : AppColors.getSurface(context),
+        side: BorderSide(
+          color: isCustom ? AppColors.indigo : AppColors.getBorder(context),
+        ),
+        labelStyle: TextStyle(
+          color: isCustom ? Colors.white : AppColors.getTextSecondary(context),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+        onPressed: () async {
+          final now = DateTime.now();
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: _selectedCustomDate ?? now,
+            firstDate: now.subtract(const Duration(days: 365)),
+            lastDate: now.add(const Duration(days: 730)),
+          );
+          if (picked != null) {
+            setState(() {
+              _dateFilter = 'custom';
+              _selectedCustomDate = picked;
+            });
+          }
+        },
       ),
     );
   }
