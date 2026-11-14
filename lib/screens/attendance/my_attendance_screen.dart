@@ -838,27 +838,44 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF6366F1),
+                                      backgroundColor: const Color(0xFF10B981),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      elevation: 0.5,
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
-                                    icon: const Icon(CupertinoIcons.check_mark_circled, size: 14),
-                                    label: const Text('Check-In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    icon: const Icon(CupertinoIcons.sunrise_fill, size: 13),
+                                    label: const Text('Check-In', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
                                     onPressed: () => _handleManualCheckIn('morning'),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF4F46E5),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0.5,
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    icon: const Icon(CupertinoIcons.sunset_fill, size: 13),
+                                    label: const Text('Punch Out', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                                    onPressed: () => _handleManualCheckIn('afternoon'),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
                                 Expanded(
                                   child: ElevatedButton.icon(
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFFD97706),
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      elevation: 0.5,
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
-                                    icon: const Icon(CupertinoIcons.sunset_fill, size: 14),
-                                    label: const Text('Early Leave', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    icon: const Icon(CupertinoIcons.clock_fill, size: 13),
+                                    label: const Text('Early Leave', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
                                     onPressed: _showEarlyDepartureDialog,
                                   ),
                                 ),
@@ -1009,6 +1026,9 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                         title: 'Evening Session',
                         record: todayAfternoon,
                         onCheckIn: () => _handleManualCheckIn('afternoon'),
+                        onEarlyLeave: (todayAfternoon == null && (todayMorning != null || isAdminRole))
+                            ? _showEarlyDepartureDialog
+                            : null,
                         isSubmitting: attendanceState.isSubmitting,
                         icon: CupertinoIcons.sunset_fill,
                         iconColor: const Color(0xFF6366F1),
@@ -1021,35 +1041,6 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                                 : (currentHour < dividerH && !isAdminRole
                                     ? 'Check-out opens at ${fmtH(dividerH)} (valid until 12:00 AM)'
                                     : 'Valid until 12:00 AM midnight • Shift ends ${fmtH(endH)}')),
-                        extraAction: (todayAfternoon == null && todayMorning != null && !isAdminRole)
-                            ? InkWell(
-                                onTap: _showEarlyDepartureDialog,
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(CupertinoIcons.clock, size: 11, color: Color(0xFFD97706)),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Early Leave',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color(0xFFD97706),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            : null,
                       ),
                     ],
                   ),
@@ -1213,6 +1204,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     required String title,
     required AttendanceRecordModel? record,
     required VoidCallback onCheckIn,
+    VoidCallback? onEarlyLeave,
     required bool isSubmitting,
     required IconData icon,
     required Color iconColor,
@@ -1223,9 +1215,10 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
     bool isDisabled = false,
   }) {
     final hasLogged = record != null;
+    final isEvening = title.toLowerCase().contains('evening');
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: isDark
             ? (hasLogged ? const Color(0xFF064E3B).withValues(alpha: 0.35) : const Color(0xFF1E293B))
@@ -1245,15 +1238,15 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: iconColor.withValues(alpha: isDark ? 0.30 : 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: iconColor, size: 18),
+                child: Icon(icon, color: iconColor, size: 19),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 11),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1262,7 +1255,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                       title,
                       style: TextStyle(
                         color: isDark ? Colors.white : const Color(0xFF0F172A),
-                        fontSize: 13,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.2,
                       ),
@@ -1288,24 +1281,30 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
               const SizedBox(width: 8),
               if (hasLogged)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.5, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.30 : 0.12),
+                    color: (record.isEarlyDeparture ? const Color(0xFFD97706) : const Color(0xFF10B981)).withValues(alpha: isDark ? 0.30 : 0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: isDark ? 0.60 : 0.35),
+                      color: (record.isEarlyDeparture ? const Color(0xFFD97706) : const Color(0xFF10B981)).withValues(alpha: isDark ? 0.60 : 0.35),
                       width: 1.0,
                     ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(CupertinoIcons.checkmark_seal_fill, size: 12, color: Color(0xFF10B981)),
-                      const SizedBox(width: 3.5),
+                      Icon(
+                        record.isEarlyDeparture ? CupertinoIcons.clock_fill : CupertinoIcons.checkmark_seal_fill,
+                        size: 12,
+                        color: record.isEarlyDeparture ? const Color(0xFFD97706) : const Color(0xFF10B981),
+                      ),
+                      const SizedBox(width: 4),
                       Text(
-                        title.toLowerCase().contains('morning') ? 'Present' : 'Checked Out',
-                        style: const TextStyle(
-                          color: Color(0xFF10B981),
+                        record.isEarlyDeparture
+                            ? 'Early Departed'
+                            : (title.toLowerCase().contains('morning') ? 'Present' : 'Checked Out'),
+                        style: TextStyle(
+                          color: record.isEarlyDeparture ? const Color(0xFFD97706) : const Color(0xFF10B981),
                           fontSize: 10.5,
                           fontWeight: FontWeight.w800,
                         ),
@@ -1313,27 +1312,41 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                     ],
                   ),
                 )
-              else
+              else if (!isEvening)
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: (isSubmitting || isDisabled) ? null : onCheckIn,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
                       decoration: BoxDecoration(
+                        gradient: isDisabled
+                            ? null
+                            : const LinearGradient(
+                                colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
                         color: isDisabled
                             ? (isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFE2E8F0))
-                            : (isCorrectTimeSlot
-                                ? (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5))
-                                : Colors.transparent),
-                        borderRadius: BorderRadius.circular(20),
+                            : null,
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: isDisabled
                               ? (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1))
-                              : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5)),
-                          width: 1.2,
+                              : const Color(0xFF1D4ED8),
+                          width: 1.0,
                         ),
+                        boxShadow: isDisabled
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: const Color(0xFF2563EB).withValues(alpha: 0.28),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                       ),
                       child: isSubmitting
                           ? const SizedBox(
@@ -1345,27 +1358,21 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  isDisabled
-                                      ? CupertinoIcons.lock_fill
-                                      : (isCorrectTimeSlot ? CupertinoIcons.arrow_right_circle_fill : CupertinoIcons.clock_fill),
+                                  isDisabled ? CupertinoIcons.lock_fill : CupertinoIcons.sunrise_fill,
                                   size: 13,
                                   color: isDisabled
                                       ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
-                                      : (isCorrectTimeSlot
-                                          ? Colors.white
-                                          : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5))),
+                                      : Colors.white,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 5),
                                 Text(
-                                  title.toLowerCase().contains('morning') ? 'Punch In' : 'Punch Out',
+                                  'Punch In',
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 11.5,
                                     fontWeight: FontWeight.w800,
                                     color: isDisabled
                                         ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
-                                        : (isCorrectTimeSlot
-                                            ? Colors.white
-                                            : (title.toLowerCase().contains('morning') ? const Color(0xFF2563EB) : const Color(0xFF4F46E5))),
+                                        : Colors.white,
                                   ),
                                 ),
                               ],
@@ -1375,6 +1382,124 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                 ),
             ],
           ),
+          if (isEvening && !hasLogged) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: (isSubmitting || onEarlyLeave == null) ? null : onEarlyLeave,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9.5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.18 : 0.10),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFF59E0B).withValues(alpha: isDark ? 0.70 : 0.60),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              CupertinoIcons.clock_fill,
+                              size: 13,
+                              color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Early Leave',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: (isSubmitting || isDisabled) ? null : onCheckIn,
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9.5),
+                        decoration: BoxDecoration(
+                          gradient: isDisabled
+                              ? null
+                              : const LinearGradient(
+                                  colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                          color: isDisabled
+                              ? (isDark ? const Color(0xFF334155).withValues(alpha: 0.5) : const Color(0xFFE2E8F0))
+                              : null,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isDisabled
+                                ? (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1))
+                                : const Color(0xFF4338CA),
+                            width: 1.0,
+                          ),
+                          boxShadow: isDisabled
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: const Color(0xFF6366F1).withValues(alpha: 0.30),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                        ),
+                        child: isSubmitting
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    isDisabled ? CupertinoIcons.lock_fill : CupertinoIcons.sunset_fill,
+                                    size: 13,
+                                    color: isDisabled
+                                        ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                        : Colors.white,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'Punch Out',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: isDisabled
+                                          ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (extraAction != null) ...[
             const SizedBox(height: 8),
             Align(
