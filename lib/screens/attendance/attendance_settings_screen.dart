@@ -1608,12 +1608,13 @@ class _AttendanceSettingsScreenState
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
-                          children: [50, 100, 150, 200, 300, 500, 1000].map((radiusMeters) {
+                          children: [100, 500, 1000, 5000, 25000, 100000, 500000, 1000000].map((radiusMeters) {
                             final isSelected = (_geofenceRadius.toInt() == radiusMeters);
+                            final labelStr = radiusMeters >= 1000 ? '${radiusMeters ~/ 1000}km' : '${radiusMeters}m';
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: ChoiceChip(
-                                label: Text('${radiusMeters}m'),
+                                label: Text(labelStr),
                                 selected: isSelected,
                                 selectedColor: const Color(0xFF4F46E5),
                                 labelStyle: TextStyle(
@@ -1636,14 +1637,13 @@ class _AttendanceSettingsScreenState
 
                       const SizedBox(height: 8),
 
-                      // Smooth Radius Slider
+                      // Smooth Radius Slider (up to 1,000 km)
                       Slider.adaptive(
-                        value: _geofenceRadius.clamp(25.0, 1000.0),
+                        value: _geofenceRadius.clamp(25.0, 1000000.0),
                         min: 25.0,
-                        max: 1000.0,
-                        divisions: 39, // steps of 25m
+                        max: 1000000.0,
                         activeColor: const Color(0xFF4F46E5),
-                        label: '${_geofenceRadius.toInt()}m',
+                        label: _geofenceRadius >= 1000 ? '${(_geofenceRadius / 1000).toStringAsFixed(1)}km' : '${_geofenceRadius.toInt()}m',
                         onChanged: (val) {
                           setState(() {
                             _geofenceRadius = val;

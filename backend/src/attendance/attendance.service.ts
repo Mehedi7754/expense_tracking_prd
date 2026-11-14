@@ -147,8 +147,8 @@ export class AttendanceService {
       const radius = settings.geofenceRadiusMeters ?? this.officeTimingSettings.geofenceRadiusMeters;
       if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
           !Number.isFinite(lng) || lng < -180 || lng > 180 ||
-          !Number.isFinite(radius) || radius < 25 || radius > 1000) {
-        throw new BadRequestException('Invalid office coordinates or geofence radius');
+          !Number.isFinite(radius) || radius < 10 || radius > 1000000) {
+        throw new BadRequestException('Invalid office coordinates or geofence radius (must be between 10m and 1,000km)');
       }
     }
     this.officeTimingSettings = {

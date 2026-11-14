@@ -720,7 +720,9 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    '${(_siteRadiusMeters ?? 200).toInt()} m (~${(3.14159 * (_siteRadiusMeters ?? 200) * (_siteRadiusMeters ?? 200)).round()} m²)',
+                                    (_siteRadiusMeters ?? 200) >= 1000
+                                        ? '${((_siteRadiusMeters ?? 200) / 1000).toStringAsFixed((_siteRadiusMeters ?? 200) % 1000 == 0 ? 0 : 1)} km (${(_siteRadiusMeters ?? 200).toInt()} m)'
+                                        : '${(_siteRadiusMeters ?? 200).toInt()} m',
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w800,
@@ -732,18 +734,19 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Allowed circular geofence boundary around this project site for field staff check-in.',
+                              'Allowed circular geofence boundary around this project site (adjustable up to 1,000 km).',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDark ? Colors.white60 : const Color(0xFF64748B),
                               ),
                             ),
                             Slider(
-                              value: (_siteRadiusMeters ?? 200.0).clamp(50.0, 2500.0),
+                              value: (_siteRadiusMeters ?? 200.0).clamp(50.0, 1000000.0),
                               min: 50,
-                              max: 2500,
-                              divisions: 98,
-                              label: '${(_siteRadiusMeters ?? 200).toInt()} m',
+                              max: 1000000,
+                              label: (_siteRadiusMeters ?? 200) >= 1000
+                                  ? '${((_siteRadiusMeters ?? 200) / 1000).toStringAsFixed(1)} km'
+                                  : '${(_siteRadiusMeters ?? 200).toInt()} m',
                               onChanged: (val) {
                                 setState(() {
                                   _siteRadiusMeters = val;
@@ -753,7 +756,7 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                             SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
-                                children: [100, 200, 350, 500, 1000, 2000].map((preset) {
+                                children: [100, 500, 1000, 5000, 25000, 100000, 500000, 1000000].map((preset) {
                                   final currentVal = _siteRadiusMeters ?? 200.0;
                                   final isSelected = (currentVal - preset).abs() < 1;
                                   return Padding(
