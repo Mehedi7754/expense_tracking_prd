@@ -68,4 +68,18 @@ export class CheckInDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  isEarlyDeparture?: boolean;
+
+  @IsOptional()
+  is_early_departure?: boolean;
+
+  @IsOptional()
+  @IsString()
+  earlyDepartureReason?: string;
+
+  @IsOptional()
+  @IsString()
+  early_departure_reason?: string;
 }
