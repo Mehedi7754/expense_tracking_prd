@@ -27,11 +27,11 @@ class CommentModel {
       authorId: (json['author_id'] ?? json['authorId'] ?? '').toString(),
       authorName: (json['author_name'] ?? json['authorName'] ?? '').toString(),
       authorRole: UserRole.fromString(roleStr),
-      text: (json['text'] ?? json['comment_text'] ?? '').toString(),
+      text: (json['comment'] ?? json['comment_text'] ?? json['text'] ?? '').toString(),
       timestamp: json['timestamp'] != null
           ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
-          : (json['created_at'] != null
-              ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+          : (json['created_at'] != null || json['createdAt'] != null
+              ? DateTime.tryParse((json['created_at'] ?? json['createdAt']).toString()) ?? DateTime.now()
               : DateTime.now()),
     );
   }
@@ -44,6 +44,8 @@ class CommentModel {
       'author_name': authorName,
       'author_role': authorRole.name,
       'text': text,
+      'comment': text,
+      'comment_text': text,
       'timestamp': timestamp.toIso8601String(),
     };
   }

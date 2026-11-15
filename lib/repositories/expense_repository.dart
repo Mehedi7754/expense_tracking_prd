@@ -125,12 +125,17 @@ class ExpenseRepository {
   Future<CommentModel> addComment(String expenseId, CommentModel comment) async {
     final response = await _client.post(
       ApiEndpoints.expenseComments(expenseId),
-      body: comment.toJson(),
+      body: {
+        'comment': comment.text,
+        'text': comment.text,
+        'comment_text': comment.text,
+        ...comment.toJson(),
+      },
     );
 
     final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
         ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+        : (response is Map<String, dynamic> ? response : <String, dynamic>{});
     return CommentModel.fromJson(data);
   }
 

@@ -657,7 +657,12 @@ export class ExpensesService {
     return this.findOne(id);
   }
 
-  async addComment(expenseId: string, authorId: string, comment: string) {
+  async addComment(expenseId: string, authorId: string, rawComment: string) {
+    const comment = (rawComment || '').trim();
+    if (!comment) {
+      throw new BadRequestException('Comment text cannot be empty');
+    }
+
     const userRes = await this.db.query('SELECT full_name, role FROM users WHERE id = $1', [authorId]);
     const userRow = userRes.rows[0] || {};
     const authorName = userRow.full_name || 'Team Member';

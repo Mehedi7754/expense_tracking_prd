@@ -72,10 +72,13 @@ export class ExpensesController {
   @Post(':id/comments')
   async addComment(
     @Param('id') id: string,
-    @Body('comment') comment: string,
+    @Body() body: any,
     @Request() req: any,
   ) {
-    return this.expensesService.addComment(id, req.user.id, comment);
+    const text = typeof body === 'string'
+      ? body
+      : (body?.comment ?? body?.text ?? body?.comment_text ?? '');
+    return this.expensesService.addComment(id, req.user.id, text);
   }
 
   @Post(':id/justification')

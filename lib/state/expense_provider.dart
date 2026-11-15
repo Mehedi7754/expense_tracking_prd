@@ -629,9 +629,24 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
-      await repo.addComment(expenseId, newComment);
+      final created = await repo.addComment(expenseId, newComment);
+      if (created.id.isNotEmpty && created.id != newComment.id) {
+        state = [
+          for (final exp in state)
+            if (exp.id == expenseId)
+              exp.copyWith(
+                comments: [
+                  for (final c in exp.comments)
+                    if (c.id == newComment.id) created else c
+                ],
+              )
+            else
+              exp,
+        ];
+        await _persistExpenses();
+      }
     } catch (_) {
-      // Offline fallback
+      // Retained in local state for seamless offline persistence
     }
   }
 }

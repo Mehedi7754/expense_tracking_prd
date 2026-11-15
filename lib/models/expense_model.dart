@@ -515,8 +515,8 @@ class ExpenseModel {
     List<CommentModel> parseComments(dynamic raw) {
       if (raw is List) {
         return raw
-            .whereType<Map<String, dynamic>>()
-            .map(CommentModel.fromJson)
+            .where((item) => item is Map)
+            .map((item) => CommentModel.fromJson(Map<String, dynamic>.from(item as Map)))
             .toList();
       }
       return const [];
