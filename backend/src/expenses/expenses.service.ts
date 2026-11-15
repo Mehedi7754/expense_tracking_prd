@@ -667,7 +667,6 @@ export class ExpensesService {
     const userRow = userRes.rows[0] || {};
     const authorName = userRow.full_name || 'Team Member';
     const authorRole = userRow.role || 'project_member';
-
     const res = await this.db.query(
       `INSERT INTO expense_comments (expense_id, author_id, author_name, author_role, comment_text)
        VALUES ($1, $2, $3, $4, $5)
@@ -675,14 +674,81 @@ export class ExpensesService {
       [expenseId, authorId, authorName, authorRole, comment],
     );
 
+    const commentRow = res.rows[0];
+
+    // Notification & FCM Push Notification: notify the counterparty
+    try {
+      const expRes = await this.db.query(
+        `SELECT e.id, e.employee_id, e.project_id, e.amount, e.currency,
+                c.name AS category_name, p.name AS project_name, u.full_name AS employee_name
+         FROM expenses e
+         LEFT JOIN categories c ON c.id = e.category_id
+         LEFT JOIN projects p ON p.id = e.project_id
+         LEFT JOIN users u ON u.id = e.employee_id
+         WHERE e.id = $1`,
+        [expenseId],
+      );
+
+      if (expRes.rows.length > 0) {
+        const exp = expRes.rows[0];
+        const isAuthorTheEmployee = authorId === exp.employee_id;
+
+        if (isAuthorTheEmployee) {
+          // Employee replied -> notify project managers and global admins
+          const managersRes = await this.db.query(
+            `SELECT user_id FROM project_members 
+             WHERE project_id = $1 AND (can_approve_expenses = TRUE OR role_in_project ILIKE '%Manager%' OR role_in_project ILIKE '%Lead%')`,
+            [exp.project_id],
+          );
+          const recipientIds = new Set<string>(managersRes.rows.map((r: any) => r.user_id));
+
+          // Also notify global admins
+          const adminsRes = await this.db.query(
+            `SELECT id FROM users WHERE role IN ('main_admin', 'admin', 'finance')`,
+          );
+          adminsRes.rows.forEach((r: any) => recipientIds.add(r.id));
+          recipientIds.delete(authorId); // Do not notify sender
+
+          for (const recipientId of recipientIds) {
+            await this.notificationsService.create({
+              userId: recipientId,
+              title: `Clarification Reply: ${exp.category_name || 'Expense'}`,
+              message: `${authorName}: "${comment.length > 90 ? comment.substring(0, 87) + '...' : comment}"`,
+              fullExplanation: `Clarification response posted by ${authorName} for expense ${exp.category_name || ''} (${exp.amount} ${exp.currency || 'BDT'}) under project ${exp.project_name || ''}.`,
+              type: 'comment_added',
+              relatedProjectId: exp.project_id,
+              relatedExpenseId: expenseId,
+              actorId: authorId,
+              actorName: authorName,
+            });
+          }
+        } else {
+          // Reviewer/Admin commented -> notify the claimant employee directly
+          await this.notificationsService.create({
+            userId: exp.employee_id,
+            title: `Clarification Needed: ${exp.category_name || 'Expense'}`,
+            message: `${authorName}: "${comment.length > 90 ? comment.substring(0, 87) + '...' : comment}"`,
+            fullExplanation: `${authorName} requested clarification or posted a remark on your ${exp.category_name || 'expense'} claim (${exp.amount} ${exp.currency || 'BDT'}). Click to view and reply.`,
+            type: 'comment_added',
+            relatedProjectId: exp.project_id,
+            relatedExpenseId: expenseId,
+            actorId: authorId,
+            actorName: authorName,
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.error('Failed to dispatch notification for clarification comment:', notifErr);
+    }
+
     return {
-      id: res.rows[0].id,
-      expenseId: res.rows[0].expense_id,
-      authorId: res.rows[0].author_id,
-      authorName: res.rows[0].author_name,
-      authorRole: res.rows[0].author_role,
-      comment: res.rows[0].comment_text,
-      createdAt: res.rows[0].created_at,
+      id: commentRow.id,
+      expenseId: commentRow.expense_id,
+      authorId: commentRow.author_id,
+      authorName: commentRow.author_name,
+      authorRole: commentRow.author_role,
+      comment: commentRow.comment_text,
+      createdAt: commentRow.created_at,
     };
   }
 

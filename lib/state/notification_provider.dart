@@ -158,7 +158,7 @@ class NotificationNotifier extends Notifier<List<NotificationModel>> {
       for (final n in filteredRemoteList) {
         if (!n.isRead && !existingIds.contains(n.id) && now.difference(n.timestamp).inMinutes < 60) {
           final type = n.type.name.toLowerCase();
-          if (type.contains('expense')) {
+          if (type.contains('expense') || type.contains('comment') || (n.relatedExpenseId != null && n.relatedExpenseId!.isNotEmpty)) {
             PushNotificationService.instance.showExpenseAlert(
               title: n.title,
               body: n.message,

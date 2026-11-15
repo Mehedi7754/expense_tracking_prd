@@ -1307,9 +1307,51 @@ class _HomeDashboardScreenState extends ConsumerState<HomeDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        expense.employeeName,
-                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, letterSpacing: -0.2),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              expense.employeeName,
+                              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, letterSpacing: -0.2),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (expense.comments.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withValues(alpha: isDark ? 0.25 : 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFFEF4444).withValues(alpha: 0.5),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFEF4444),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${expense.comments.length}',
+                                    style: const TextStyle(
+                                      color: Color(0xFFEF4444),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(
