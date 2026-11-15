@@ -85,14 +85,19 @@ export class ExpensesService {
         justification: details.justification,
         vendor: details.vendor,
       } : null,
-      comments: comments.map((c) => ({
+      comments: (comments || []).map((c) => ({
         id: c.id,
-        expenseId: c.expense_id,
-        authorId: c.author_id,
-        authorName: c.author_name || 'User',
-        authorRole: c.author_role || 'Member',
-        comment: c.comment_text || c.comment || '',
-        createdAt: c.created_at,
+        expenseId: c.expense_id || c.expenseId,
+        authorId: c.author_id || c.authorId,
+        authorName: c.author_name || c.authorName || c.userName || c.full_name || 'Team Member',
+        userName: c.author_name || c.authorName || c.userName || c.full_name || 'Team Member',
+        user_name: c.author_name || c.authorName || c.userName || c.full_name || 'Team Member',
+        authorRole: c.author_role || c.authorRole || 'Member',
+        authorAvatar: c.author_avatar || c.authorAvatar || c.avatar_url || c.avatarUrl || null,
+        avatarUrl: c.author_avatar || c.authorAvatar || c.avatar_url || c.avatarUrl || null,
+        comment: c.comment_text || c.comment || c.text || '',
+        text: c.comment_text || c.comment || c.text || '',
+        createdAt: c.created_at || c.createdAt,
       })),
     };
   }
@@ -109,10 +114,14 @@ export class ExpensesService {
         COALESCE(
           (SELECT json_agg(json_build_object(
             'id', ec.id, 'expense_id', ec.expense_id, 'author_id', ec.author_id,
-            'author_name', ec.author_name, 'author_role', ec.author_role, 'comment_text', ec.comment_text,
+            'author_name', COALESCE(u_c.full_name, ec.author_name),
+            'author_role', COALESCE(u_c.role, ec.author_role),
+            'author_avatar', u_c.avatar_url,
+            'comment_text', ec.comment_text,
             'created_at', ec.created_at
-          ))
+          ) ORDER BY ec.created_at ASC)
           FROM expense_comments ec
+          LEFT JOIN users u_c ON u_c.id = ec.author_id
           WHERE ec.expense_id = e.id),
           '[]'::json
         ) AS comments
@@ -179,10 +188,14 @@ export class ExpensesService {
         COALESCE(
           (SELECT json_agg(json_build_object(
             'id', ec.id, 'expense_id', ec.expense_id, 'author_id', ec.author_id,
-            'author_name', ec.author_name, 'author_role', ec.author_role, 'comment_text', ec.comment_text,
+            'author_name', COALESCE(u_c.full_name, ec.author_name),
+            'author_role', COALESCE(u_c.role, ec.author_role),
+            'author_avatar', u_c.avatar_url,
+            'comment_text', ec.comment_text,
             'created_at', ec.created_at
-          ))
+          ) ORDER BY ec.created_at ASC)
           FROM expense_comments ec
+          LEFT JOIN users u_c ON u_c.id = ec.author_id
           WHERE ec.expense_id = e.id),
           '[]'::json
         ) AS comments
@@ -663,10 +676,11 @@ export class ExpensesService {
       throw new BadRequestException('Comment text cannot be empty');
     }
 
-    const userRes = await this.db.query('SELECT full_name, role FROM users WHERE id = $1', [authorId]);
+    const userRes = await this.db.query('SELECT full_name, role, avatar_url FROM users WHERE id = $1', [authorId]);
     const userRow = userRes.rows[0] || {};
     const authorName = userRow.full_name || 'Team Member';
     const authorRole = userRow.role || 'project_member';
+    const authorAvatar = userRow.avatar_url || null;
     const res = await this.db.query(
       `INSERT INTO expense_comments (expense_id, author_id, author_name, author_role, comment_text)
        VALUES ($1, $2, $3, $4, $5)
@@ -746,8 +760,13 @@ export class ExpensesService {
       expenseId: commentRow.expense_id,
       authorId: commentRow.author_id,
       authorName: commentRow.author_name,
+      userName: commentRow.author_name,
+      user_name: commentRow.author_name,
       authorRole: commentRow.author_role,
+      authorAvatar: authorAvatar,
+      avatarUrl: authorAvatar,
       comment: commentRow.comment_text,
+      text: commentRow.comment_text,
       createdAt: commentRow.created_at,
     };
   }
