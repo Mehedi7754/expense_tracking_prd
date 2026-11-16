@@ -368,7 +368,7 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
       }
     }
 
-    final isMorningSlot = !isWeekendToday && currentHour >= startH && currentHour < dividerH;
+    final isMorningSlot = !isWeekendToday && currentHour < dividerH;
 
     String currentSlotBadge;
     Color currentSlotBadgeColor;
@@ -377,6 +377,9 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
       currentSlotBadgeColor = const Color(0xFF6366F1);
     } else if (isWeekendToday) {
       currentSlotBadge = '${shift.name} • Off-Day';
+      currentSlotBadgeColor = const Color(0xFF10B981);
+    } else if (currentHour < startH) {
+      currentSlotBadge = '${shift.name} • Early Arrival';
       currentSlotBadgeColor = const Color(0xFF10B981);
     } else if (isMorningSlot) {
       currentSlotBadge = '${shift.name} • Morning';
@@ -1013,11 +1016,11 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                         icon: CupertinoIcons.sunrise_fill,
                         iconColor: const Color(0xFFF59E0B),
                         isCorrectTimeSlot: isMorningSlot,
-                        isDisabled: !isAdminRole && currentHour < startH,
-                        timingHint: currentHour < startH
-                            ? 'Opens at ${fmtH(startH)}'
-                            : (todayMorning != null
-                                ? 'Logged at ${todayMorning.formattedTime}'
+                        isDisabled: false,
+                        timingHint: todayMorning != null
+                            ? 'Logged at ${todayMorning.formattedTime}'
+                            : (currentHour < startH
+                                ? 'Early arrival • Shift starts at ${fmtH(startH)}'
                                 : (currentHour >= dividerH
                                     ? 'Morning window ended • Log check-in'
                                     : '${fmtH(startH)} - ${fmtH(dividerH)}')),
@@ -1405,24 +1408,30 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                             width: 1.2,
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              CupertinoIcons.clock_fill,
-                              size: 13,
-                              color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  CupertinoIcons.clock_fill,
+                                  size: 13,
+                                  color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Early Leave',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Early Leave',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -1473,28 +1482,34 @@ class _MyAttendanceScreenState extends ConsumerState<MyAttendanceScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                 ),
                               )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    isDisabled ? CupertinoIcons.lock_fill : CupertinoIcons.sunset_fill,
-                                    size: 13,
-                                    color: isDisabled
-                                        ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
-                                        : Colors.white,
+                            : FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        isDisabled ? CupertinoIcons.lock_fill : CupertinoIcons.sunset_fill,
+                                        size: 13,
+                                        color: isDisabled
+                                            ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                            : Colors.white,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Punch Out',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800,
+                                          color: isDisabled
+                                              ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
+                                              : Colors.white,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 5),
-                                  Text(
-                                    'Punch Out',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                      color: isDisabled
-                                          ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))
-                                          : Colors.white,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                       ),
                     ),

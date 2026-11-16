@@ -513,9 +513,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       final shift = s.getShiftForUser(userId);
 
       if (session == 'morning') {
-        if (h < shift.morningStartHour) {
-          return 'Morning check-in for ${shift.name} opens at ${_fmt(shift.morningStartHour)}.';
-        }
+        // Early check-in before shift start is permitted and recorded as on-time/early.
       } else if (session == 'afternoon') {
         final breakStart = shift.breakStartHour;
         if (h < breakStart) {
@@ -525,13 +523,10 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       return null;
     }
 
-    final start = s?.morningStartHour ?? 9;
     final breakStart = s?.breakStartHour ?? 13;
 
     if (session == 'morning') {
-      if (h < start) {
-        return 'Morning check-in opens at ${_fmt(start)}.';
-      }
+      // Early check-in before shift start is permitted and recorded as on-time/early.
     } else if (session == 'afternoon') {
       if (h < breakStart) {
         return 'Evening check-out is only permitted starting at ${_fmt(breakStart)} until 12:00 AM midnight.';

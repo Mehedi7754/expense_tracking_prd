@@ -209,6 +209,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     required DateTime date,
     required bool hasReceipt,
     String? receiptPhotoUrl,
+    List<String> receiptPhotoUrls = const [],
     EquipmentDetails? equipmentDetails,
     TransportationDetails? transportationDetails,
     FoodDetails? foodDetails,
@@ -216,6 +217,10 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     OfficeCostDetails? officeCostDetails,
   }) async {
     final officeBenefit = amount * officeBenefitRate;
+    final effectiveReceiptUrls = receiptPhotoUrls.isNotEmpty
+        ? receiptPhotoUrls
+        : (receiptPhotoUrl != null && receiptPhotoUrl.isNotEmpty ? [receiptPhotoUrl] : <String>[]);
+    final effectiveReceiptUrl = receiptPhotoUrl ?? (effectiveReceiptUrls.isNotEmpty ? effectiveReceiptUrls.first : null);
     final newExpense = ExpenseModel(
       id: 'exp_${DateTime.now().microsecondsSinceEpoch}',
       employeeId: employeeId,
@@ -238,7 +243,8 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       note: note,
       date: date,
       hasReceipt: hasReceipt,
-      receiptPhotoUrl: receiptPhotoUrl,
+      receiptPhotoUrl: effectiveReceiptUrl,
+      receiptPhotoUrls: effectiveReceiptUrls,
       status: ExpenseStatus.pending,
       justificationStatus: hasReceipt ? JustificationStatus.none : JustificationStatus.required,
       createdAt: DateTime.now(),
@@ -580,10 +586,20 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     }
   }
 
-  void withdrawExpense(String id) {
-    state = state.where((exp) => !(exp.id == id && exp.status == ExpenseStatus.pending)).toList();
+  Future<void> deleteExpense(String id) async {
+    try {
+      final repo = ref.read(expenseRepositoryProvider);
+      await repo.deleteExpense(id);
+    } catch (e) {
+      // Log or rethrow if error
+    }
+    state = state.where((exp) => exp.id != id).toList();
     _persistExpenses();
     invalidateCache();
+  }
+
+  Future<void> withdrawExpense(String id) async {
+    await deleteExpense(id);
   }
 
   void updateExpenseReceiptUrl(String expenseId, String remoteUrl) {

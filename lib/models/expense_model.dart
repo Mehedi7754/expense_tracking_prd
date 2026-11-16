@@ -340,6 +340,7 @@ class ExpenseModel {
   final DateTime date;
   final bool hasReceipt; // Receipt Available vs No Receipt
   final String? receiptPhotoUrl;
+  final List<String> receiptPhotoUrls;
   final ExpenseStatus status;
   final String? rejectionReason;
   final List<CommentModel> comments;
@@ -386,6 +387,7 @@ class ExpenseModel {
     required this.date,
     this.hasReceipt = true,
     this.receiptPhotoUrl,
+    this.receiptPhotoUrls = const [],
     this.status = ExpenseStatus.pending,
     this.rejectionReason,
     this.comments = const [],
@@ -450,6 +452,7 @@ class ExpenseModel {
     DateTime? date,
     bool? hasReceipt,
     String? receiptPhotoUrl,
+    List<String>? receiptPhotoUrls,
     ExpenseStatus? status,
     String? rejectionReason,
     List<CommentModel>? comments,
@@ -492,6 +495,7 @@ class ExpenseModel {
       date: date ?? this.date,
       hasReceipt: hasReceipt ?? this.hasReceipt,
       receiptPhotoUrl: receiptPhotoUrl ?? this.receiptPhotoUrl,
+      receiptPhotoUrls: receiptPhotoUrls ?? this.receiptPhotoUrls,
       status: status ?? this.status,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       comments: comments ?? this.comments,
@@ -556,10 +560,25 @@ class ExpenseModel {
     final ofData = json['office_cost_details'] ?? json['officeCostDetails'] ?? categoryDetails?['office'];
 
     final receiptPhoto = json['receipt_photo_url']?.toString() ?? json['receiptPhotoUrl']?.toString();
+    List<String> parsedReceiptUrls = [];
+    final rawReceiptUrls = json['receipt_photo_urls'] ?? json['receiptPhotoUrls'];
+    if (rawReceiptUrls is List) {
+      parsedReceiptUrls = rawReceiptUrls.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    } else if (rawReceiptUrls is String && rawReceiptUrls.isNotEmpty) {
+      if (rawReceiptUrls.startsWith('{') && rawReceiptUrls.endsWith('}')) {
+        parsedReceiptUrls = rawReceiptUrls.substring(1, rawReceiptUrls.length - 1).split(',').map((s) => s.trim().replaceAll('"', '')).where((s) => s.isNotEmpty).toList();
+      } else {
+        parsedReceiptUrls = [rawReceiptUrls];
+      }
+    }
+    if (parsedReceiptUrls.isEmpty && receiptPhoto != null && receiptPhoto.isNotEmpty) {
+      parsedReceiptUrls = [receiptPhoto];
+    }
+
     final rawReceipt = json['has_receipt'] ?? json['hasReceipt'];
     final bool parsedHasReceipt = rawReceipt != null
         ? parseBool(rawReceipt, false)
-        : (receiptPhoto != null && receiptPhoto.isNotEmpty);
+        : (parsedReceiptUrls.isNotEmpty || (receiptPhoto != null && receiptPhoto.isNotEmpty));
 
     double parsedVatRate = parseDouble(json['vat_rate'] ?? json['vatRate']);
     double? parsedVatAmount = (json['vat_amount'] != null || json['vatAmount'] != null)
@@ -615,7 +634,8 @@ class ExpenseModel {
           ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
           : DateTime.now(),
       hasReceipt: parsedHasReceipt,
-      receiptPhotoUrl: receiptPhoto,
+      receiptPhotoUrl: receiptPhoto ?? (parsedReceiptUrls.isNotEmpty ? parsedReceiptUrls.first : null),
+      receiptPhotoUrls: parsedReceiptUrls,
       status: ExpenseStatus.fromString(statusStr),
       rejectionReason: json['rejection_reason']?.toString() ?? json['rejectionReason']?.toString(),
       comments: parseComments(json['comments']),
@@ -674,6 +694,7 @@ class ExpenseModel {
       'date': date.toIso8601String(),
       'has_receipt': hasReceipt,
       if (receiptPhotoUrl != null) 'receipt_photo_url': receiptPhotoUrl,
+      'receipt_photo_urls': receiptPhotoUrls,
       'status': status.name,
       if (rejectionReason != null) 'rejection_reason': rejectionReason,
       'comments': comments.map((c) => c.toJson()).toList(),

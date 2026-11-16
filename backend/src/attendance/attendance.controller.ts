@@ -106,7 +106,7 @@ export class AttendanceController {
     return this.attendanceService.getTimingSettings();
   }
 
-  @Roles('main_admin', 'project_manager', 'finance')
+  @Roles('main_admin', 'admin')
   @Post('settings')
   async updateTimingSettings(
     @Body() body: Record<string, any>,

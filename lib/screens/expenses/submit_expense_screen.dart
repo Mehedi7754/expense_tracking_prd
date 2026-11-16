@@ -47,6 +47,9 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   String? _receiptFileName;
   String? _receiptPath;
   String? _serverReceiptUrl;
+  final List<String> _receiptPaths = [];
+  final List<String> _receiptFileNames = [];
+  final List<String> _serverReceiptUrls = [];
   bool _isUploadingReceipt = false;
   bool _isSubmitting = false;
 
@@ -147,14 +150,48 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   bool get _exceedsFoodAllowance {
     if (_selectedCategory != 'food') return false;
     final people = int.tryParse(_foodPeopleCountController.text.trim()) ?? 1;
-    final settings = ref.read(settingsProvider);
-    final limit = settings.dailyFoodAllowance * (people > 0 ? people : 1);
+    final projectAllowance = _selectedProject?.dailyFoodAllowance;
+    final baseAllowance = (projectAllowance != null && projectAllowance > 0)
+        ? projectAllowance
+        : ref.read(settingsProvider).dailyFoodAllowance;
+    final limit = baseAllowance * (people > 0 ? people : 1);
     return _totalCost > limit;
   }
 
   Future<void> _pickReceipt(ImageSource source) async {
     try {
       final picker = ImagePicker();
+      if (source == ImageSource.gallery) {
+        final List<XFile> images = await picker.pickMultiImage(
+          maxWidth: 1920,
+          maxHeight: 1920,
+          imageQuality: 85,
+        );
+        if (images.isNotEmpty) {
+          final newPaths = <String>[];
+          for (final img in images) {
+            final name = img.name.isNotEmpty ? img.name : img.path.split(RegExp(r'[/\\]')).last;
+            if (!_receiptPaths.contains(img.path)) {
+              _receiptPaths.add(img.path);
+              _receiptFileNames.add(name);
+              newPaths.add(img.path);
+            }
+          }
+          setState(() {
+            _receiptPath = _receiptPaths.first;
+            _receiptFileName = _receiptFileNames.first;
+          });
+          _uploadBatchReceipts(newPaths);
+          if (mounted) {
+            NotificationBanner.showSuccess(
+              context,
+              '${images.length} receipt image(s) selected from Gallery',
+            );
+          }
+          return;
+        }
+      }
+
       final XFile? image = await picker.pickImage(
         source: source,
         maxWidth: 1920,
@@ -162,11 +199,16 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
         imageQuality: 85,
       );
       if (image != null) {
+        final name = image.name.isNotEmpty ? image.name : image.path.split(RegExp(r'[/\\]')).last;
         setState(() {
-          _receiptPath = image.path;
-          _receiptFileName = image.name.isNotEmpty ? image.name : image.path.split(RegExp(r'[/\\]')).last;
+          if (!_receiptPaths.contains(image.path)) {
+            _receiptPaths.add(image.path);
+            _receiptFileNames.add(name);
+          }
+          _receiptPath = _receiptPaths.first;
+          _receiptFileName = _receiptFileNames.first;
         });
-        _uploadPickedReceipt(image.path);
+        _uploadBatchReceipts([image.path]);
         if (mounted) {
           NotificationBanner.showSuccess(
             context,
@@ -186,20 +228,28 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     }
   }
 
-  Future<void> _uploadPickedReceipt(String filePath) async {
+  Future<void> _uploadBatchReceipts(List<String> filePaths) async {
+    if (filePaths.isEmpty) return;
     setState(() => _isUploadingReceipt = true);
     try {
       final uploadRepo = ref.read(fileUploadRepositoryProvider);
-      final res = await uploadRepo.upload(
-        filePathOrDataUri: filePath,
+      final results = await uploadRepo.uploadBatch(
+        filePathsOrDataUris: filePaths,
         category: UploadCategory.receipts,
       );
       if (mounted) {
         setState(() {
-          _serverReceiptUrl = res.url;
+          for (final res in results) {
+            if (!_serverReceiptUrls.contains(res.url)) {
+              _serverReceiptUrls.add(res.url);
+            }
+          }
+          if (_serverReceiptUrls.isNotEmpty) {
+            _serverReceiptUrl = _serverReceiptUrls.first;
+          }
           _isUploadingReceipt = false;
         });
-        NotificationBanner.showSuccess(context, 'Receipt uploaded successfully to cloud!');
+        NotificationBanner.showSuccess(context, 'Receipt(s) uploaded successfully to cloud!');
       }
     } catch (e) {
       if (mounted) {
@@ -208,32 +258,49 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     }
   }
 
+
+
   Future<void> _pickDocumentOrMedia() async {
     try {
       final picker = ImagePicker();
-      final XFile? file = await picker.pickMedia();
-      if (file != null) {
-        setState(() {
-          _receiptPath = file.path;
-          _receiptFileName = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
-        });
-        _uploadPickedReceipt(file.path);
-        if (mounted) {
-          NotificationBanner.showSuccess(context, 'Receipt file attached: $_receiptFileName');
+      final List<XFile> files = await picker.pickMultipleMedia();
+      if (files.isNotEmpty) {
+        final newPaths = <String>[];
+        for (final file in files) {
+          final name = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
+          if (!_receiptPaths.contains(file.path)) {
+            _receiptPaths.add(file.path);
+            _receiptFileNames.add(name);
+            newPaths.add(file.path);
+          }
         }
+        setState(() {
+          _receiptPath = _receiptPaths.first;
+          _receiptFileName = _receiptFileNames.first;
+        });
+        _uploadBatchReceipts(newPaths);
+        if (mounted) {
+          NotificationBanner.showSuccess(context, '${files.length} file(s) attached');
+        }
+        return;
       }
     } catch (_) {
       try {
         final picker = ImagePicker();
         final XFile? file = await picker.pickImage(source: ImageSource.gallery);
         if (file != null) {
+          final name = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
           setState(() {
-            _receiptPath = file.path;
-            _receiptFileName = file.name.isNotEmpty ? file.name : file.path.split(RegExp(r'[/\\]')).last;
+            if (!_receiptPaths.contains(file.path)) {
+              _receiptPaths.add(file.path);
+              _receiptFileNames.add(name);
+            }
+            _receiptPath = _receiptPaths.first;
+            _receiptFileName = _receiptFileNames.first;
           });
-          _uploadPickedReceipt(file.path);
+          _uploadBatchReceipts([file.path]);
           if (mounted) {
-            NotificationBanner.showSuccess(context, 'Receipt file attached: $_receiptFileName');
+            NotificationBanner.showSuccess(context, 'Receipt file attached: $name');
           }
         }
       } catch (err) {
@@ -327,6 +394,11 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
 
     try {
+      final effectiveReceiptUrls = _serverReceiptUrls.isNotEmpty
+          ? _serverReceiptUrls
+          : (_receiptPaths.isNotEmpty ? _receiptPaths : (localReceiptPath != null ? [localReceiptPath] : <String>[]));
+      final effectiveReceipt = _serverReceiptUrl ?? localReceiptPath;
+
       final created = await ref.read(expenseProvider.notifier).submitExpense(
             employeeId: user.id,
             employeeName: user.name,
@@ -346,7 +418,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             note: _noteController.text.trim(),
             date: _selectedDate,
             hasReceipt: _hasReceipt,
-            receiptPhotoUrl: _serverReceiptUrl ?? localReceiptPath,
+            receiptPhotoUrl: effectiveReceipt,
+            receiptPhotoUrls: effectiveReceiptUrls,
             equipmentDetails: equipDetails,
             transportationDetails: transDetails,
             foodDetails: foodDetails,
@@ -355,7 +428,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           );
 
       // If receipt hasn't finished remote uploading yet, enqueue background upload
-      final effectiveReceipt = _serverReceiptUrl ?? localReceiptPath;
       if (effectiveReceipt != null &&
           effectiveReceipt.isNotEmpty &&
           !effectiveReceipt.startsWith('http') &&
@@ -1136,64 +1208,85 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                         ),
                       ],
                     ),
-                    if (_receiptFileName != null) ...[
+                    if (_receiptFileNames.isNotEmpty || _receiptFileName != null) ...[
                       const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _receiptFileName!.endsWith('.pdf') ? Icons.picture_as_pdf_rounded : Icons.image_rounded,
-                              size: 20,
-                              color: _receiptFileName!.endsWith('.pdf') ? const Color(0xFFEF4444) : const Color(0xFF10B981),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      _receiptFileName!,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark ? Colors.white : const Color(0xFF1E293B),
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (_isUploadingReceipt) ...[
-                                    const SizedBox(width: 8),
-                                    const SizedBox(
-                                      width: 12,
-                                      height: 12,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                  ],
-                                ],
+                      ...List.generate(
+                        _receiptFileNames.isNotEmpty ? _receiptFileNames.length : 1,
+                        (index) {
+                          final name = _receiptFileNames.isNotEmpty
+                              ? _receiptFileNames[index]
+                              : (_receiptFileName ?? 'Receipt');
+                          final isPdf = name.toLowerCase().endsWith('.pdf');
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.darkBackground : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded, size: 16),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              color: Colors.grey,
-                              onPressed: () => setState(() {
-                                _receiptFileName = null;
-                                _receiptPath = null;
-                                _serverReceiptUrl = null;
-                                _hasReceipt = false; // Turn off the toggle automatically when receipt is removed
-                              }),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isPdf ? Icons.picture_as_pdf_rounded : Icons.image_rounded,
+                                  size: 20,
+                                  color: isPdf ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (_isUploadingReceipt) ...[
+                                        const SizedBox(width: 8),
+                                        const SizedBox(
+                                          width: 12,
+                                          height: 12,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 16),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  color: Colors.grey,
+                                  onPressed: () => setState(() {
+                                    if (_receiptFileNames.isNotEmpty && index < _receiptFileNames.length) {
+                                      _receiptFileNames.removeAt(index);
+                                      if (index < _receiptPaths.length) _receiptPaths.removeAt(index);
+                                      if (index < _serverReceiptUrls.length) _serverReceiptUrls.removeAt(index);
+                                      _receiptFileName = _receiptFileNames.isNotEmpty ? _receiptFileNames.first : null;
+                                      _receiptPath = _receiptPaths.isNotEmpty ? _receiptPaths.first : null;
+                                      _serverReceiptUrl = _serverReceiptUrls.isNotEmpty ? _serverReceiptUrls.first : null;
+                                    } else {
+                                      _receiptFileName = null;
+                                      _receiptPath = null;
+                                      _serverReceiptUrl = null;
+                                    }
+                                    if (_receiptFileNames.isEmpty && _receiptFileName == null) {
+                                      _hasReceipt = false;
+                                    }
+                                  }),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          );
+                        },
                       ),
                     ],
                   ],
@@ -1425,7 +1518,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                 value: _mealType,
                 isExpanded: true,
                 decoration: InputDecoration(labelText: 'Meal Type'),
-                items: ['Breakfast', 'Lunch', 'Dinner', 'Refreshments / Tea'].map((m) {
+                items: ['Breakfast', 'Lunch', 'Dinner', 'Refreshments / Tea', 'Full-Day Meal'].map((m) {
                   return DropdownMenuItem(value: m, child: Text(m, overflow: TextOverflow.ellipsis));
                 }).toList(),
                 onChanged: (v) => setState(() => _mealType = v!),

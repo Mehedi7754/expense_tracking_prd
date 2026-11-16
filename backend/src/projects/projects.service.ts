@@ -33,7 +33,11 @@ export class ProjectsService {
         (lng !== null && (!Number.isFinite(lng) || lng < -180 || lng > 180))) {
       throw new BadRequestException('Provide a valid project site latitude and longitude together');
     }
-    return { lat, lng, radius };
+    const result: { lat: number | null; lng: number | null; radius?: number | null } = { lat, lng };
+    if (radiusGiven || current?.siteRadiusMeters !== undefined) {
+      result.radius = radius;
+    }
+    return result;
   }
 
   constructor(
@@ -83,6 +87,8 @@ export class ProjectsService {
       siteLatitude: p.site_latitude == null ? null : Number(p.site_latitude),
       siteLongitude: p.site_longitude == null ? null : Number(p.site_longitude),
       siteRadiusMeters: p.site_radius_meters == null ? null : Number(p.site_radius_meters),
+      dailyFoodAllowance: p.daily_food_allowance == null ? null : Number(p.daily_food_allowance),
+      daily_food_allowance: p.daily_food_allowance == null ? null : Number(p.daily_food_allowance),
       progressPercentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
       progress_percentage: Number(p.progress_percentage !== null && p.progress_percentage !== undefined ? p.progress_percentage : (p.category_budgets?._meta_progress ?? 0)),
       progressNotes: typeof p.progress_notes === 'string' ? JSON.parse(p.progress_notes) : (p.progress_notes || []),
@@ -296,6 +302,13 @@ export class ProjectsService {
       const initialProgress = Math.max(0, Math.min(100, isNaN(rawProgress) ? 0 : rawProgress));
       const initialNotes = data.progressNotes ?? data.progress_notes ?? [];
 
+      const rawDailyFoodAllowance = data.dailyFoodAllowance !== undefined
+        ? data.dailyFoodAllowance
+        : (data.daily_food_allowance !== undefined ? data.daily_food_allowance : null);
+      const parsedFoodAllowance = rawDailyFoodAllowance === null || rawDailyFoodAllowance === '' || isNaN(Number(rawDailyFoodAllowance))
+        ? null
+        : Number(rawDailyFoodAllowance);
+
       const projRes = await client.query(
         `INSERT INTO projects (
           project_code, name, description, client_name, client_id, client_type, assignment_type,
@@ -303,14 +316,16 @@ export class ProjectsService {
           advance_received, amount_received, amount_receivable, budget,
           category_budgets, estimated_remaining_cost, office_benefit_rate,
           start_date, end_date, status, created_by, image_url,
-          progress_percentage, progress_notes, site_latitude, site_longitude, site_radius_meters
+          progress_percentage, progress_notes, site_latitude, site_longitude, site_radius_meters,
+          daily_food_allowance
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7,
           $8, $9, $10, $11,
           $12, $13, $14, $15,
           $16, $17, $18,
           $19, $20, $21, $22, $23,
-          $24, $25, $26, $27, $28
+          $24, $25, $26, $27, $28,
+          $29
         ) RETURNING *`,
         [
           projectCode,
@@ -341,6 +356,7 @@ export class ProjectsService {
           site?.lat ?? null,
           site?.lng ?? null,
           site?.radius ?? null,
+          parsedFoodAllowance,
         ],
       );
 
@@ -479,10 +495,18 @@ export class ProjectsService {
   async update(id: string, data: any, user?: any) {
     const existing = await this.findOne(id, user);
 
-    const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'finance_manager' || user?.role === 'finance';
+    const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'finance_manager' || user?.role === 'finance';
     if (user && !isAdminOrFinance) {
-      const isAssigned = (existing.teamMemberIds || []).includes(user.id) || (user.assignedProjectIds || []).includes(existing.id);
-      if (!isAssigned) {
+      const pmRes = await this.db.query(
+        'SELECT can_edit_project, role_in_project FROM project_members WHERE project_id = $1 AND user_id = $2',
+        [id, user.id],
+      );
+      const canEdit = pmRes.rows.length > 0 && (
+        pmRes.rows[0].can_edit_project === true ||
+        (pmRes.rows[0].role_in_project || '').toLowerCase().includes('manager') ||
+        (pmRes.rows[0].role_in_project || '').toLowerCase().includes('lead')
+      );
+      if (!canEdit) {
         throw new ForbiddenException('You do not have permission to update this project');
       }
     }
@@ -494,6 +518,13 @@ export class ProjectsService {
     if (site) {
       fields.push(`site_latitude = $${idx++}`, `site_longitude = $${idx++}`, `site_radius_meters = $${idx++}`);
       values.push(site.lat, site.lng, site.radius);
+    }
+
+    if (data.dailyFoodAllowance !== undefined || data.daily_food_allowance !== undefined) {
+      const rawAllowance = data.dailyFoodAllowance !== undefined ? data.dailyFoodAllowance : data.daily_food_allowance;
+      const parsedAllowance = rawAllowance === null || rawAllowance === '' || isNaN(Number(rawAllowance)) ? null : Number(rawAllowance);
+      fields.push(`daily_food_allowance = $${idx++}`);
+      values.push(parsedAllowance);
     }
 
     if (data.name !== undefined) {

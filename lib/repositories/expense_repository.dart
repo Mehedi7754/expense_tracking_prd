@@ -122,6 +122,26 @@ class ExpenseRepository {
     return ExpenseModel.fromJson(data);
   }
 
+  Future<void> deleteExpense(String id) async {
+    await _client.delete(ApiEndpoints.deleteExpense(id));
+  }
+
+  Future<List<CommentModel>> getComments(String expenseId) async {
+    final response = await _client.get(ApiEndpoints.expenseComments(expenseId));
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map(CommentModel.fromJson)
+          .toList();
+    } else if (response is Map<String, dynamic> && response['data'] is List) {
+      return (response['data'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(CommentModel.fromJson)
+          .toList();
+    }
+    return const [];
+  }
+
   Future<CommentModel> addComment(String expenseId, CommentModel comment) async {
     final response = await _client.post(
       ApiEndpoints.expenseComments(expenseId),

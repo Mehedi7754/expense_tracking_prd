@@ -216,11 +216,10 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
         body: const Center(child: Text('Expense record not found.')),
       );
     }
-
     final expense = expenseList.first;
 
-    // Security check: PRD mandates only Pending expenses can be edited
-    if (expense.status != ExpenseStatus.pending) {
+    // Security check: PRD & Client feedback: pending and rejected claims can be edited
+    if (expense.status != ExpenseStatus.pending && expense.status != ExpenseStatus.rejected) {
       return Scaffold(
         appBar: AppBar(title: const Text('Edit Expense')),
         body: Center(
@@ -234,7 +233,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 Text('Expense Cannot Be Edited', style: AppTextStyles.titleMedium),
                 const SizedBox(height: 8),
                 Text(
-                  'Only pending expenses can be edited. This claim is already ${expense.status.displayName.toLowerCase()}.',
+                  'Approved expenses cannot be edited. This claim is already ${expense.status.displayName.toLowerCase()}.',
                   style: AppTextStyles.bodyMedium,
                   textAlign: TextAlign.center,
                 ),

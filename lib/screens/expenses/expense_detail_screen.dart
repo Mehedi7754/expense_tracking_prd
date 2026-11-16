@@ -84,6 +84,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
     final isReviewer = user != null && (user.role.canApproveExpenses || hasProjectApproval);
 
     final isPending = expense.status == ExpenseStatus.pending;
+    final isEditableByOwner = isEmployeeOwner && (expense.status == ExpenseStatus.pending || expense.status == ExpenseStatus.rejected);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final allUsers = ref.watch(userManagementProvider);
@@ -551,16 +552,39 @@ class ExpenseDetailScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Receipt Documentation',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                      Text(
+                        expense.receiptPhotoUrls.length > 1
+                            ? 'Receipt Documentation (${expense.receiptPhotoUrls.length} Files)'
+                            : 'Receipt Documentation',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                       ),
                       const SizedBox(height: 12),
-                      ReceiptUploader(
-                        imagePath: expense.receiptPhotoUrl,
-                        isReadOnly: true,
-                        onImageChanged: (_) {},
-                      ),
+                      if (expense.receiptPhotoUrls.length > 1) ...[
+                        SizedBox(
+                          height: 160,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: expense.receiptPhotoUrls.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (ctx, idx) {
+                              return SizedBox(
+                                width: 140,
+                                child: ReceiptUploader(
+                                  imagePath: expense.receiptPhotoUrls[idx],
+                                  isReadOnly: true,
+                                  onImageChanged: (_) {},
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ] else ...[
+                        ReceiptUploader(
+                          imagePath: expense.receiptPhotoUrl,
+                          isReadOnly: true,
+                          onImageChanged: (_) {},
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -587,8 +611,8 @@ class ExpenseDetailScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 // 7. ACTION BUTTONS: REUSABLE & CONSISTENT
-                // Employee Actions: Withdraw & Edit (when pending)
-                if (isEmployeeOwner && isPending) ...[
+                // Employee Actions: Delete & Edit (when pending or rejected)
+                if (isEditableByOwner) ...[
                   Row(
                     children: [
                       Expanded(
@@ -596,9 +620,9 @@ class ExpenseDetailScreen extends ConsumerWidget {
                           height: 48,
                           child: OutlinedButton.icon(
                             icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
-                            label: const Text(
-                              'Withdraw Claim',
-                              style: TextStyle(
+                            label: Text(
+                              expense.status == ExpenseStatus.rejected ? 'Delete Claim' : 'Withdraw Claim',
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFFEF4444),
@@ -609,11 +633,14 @@ class ExpenseDetailScreen extends ConsumerWidget {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             onPressed: () async {
+                              final isRejected = expense.status == ExpenseStatus.rejected;
                               final confirm = await showDialog<bool>(
                                 context: context,
                                 builder: (ctx) => AlertDialog(
-                                  title: const Text('Withdraw Expense Claim?'),
-                                  content: const Text('Are you sure you want to withdraw this pending expense claim?'),
+                                  title: Text(isRejected ? 'Delete Expense Claim?' : 'Withdraw Expense Claim?'),
+                                  content: Text(isRejected
+                                      ? 'Are you sure you want to delete this rejected expense claim?'
+                                      : 'Are you sure you want to withdraw this pending expense claim?'),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(ctx, false),
@@ -625,14 +652,14 @@ class ExpenseDetailScreen extends ConsumerWidget {
                                         foregroundColor: Colors.white,
                                       ),
                                       onPressed: () => Navigator.pop(ctx, true),
-                                      child: const Text('Withdraw'),
+                                      child: Text(isRejected ? 'Delete' : 'Withdraw'),
                                     ),
                                   ],
                                 ),
                               );
                               if (confirm == true && context.mounted) {
-                                ref.read(expenseProvider.notifier).withdrawExpense(expense.id);
-                                NotificationBanner.showSuccess(context, 'Expense claim withdrawn.');
+                                ref.read(expenseProvider.notifier).deleteExpense(expense.id);
+                                NotificationBanner.showSuccess(context, isRejected ? 'Expense claim deleted.' : 'Expense claim withdrawn.');
                                 context.pop();
                               }
                             },

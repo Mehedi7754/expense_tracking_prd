@@ -44,7 +44,11 @@ export class ExpensesService {
       note: e.note || '',
       date: e.date,
       hasReceipt: Boolean(e.has_receipt),
-      receiptPhotoUrl: e.receipt_photo_url,
+      receiptPhotoUrl: e.receipt_photo_url || (Array.isArray(e.receipt_photo_urls) && e.receipt_photo_urls[0]) || null,
+      receiptPhotoUrls: Array.isArray(e.receipt_photo_urls) && e.receipt_photo_urls.length > 0
+        ? e.receipt_photo_urls
+        : (e.receipt_photo_url ? [e.receipt_photo_url] : []),
+      receiptPhotos: e.receipt_photos && Array.isArray(e.receipt_photos) ? e.receipt_photos : [],
       status: e.status,
       rejectionReason: e.rejection_reason,
       justificationStatus: e.justification_status,
@@ -213,7 +217,7 @@ export class ExpensesService {
 
     const expense = this.mapExpenseRow(res.rows[0], res.rows[0].comments);
 
-    if (user && user.role !== 'main_admin' && user.role !== 'finance_manager' && user.role !== 'finance') {
+    if (user && user.role !== 'main_admin' && user.role !== 'admin' && user.role !== 'finance_manager' && user.role !== 'finance') {
       const isOwner = expense.employeeId === user.id;
       if (!isOwner) {
         const pmCheck = await this.db.query(
@@ -314,17 +318,27 @@ export class ExpensesService {
     const taxRate = Number(data.taxRate ?? data.tax_rate ?? 0);
     const taxAmount = Number(data.taxAmount ?? data.tax_amount ?? (taxRate > 0 ? (baseAmount * taxRate / 100) : 0));
 
+    const receiptUrls: string[] = Array.isArray(data.receiptPhotoUrls)
+      ? data.receiptPhotoUrls
+      : (Array.isArray(data.receipt_photo_urls)
+        ? data.receipt_photo_urls
+        : (data.receiptPhotoUrl || data.receipt_photo_url ? [data.receiptPhotoUrl || data.receipt_photo_url] : []));
+    const primaryReceiptUrl = receiptUrls[0] || data.receiptPhotoUrl || data.receipt_photo_url || null;
+    const receiptPhotos = Array.isArray(data.receiptPhotos) ? data.receiptPhotos : (Array.isArray(data.receipt_photos) ? data.receipt_photos : []);
+
     const res = await this.db.query(
       `INSERT INTO expenses (
         employee_id, project_id, task_id, amount, currency, category_id,
         note, date, has_receipt, receipt_photo_url, status,
         justification_status, justification_reason, justification_comment,
-        category_details, base_amount, vat_rate, vat_amount, tax_rate, tax_amount
+        category_details, base_amount, vat_rate, vat_amount, tax_rate, tax_amount,
+        receipt_photo_urls, receipt_photos
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10, $11,
         $12, $13, $14,
-        $15, $16, $17, $18, $19, $20
+        $15, $16, $17, $18, $19, $20,
+        $21, $22
       ) RETURNING id`,
       [
         employeeId,
@@ -336,7 +350,7 @@ export class ExpensesService {
         data.note || '',
         data.date || new Date().toISOString().split('T')[0],
         hasReceipt,
-        data.receiptPhotoUrl || data.receipt_photo_url || null,
+        primaryReceiptUrl,
         initialStatus,
         justificationStatus,
         data.justificationReason || data.justification_reason || null,
@@ -347,6 +361,8 @@ export class ExpensesService {
         vatAmount,
         taxRate,
         taxAmount,
+        receiptUrls,
+        JSON.stringify(receiptPhotos),
       ],
     );
 
@@ -421,15 +437,15 @@ export class ExpensesService {
   async update(id: string, data: any, user?: any) {
     const existing = await this.findOne(id, user);
 
-    const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'finance_manager' || user?.role === 'finance';
+    const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'finance_manager' || user?.role === 'finance';
     const isProjectManager = user?.role === 'project_manager';
 
     if (user && !isAdminOrFinance && !isProjectManager) {
       if (existing.employeeId !== user.id) {
         throw new ForbiddenException('You can only edit your own expense reports');
       }
-      if (existing.status !== 'pending' && existing.status !== 'draft') {
-        throw new ForbiddenException('Cannot edit an expense that has already been approved or rejected');
+      if (existing.status !== 'pending' && existing.status !== 'draft' && existing.status !== 'rejected') {
+        throw new ForbiddenException('Cannot edit an expense that has already been approved');
       }
     }
 
@@ -450,6 +466,12 @@ export class ExpensesService {
     const values: any[] = [];
     let idx = 1;
 
+    // Resubmission of rejected expense
+    if (existing.status === 'rejected' && (!data.status || data.status === 'rejected')) {
+      fields.push(`status = 'pending'`);
+      fields.push(`rejection_reason = NULL`);
+    }
+
     if (data.amount !== undefined) {
       fields.push(`amount = $${idx++}`);
       values.push(Number(data.amount));
@@ -469,6 +491,22 @@ export class ExpensesService {
     if (data.receiptPhotoUrl !== undefined || data.receipt_photo_url !== undefined) {
       fields.push(`receipt_photo_url = $${idx++}`);
       values.push(data.receiptPhotoUrl ?? data.receipt_photo_url ?? null);
+    }
+    if (data.receiptPhotoUrls !== undefined || data.receipt_photo_urls !== undefined) {
+      const urls = Array.isArray(data.receiptPhotoUrls)
+        ? data.receiptPhotoUrls
+        : (Array.isArray(data.receipt_photo_urls) ? data.receipt_photo_urls : []);
+      fields.push(`receipt_photo_urls = $${idx++}`);
+      values.push(urls);
+      if (!data.receiptPhotoUrl && !data.receipt_photo_url && urls.length > 0) {
+        fields.push(`receipt_photo_url = $${idx++}`);
+        values.push(urls[0]);
+      }
+    }
+    if (data.receiptPhotos !== undefined || data.receipt_photos !== undefined) {
+      const photos = Array.isArray(data.receiptPhotos) ? data.receiptPhotos : (Array.isArray(data.receipt_photos) ? data.receipt_photos : []);
+      fields.push(`receipt_photos = $${idx++}`);
+      values.push(JSON.stringify(photos));
     }
     if (data.justificationStatus !== undefined || data.justification_status !== undefined) {
       fields.push(`justification_status = $${idx++}`);
@@ -505,15 +543,29 @@ export class ExpensesService {
 
     values.push(id);
     await this.db.query(`UPDATE expenses SET ${fields.join(', ')} WHERE id = $${idx}`, values);
-    return this.findOne(id, user);
+    const updated = await this.findOne(id, user);
+
+    try {
+      await this.auditLogsService.log(
+        {
+          action: 'EXPENSE_UPDATED',
+          entityType: 'Expense',
+          entityId: id,
+          details: { amount: updated.amount, projectId: updated.projectId, status: updated.status },
+        },
+        user,
+      );
+    } catch (_) {}
+
+    return updated;
   }
 
   async delete(id: string, user?: any) {
     const exp = await this.findOne(id, user);
-    const isAdmin = user?.role === 'main_admin';
+    const isAdmin = user?.role === 'main_admin' || user?.role === 'admin';
     if (!isAdmin) {
-      const isAssignedManager = (user?.assignedProjectIds || []).includes(exp.projectId);
-      const isOwner = exp.employeeId === user?.id && (exp.status === 'pending' || exp.status === 'draft');
+      const isAssignedManager = (user?.assignedProjectIds || []).includes(exp.projectId) || user?.role === 'project_manager';
+      const isOwner = exp.employeeId === user?.id && (exp.status === 'pending' || exp.status === 'draft' || exp.status === 'rejected');
       if (!isAssignedManager && !isOwner) {
         throw new ForbiddenException('You do not have permission to delete this expense');
       }
@@ -529,17 +581,57 @@ export class ExpensesService {
         entityType: 'Expense',
         entityId: id,
         details: { amount: exp.amount, projectId: exp.projectId },
-      });
+      }, user);
     } catch (e) {
       console.error('Failed to log audit for expense delete:', e);
     }
     return { success: true, id };
   }
 
+  async getComments(expenseId: string, user?: any) {
+    await this.findOne(expenseId, user);
+    const res = await this.db.query(
+      `SELECT ec.id, ec.expense_id, ec.author_id,
+              COALESCE(u.full_name, ec.author_name) AS author_name,
+              COALESCE(u.role, ec.author_role) AS author_role,
+              u.avatar_url AS author_avatar,
+              ec.comment_text,
+              ec.created_at
+       FROM expense_comments ec
+       LEFT JOIN users u ON u.id = ec.author_id
+       WHERE ec.expense_id = $1
+       ORDER BY ec.created_at ASC`,
+      [expenseId],
+    );
+    return res.rows.map((c) => ({
+      id: c.id,
+      expenseId: c.expense_id,
+      authorId: c.author_id,
+      authorName: c.author_name || 'Team Member',
+      userName: c.author_name || 'Team Member',
+      user_name: c.author_name || 'Team Member',
+      authorRole: c.author_role || 'Member',
+      authorAvatar: c.author_avatar || null,
+      avatarUrl: c.author_avatar || null,
+      comment: c.comment_text || '',
+      text: c.comment_text || '',
+      createdAt: c.created_at,
+    }));
+  }
+
   async approve(id: string, reviewerId: string, note?: string, user?: any) {
     const exp = await this.findOne(id);
     if (exp.employeeId === reviewerId) {
       throw new ForbiddenException('Anti-fraud rule: You cannot approve your own expense report');
+    }
+
+    const projRes = await this.db.query('SELECT is_closed, status FROM projects WHERE id = $1', [exp.projectId]);
+    if (
+      projRes.rows.length &&
+      (projRes.rows[0].is_closed === true ||
+        (projRes.rows[0].status && ['closed', 'completed'].includes(projRes.rows[0].status.toLowerCase())))
+    ) {
+      throw new BadRequestException('Cannot approve expenses for a closed project');
     }
 
     const isGlobalAdmin = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'project_manager';
@@ -551,15 +643,6 @@ export class ExpensesService {
       if (!pmRes.rows.length || !pmRes.rows[0].can_approve_expenses) {
         throw new ForbiddenException('You do not have approval permission for this project');
       }
-    }
-
-    const projRes = await this.db.query('SELECT is_closed, status FROM projects WHERE id = $1', [exp.projectId]);
-    if (
-      projRes.rows.length &&
-      (projRes.rows[0].is_closed === true ||
-        (projRes.rows[0].status && ['closed', 'completed'].includes(projRes.rows[0].status.toLowerCase())))
-    ) {
-      throw new BadRequestException('Cannot approve expenses for a closed project');
     }
 
     await this.db.query(

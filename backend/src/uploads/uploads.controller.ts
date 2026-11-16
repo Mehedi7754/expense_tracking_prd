@@ -62,6 +62,40 @@ export class UploadsController {
     };
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('batch')
+  async uploadBatch(@Body() body: { files: Array<{ file: string; category?: string; entityId?: string }> }) {
+    if (!body || !Array.isArray(body.files) || body.files.length === 0) {
+      throw new BadRequestException('files array is required');
+    }
+
+    const validCategories: UploadCategory[] = ['receipts', 'avatars', 'projects', 'chat'];
+    const results = [];
+
+    for (const item of body.files) {
+      if (!item.file || item.file.trim().length === 0) continue;
+      const category = (item.category || 'receipts') as UploadCategory;
+      if (!validCategories.includes(category)) continue;
+
+      const result = await this.uploadsService.saveFile(
+        item.file,
+        category,
+        item.entityId,
+      );
+      results.push({
+        url: result.url,
+        filename: result.filename,
+        sizeBytes: result.sizeBytes,
+      });
+    }
+
+    return {
+      success: true,
+      files: results,
+      urls: results.map((r) => r.url),
+    };
+  }
+
   @Get(':category/:filename')
   async getUploadedFile(
     @Param('category') category: string,

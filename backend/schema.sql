@@ -199,6 +199,8 @@ CREATE TABLE IF NOT EXISTS projects (
     image_url TEXT,
     site_latitude NUMERIC(10, 7),
     site_longitude NUMERIC(10, 7),
+    site_radius_meters NUMERIC(10, 2) DEFAULT 200.0,
+    daily_food_allowance NUMERIC(15, 2) DEFAULT NULL,
     CONSTRAINT chk_project_site_pair CHECK ((site_latitude IS NULL) = (site_longitude IS NULL)),
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
@@ -263,6 +265,8 @@ CREATE TABLE IF NOT EXISTS expenses (
     date DATE NOT NULL DEFAULT CURRENT_DATE,
     has_receipt BOOLEAN NOT NULL DEFAULT TRUE,
     receipt_photo_url TEXT,
+    receipt_photo_urls TEXT[] NOT NULL DEFAULT '{}',
+    receipt_photos JSONB NOT NULL DEFAULT '[]'::jsonb,
     status expense_status_enum NOT NULL DEFAULT 'pending',
     rejection_reason TEXT,
     
@@ -487,7 +491,7 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_benefit_rate NUMERIC(5, 4);
 BEGIN
-    IF NEW.office_benefit_amount IS NULL OR NEW.office_benefit_amount = 0 THEN
+    IF (TG_OP = 'UPDATE' AND NEW.amount <> OLD.amount) OR NEW.office_benefit_amount IS NULL OR NEW.office_benefit_amount = 0 THEN
         SELECT office_benefit_rate INTO v_benefit_rate
         FROM projects
         WHERE id = NEW.project_id;

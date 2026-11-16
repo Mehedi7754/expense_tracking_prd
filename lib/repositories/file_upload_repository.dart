@@ -93,6 +93,42 @@ class FileUploadRepository {
     throw Exception('Unexpected upload response format');
   }
 
+  Future<List<UploadResult>> uploadBatch({
+    required List<String> filePathsOrDataUris,
+    required UploadCategory category,
+    String? entityId,
+  }) async {
+    final List<String> base64Files = [];
+    for (final path in filePathsOrDataUris) {
+      if (path.startsWith('data:') || _isRawBase64(path)) {
+        base64Files.add(path);
+      } else if (!kIsWeb && File(path).existsSync()) {
+        final file = File(path);
+        final b64 = await AppImageHelper.fileToBase64DataUri(file);
+        base64Files.add(b64);
+      } else if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/uploads/')) {
+        base64Files.add(path);
+      }
+    }
+
+    final response = await _client.post(
+      '/uploads/batch',
+      body: {
+        'files': base64Files,
+        'category': category.value,
+        if (entityId != null) 'entityId': entityId,
+      },
+    );
+
+    if (response is Map<String, dynamic> && response['results'] is List) {
+      return (response['results'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(UploadResult.fromJson)
+          .toList();
+    }
+    return const [];
+  }
+
   /// Quick helper to check if a string looks like raw base64.
   bool _isRawBase64(String value) {
     if (value.length < 100) return false;

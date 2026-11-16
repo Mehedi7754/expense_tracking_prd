@@ -64,6 +64,7 @@ describe('ExpensesService Unit & Business Rules', () => {
 
       mockDb.query
         .mockResolvedValueOnce({ rows: [{ is_closed: false, status: 'ongoing' }] }) // project query
+        .mockResolvedValueOnce({ rows: [{ can_approve_expenses: true }] }) // project_members permission query
         .mockResolvedValueOnce({ rows: [] }) // update expenses
         .mockResolvedValueOnce({ rows: [{ full_name: 'Manager Sarah', role: 'project_manager' }] }); // reviewer query
 
@@ -83,28 +84,30 @@ describe('ExpensesService Unit & Business Rules', () => {
 
   describe('IDOR & Access Control', () => {
     it('throws ForbiddenException when a member attempts to view an expense not belonging to their project', async () => {
-      mockDb.query.mockResolvedValue({
-        rows: [
-          {
-            id: 'exp-other',
-            employee_id: 'other-user',
-            project_id: 'proj-other',
-            amount: '3000',
-            currency: 'BDT',
-            status: 'pending',
-            category_name: 'Equipment',
-            category_icon: 'laptop',
-            comments: [],
-            has_receipt: true,
-            receipt_photo_url: null,
-            justification_status: null,
-            justification_reason: null,
-            category_details: '{}',
-            created_at: new Date().toISOString(),
-            date: '2026-10-01',
-          },
-        ],
-      });
+      mockDb.query
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'exp-other',
+              employee_id: 'other-user',
+              project_id: 'proj-other',
+              amount: '3000',
+              currency: 'BDT',
+              status: 'pending',
+              category_name: 'Equipment',
+              category_icon: 'laptop',
+              comments: [],
+              has_receipt: true,
+              receipt_photo_url: null,
+              justification_status: null,
+              justification_reason: null,
+              category_details: '{}',
+              created_at: new Date().toISOString(),
+              date: '2026-10-01',
+            },
+          ],
+        })
+        .mockResolvedValueOnce({ rows: [] }); // project_members permission query returns empty
 
       const regularUser = {
         id: 'user-regular',

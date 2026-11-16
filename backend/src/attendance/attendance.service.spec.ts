@@ -114,6 +114,7 @@ describe('AttendanceService Unit & Session Logic', () => {
         latitude: 23.8120,
         longitude: 90.4140,
         addressText: 'Updated Location, Dhaka',
+        workMode: 'home_office' as const,
       };
 
       // Query 0: getTimingSettings
@@ -173,6 +174,7 @@ describe('AttendanceService Unit & Session Logic', () => {
         longitude: 90.4125,
         addressText: 'Dhaka, Bangladesh',
         deviceInfo: 'Flutter Mobile App',
+        workMode: 'home_office' as const,
       };
 
       // Query 0: getTimingSettings
@@ -182,6 +184,8 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
         // Query 1.5: getAssignedWorkLocation
         .mockResolvedValueOnce({ rows: [] })
+        // Query 1.7: Check morning check-in exists for today
+        .mockResolvedValueOnce({ rows: [{ id: 'att-rec-morning' }] })
         // Query 2: Check existing check-in -> none
         .mockResolvedValueOnce({ rows: [] })
         // Query 3: Insert returning id
@@ -243,6 +247,7 @@ describe('AttendanceService Unit & Session Logic', () => {
         longitude: 90.4125,
         addressText: 'Dhaka, Bangladesh',
         deviceInfo: 'Flutter Mobile App',
+        workMode: 'home_office' as const,
       };
 
       // Query 0: getTimingSettings
@@ -252,6 +257,8 @@ describe('AttendanceService Unit & Session Logic', () => {
         .mockResolvedValueOnce({ rows: [{ role: 'employee', full_name: 'Fahim Ahmed', email: 'fahim@pfis.com' }] })
         // Query 1.5: getAssignedWorkLocation
         .mockResolvedValueOnce({ rows: [] })
+        // Query 1.7: Check morning check-in exists for today
+        .mockResolvedValueOnce({ rows: [{ id: 'att-rec-morning' }] })
         // Query 2: Check existing check-in -> none
         .mockResolvedValueOnce({ rows: [] })
         // Query 3: Insert returning id

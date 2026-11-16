@@ -45,7 +45,6 @@ export class ExpensesController {
     return this.expensesService.update(id, body, req.user);
   }
 
-  @Roles('main_admin', 'project_manager')
   @Delete(':id')
   async deleteExpense(@Param('id') id: string, @Request() req: any) {
     return this.expensesService.delete(id, req.user);
@@ -67,6 +66,11 @@ export class ExpensesController {
     @Request() req: any,
   ) {
     return this.expensesService.reject(id, req.user.id, reason, req.user);
+  }
+
+  @Get(':id/comments')
+  async getComments(@Param('id') id: string, @Request() req: any) {
+    return this.expensesService.getComments(id, req.user);
   }
 
   @Post(':id/comments')

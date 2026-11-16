@@ -56,11 +56,7 @@ export class AttendanceService {
   getDhakaDateStr(date?: Date): string {
     const d = date || new Date();
     const tz = this.officeTimingSettings.timezone || 'Asia/Dhaka';
-    const localDate = new Date(d.toLocaleString('en-US', { timeZone: tz }));
-    const yyyy = localDate.getFullYear();
-    const mm = String(localDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(localDate.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
   }
 
   private officeTimingSettings = {
@@ -243,8 +239,7 @@ export class AttendanceService {
     }
 
     const tz = this.officeTimingSettings.timezone || 'Asia/Dhaka';
-    const dhakaNow = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-    const targetDateForCheck = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
+    const targetDateForCheck = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr();
     const assignedLocationInfo = await this.getAssignedWorkLocation(userId, targetDateForCheck);
 
     let workMode = dto.workMode || dto.work_mode;
@@ -323,8 +318,14 @@ export class AttendanceService {
     }
 
     // 2. Resolve local office hour (Bangladesh Standard Time: UTC+6) and assigned user shift
-    const currentHour = dhakaNow.getHours();
-    const currentMinute = dhakaNow.getMinutes();
+    const timeParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(new Date());
+    const currentHour = parseInt(timeParts.find((p) => p.type === 'hour')?.value || '0', 10);
+    const currentMinute = parseInt(timeParts.find((p) => p.type === 'minute')?.value || '0', 10);
     const userShift = this.getShiftForUser(userId);
 
     const morningStart = userShift.morningStartHour ?? 9;
@@ -342,7 +343,7 @@ export class AttendanceService {
       session = currentHour < breakEnd ? 'morning' : 'afternoon';
     }
 
-    const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr(dhakaNow);
+    const targetDate = dto.date && /^\d{4}-\d{2}-\d{2}$/.test(dto.date) ? dto.date : this.getDhakaDateStr();
 
     const notesLower = (dto.notes || '').toLowerCase();
     const isEarlyDepartureReq = Boolean(
@@ -420,7 +421,7 @@ export class AttendanceService {
 
     // Check if record exists for this user, date and session
     const existing = await this.db.query(
-      `SELECT id FROM attendance_records
+      `SELECT id, status, login_time FROM attendance_records
        WHERE user_id = $1 AND date = $2 AND session_type = $3`,
       [userId, targetDate, session],
     );
@@ -428,13 +429,24 @@ export class AttendanceService {
     let recordId: string;
 
     if (existing.rows.length > 0) {
+      const existingRecord = existing.rows[0];
+      // Idempotency: Preserve on-time status if already recorded as present
+      const preserveOnTime = existingRecord.status === 'present' && statusVal === 'late';
+      const finalStatus = preserveOnTime ? 'present' : statusVal;
+
       const res = await this.db.query(
         `UPDATE attendance_records
-         SET login_time = CASE WHEN date = (clock_timestamp() AT TIME ZONE 'Asia/Dhaka')::date THEN clock_timestamp() ELSE login_time END,
-             latitude = $2, longitude = $3, address_text = $4, device_info = $5, status = $6, notes = $7, work_mode = $8
+         SET login_time = COALESCE(login_time, clock_timestamp()),
+             latitude = COALESCE($2, latitude),
+             longitude = COALESCE($3, longitude),
+             address_text = COALESCE($4, address_text),
+             device_info = COALESCE($5, device_info),
+             status = $6,
+             notes = CASE WHEN notes IS NULL OR notes = '' THEN $7 ELSE notes END,
+             work_mode = COALESCE($8, work_mode)
          WHERE id = $1
          RETURNING id`,
-        [existing.rows[0].id, dto.latitude, dto.longitude, address, deviceInfo, statusVal, notes, workMode],
+        [existingRecord.id, dto.latitude, dto.longitude, address, deviceInfo, finalStatus, notes, workMode],
       );
       recordId = res.rows[0].id;
       this.logger.log(`Updated attendance check-in for user ${userId} (${session}) on ${targetDate}`);

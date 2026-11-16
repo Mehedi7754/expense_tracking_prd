@@ -734,19 +734,18 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Allowed circular geofence boundary around this project site (adjustable up to 1,000 km).',
+                              'Allowed circular geofence boundary around this project site (adjustable from 50m up to 2,500m).',
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDark ? Colors.white60 : const Color(0xFF64748B),
                               ),
                             ),
                             Slider(
-                              value: (_siteRadiusMeters ?? 200.0).clamp(50.0, 1000000.0),
+                              value: (_siteRadiusMeters ?? 200.0).clamp(50.0, 2500.0),
                               min: 50,
-                              max: 1000000,
-                              label: (_siteRadiusMeters ?? 200) >= 1000
-                                  ? '${((_siteRadiusMeters ?? 200) / 1000).toStringAsFixed(1)} km'
-                                  : '${(_siteRadiusMeters ?? 200).toInt()} m',
+                              max: 2500,
+                              divisions: 49,
+                              label: '${(_siteRadiusMeters ?? 200).toInt()} m',
                               onChanged: (val) {
                                 setState(() {
                                   _siteRadiusMeters = val;
@@ -756,14 +755,14 @@ class _AddEditProjectScreenState extends ConsumerState<AddEditProjectScreen> {
                             SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
-                                children: [100, 500, 1000, 5000, 25000, 100000, 500000, 1000000].map((preset) {
+                                children: [50, 100, 200, 500, 1000, 1500, 2500].map((preset) {
                                   final currentVal = _siteRadiusMeters ?? 200.0;
                                   final isSelected = (currentVal - preset).abs() < 1;
                                   return Padding(
                                     padding: const EdgeInsets.only(right: 6),
                                     child: ChoiceChip(
                                       label: Text(
-                                        preset >= 1000 ? '${preset ~/ 1000} km' : '$preset m',
+                                        preset >= 1000 ? '${preset / 1000} km' : '$preset m',
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
