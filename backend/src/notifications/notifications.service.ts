@@ -42,7 +42,10 @@ export class NotificationsService {
             if (msg.data.userId) {
               return msg.data.userId === userId;
             }
-            // Broadcast notifications with no specific user_id: privileged users only
+            // Broadcast notifications with no specific user_id: privileged users only, except rejected expense notices
+            if (msg.data.type === 'expense_rejected') {
+              return false;
+            }
             return isPrivileged;
           }),
         ),
@@ -66,6 +69,7 @@ export class NotificationsService {
 
     // User-targeted notifications belong strictly to that user!
     // Broadcast notifications (user_id IS NULL) are only included if the user has a privileged role (admin/manager/finance).
+    // Privileged admins should NOT receive or see 'expense_rejected' notifications (only the claimant sees them) unless the admin is themselves the claimant.
     const res = await this.db.query(
       isPrivileged
         ? `SELECT n.*, 
@@ -73,7 +77,8 @@ export class NotificationsService {
                   COALESCE(u_actor.avatar_url, n.actor_avatar_url) AS resolved_actor_avatar_url
            FROM notifications n
            LEFT JOIN users u_actor ON n.actor_id = u_actor.id
-           WHERE n.user_id = $1 OR n.user_id IS NULL
+           WHERE (n.user_id = $1 OR (n.user_id IS NULL AND n.type != 'expense_rejected'))
+             AND NOT (n.type = 'expense_rejected' AND n.actor_id = $1)
            ORDER BY n.created_at DESC LIMIT 500`
         : `SELECT n.*, 
                   COALESCE(u_actor.full_name, n.actor_name) AS resolved_actor_name, 
