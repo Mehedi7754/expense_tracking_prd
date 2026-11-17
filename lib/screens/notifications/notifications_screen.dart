@@ -91,6 +91,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           if (n.type == NotificationType.userRegistration) {
             return user.role == UserRole.mainAdmin;
           }
+          // Expense rejection notifications: NEVER shown to admins/reviewers, strictly to the claimant only!
+          if (n.type == NotificationType.expenseRejected) {
+            return n.userId.isNotEmpty && n.userId == user.id;
+          }
           // Direct notification with recipient: strictly for that user!
           if (n.userId.isNotEmpty) {
             return n.userId == user.id;
