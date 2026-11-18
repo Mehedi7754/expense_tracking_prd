@@ -577,8 +577,11 @@ export class ExpensesService {
     const exp = await this.findOne(id, user);
     const isAdmin = user?.role === 'main_admin' || user?.role === 'admin';
     if (!isAdmin) {
-      const isAssignedManager = (user?.assignedProjectIds || []).includes(exp.projectId) || user?.role === 'project_manager';
-      const isOwner = exp.employeeId === user?.id && (exp.status === 'pending' || exp.status === 'draft' || exp.status === 'rejected');
+      if (exp.status !== 'pending' && exp.status !== 'draft' && exp.status !== 'rejected') {
+        throw new ForbiddenException('Cannot delete an expense that has already been approved');
+      }
+      const isAssignedManager = user?.role === 'project_manager' && (user?.assignedProjectIds || []).includes(exp.projectId);
+      const isOwner = exp.employeeId === user?.id;
       if (!isAssignedManager && !isOwner) {
         throw new ForbiddenException('You do not have permission to delete this expense');
       }
