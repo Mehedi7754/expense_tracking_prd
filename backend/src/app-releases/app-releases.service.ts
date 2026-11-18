@@ -360,22 +360,27 @@ export class AppReleasesService {
         id,
       ]);
 
-      const b64 = completeBuffer.toString('base64');
-      await this.db.query(
-        `INSERT INTO app_uploaded_files (id, filename, category, mime_type, file_size, data_base64)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (id) DO UPDATE 
-         SET data_base64 = EXCLUDED.data_base64, file_size = EXCLUDED.file_size, updated_at = NOW()`,
-        [`apk_release_${id}`, versionFileName, 'apps', 'application/vnd.android.package-archive', totalSize, b64],
-      );
-      if (r.is_latest) {
+      // Try DB mirror for persistence across redeploys, but do not fail chunk upload if DB exceeds limit
+      try {
+        const b64 = completeBuffer.toString('base64');
         await this.db.query(
           `INSERT INTO app_uploaded_files (id, filename, category, mime_type, file_size, data_base64)
-           VALUES ('apk_latest_binary', 'geospatial-works.apk', 'apps', 'application/vnd.android.package-archive', $1, $2)
+           VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (id) DO UPDATE 
            SET data_base64 = EXCLUDED.data_base64, file_size = EXCLUDED.file_size, updated_at = NOW()`,
-          [totalSize, b64],
+          [`apk_release_${id}`, versionFileName, 'apps', 'application/vnd.android.package-archive', totalSize, b64],
         );
+        if (r.is_latest) {
+          await this.db.query(
+            `INSERT INTO app_uploaded_files (id, filename, category, mime_type, file_size, data_base64)
+             VALUES ('apk_latest_binary', 'geospatial-works.apk', 'apps', 'application/vnd.android.package-archive', $1, $2)
+             ON CONFLICT (id) DO UPDATE 
+             SET data_base64 = EXCLUDED.data_base64, file_size = EXCLUDED.file_size, updated_at = NOW()`,
+            [totalSize, b64],
+          );
+        }
+      } catch (err: any) {
+        this.logger.warn(`Could not save APK binary to DB: ${err.message}`);
       }
 
       return { completed: true, totalSize };
