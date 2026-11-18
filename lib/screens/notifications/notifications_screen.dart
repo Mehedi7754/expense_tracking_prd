@@ -955,6 +955,80 @@ class _NotificationCard extends StatelessWidget {
                           maxLines: 4,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if ((notif.type == NotificationType.expenseSubmitted ||
+                                notif.type == NotificationType.expenseApproved ||
+                                notif.type == NotificationType.expenseRejected) &&
+                            (notif.expenseDate != null || notif.submittedDate != null)) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (notif.expenseDate != null && notif.expenseDate!.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.3) : const Color(0xFFBFDBFE),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today_rounded,
+                                        size: 10,
+                                        color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Expense Date: ${notif.expenseDate}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              if (notif.submittedDate != null && notif.submittedDate!.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.send_rounded,
+                                        size: 9.5,
+                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        'Submitted: ${notif.submittedDate}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
                         if (notif.type == NotificationType.expenseRejected &&
                             notif.message.toLowerCase().contains('reason:')) ...[
                           const SizedBox(height: 6),

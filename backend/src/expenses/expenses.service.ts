@@ -422,6 +422,8 @@ export class ExpensesService {
           actorId: employeeId,
           actorName: submitterName,
           actorAvatarUrl: submitterAvatar,
+          expenseDate: expenseDateFormatted,
+          submittedDate: submittedDateFormatted,
         });
 
         if (recipient.email) {
@@ -431,7 +433,9 @@ export class ExpensesService {
             created.amount,
             created.currency,
             created.categoryName,
-            created.projectName
+            created.projectName,
+            expenseDateFormatted,
+            submittedDateFormatted
           );
         }
       }

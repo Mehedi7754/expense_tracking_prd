@@ -50,6 +50,8 @@ class _FakeAttendanceRecordNotifier extends AttendanceNotifier {
   Future<void> fetchAttendanceRecords({
     String? userId,
     String? date,
+    String? startDate,
+    String? endDate,
     int? month,
     int? year,
     bool force = false,

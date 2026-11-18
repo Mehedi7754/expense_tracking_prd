@@ -152,6 +152,8 @@ class NotificationModel {
   final String? relatedExpenseId;
   final String? relatedProjectId;
   final String? relatedTaskId;
+  final String? expenseDate;
+  final String? submittedDate;
   final bool isRead;
   final DateTime timestamp;
 
@@ -168,6 +170,8 @@ class NotificationModel {
     this.relatedExpenseId,
     this.relatedProjectId,
     this.relatedTaskId,
+    this.expenseDate,
+    this.submittedDate,
     this.isRead = false,
     required this.timestamp,
   });
@@ -185,6 +189,8 @@ class NotificationModel {
     String? relatedExpenseId,
     String? relatedProjectId,
     String? relatedTaskId,
+    String? expenseDate,
+    String? submittedDate,
     bool? isRead,
     DateTime? timestamp,
   }) {
@@ -201,6 +207,8 @@ class NotificationModel {
       relatedExpenseId: relatedExpenseId ?? this.relatedExpenseId,
       relatedProjectId: relatedProjectId ?? this.relatedProjectId,
       relatedTaskId: relatedTaskId ?? this.relatedTaskId,
+      expenseDate: expenseDate ?? this.expenseDate,
+      submittedDate: submittedDate ?? this.submittedDate,
       isRead: isRead ?? this.isRead,
       timestamp: timestamp ?? this.timestamp,
     );
@@ -232,6 +240,11 @@ class NotificationModel {
       relatedTaskId:
           json['related_task_id']?.toString() ??
           json['relatedTaskId']?.toString(),
+      expenseDate:
+          json['expense_date']?.toString() ?? json['expenseDate']?.toString(),
+      submittedDate:
+          json['submitted_date']?.toString() ??
+          json['submittedDate']?.toString(),
       isRead: json['is_read'] ?? json['isRead'] ?? false,
       timestamp: () {
         for (final key in ['createdAt', 'created_at', 'timestamp', 'date']) {
@@ -265,6 +278,8 @@ class NotificationModel {
       if (relatedExpenseId != null) 'related_expense_id': relatedExpenseId,
       if (relatedProjectId != null) 'related_project_id': relatedProjectId,
       if (relatedTaskId != null) 'related_task_id': relatedTaskId,
+      if (expenseDate != null) 'expense_date': expenseDate,
+      if (submittedDate != null) 'submitted_date': submittedDate,
       'is_read': isRead,
       'timestamp': timestamp.toIso8601String(),
     };

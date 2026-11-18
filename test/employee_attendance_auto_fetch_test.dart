@@ -14,6 +14,8 @@ class MockAttendanceRepository extends Fake implements AttendanceRepository {
   Future<List<AttendanceRecordModel>> getAttendanceRecords({
     String? userId,
     String? date,
+    String? startDate,
+    String? endDate,
     String? sessionType,
     int? month,
     int? year,
