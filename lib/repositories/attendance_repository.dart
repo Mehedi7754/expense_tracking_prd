@@ -89,14 +89,19 @@ class AttendanceRepository {
     int? month,
     int? year,
     String? sessionType,
+    String? startDate,
+    String? endDate,
   }) async {
     final queryParams = <String, String>{};
     if (userId != null && userId.isNotEmpty) queryParams['userId'] = userId;
     if (date != null && date.isNotEmpty) queryParams['date'] = date;
     if (month != null) queryParams['month'] = month.toString();
     if (year != null) queryParams['year'] = year.toString();
-    if (sessionType != null && sessionType.isNotEmpty)
+    if (sessionType != null && sessionType.isNotEmpty) {
       queryParams['sessionType'] = sessionType;
+    }
+    if (startDate != null && startDate.isNotEmpty) queryParams['startDate'] = startDate;
+    if (endDate != null && endDate.isNotEmpty) queryParams['endDate'] = endDate;
 
     String url = ApiEndpoints.attendance;
     if (queryParams.isNotEmpty) {

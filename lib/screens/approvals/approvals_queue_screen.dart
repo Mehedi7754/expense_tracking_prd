@@ -485,16 +485,71 @@ class _ApprovalsQueueScreenState extends ConsumerState<ApprovalsQueueScreen> {
                           letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
-                        '${exp.projectName} • ${DateFormatter.formatRelative(exp.date)}',
+                        exp.projectName,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                           color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 3),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 6,
+                        runSpacing: 2,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.event_note_outlined,
+                                size: 11.5,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Date: ${DateFormatter.formatShort(exp.date)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '•',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: isDark ? Colors.white38 : const Color(0xFF94A3B8),
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.send_outlined,
+                                size: 10.5,
+                                color: const Color(0xFF0284C7),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Sub: ${DateFormatter.formatShort(exp.createdAt)}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0284C7),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [

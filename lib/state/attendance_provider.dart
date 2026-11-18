@@ -138,6 +138,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
     String? date,
     int? month,
     int? year,
+    String? startDate,
+    String? endDate,
     bool force = false,
   }) async {
     final authUser = ref.read(authProvider).currentUser;
@@ -151,7 +153,7 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
         date ??
         (effectiveUserId != null
             ? null
-            : (month == null ? state.selectedDate : null));
+            : (month == null && startDate == null ? state.selectedDate : null));
 
     final isParamsChanged =
         effectiveUserId != _lastRecordsUserId ||
@@ -178,6 +180,8 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
         date: resolvedDate,
         month: month,
         year: year,
+        startDate: startDate,
+        endDate: endDate,
       );
       _lastRecordsFetchTime = DateTime.now();
       state = state.copyWith(

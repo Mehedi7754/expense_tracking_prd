@@ -47,7 +47,7 @@ class _SalaryDetailScreenState extends ConsumerState<SalaryDetailScreen> {
               const Text('Adjustment Type', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

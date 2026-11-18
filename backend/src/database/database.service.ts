@@ -191,7 +191,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ALTER TABLE notifications 
         ADD COLUMN IF NOT EXISTS actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
         ADD COLUMN IF NOT EXISTS actor_name VARCHAR(255),
-        ADD COLUMN IF NOT EXISTS actor_avatar_url TEXT;
+        ADD COLUMN IF NOT EXISTS actor_avatar_url TEXT,
+        ADD COLUMN IF NOT EXISTS expense_date VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS submitted_date VARCHAR(100);
 
         DO $$
         BEGIN

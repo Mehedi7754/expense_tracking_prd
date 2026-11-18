@@ -401,12 +401,21 @@ export class ExpensesService {
       const submitterName = submitter?.full_name?.trim() || user?.name || user?.fullName || 'Team member';
       const submitterAvatar = submitter?.avatar_url || user?.avatarUrl || null;
 
+      const expDateObj = new Date(created.date);
+      const expenseDateFormatted = !isNaN(expDateObj.getTime())
+        ? expDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : created.date;
+      const submittedDateObj = new Date(created.createdAt || new Date());
+      const submittedDateFormatted = !isNaN(submittedDateObj.getTime())
+        ? submittedDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : 'Today';
+
       for (const recipient of recipientsRes.rows) {
         await this.notificationsService.create({
           userId: recipient.id,
           title: 'New Expense Submitted',
-          message: `${submitterName} submitted a ${created.categoryName} expense of ${created.amount} ${created.currency} for ${created.projectName}.`,
-          fullExplanation: `${submitterName} submitted a new expense claim:\n• Category: ${created.categoryName}\n• Amount: ${created.amount} ${created.currency}\n• Project: ${created.projectName}\n• Date: ${created.date}\n\nPlease review and approve or reject from the Approvals section.`,
+          message: `${submitterName} submitted a ${created.categoryName} expense of ${created.amount} ${created.currency} for ${created.projectName} (Expense Date: ${expenseDateFormatted} • Submitted: ${submittedDateFormatted}).`,
+          fullExplanation: `${submitterName} submitted a new expense claim:\n• Category: ${created.categoryName}\n• Amount: ${created.amount} ${created.currency}\n• Project: ${created.projectName}\n• Expense Date: ${expenseDateFormatted}\n• Submitted On: ${submittedDateFormatted}\n\nPlease review and approve or reject from the Approvals section.`,
           type: 'expense_submitted',
           relatedProjectId: created.projectId,
           relatedExpenseId: created.id,

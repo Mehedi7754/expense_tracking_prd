@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,10 +6,12 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/widgets/chart_widget.dart';
+import '../../core/widgets/notification_banner.dart';
 import '../../core/widgets/project_card.dart';
 import '../../core/widgets/stat_card.dart';
 import '../../models/expense_model.dart';
 import '../../state/expense_provider.dart';
+import '../../state/export_service.dart';
 import '../../state/project_provider.dart';
 
 class CompanyDashboardScreen extends ConsumerWidget {
@@ -73,6 +76,44 @@ class CompanyDashboardScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.download_rounded),
+            tooltip: 'Export Overview',
+            onSelected: (type) async {
+              try {
+                if (type == 'pdf') {
+                  final bytes = await ExportService.generateFinancialOverviewPdf(allProjects, allExpenses);
+                  await ExportService.saveAndShare(
+                    bytes: bytes,
+                    fileName: 'company_financial_overview_${DateTime.now().millisecondsSinceEpoch}.pdf',
+                    mimeType: 'application/pdf',
+                    subject: 'Company Financial Overview Report',
+                  );
+                } else if (type == 'csv') {
+                  final csv = ExportService.generateFinancialOverviewCsv(allProjects, allExpenses);
+                  await ExportService.saveAndShare(
+                    bytes: utf8.encode('\uFEFF$csv'),
+                    fileName: 'company_financial_overview_${DateTime.now().millisecondsSinceEpoch}.csv',
+                    mimeType: 'text/csv',
+                    subject: 'Company Financial Overview Report',
+                  );
+                }
+                if (context.mounted) {
+                  NotificationBanner.showSuccess(context, 'Export generated successfully');
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  NotificationBanner.showError(context, 'Export failed: $e');
+                }
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'pdf', child: Text('Export PDF Report')),
+              PopupMenuItem(value: 'csv', child: Text('Export CSV Sheet')),
+            ],
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),

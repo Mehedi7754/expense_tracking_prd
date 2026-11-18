@@ -314,14 +314,19 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- NOTIFICATIONS TABLE
 CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(250) NOT NULL,
     message TEXT NOT NULL,
     full_explanation TEXT NOT NULL DEFAULT '',
-    type notification_type_enum NOT NULL DEFAULT 'general',
+    type VARCHAR(100) NOT NULL DEFAULT 'general',
     related_expense_id UUID REFERENCES expenses(id) ON DELETE CASCADE,
     related_project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
     related_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE,
+    actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    actor_name VARCHAR(255),
+    actor_avatar_url TEXT,
+    expense_date VARCHAR(100),
+    submitted_date VARCHAR(100),
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );

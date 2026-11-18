@@ -43,9 +43,14 @@ export class AttendanceController {
   @Get()
   async getAttendanceRecords(
     @Query('userId') userId: string,
+    @Query('user_id') queryUserId: string,
     @Query('date') date: string,
     @Query('month') month: string,
     @Query('year') year: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
     @Request() req: any,
   ) {
     const isManagerOrAdmin =
@@ -54,18 +59,44 @@ export class AttendanceController {
       req.user.role === 'finance_manager' ||
       req.user.role === 'finance';
 
-    const targetUserId = !isManagerOrAdmin ? req.user.id : (userId || undefined);
+    const rawUserId = userId || queryUserId || undefined;
+    const cleanUserId =
+      rawUserId && rawUserId !== 'null' && rawUserId !== 'undefined' && rawUserId.trim() !== ''
+        ? rawUserId.trim()
+        : undefined;
+
+    const targetUserId = !isManagerOrAdmin ? req.user.id : cleanUserId;
 
     if (month && year) {
-      if (targetUserId) {
-        return this.attendanceService.getMonthlyRecords(targetUserId, parseInt(year, 10), parseInt(month, 10));
-      } else {
-        return this.attendanceService.getAllMonthlyRecords(parseInt(year, 10), parseInt(month, 10));
+      const parsedYear = parseInt(year, 10);
+      const parsedMonth = parseInt(month, 10);
+      if (!isNaN(parsedYear) && !isNaN(parsedMonth)) {
+        if (targetUserId) {
+          return this.attendanceService.getMonthlyRecords(targetUserId, parsedYear, parsedMonth);
+        } else {
+          return this.attendanceService.getAllMonthlyRecords(parsedYear, parsedMonth);
+        }
       }
     }
 
-    // Single date or user history
-    return this.attendanceService.getRecordsByDate(date, targetUserId);
+    const cleanDate =
+      date && date !== 'null' && date !== 'undefined' && date.trim() !== ''
+        ? date.trim()
+        : undefined;
+
+    const rawStart = startDate || from;
+    const effectiveStartDate =
+      rawStart && rawStart !== 'null' && rawStart !== 'undefined' && rawStart.trim() !== ''
+        ? rawStart.trim()
+        : undefined;
+
+    const rawEnd = endDate || to;
+    const effectiveEndDate =
+      rawEnd && rawEnd !== 'null' && rawEnd !== 'undefined' && rawEnd.trim() !== ''
+        ? rawEnd.trim()
+        : undefined;
+
+    return this.attendanceService.getRecordsByDate(cleanDate, targetUserId, effectiveStartDate, effectiveEndDate);
   }
 
   @Get('overview')

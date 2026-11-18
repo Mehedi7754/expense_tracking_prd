@@ -327,6 +327,13 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         icon: Icons.calendar_today_rounded,
                         isDark: isDark,
                       ),
+                      const SizedBox(height: 10),
+                      _DetailRow(
+                        label: 'Submitted On',
+                        value: DateFormatter.formatDateTime(expense.createdAt),
+                        icon: Icons.send_rounded,
+                        isDark: isDark,
+                      ),
                       if (expense.taskTitle != null) ...[
                         const SizedBox(height: 10),
                         _DetailRow(

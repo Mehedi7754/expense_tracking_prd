@@ -104,6 +104,8 @@ export class NotificationsService {
       relatedProjectId: r.related_project_id,
       relatedExpenseId: r.related_expense_id,
       relatedTaskId: r.related_task_id,
+      expenseDate: r.expense_date || null,
+      submittedDate: r.submitted_date || null,
     }));
   }
 
@@ -119,12 +121,14 @@ export class NotificationsService {
     actorId?: string;
     actorName?: string;
     actorAvatarUrl?: string;
+    expenseDate?: string;
+    submittedDate?: string;
   }) {
     let savedNotification: any = null;
     try {
       const res = await this.db.query(
-        `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id, expense_date, submitted_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
          RETURNING *`,
         [
           data.userId || null,
@@ -138,11 +142,35 @@ export class NotificationsService {
           data.actorName || null,
           data.actorAvatarUrl || null,
           data.relatedTaskId || null,
+          data.expenseDate || null,
+          data.submittedDate || null,
         ],
       );
       savedNotification = res.rows[0];
     } catch (dbErr) {
-      this.logger.error('Database error creating notification row:', dbErr);
+      try {
+        const fallbackRes = await this.db.query(
+          `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           RETURNING *`,
+          [
+            data.userId || null,
+            data.title,
+            data.message,
+            data.fullExplanation || data.message,
+            data.type || 'general',
+            data.relatedProjectId || null,
+            data.relatedExpenseId || null,
+            data.actorId || null,
+            data.actorName || null,
+            data.actorAvatarUrl || null,
+            data.relatedTaskId || null,
+          ],
+        );
+        savedNotification = fallbackRes.rows[0];
+      } catch (fallbackErr) {
+        this.logger.error('Database error creating notification row:', fallbackErr);
+      }
     }
 
     // Broadcast immediately to connected admin & web client SSE streams (0ms latency)
@@ -163,6 +191,8 @@ export class NotificationsService {
           relatedProjectId: savedNotification.related_project_id,
           relatedExpenseId: savedNotification.related_expense_id,
           relatedTaskId: savedNotification.related_task_id,
+          expenseDate: savedNotification.expense_date || data.expenseDate || null,
+          submittedDate: savedNotification.submitted_date || data.submittedDate || null,
         };
         this.notificationSubject.next({ data: item });
       } catch (broadcastErr) {
@@ -182,6 +212,8 @@ export class NotificationsService {
       if (data.actorId) payloadData.actorId = data.actorId;
       if (data.actorName) payloadData.actorName = data.actorName;
       if (data.actorAvatarUrl) payloadData.actorAvatarUrl = data.actorAvatarUrl;
+      if (data.expenseDate) payloadData.expenseDate = String(data.expenseDate);
+      if (data.submittedDate) payloadData.submittedDate = String(data.submittedDate);
 
       if (data.userId) {
         await this.fcm.sendPushToUser(data.userId, data.title, data.message, payloadData);

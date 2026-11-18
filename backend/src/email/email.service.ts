@@ -76,7 +76,16 @@ export class EmailService {
     }
   }
 
-  async sendNewExpenseNotification(email: string, submitterName: string, amount: number, currency: string, category: string, projectName: string) {
+  async sendNewExpenseNotification(
+    email: string,
+    submitterName: string,
+    amount: number,
+    currency: string,
+    category: string,
+    projectName: string,
+    expenseDate?: string,
+    submittedDate?: string,
+  ) {
     if (!this.resend) return;
 
     try {
@@ -92,7 +101,7 @@ export class EmailService {
             
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr>
-                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #718096; width: 30%;"><strong>Amount</strong></td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #718096; width: 35%;"><strong>Amount</strong></td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #2d3748; font-weight: bold; font-size: 18px;">${amount.toFixed(2)} ${currency}</td>
               </tr>
               <tr>
@@ -103,6 +112,16 @@ export class EmailService {
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #718096;"><strong>Project</strong></td>
                 <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #2d3748;">${projectName}</td>
               </tr>
+              ${expenseDate ? `
+              <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #718096;"><strong>Expense Date</strong></td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #2d3748;">${expenseDate}</td>
+              </tr>` : ''}
+              ${submittedDate ? `
+              <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #718096;"><strong>Submitted Date</strong></td>
+                <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; color: #2d3748;">${submittedDate}</td>
+              </tr>` : ''}
             </table>
             
             <div style="text-align: center; margin-top: 30px;">

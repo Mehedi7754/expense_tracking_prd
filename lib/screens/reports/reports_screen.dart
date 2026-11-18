@@ -14,6 +14,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/report_filters.dart';
 import '../../core/widgets/app_back_button.dart';
 import '../../core/widgets/notification_banner.dart';
+import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
 import '../../models/user_model.dart';
 import '../../state/attendance_provider.dart';
@@ -22,10 +23,11 @@ import '../../state/expense_provider.dart';
 import '../../state/export_service.dart';
 import '../../state/leave_provider.dart';
 import '../../state/project_provider.dart';
+import '../../state/salary_provider.dart';
 import '../../state/task_provider.dart';
 import '../../state/user_management_provider.dart';
 
-enum _ReportKind { financial, expenses, tasks, leaves, attendance }
+enum _ReportKind { financial, expenses, tasks, leaves, attendance, payroll }
 
 enum _ReportFormat { csv, excel, pdf, word }
 
@@ -36,6 +38,7 @@ extension on _ReportKind {
     _ReportKind.tasks => 'Tasks',
     _ReportKind.leaves => 'Leave requests',
     _ReportKind.attendance => 'Attendance',
+    _ReportKind.payroll => 'Payroll & Salary',
   };
   IconData get icon => switch (this) {
     _ReportKind.financial => Icons.account_balance_wallet_outlined,
@@ -43,6 +46,7 @@ extension on _ReportKind {
     _ReportKind.tasks => Icons.task_alt_rounded,
     _ReportKind.leaves => Icons.event_busy_outlined,
     _ReportKind.attendance => Icons.location_on_outlined,
+    _ReportKind.payroll => Icons.payments_outlined,
   };
   List<String> get columns => switch (this) {
     _ReportKind.financial => [
@@ -50,6 +54,12 @@ extension on _ReportKind {
       'Client',
       'Contract value',
       'Budget',
+      'Received',
+      'Remaining',
+      'Office benefit 30%',
+      'Total spent',
+      'Expense ratio',
+      'Net margin',
       'Status',
     ],
     _ReportKind.expenses => [
@@ -57,8 +67,14 @@ extension on _ReportKind {
       'Project',
       'Employee',
       'Category',
-      'Amount',
+      'Base Cost',
+      'VAT / Tax',
+      'Total Amount',
+      'Receipt',
+      'Details / Meal',
+      'Justification',
       'Status',
+      'Rejection Reason',
     ],
     _ReportKind.tasks => [
       'Task',
@@ -74,14 +90,27 @@ extension on _ReportKind {
       'Start date',
       'End date',
       'Days',
+      'Reason',
       'Status',
     ],
     _ReportKind.attendance => [
       'Employee',
       'Date',
-      'Check-in',
-      'Work location',
       'Department',
+      'Shift',
+      'Time',
+      'Work location',
+      'Notes / Reason',
+      'Status',
+    ],
+    _ReportKind.payroll => [
+      'Employee',
+      'Department',
+      'Designation',
+      'Base salary',
+      'Allowances',
+      'Deductions',
+      'Net salary',
       'Status',
     ],
   };
@@ -121,6 +150,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       ref.read(projectProvider.notifier).fetchProjects(force: true),
       ref.read(expenseProvider.notifier).fetchExpenses(force: true),
       ref.read(userManagementProvider.notifier).fetchUsers(force: true),
+      ref.read(salaryProvider.notifier).fetchOrgSalaryReport(force: true),
     ];
     if (user != null) {
       jobs.add(
@@ -131,10 +161,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
       );
       jobs.add(ref.read(leaveProvider.notifier).fetchLeaves(force: true));
+      // Fetch across last 60 days so company attendance reports are populated
+      final now = DateTime.now();
+      final sixtyDaysAgo = now.subtract(const Duration(days: 60));
       jobs.add(
         ref
             .read(attendanceProvider.notifier)
-            .fetchAttendanceRecords(force: true),
+            .fetchAttendanceRecords(
+              startDate: DateFormat('yyyy-MM-dd').format(sixtyDaysAgo),
+              endDate: DateFormat('yyyy-MM-dd').format(now),
+              force: true,
+            ),
       );
     }
     await Future.wait(jobs.map((job) => job.catchError((_) {})));
@@ -188,7 +225,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                       title: Text(kind.label),
                       trailing:
                           kind == _kind
-                              ? const Icon(
+                               ? const Icon(
                                 Icons.check_rounded,
                                 color: AppColors.indigo,
                               )
@@ -209,18 +246,34 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   List<Map<String, dynamic>> _allRows() {
     switch (_kind) {
       case _ReportKind.financial:
+        final allExpenses = ref.watch(expenseProvider);
         return ref
             .watch(projectProvider)
             .map(
-              (p) => {
-                'id': p.id,
-                'projectId': p.id,
-                'projectName': p.name,
-                'client': p.client,
-                'contractValue': p.grossProjectValue,
-                'budget': p.budget,
-                'date': p.startDate.toIso8601String(),
-                'status': p.status.displayName,
+              (p) {
+                final spent = allExpenses
+                    .where((e) => e.projectId == p.id && e.status == ExpenseStatus.approved)
+                    .fold(0.0, (sum, e) => sum + e.totalCost);
+                final contractVal = p.grossProjectValue;
+                final officeBenefit = contractVal * (p.officeBenefitRate > 0 ? p.officeBenefitRate : 0.30);
+                final expenseRatioStr = contractVal > 0 ? '${((spent / contractVal) * 100).toStringAsFixed(1)}%' : '0%';
+                final netMarginStr = contractVal > 0 ? '${(((contractVal - spent) / contractVal) * 100).toStringAsFixed(1)}%' : '0%';
+                return {
+                  'id': p.id,
+                  'projectId': p.id,
+                  'projectName': p.name,
+                  'client': p.client,
+                  'contractValue': contractVal,
+                  'budget': p.budget,
+                  'totalReceived': p.amountReceived,
+                  'remaining': (contractVal - p.amountReceived).clamp(0, double.infinity),
+                  'officeBenefit': officeBenefit,
+                  'totalSpent': spent,
+                  'expenseRatio': expenseRatioStr,
+                  'netMargin': netMarginStr,
+                  'date': p.startDate.toIso8601String(),
+                  'status': p.status.displayName,
+                };
               },
             )
             .toList();
@@ -228,18 +281,32 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         return ref
             .watch(expenseProvider)
             .map(
-              (e) => {
-                'id': e.id,
-                'date': e.date.toIso8601String(),
-                'projectId': e.projectId,
-                'projectName': e.projectName,
-                'employeeId': e.employeeId,
-                'employeeName': e.employeeName,
-                'category': e.categoryName,
-                'amount': e.totalCost,
-                'status': e.status.displayName,
-                'description': e.note,
-                'hasReceipt': e.hasReceipt,
+              (e) {
+                final taxVat = e.vatAmount + e.taxAmount;
+                final taxVatStr = taxVat > 0 ? CurrencyFormatter.format(taxVat) : '৳0';
+                final hasRcpt = e.hasReceipt || (e.receiptPhotoUrl != null && e.receiptPhotoUrl!.isNotEmpty) || e.receiptPhotoUrls.isNotEmpty;
+                final detailsStr = e.foodDetails != null
+                    ? '${e.foodDetails!.mealType} (${e.foodDetails!.numberOfPeople} ppl)'
+                    : (e.note.isNotEmpty ? e.note : '—');
+                return {
+                  'id': e.id,
+                  'date': e.date.toIso8601String(),
+                  'projectId': e.projectId,
+                  'projectName': e.projectName,
+                  'employeeId': e.employeeId,
+                  'employeeName': e.employeeName,
+                  'category': e.categoryName,
+                  'baseCost': e.baseCost > 0 ? e.baseCost : e.amount,
+                  'vatTax': taxVatStr,
+                  'amount': e.totalCost,
+                  'receipt': hasRcpt ? 'Attached' : 'No Receipt',
+                  'details': detailsStr,
+                  'justificationStatus': e.justificationStatus.displayName,
+                  'status': e.status.displayName,
+                  'rejectionReason': e.rejectionReason ?? (e.status == ExpenseStatus.rejected ? 'No reason recorded' : '—'),
+                  'description': e.note,
+                  'hasReceipt': hasRcpt,
+                };
               },
             )
             .toList();
@@ -299,16 +366,39 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 'id': a.id,
                 'userId': a.userId,
                 'employeeId': a.userId,
-                'employeeName': a.userName,
+                'employeeName': a.userName.isNotEmpty ? a.userName : 'Employee',
                 'date': a.date,
+                'department': a.department.isNotEmpty ? a.department : '—',
+                'shift': a.isMorning ? 'Morning' : (a.isAfternoon ? 'Afternoon' : a.sessionType),
                 'checkIn': a.formattedTime,
                 'category': a.workModeLabel,
                 'workLocation': a.workModeLabel,
-                'department': a.department,
                 'status': a.status,
+                'notes': a.notes.isNotEmpty ? a.notes : '—',
               },
             )
             .toList();
+      case _ReportKind.payroll:
+        final orgReport = ref.watch(salaryProvider).orgReport;
+        if (orgReport == null || orgReport.employees.isEmpty) {
+          return <Map<String, dynamic>>[];
+        }
+        return orgReport.employees.map((emp) {
+          final totalDeductions = emp.totalAbsenceDeductions + emp.totalPenalties;
+          return {
+            'id': emp.userId,
+            'employeeId': emp.userId,
+            'employeeName': emp.userName,
+            'department': emp.department.isNotEmpty ? emp.department : '—',
+            'designation': emp.designation.isNotEmpty ? emp.designation : '—',
+            'baseSalary': emp.monthlyBaseSalary,
+            'allowances': emp.totalAdditions,
+            'deductions': totalDeductions,
+            'netSalary': emp.finalPayableSalary,
+            'status': emp.isConfirmed ? 'Confirmed' : 'Computed',
+            'category': emp.department,
+          };
+        }).toList();
     }
   }
 
@@ -385,6 +475,73 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
+  List<String> _reportKeys(_ReportKind kind) => switch (kind) {
+    _ReportKind.financial => [
+      'projectName',
+      'client',
+      'contractValue',
+      'budget',
+      'totalReceived',
+      'remaining',
+      'officeBenefit',
+      'totalSpent',
+      'expenseRatio',
+      'netMargin',
+      'status',
+    ],
+    _ReportKind.expenses => [
+      'date',
+      'projectName',
+      'employeeName',
+      'category',
+      'baseCost',
+      'vatTax',
+      'amount',
+      'receipt',
+      'details',
+      'justificationStatus',
+      'status',
+      'rejectionReason',
+    ],
+    _ReportKind.tasks => [
+      'title',
+      'projectName',
+      'employeeName',
+      'dueDate',
+      'priority',
+      'status',
+    ],
+    _ReportKind.leaves => [
+      'employeeName',
+      'leaveType',
+      'startDate',
+      'endDate',
+      'days',
+      'reason',
+      'status',
+    ],
+    _ReportKind.attendance => [
+      'employeeName',
+      'date',
+      'department',
+      'shift',
+      'checkIn',
+      'workLocation',
+      'notes',
+      'status',
+    ],
+    _ReportKind.payroll => [
+      'employeeName',
+      'department',
+      'designation',
+      'baseSalary',
+      'allowances',
+      'deductions',
+      'netSalary',
+      'status',
+    ],
+  };
+
   Future<void> _export(
     _ReportFormat format, {
     Map<String, dynamic>? row,
@@ -392,47 +549,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final rows = row == null ? _rows : [row];
     if (rows.isEmpty) return;
     final headers = _kind.columns;
-    final keys = switch (_kind) {
-      _ReportKind.financial => [
-        'projectName',
-        'client',
-        'contractValue',
-        'budget',
-        'status',
-      ],
-      _ReportKind.expenses => [
-        'date',
-        'projectName',
-        'employeeName',
-        'category',
-        'amount',
-        'status',
-      ],
-      _ReportKind.tasks => [
-        'title',
-        'projectName',
-        'employeeName',
-        'dueDate',
-        'priority',
-        'status',
-      ],
-      _ReportKind.leaves => [
-        'employeeName',
-        'leaveType',
-        'startDate',
-        'endDate',
-        'days',
-        'status',
-      ],
-      _ReportKind.attendance => [
-        'employeeName',
-        'date',
-        'checkIn',
-        'workLocation',
-        'department',
-        'status',
-      ],
-    };
+    final keys = _reportKeys(_kind);
     final name =
         '${_kind.name}_report_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}';
     final values =
@@ -544,10 +661,26 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
   String _displayValue(dynamic value, String key) {
     if (value == null || value.toString().isEmpty) return '—';
-    if (key == 'amount' || key == 'budget' || key == 'contractValue') {
-      return CurrencyFormatter.format((value as num).toDouble());
+    final lowerKey = key.toLowerCase();
+    if (lowerKey == 'amount' ||
+        lowerKey == 'budget' ||
+        lowerKey == 'contractvalue' ||
+        lowerKey == 'remaining' ||
+        lowerKey == 'totalreceived' ||
+        lowerKey == 'officebenefit' ||
+        lowerKey == 'totalspent' ||
+        lowerKey == 'basecost' ||
+        lowerKey == 'basesalary' ||
+        lowerKey == 'allowances' ||
+        lowerKey == 'deductions' ||
+        lowerKey == 'netsalary') {
+      if (value is num) {
+        return CurrencyFormatter.format(value.toDouble());
+      }
+      final parsed = double.tryParse(value.toString());
+      if (parsed != null) return CurrencyFormatter.format(parsed);
     }
-    if (key.toLowerCase().contains('date')) {
+    if (lowerKey.contains('date')) {
       final date = DateTime.tryParse(value.toString());
       if (date != null) return DateFormat.yMMMd().format(date);
     }
@@ -711,7 +844,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 TextButton.icon(
                   onPressed: _showAllReportKinds,
                   icon: const Icon(Icons.grid_view_rounded, size: 15),
-                  label: const Text('All 5'),
+                  label: const Text('All 6'),
                   style: TextButton.styleFrom(
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -805,6 +938,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             ),
             const SizedBox(height: 10),
             _buildFilters(context),
+            const SizedBox(height: 10),
+            _buildSummaryKpis(context, rows),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -1005,49 +1140,91 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     ),
   );
 
+  Widget _buildSummaryKpis(BuildContext context, List<Map<String, dynamic>> rows) {
+    if (rows.isEmpty) return const SizedBox.shrink();
+    final kpis = <Map<String, String>>[];
+    switch (_kind) {
+      case _ReportKind.financial:
+        final totalContract = rows.fold(0.0, (sum, r) => sum + ((r['contractValue'] as num?)?.toDouble() ?? 0.0));
+        final totalRecv = rows.fold(0.0, (sum, r) => sum + ((r['totalReceived'] as num?)?.toDouble() ?? 0.0));
+        final totalOfficeBenefit = rows.fold(0.0, (sum, r) => sum + ((r['officeBenefit'] as num?)?.toDouble() ?? 0.0));
+        kpis.add({'label': 'Total Value', 'value': CurrencyFormatter.format(totalContract)});
+        kpis.add({'label': 'Received', 'value': CurrencyFormatter.format(totalRecv)});
+        kpis.add({'label': 'Office 30%', 'value': CurrencyFormatter.format(totalOfficeBenefit)});
+        break;
+      case _ReportKind.expenses:
+        final totalExp = rows.fold(0.0, (sum, r) => sum + ((r['amount'] as num?)?.toDouble() ?? 0.0));
+        final approved = rows.where((r) => (r['status'] ?? '').toString().toLowerCase().contains('approv')).length;
+        kpis.add({'label': 'Total Amount', 'value': CurrencyFormatter.format(totalExp)});
+        kpis.add({'label': 'Approved', 'value': '$approved / ${rows.length}'});
+        break;
+      case _ReportKind.tasks:
+        final completed = rows.where((r) => (r['status'] ?? '').toString().toLowerCase().contains('done') || (r['status'] ?? '').toString().toLowerCase().contains('complete')).length;
+        kpis.add({'label': 'Total Tasks', 'value': '${rows.length}'});
+        kpis.add({'label': 'Completed', 'value': '$completed (${rows.isEmpty ? 0 : ((completed / rows.length) * 100).round()}%)'});
+        break;
+      case _ReportKind.leaves:
+        final totalDays = rows.fold(0, (sum, r) => sum + ((r['days'] as num?)?.toInt() ?? 0));
+        final pending = rows.where((r) => (r['status'] ?? '').toString().toLowerCase().contains('pending')).length;
+        kpis.add({'label': 'Total Days', 'value': '$totalDays days'});
+        kpis.add({'label': 'Pending', 'value': '$pending'});
+        break;
+      case _ReportKind.attendance:
+        final present = rows.where((r) => (r['status'] ?? '').toString().toLowerCase().contains('present')).length;
+        kpis.add({'label': 'Records', 'value': '${rows.length}'});
+        kpis.add({'label': 'Present Rate', 'value': '${rows.isEmpty ? 0 : ((present / rows.length) * 100).round()}%'});
+        break;
+      case _ReportKind.payroll:
+        final totalBase = rows.fold(0.0, (sum, r) => sum + ((r['baseSalary'] as num?)?.toDouble() ?? 0.0));
+        final totalNet = rows.fold(0.0, (sum, r) => sum + ((r['netSalary'] as num?)?.toDouble() ?? 0.0));
+        kpis.add({'label': 'Total Net Payroll', 'value': CurrencyFormatter.format(totalNet)});
+        kpis.add({'label': 'Total Base', 'value': CurrencyFormatter.format(totalBase)});
+        break;
+    }
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: kpis.map((kpi) {
+          return Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.getSurface(context),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.getBorder(context)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  kpi['label']!,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.getTextMuted(context),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  kpi['value']!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _recordCard(BuildContext context, Map<String, dynamic> row) {
     final data = _kind.columns;
-    final keys = switch (_kind) {
-      _ReportKind.financial => [
-        'projectName',
-        'client',
-        'contractValue',
-        'budget',
-        'status',
-      ],
-      _ReportKind.expenses => [
-        'date',
-        'projectName',
-        'employeeName',
-        'category',
-        'amount',
-        'status',
-      ],
-      _ReportKind.tasks => [
-        'title',
-        'projectName',
-        'employeeName',
-        'dueDate',
-        'priority',
-        'status',
-      ],
-      _ReportKind.leaves => [
-        'employeeName',
-        'leaveType',
-        'startDate',
-        'endDate',
-        'days',
-        'status',
-      ],
-      _ReportKind.attendance => [
-        'employeeName',
-        'date',
-        'checkIn',
-        'workLocation',
-        'department',
-        'status',
-      ],
-    };
+    final keys = _reportKeys(_kind);
     final title = _displayValue(row[keys.first], keys.first);
     final status = (row['status'] ?? '').toString();
     final tone = _statusColor(status);

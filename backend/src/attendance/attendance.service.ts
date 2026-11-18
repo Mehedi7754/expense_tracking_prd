@@ -8,22 +8,32 @@ import { EmailService } from '../email/email.service';
 export interface AttendanceRecord {
   id: string;
   userId: string;
+  user_id?: string;
   userName: string;
+  user_name?: string;
   userEmail: string;
+  user_email?: string;
   department: string;
   designation: string;
   avatarUrl?: string;
+  avatar_url?: string;
   date: string;
   sessionType: 'morning' | 'afternoon';
+  session_type?: 'morning' | 'afternoon';
   loginTime: string;
+  login_time?: string;
   latitude: number | null;
   longitude: number | null;
   addressText: string;
+  address_text?: string;
   deviceInfo: string;
+  device_info?: string;
   workMode: string;
+  work_mode?: string;
   status: string;
   notes: string;
   createdAt: string;
+  created_at?: string;
 }
 
 export interface ShiftDefinition {
@@ -552,12 +562,22 @@ export class AttendanceService {
 
   async getRecordById(id: string): Promise<AttendanceRecord | null> {
     const res = await this.db.query(
-      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
-              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
-              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
-              a.login_time::text as "loginTime", a.latitude, a.longitude,
-              a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
+      `SELECT a.id, 
+              a.user_id as "userId", a.user_id as "user_id",
+              u.full_name as "userName", u.full_name as "user_name",
+              u.email as "userEmail", u.email as "user_email",
+              COALESCE(u.department, '') as department, 
+              COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", u.avatar_url as "avatar_url",
+              a.date::text as "date", 
+              a.session_type as "sessionType", a.session_type as "session_type",
+              a.login_time::text as "loginTime", a.login_time::text as "login_time",
+              a.latitude, a.longitude,
+              a.address_text as "addressText", a.address_text as "address_text",
+              a.device_info as "deviceInfo", a.device_info as "device_info",
+              a.status, a.notes, 
+              a.work_mode as "workMode", a.work_mode as "work_mode",
+              a.created_at::text as "createdAt", a.created_at::text as "created_at"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
        WHERE a.id = $1`,
@@ -570,30 +590,53 @@ export class AttendanceService {
     return this.getRecordsByDate(this.getDhakaDateStr());
   }
 
-  async getRecordsByDate(dateStr?: string, userId?: string): Promise<AttendanceRecord[]> {
-    let sql = `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
-                      COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
-                      u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
-                      a.login_time::text as "loginTime", a.latitude, a.longitude,
-                      a.address_text as "addressText", a.device_info as "deviceInfo",
-                      a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
+  async getRecordsByDate(
+    dateStr?: string,
+    userId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<AttendanceRecord[]> {
+    let sql = `SELECT a.id, 
+                      a.user_id as "userId", a.user_id as "user_id",
+                      u.full_name as "userName", u.full_name as "user_name",
+                      u.email as "userEmail", u.email as "user_email",
+                      COALESCE(u.department, '') as department, 
+                      COALESCE(u.designation, '') as designation,
+                      u.avatar_url as "avatarUrl", u.avatar_url as "avatar_url",
+                      a.date::text as "date", 
+                      a.session_type as "sessionType", a.session_type as "session_type",
+                      a.login_time::text as "loginTime", a.login_time::text as "login_time",
+                      a.latitude, a.longitude,
+                      a.address_text as "addressText", a.address_text as "address_text",
+                      a.device_info as "deviceInfo", a.device_info as "device_info",
+                      a.status, a.notes, 
+                      a.work_mode as "workMode", a.work_mode as "work_mode",
+                      a.created_at::text as "createdAt", a.created_at::text as "created_at"
                FROM attendance_records a
                JOIN users u ON a.user_id = u.id
-               WHERE u.is_active = TRUE`;
+               WHERE 1=1`;
     const params: any[] = [];
+
     if (dateStr) {
       params.push(dateStr);
       sql += ` AND a.date = $${params.length}`;
-    } else if (!userId) {
-      params.push(this.getDhakaDateStr());
-      sql += ` AND a.date = $${params.length}`;
+    } else if (startDate || endDate) {
+      if (startDate) {
+        params.push(startDate);
+        sql += ` AND a.date >= $${params.length}`;
+      }
+      if (endDate) {
+        params.push(endDate);
+        sql += ` AND a.date <= $${params.length}`;
+      }
     }
 
     if (userId) {
       params.push(userId);
       sql += ` AND a.user_id = $${params.length}`;
     }
-    sql += ' ORDER BY a.date DESC, a.login_time DESC LIMIT 100';
+
+    sql += ' ORDER BY a.date DESC, a.login_time DESC LIMIT 500';
     const res = await this.db.query(sql, params);
     return res.rows;
   }
@@ -605,15 +648,25 @@ export class AttendanceService {
     const endDate = `${nextMonthYear}-${String(nextMonthVal).padStart(2, '0')}-01`;
 
     const res = await this.db.query(
-      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
-              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
-              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
-              a.login_time::text as "loginTime", a.latitude, a.longitude,
-              a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
+      `SELECT a.id, 
+              a.user_id as "userId", a.user_id as "user_id",
+              u.full_name as "userName", u.full_name as "user_name",
+              u.email as "userEmail", u.email as "user_email",
+              COALESCE(u.department, '') as department, 
+              COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", u.avatar_url as "avatar_url",
+              a.date::text as "date", 
+              a.session_type as "sessionType", a.session_type as "session_type",
+              a.login_time::text as "loginTime", a.login_time::text as "login_time",
+              a.latitude, a.longitude,
+              a.address_text as "addressText", a.address_text as "address_text",
+              a.device_info as "deviceInfo", a.device_info as "device_info",
+              a.status, a.notes, 
+              a.work_mode as "workMode", a.work_mode as "work_mode",
+              a.created_at::text as "createdAt", a.created_at::text as "created_at"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
-       WHERE a.user_id = $1 AND a.date >= $2 AND a.date < $3 AND u.is_active = TRUE
+       WHERE a.user_id = $1 AND a.date >= $2 AND a.date < $3
        ORDER BY a.date ASC, a.session_type ASC`,
       [userId, startDate, endDate],
     );
@@ -627,15 +680,25 @@ export class AttendanceService {
     const endDate = `${nextMonthYear}-${String(nextMonthVal).padStart(2, '0')}-01`;
 
     const res = await this.db.query(
-      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
-              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
-              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
-              a.login_time::text as "loginTime", a.latitude, a.longitude,
-              a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
+      `SELECT a.id, 
+              a.user_id as "userId", a.user_id as "user_id",
+              u.full_name as "userName", u.full_name as "user_name",
+              u.email as "userEmail", u.email as "user_email",
+              COALESCE(u.department, '') as department, 
+              COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", u.avatar_url as "avatar_url",
+              a.date::text as "date", 
+              a.session_type as "sessionType", a.session_type as "session_type",
+              a.login_time::text as "loginTime", a.login_time::text as "login_time",
+              a.latitude, a.longitude,
+              a.address_text as "addressText", a.address_text as "address_text",
+              a.device_info as "deviceInfo", a.device_info as "device_info",
+              a.status, a.notes, 
+              a.work_mode as "workMode", a.work_mode as "work_mode",
+              a.created_at::text as "createdAt", a.created_at::text as "created_at"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
-       WHERE a.date >= $1 AND a.date < $2 AND u.is_active = TRUE
+       WHERE a.date >= $1 AND a.date < $2
        ORDER BY a.date ASC, a.session_type ASC`,
       [startDate, endDate],
     );
@@ -662,12 +725,22 @@ export class AttendanceService {
     );
 
     const recordsRes = await this.db.query(
-      `SELECT a.id, a.user_id as "userId", u.full_name as "userName", u.email as "userEmail",
-              COALESCE(u.department, '') as department, COALESCE(u.designation, '') as designation,
-              u.avatar_url as "avatarUrl", a.date::text, a.session_type as "sessionType",
-              a.login_time::text as "loginTime", a.latitude, a.longitude,
-              a.address_text as "addressText", a.device_info as "deviceInfo",
-              a.status, a.notes, a.work_mode as "workMode", a.created_at::text as "createdAt"
+      `SELECT a.id, 
+              a.user_id as "userId", a.user_id as "user_id",
+              u.full_name as "userName", u.full_name as "user_name",
+              u.email as "userEmail", u.email as "user_email",
+              COALESCE(u.department, '') as department, 
+              COALESCE(u.designation, '') as designation,
+              u.avatar_url as "avatarUrl", u.avatar_url as "avatar_url",
+              a.date::text as "date", 
+              a.session_type as "sessionType", a.session_type as "session_type",
+              a.login_time::text as "loginTime", a.login_time::text as "login_time",
+              a.latitude, a.longitude,
+              a.address_text as "addressText", a.address_text as "address_text",
+              a.device_info as "deviceInfo", a.device_info as "device_info",
+              a.status, a.notes, 
+              a.work_mode as "workMode", a.work_mode as "work_mode",
+              a.created_at::text as "createdAt", a.created_at::text as "created_at"
        FROM attendance_records a
        JOIN users u ON a.user_id = u.id
        WHERE a.date = $1 AND u.is_active = TRUE`,

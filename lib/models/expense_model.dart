@@ -519,8 +519,8 @@ class ExpenseModel {
     List<CommentModel> parseComments(dynamic raw) {
       if (raw is List) {
         return raw
-            .where((item) => item is Map)
-            .map((item) => CommentModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .whereType<Map>()
+            .map((item) => CommentModel.fromJson(Map<String, dynamic>.from(item)))
             .toList();
       }
       return const [];
@@ -639,8 +639,8 @@ class ExpenseModel {
       status: ExpenseStatus.fromString(statusStr),
       rejectionReason: json['rejection_reason']?.toString() ?? json['rejectionReason']?.toString(),
       comments: parseComments(json['comments']),
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
+      createdAt: (json['created_at'] != null || json['createdAt'] != null)
+          ? DateTime.tryParse((json['created_at'] ?? json['createdAt']).toString()) ?? DateTime.now()
           : DateTime.now(),
       justificationStatus: JustificationStatus.fromString(justStatusStr),
       justificationReason: json['justification_reason']?.toString() ?? json['justificationReason']?.toString(),
