@@ -5,7 +5,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import '../core/network/api_exceptions.dart';
 import '../core/services/location_service.dart';
-import '../core/services/push_notification_service.dart';
 import '../models/attendance_model.dart';
 import '../models/user_role.dart';
 import '../repositories/attendance_repository.dart';
@@ -466,14 +465,6 @@ class AttendanceNotifier extends Notifier<AttendanceState> {
       invalidateCache();
       await fetchDailyOverview(force: true);
       await fetchAttendanceRecords(userId: userId, force: true);
-
-      // Fire OS status bar push notification immediately
-      PushNotificationService.instance.showAttendanceReminder(
-        title: 'Attendance Recorded 📍',
-        body:
-            'Your check-in for the $explicitSession session was recorded successfully.',
-        notificationId: 'checkin_${DateTime.now().millisecondsSinceEpoch}',
-      );
 
       // Refresh notifications from backend so the server-generated attendance notification is loaded
       ref.read(notificationProvider.notifier).fetchNotifications();

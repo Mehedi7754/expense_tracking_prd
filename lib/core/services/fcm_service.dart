@@ -34,7 +34,13 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final type = data['type']?.toString().toLowerCase() ?? 'general';
   final notifId = message.messageId ?? data['notificationId']?.toString();
 
-  debugPrint('[FCM-BG] Background message: type=$type, title=$title, id=$notifId');
+  // If the message contains a notification payload, Android/iOS system tray
+  // automatically posts the notification when backgrounded/killed.
+  // Showing local notification again would produce a duplicate notification tray entry.
+  if (notification != null) {
+    debugPrint('[FCM-BG] Notification payload present, OS system tray handles display automatically: $notifId');
+    return;
+  }
 
   try {
     if (type.contains('chat')) {

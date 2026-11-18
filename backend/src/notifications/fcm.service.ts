@@ -256,11 +256,12 @@ export class FcmService implements OnModuleInit {
     }
 
     const notifTag =
+      stringData.tag ||
       stringData.messageId ||
       stringData.notificationId ||
       stringData.expenseId ||
       stringData.channelId ||
-      undefined;
+      (stringData.type && stringData.actorId ? `${stringData.type}_${stringData.actorId}` : undefined);
 
     const message: MulticastMessage = {
       tokens: uniqueTokens,

@@ -65,6 +65,7 @@ class PushNotificationService {
 
   /// Track already-shown attendance reminder IDs to prevent duplicates
   final Set<String> _shownAttendanceIds = <String>{};
+  final Map<String, DateTime> _recentFingerprints = <String, DateTime>{};
 
   /// Attendance reminders are for employees ONLY. Admin/finance/viewer never get them.
   Future<void> syncAttendanceReminders({
@@ -116,16 +117,28 @@ class PushNotificationService {
       return;
     }
 
-    // Dedup: same notification ID should not fire more than once
+    // Dedup by notification ID
     if (notificationId != null && notificationId.isNotEmpty) {
       if (_shownAttendanceIds.contains(notificationId)) {
-        debugPrint('[PushNotificationService] Duplicate attendance notif suppressed: $notificationId');
+        debugPrint('[PushNotificationService] Duplicate attendance notif ID suppressed: $notificationId');
         return;
       }
       _shownAttendanceIds.add(notificationId);
       if (_shownAttendanceIds.length > 100) {
         _shownAttendanceIds.remove(_shownAttendanceIds.first);
       }
+    }
+
+    // Dedup by content fingerprint (title + body) within 60s window
+    final fingerprint = '${title.trim()}_${body.trim()}';
+    final lastShown = _recentFingerprints[fingerprint];
+    if (lastShown != null && now.difference(lastShown).inSeconds < 60) {
+      debugPrint('[PushNotificationService] Duplicate attendance content suppressed: $fingerprint');
+      return;
+    }
+    _recentFingerprints[fingerprint] = now;
+    if (_recentFingerprints.length > 100) {
+      _recentFingerprints.remove(_recentFingerprints.keys.first);
     }
 
     await showImmediate(
@@ -227,6 +240,18 @@ class PushNotificationService {
       if (_deliveredNotificationIds.length > 200) {
         _deliveredNotificationIds.remove(_deliveredNotificationIds.first);
       }
+    }
+
+    final now = DateTime.now();
+    final fingerprint = '${channel}_${title.trim()}_${body.trim()}';
+    final lastShown = _recentFingerprints[fingerprint];
+    if (lastShown != null && now.difference(lastShown).inSeconds < 45) {
+      debugPrint('[PushNotificationService] showImmediate duplicate suppressed: $fingerprint');
+      return;
+    }
+    _recentFingerprints[fingerprint] = now;
+    if (_recentFingerprints.length > 200) {
+      _recentFingerprints.remove(_recentFingerprints.keys.first);
     }
 
     final id = notificationId != null && notificationId.hashCode != 0
