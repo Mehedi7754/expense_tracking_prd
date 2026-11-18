@@ -26,8 +26,9 @@ COPY firebase-service-account*.json ./
 RUN npm ci --quiet --omit=dev && npm cache clean --force
 
 COPY --from=builder /usr/src/app/dist ./dist
+COPY uploads/ ./uploads/
 
-RUN mkdir -p /usr/src/app/uploads/receipts /usr/src/app/uploads/avatars /usr/src/app/uploads/projects \
+RUN mkdir -p /usr/src/app/uploads/receipts /usr/src/app/uploads/avatars /usr/src/app/uploads/projects /usr/src/app/uploads/apps \
     && chown -R node:node /usr/src/app
 
 USER node
