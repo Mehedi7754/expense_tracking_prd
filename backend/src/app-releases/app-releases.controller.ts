@@ -44,7 +44,11 @@ export class AppReleasesController {
     } catch (_) {}
 
     // If downloadUrl is an external link (e.g. S3 / CDN / GitHub releases), redirect directly
-    if (latest.downloadUrl && latest.downloadUrl.startsWith('http')) {
+    if (
+      latest.downloadUrl &&
+      latest.downloadUrl.startsWith('http') &&
+      !latest.downloadUrl.includes('/download-latest')
+    ) {
       return reply.redirect(latest.downloadUrl, 302);
     }
 
