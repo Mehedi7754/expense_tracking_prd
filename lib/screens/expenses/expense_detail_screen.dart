@@ -728,9 +728,15 @@ class ExpenseDetailScreen extends ConsumerWidget {
                                 subtitle: 'Provide an explanatory reason for ${expense.employeeName}.',
                               );
                               if (reason != null && context.mounted) {
-                                ref.read(expenseProvider.notifier).rejectExpense(expense.id, reason);
-                                NotificationBanner.showWarning(context, 'Expense claim rejected.');
-                                context.pop();
+                                try {
+                                  await ref.read(expenseProvider.notifier).rejectExpense(expense.id, reason);
+                                  if (context.mounted) {
+                                    NotificationBanner.showWarning(context, 'Expense claim rejected.');
+                                    context.pop();
+                                  }
+                                } catch (error) {
+                                  if (context.mounted) NotificationBanner.showError(context, 'Could not reject expense: $error');
+                                }
                               }
                             },
                           ),

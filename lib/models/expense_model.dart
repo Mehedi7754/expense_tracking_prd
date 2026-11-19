@@ -681,10 +681,17 @@ class ExpenseModel {
         addReceiptValue(value);
       }
     }
-    if (parsedReceiptUrls.isEmpty &&
-        receiptPhoto != null &&
-        receiptPhoto.isNotEmpty) {
-      parsedReceiptUrls = [receiptPhoto];
+    bool isViewableReceipt(String url) =>
+        url.startsWith('https://') ||
+        url.startsWith('http://') ||
+        url.startsWith('/uploads/') ||
+        url.startsWith('/api/v1/uploads/') ||
+        url.startsWith('data:image/');
+    parsedReceiptUrls = parsedReceiptUrls.where(isViewableReceipt).toList();
+    if (receiptPhoto != null &&
+        isViewableReceipt(receiptPhoto) &&
+        !parsedReceiptUrls.contains(receiptPhoto)) {
+      parsedReceiptUrls.insert(0, receiptPhoto);
     }
 
     final rawReceipt = json['has_receipt'] ?? json['hasReceipt'];
@@ -772,8 +779,7 @@ class ExpenseModel {
               : DateTime.now(),
       hasReceipt: parsedHasReceipt,
       receiptPhotoUrl:
-          receiptPhoto ??
-          (parsedReceiptUrls.isNotEmpty ? parsedReceiptUrls.first : null),
+          parsedReceiptUrls.isNotEmpty ? parsedReceiptUrls.first : null,
       receiptPhotoUrls: parsedReceiptUrls,
       status: ExpenseStatus.fromString(statusStr),
       rejectionReason:

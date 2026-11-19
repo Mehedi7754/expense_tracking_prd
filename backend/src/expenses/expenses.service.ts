@@ -15,6 +15,8 @@ export class ExpensesService {
 
   private mapExpenseRow(e: any, comments: any[] = []) {
     const details = typeof e.category_details === 'string' ? JSON.parse(e.category_details) : e.category_details || {};
+    const receiptPhotoUrls = [...new Set([e.receipt_photo_url, ...(Array.isArray(e.receipt_photo_urls) ? e.receipt_photo_urls : [])]
+      .filter((url): url is string => typeof url === 'string' && /^(https?:\/\/|\/uploads\/|\/api\/v1\/uploads\/|data:image\/)/i.test(url)))];
 
     return {
       id: e.id,
@@ -44,10 +46,8 @@ export class ExpensesService {
       note: e.note || '',
       date: e.date,
       hasReceipt: Boolean(e.has_receipt),
-      receiptPhotoUrl: e.receipt_photo_url || (Array.isArray(e.receipt_photo_urls) && e.receipt_photo_urls[0]) || null,
-      receiptPhotoUrls: Array.isArray(e.receipt_photo_urls) && e.receipt_photo_urls.length > 0
-        ? e.receipt_photo_urls
-        : (e.receipt_photo_url ? [e.receipt_photo_url] : []),
+      receiptPhotoUrl: receiptPhotoUrls[0] || null,
+      receiptPhotoUrls,
       receiptPhotos: e.receipt_photos && Array.isArray(e.receipt_photos) ? e.receipt_photos : [],
       status: e.status,
       rejectionReason: e.rejection_reason,
@@ -710,10 +710,10 @@ export class ExpensesService {
       [reviewerId, note || 'Approved by reviewer', id],
     );
 
+    let reviewer: { full_name: string; role: string; avatar_url?: string } = { full_name: 'Reviewer', role: 'project_manager' };
     try {
       const reviewerRes = await this.db.query('SELECT full_name, role, avatar_url FROM users WHERE id = $1', [reviewerId]);
-      const reviewer = reviewerRes.rows[0] || { full_name: 'Reviewer', role: 'project_manager' };
-
+      reviewer = reviewerRes.rows[0] || reviewer;
       await this.auditLogsService.log({
         userId: reviewerId,
         userName: reviewer.full_name,
@@ -724,6 +724,11 @@ export class ExpensesService {
         details: { note: note || '', amount: exp.amount },
       });
 
+    } catch (e) {
+      console.error('Failed to audit expense approval:', e);
+    }
+
+    try {
       await this.notificationsService.create({
         userId: exp.employeeId,
         title: 'Expense Approved',
@@ -775,10 +780,10 @@ export class ExpensesService {
       [cleanReason, reviewerId, id],
     );
 
+    let reviewer: { full_name: string; role: string; avatar_url?: string } = { full_name: 'Reviewer', role: 'project_manager' };
     try {
       const reviewerRes = await this.db.query('SELECT full_name, role, avatar_url FROM users WHERE id = $1', [reviewerId]);
-      const reviewer = reviewerRes.rows[0] || { full_name: 'Reviewer', role: 'project_manager' };
-
+      reviewer = reviewerRes.rows[0] || reviewer;
       await this.auditLogsService.log({
         userId: reviewerId,
         userName: reviewer.full_name,
@@ -788,7 +793,11 @@ export class ExpensesService {
         entityId: id,
         details: { reason: cleanReason, amount: exp.amount },
       });
+    } catch (e) {
+      console.error('Failed to audit expense rejection:', e);
+    }
 
+    try {
       await this.notificationsService.create({
         userId: exp.employeeId,
         title: 'Expense Rejected',
@@ -803,7 +812,7 @@ export class ExpensesService {
         actorAvatarUrl: reviewer.avatar_url || null,
       });
     } catch (e) {
-      console.error('Failed to process audit/notification for expense reject:', e);
+      console.error('Failed to notify expense submitter about rejection:', e);
     }
 
     return this.findOne(id);

@@ -2529,9 +2529,11 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                                         subtitle: 'Provide a reason for rejecting this claim by ${exp.employeeName}.',
                                       );
                                       if (reason != null && mounted) {
-                                        await ref.read(expenseProvider.notifier).rejectExpense(exp.id, reason);
-                                        if (mounted) {
-                                          NotificationBanner.showWarning(context, 'Expense claim rejected.');
+                                        try {
+                                          await ref.read(expenseProvider.notifier).rejectExpense(exp.id, reason);
+                                          if (context.mounted) NotificationBanner.showWarning(context, 'Expense claim rejected.');
+                                        } catch (error) {
+                                          if (context.mounted) NotificationBanner.showError(context, 'Could not reject expense: $error');
                                         }
                                       }
                                     },

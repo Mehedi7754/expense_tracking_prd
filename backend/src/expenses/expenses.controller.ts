@@ -62,9 +62,10 @@ export class ExpensesController {
   @Post(':id/reject')
   async rejectExpense(
     @Param('id') id: string,
-    @Body('reason') reason: string,
+    @Body() body: { reason?: string; rejectionReason?: string; rejection_reason?: string },
     @Request() req: any,
   ) {
+    const reason = body?.reason ?? body?.rejectionReason ?? body?.rejection_reason;
     return this.expensesService.reject(id, req.user.id, reason, req.user);
   }
 

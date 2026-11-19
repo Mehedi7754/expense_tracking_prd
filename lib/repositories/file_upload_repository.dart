@@ -58,7 +58,8 @@ class FileUploadRepository {
   }) async {
     String base64Data;
 
-    if (filePathOrDataUri.startsWith('data:') || _isRawBase64(filePathOrDataUri)) {
+    if (filePathOrDataUri.startsWith('data:') ||
+        _isRawBase64(filePathOrDataUri)) {
       // Already a data URI or raw base64
       base64Data = filePathOrDataUri;
     } else if (!kIsWeb && File(filePathOrDataUri).existsSync()) {
@@ -67,7 +68,9 @@ class FileUploadRepository {
       base64Data = await AppImageHelper.fileToBase64DataUri(file);
     } else {
       // If it's already a URL, return it as-is (no upload needed)
-      if (filePathOrDataUri.startsWith('http://') || filePathOrDataUri.startsWith('https://') || filePathOrDataUri.startsWith('/uploads/')) {
+      if (filePathOrDataUri.startsWith('http://') ||
+          filePathOrDataUri.startsWith('https://') ||
+          filePathOrDataUri.startsWith('/uploads/')) {
         return UploadResult(
           url: filePathOrDataUri,
           filename: filePathOrDataUri.split('/').last,
@@ -106,9 +109,14 @@ class FileUploadRepository {
         final file = File(path);
         final b64 = await AppImageHelper.fileToBase64DataUri(file);
         base64Files.add(b64);
-      } else if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('/uploads/')) {
+      } else if (path.startsWith('http://') ||
+          path.startsWith('https://') ||
+          path.startsWith('/uploads/')) {
         base64Files.add(path);
       }
+    }
+    if (base64Files.length != filePathsOrDataUris.length) {
+      throw const FormatException('One or more receipt images are no longer available');
     }
 
     final response = await _client.post(
@@ -120,13 +128,23 @@ class FileUploadRepository {
       },
     );
 
-    if (response is Map<String, dynamic> && response['results'] is List) {
-      return (response['results'] as List)
-          .whereType<Map<String, dynamic>>()
-          .map(UploadResult.fromJson)
-          .toList();
+    final rows =
+        response is Map<String, dynamic>
+            ? (response['results'] ?? response['files'])
+            : null;
+    if (rows is List) {
+      final results =
+          rows
+              .whereType<Map<String, dynamic>>()
+              .map(UploadResult.fromJson)
+              .toList();
+      if (results.length != base64Files.length ||
+          results.any((result) => result.url.isEmpty)) {
+        throw const FormatException('Some receipt images were not uploaded');
+      }
+      return results;
     }
-    return const [];
+    throw const FormatException('Invalid batch upload response');
   }
 
   /// Quick helper to check if a string looks like raw base64.

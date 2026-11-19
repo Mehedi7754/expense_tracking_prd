@@ -8,7 +8,6 @@ import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
 import '../../models/project_model.dart';
-import '../../core/services/background_receipt_uploader.dart';
 import '../../repositories/file_upload_repository.dart';
 import '../../state/auth_provider.dart';
 import '../../state/expense_provider.dart';
@@ -45,11 +44,9 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
   bool _hasReceipt = true; // PRD Section 10: Receipt available Yes/No
   String? _receiptFileName;
-  String? _receiptPath;
-  String? _serverReceiptUrl;
   final List<String> _receiptPaths = [];
   final List<String> _receiptFileNames = [];
-  final List<String> _serverReceiptUrls = [];
+  final Map<String, String> _uploadedReceiptUrlsByPath = {};
   bool _isUploadingReceipt = false;
   bool _isSubmitting = false;
 
@@ -178,7 +175,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             }
           }
           setState(() {
-            _receiptPath = _receiptPaths.first;
             _receiptFileName = _receiptFileNames.first;
           });
           _uploadBatchReceipts(newPaths);
@@ -205,7 +201,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             _receiptPaths.add(image.path);
             _receiptFileNames.add(name);
           }
-          _receiptPath = _receiptPaths.first;
           _receiptFileName = _receiptFileNames.first;
         });
         _uploadBatchReceipts([image.path]);
@@ -239,13 +234,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       );
       if (mounted) {
         setState(() {
-          for (final res in results) {
-            if (!_serverReceiptUrls.contains(res.url)) {
-              _serverReceiptUrls.add(res.url);
-            }
-          }
-          if (_serverReceiptUrls.isNotEmpty) {
-            _serverReceiptUrl = _serverReceiptUrls.first;
+          for (var i = 0; i < results.length; i++) {
+            _uploadedReceiptUrlsByPath[filePaths[i]] = results[i].url;
           }
           _isUploadingReceipt = false;
         });
@@ -254,6 +244,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isUploadingReceipt = false);
+        NotificationBanner.showError(context, 'Receipt upload failed. Please retry before submitting.');
       }
     }
   }
@@ -275,7 +266,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           }
         }
         setState(() {
-          _receiptPath = _receiptPaths.first;
           _receiptFileName = _receiptFileNames.first;
         });
         _uploadBatchReceipts(newPaths);
@@ -295,7 +285,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
               _receiptPaths.add(file.path);
               _receiptFileNames.add(name);
             }
-            _receiptPath = _receiptPaths.first;
             _receiptFileName = _receiptFileNames.first;
           });
           _uploadBatchReceipts([file.path]);
@@ -329,9 +318,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       return;
     }
 
-    final localReceiptPath = _receiptPath ?? _receiptFileName;
-
-    if (_hasReceipt && (localReceiptPath == null || localReceiptPath.isEmpty)) {
+    if (_hasReceipt && _receiptPaths.isEmpty) {
       NotificationBanner.showError(context, 'Please attach a receipt image or turn off the receipt toggle.');
       return;
     }
@@ -394,12 +381,27 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
 
     try {
-      final effectiveReceiptUrls = _serverReceiptUrls.isNotEmpty
-          ? _serverReceiptUrls
-          : (_receiptPaths.isNotEmpty ? _receiptPaths : (localReceiptPath != null ? [localReceiptPath] : <String>[]));
-      final effectiveReceipt = _serverReceiptUrl ?? localReceiptPath;
+      final missingPaths = _hasReceipt
+          ? _receiptPaths.where((path) => !_uploadedReceiptUrlsByPath.containsKey(path)).toList()
+          : <String>[];
+      if (missingPaths.isNotEmpty) {
+        final uploaded = await ref.read(fileUploadRepositoryProvider).uploadBatch(
+          filePathsOrDataUris: missingPaths,
+          category: UploadCategory.receipts,
+        );
+        for (var i = 0; i < missingPaths.length; i++) {
+          _uploadedReceiptUrlsByPath[missingPaths[i]] = uploaded[i].url;
+        }
+      }
+      final effectiveReceiptUrls = _hasReceipt
+          ? _receiptPaths.map((path) => _uploadedReceiptUrlsByPath[path]).whereType<String>().toList()
+          : <String>[];
+      if (_hasReceipt && effectiveReceiptUrls.length != _receiptPaths.length) {
+        throw StateError('All receipt images must finish uploading before submission');
+      }
+      final effectiveReceipt = effectiveReceiptUrls.isEmpty ? null : effectiveReceiptUrls.first;
 
-      final created = await ref.read(expenseProvider.notifier).submitExpense(
+      await ref.read(expenseProvider.notifier).submitExpense(
             employeeId: user.id,
             employeeName: user.name,
             projectId: _selectedProject!.id,
@@ -426,18 +428,6 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             accommodationDetails: accommDetails,
             officeCostDetails: officeDetails,
           );
-
-      // If receipt hasn't finished remote uploading yet, enqueue background upload
-      if (effectiveReceipt != null &&
-          effectiveReceipt.isNotEmpty &&
-          !effectiveReceipt.startsWith('http') &&
-          !effectiveReceipt.startsWith('/uploads')) {
-        BackgroundReceiptUploader.instance.enqueue(
-          expenseId: created.id,
-          localFilePath: effectiveReceipt,
-          ref: ref,
-        );
-      }
 
       if (mounted) {
         NotificationBanner.showSuccess(
@@ -1268,15 +1258,13 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                                   onPressed: () => setState(() {
                                     if (_receiptFileNames.isNotEmpty && index < _receiptFileNames.length) {
                                       _receiptFileNames.removeAt(index);
-                                      if (index < _receiptPaths.length) _receiptPaths.removeAt(index);
-                                      if (index < _serverReceiptUrls.length) _serverReceiptUrls.removeAt(index);
+                                      if (index < _receiptPaths.length) {
+                                        _uploadedReceiptUrlsByPath.remove(_receiptPaths[index]);
+                                        _receiptPaths.removeAt(index);
+                                      }
                                       _receiptFileName = _receiptFileNames.isNotEmpty ? _receiptFileNames.first : null;
-                                      _receiptPath = _receiptPaths.isNotEmpty ? _receiptPaths.first : null;
-                                      _serverReceiptUrl = _serverReceiptUrls.isNotEmpty ? _serverReceiptUrls.first : null;
                                     } else {
                                       _receiptFileName = null;
-                                      _receiptPath = null;
-                                      _serverReceiptUrl = null;
                                     }
                                     if (_receiptFileNames.isEmpty && _receiptFileName == null) {
                                       _hasReceipt = false;
@@ -1300,7 +1288,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             SizedBox(
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: _isSubmitting ? null : _handleSubmit,
+                onPressed: _isSubmitting || _isUploadingReceipt ? null : _handleSubmit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4F46E5),
                   foregroundColor: Colors.white,

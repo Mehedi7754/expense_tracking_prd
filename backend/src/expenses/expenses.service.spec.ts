@@ -27,6 +27,25 @@ describe('ExpensesService Unit & Business Rules', () => {
   });
 
   describe('Anti-Fraud and Approval Rules', () => {
+    it('rejects on the server and sends the reason to the expense submitter', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'exp-1', employeeId: 'submitter-1', projectId: 'project-1',
+        categoryName: 'Transport', amount: 350, currency: 'BDT', status: 'pending',
+      } as any);
+      mockDb.query.mockResolvedValue({ rows: [{ full_name: 'Reviewer', role: 'admin' }] });
+
+      await service.reject('exp-1', 'reviewer-1', 'Receipt is unreadable', { role: 'admin' });
+
+      expect(mockDb.query).toHaveBeenCalledWith(
+        expect.stringContaining("SET status = 'rejected'"),
+        ['Receipt is unreadable', 'reviewer-1', 'exp-1'],
+      );
+      expect(mockNotifications.create).toHaveBeenCalledWith(expect.objectContaining({
+        userId: 'submitter-1', type: 'expense_rejected', relatedExpenseId: 'exp-1',
+        rejectionReason: 'Receipt is unreadable',
+      }));
+    });
+
     it('throws ForbiddenException when a reviewer tries to approve their own expense report', async () => {
       const expenseId = 'exp-123';
       const reviewerId = 'user-owner';
@@ -83,6 +102,21 @@ describe('ExpensesService Unit & Business Rules', () => {
   });
 
   describe('IDOR & Access Control', () => {
+    it('keeps uploaded receipts visible when older rows also contain device paths', async () => {
+      mockDb.query.mockResolvedValue({ rows: [{
+        id: 'exp-receipts', employee_id: 'owner', project_id: 'project-1',
+        amount: '100', currency: 'BDT', status: 'pending', category_details: '{}',
+        receipt_photo_url: '/uploads/receipts/first.jpg',
+        receipt_photo_urls: ['/data/user/0/cache/lost.jpg', '/uploads/receipts/second.jpg'],
+      }] });
+
+      const expense = await service.findOne('exp-receipts', { id: 'owner', role: 'project_member' });
+      expect(expense.receiptPhotoUrl).toBe('/uploads/receipts/first.jpg');
+      expect(expense.receiptPhotoUrls).toEqual([
+        '/uploads/receipts/first.jpg', '/uploads/receipts/second.jpg',
+      ]);
+    });
+
     it('throws ForbiddenException when a member attempts to view an expense not belonging to their project', async () => {
       mockDb.query
         .mockResolvedValueOnce({

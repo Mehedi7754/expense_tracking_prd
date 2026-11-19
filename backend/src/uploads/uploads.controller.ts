@@ -64,23 +64,28 @@ export class UploadsController {
 
   @UseGuards(JwtAuthGuard)
   @Post('batch')
-  async uploadBatch(@Body() body: { files: Array<{ file: string; category?: string; entityId?: string }> }) {
+  async uploadBatch(@Body() body: { files: Array<string | { file: string; category?: string; entityId?: string }>; category?: string; entityId?: string }) {
     if (!body || !Array.isArray(body.files) || body.files.length === 0) {
       throw new BadRequestException('files array is required');
     }
+    if (body.files.length > 20) throw new BadRequestException('A batch can contain at most 20 files');
 
     const validCategories: UploadCategory[] = ['receipts', 'avatars', 'projects', 'chat'];
     const results = [];
 
     for (const item of body.files) {
-      if (!item.file || item.file.trim().length === 0) continue;
-      const category = (item.category || 'receipts') as UploadCategory;
-      if (!validCategories.includes(category)) continue;
+      const file = typeof item === 'string' ? item : item?.file;
+      const category = (typeof item === 'string' ? body.category || 'receipts' : item?.category || body.category || 'receipts') as UploadCategory;
+      const entityId = typeof item === 'string' ? body.entityId : item?.entityId || body.entityId;
+      if (!file || typeof file !== 'string' || file.trim().length === 0) {
+        throw new BadRequestException('Every batch item must contain a file');
+      }
+      if (!validCategories.includes(category)) throw new BadRequestException(`Invalid upload category: ${category}`);
 
       const result = await this.uploadsService.saveFile(
-        item.file,
+        file,
         category,
-        item.entityId,
+        entityId,
       );
       results.push({
         url: result.url,
@@ -91,6 +96,7 @@ export class UploadsController {
 
     return {
       success: true,
+      results,
       files: results,
       urls: results.map((r) => r.url),
     };

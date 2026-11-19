@@ -619,39 +619,19 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
   }
 
   Future<void> rejectExpense(String id, String reason) async {
-    final matches = state.where((e) => e.id == id);
-    final exp = matches.isNotEmpty ? matches.first : null;
-
+    final repo = ref.read(expenseRepositoryProvider);
+    final updated = await repo.updateStatus(
+      id,
+      ExpenseStatus.rejected,
+      rejectionReason: reason,
+    );
     state = [
       for (final exp in state)
-        if (exp.id == id)
-          exp.copyWith(status: ExpenseStatus.rejected, rejectionReason: reason)
-        else
-          exp,
+        if (exp.id == id) updated else exp,
     ];
     await _persistExpenses();
     invalidateCache();
-
-    // Trigger instant OS-level push notification
-    if (exp != null) {
-      PushNotificationService.instance.showExpenseAlert(
-        title: 'Expense Rejected ❌',
-        body: 'Expense report for ${exp.categoryName} was rejected: $reason',
-        expenseId: id,
-      );
-    }
     ref.read(notificationProvider.notifier).fetchNotifications();
-
-    try {
-      final repo = ref.read(expenseRepositoryProvider);
-      await repo.updateStatus(
-        id,
-        ExpenseStatus.rejected,
-        rejectionReason: reason,
-      );
-    } catch (_) {
-      // Offline fallback
-    }
   }
 
   Future<void> deleteExpense(String id) async {

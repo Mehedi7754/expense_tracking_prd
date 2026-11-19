@@ -42,9 +42,11 @@ class ExpenseRepository {
 
   Future<ExpenseModel> getExpenseById(String id) async {
     final response = await _client.get(ApiEndpoints.expenseById(id));
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return ExpenseModel.fromJson(data);
   }
 
@@ -54,9 +56,11 @@ class ExpenseRepository {
       body: expense.toJson(),
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return ExpenseModel.fromJson(data);
   }
 
@@ -66,9 +70,11 @@ class ExpenseRepository {
       body: expense.toJson(),
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return ExpenseModel.fromJson(data);
   }
 
@@ -87,7 +93,7 @@ class ExpenseRepository {
       } else if (status == ExpenseStatus.rejected) {
         response = await _client.post(
           ApiEndpoints.rejectExpense(expenseId),
-          body: {'rejectionReason': rejectionReason ?? 'Rejected by reviewer'},
+          body: {'reason': rejectionReason ?? 'Rejected by reviewer'},
         );
       } else {
         response = await _client.put(
@@ -96,6 +102,8 @@ class ExpenseRepository {
         );
       }
     } catch (_) {
+      if (status == ExpenseStatus.rejected || status == ExpenseStatus.approved)
+        rethrow;
       // Fallback for endpoints or servers implementing PATCH status or direct PUT
       try {
         response = await _client.put(
@@ -116,9 +124,11 @@ class ExpenseRepository {
       }
     }
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return ExpenseModel.fromJson(data);
   }
 
@@ -142,7 +152,10 @@ class ExpenseRepository {
     return const [];
   }
 
-  Future<CommentModel> addComment(String expenseId, CommentModel comment) async {
+  Future<CommentModel> addComment(
+    String expenseId,
+    CommentModel comment,
+  ) async {
     final response = await _client.post(
       ApiEndpoints.expenseComments(expenseId),
       body: {
@@ -153,9 +166,13 @@ class ExpenseRepository {
       },
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : (response is Map<String, dynamic> ? response : <String, dynamic>{});
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : (response is Map<String, dynamic>
+                ? response
+                : <String, dynamic>{});
     return CommentModel.fromJson(data);
   }
 
@@ -170,13 +187,16 @@ class ExpenseRepository {
       body: {
         'justification_reason': reason,
         if (comment != null) 'justification_comment': comment,
-        if (attachmentUrl != null) 'justification_attachment_url': attachmentUrl,
+        if (attachmentUrl != null)
+          'justification_attachment_url': attachmentUrl,
       },
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return ExpenseModel.fromJson(data);
   }
 
@@ -189,13 +209,16 @@ class ExpenseRepository {
       ApiEndpoints.reviewJustification(expenseId),
       body: {
         'justification_status': status.name,
-        if (reviewComment != null) 'justification_review_comment': reviewComment,
+        if (reviewComment != null)
+          'justification_review_comment': reviewComment,
       },
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return ExpenseModel.fromJson(data);
   }
 }
