@@ -64,11 +64,9 @@ class _LeaveDetailScreenState extends ConsumerState<LeaveDetailScreen> {
       if (leave == null) {
         final user = ref.read(authProvider).currentUser;
         if (user == null) throw Exception('Your session has expired.');
-        final leaves = await ref
+        leave = await ref
             .read(leaveRepositoryProvider)
-            .getLeaves(userId: user.role.canApproveMembers ? null : user.id);
-        leave = leaves.where((item) => item.id == widget.leaveId).firstOrNull;
-        if (leave == null) throw Exception('Leave request could not be found.');
+            .getLeaveById(widget.leaveId);
       }
       if (!mounted) return;
       setState(() {
@@ -100,11 +98,11 @@ class _LeaveDetailScreenState extends ConsumerState<LeaveDetailScreen> {
           _commentsError = _messageFor(error);
         });
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Leave details could not be loaded. Please try again.';
+        _error = _messageFor(error);
       });
     }
   }

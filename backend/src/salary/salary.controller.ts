@@ -144,6 +144,11 @@ export class SalaryController {
     return this.salaryService.getLeaves(queryUserId, targetMonth, targetYear, req.user);
   }
 
+  @Get('leaves/:id')
+  async getLeaveById(@Param('id') id: string, @Request() req: any) {
+    return this.salaryService.getLeaveById(id, req.user);
+  }
+
   @Post('leaves')
   async addLeave(@Body() dto: CreateLeaveDto, @Request() req: any) {
     // If not admin/finance, employee can only request leave for themselves

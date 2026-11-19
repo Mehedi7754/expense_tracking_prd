@@ -289,6 +289,14 @@ export class SalaryService {
     }));
   }
 
+  async getLeaveById(id: string, viewer: { id: string; role: string; assignedProjectIds?: string[] }) {
+    const ownerId = await this.assertLeaveCommentAccess(id, viewer);
+    const leave = (await this.getLeaves(ownerId, undefined, undefined, viewer))
+      .find((item) => item.id === id);
+    if (!leave) throw new NotFoundException('Leave request not found');
+    return leave;
+  }
+
   async addLeave(dto: CreateLeaveDto, approvedBy?: string) {
     const res = await this.db.query(
        `INSERT INTO leave_records (user_id, start_date, end_date, leave_type, reason, is_approved, status, approved_by)

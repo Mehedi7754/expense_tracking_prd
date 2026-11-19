@@ -49,8 +49,9 @@ class LeaveRepository {
     final response = await _client.get(
       '${ApiEndpoints.salary}/leave-allowances?$query',
     );
-    if (response is! List)
+    if (response is! List) {
       throw const FormatException('Invalid leave allowance response');
+    }
     return response
         .whereType<Map<String, dynamic>>()
         .map(LeaveAllowance.fromJson)
@@ -72,8 +73,9 @@ class LeaveRepository {
         'allowedDays': allowedDays,
       },
     );
-    if (response is! Map<String, dynamic>)
+    if (response is! Map<String, dynamic>) {
       throw const FormatException('Invalid leave allowance response');
+    }
     return LeaveAllowance.fromJson(response);
   }
 
@@ -106,6 +108,17 @@ class LeaveRepository {
         .whereType<Map<String, dynamic>>()
         .map(LeaveRecordModel.fromJson)
         .toList();
+  }
+
+  Future<LeaveRecordModel> getLeaveById(String id) async {
+    dynamic response = await _client.get(ApiEndpoints.leaveById(id));
+    while (response is Map<String, dynamic> && response['data'] is Map<String, dynamic>) {
+      response = response['data'];
+    }
+    if (response is! Map<String, dynamic>) {
+      throw const FormatException('Invalid leave detail response');
+    }
+    return LeaveRecordModel.fromJson(response);
   }
 
   /// Submits a new leave application to the live backend.
