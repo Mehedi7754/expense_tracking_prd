@@ -15,6 +15,16 @@ const leaveTypes = [
   'maternity',
 ];
 
+Color _leaveTypeColor(String type) => switch (type) {
+  'casual' => const Color(0xFF2563EB),
+  'sick' => const Color(0xFF059669),
+  'emergency' => const Color(0xFFD97706),
+  'paid' => const Color(0xFF7C3AED),
+  'unpaid' => const Color(0xFF475569),
+  'maternity' => const Color(0xFFDB2777),
+  _ => const Color(0xFF4F46E5),
+};
+
 class LeaveSettingsScreen extends ConsumerStatefulWidget {
   const LeaveSettingsScreen({super.key});
 
@@ -388,25 +398,57 @@ class _LeaveSettingsScreenState extends ConsumerState<LeaveSettingsScreen> {
                                                   user.id,
                                                   type,
                                                 );
-                              return ListTile(
-                                                  contentPadding:
-                                                      EdgeInsets.zero,
-                                dense: true,
-                                title: Text(
-                                                    type[0].toUpperCase() +
-                                                        type.substring(1),
+                              final color = _leaveTypeColor(type);
+                              final allowed = allowance?.allowedDays;
+                              final remaining = allowed == null
+                                  ? null
+                                  : (allowed - used).clamp(0, allowed);
+                              return Card(
+                                margin: const EdgeInsets.only(top: 8),
+                                elevation: 0,
+                                color: color.withValues(alpha: .07),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  side: BorderSide(color: color.withValues(alpha: .22)),
                                 ),
-                                subtitle: Text(
-                                  allowance == null
-                                      ? '$used used · allowance not set'
-                                      : '${allowance.allowedDays} allowed · $used used · ${allowance.allowedDays - used} left',
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 38,
+                                        height: 38,
+                                        decoration: BoxDecoration(color: color.withValues(alpha: .14), borderRadius: BorderRadius.circular(12)),
+                                        child: Icon(Icons.event_available_rounded, color: color, size: 20),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(type[0].toUpperCase() + type.substring(1), style: TextStyle(fontWeight: FontWeight.w700, color: color)),
+                                            const SizedBox(height: 2),
+                                            Text(allowed == null ? '$used days used · Not configured' : '$used used · $remaining remaining of $allowed', style: Theme.of(context).textTheme.bodySmall),
+                                            if (allowed != null && allowed > 0) ...[
+                                              const SizedBox(height: 6),
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(4),
+                                                child: LinearProgressIndicator(value: (used / allowed).clamp(0, 1).toDouble(), minHeight: 4, color: color, backgroundColor: color.withValues(alpha: .14)),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      TextButton.icon(
+                                        onPressed: () => _edit(user, type),
+                                        icon: const Icon(Icons.edit_outlined, size: 16),
+                                        label: const Text('Edit'),
+                                        style: TextButton.styleFrom(foregroundColor: color),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                trailing: const Icon(
-                                  Icons.edit_outlined,
-                                  size: 19,
-                                ),
-                                                  onTap:
-                                                      () => _edit(user, type),
                               );
                             },
                           ),
