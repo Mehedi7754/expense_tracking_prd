@@ -381,8 +381,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           SELECT '1.0.30', 2030, 'Field-level custom geofence radius slider and perimeter preview for project sites, allowing customized attendance perimeters up to 2500m.', 'GW-Project-v1.0.30.apk', 'https://github.com/Mehedi7754/expense_tracking_prd/releases/download/v1.0.30/GW-Project-v1.0.30.apk', 36943868, TRUE
           WHERE NOT EXISTS (SELECT 1 FROM app_releases WHERE build_number >= 2030);
 
-          UPDATE app_releases SET is_latest = FALSE WHERE build_number < 2030;
-          UPDATE app_releases SET is_latest = TRUE WHERE build_number = 2030;
         `);
       } catch (releaseErr: any) {
         this.logger.warn(`Failed to auto-seed app release: ${releaseErr.message}`);

@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { SalaryService } from './salary.service';
 
@@ -34,5 +34,30 @@ describe('SalaryService leave access and decisions', () => {
 
     await service.setLeaveDecision('leave-1', true, { id: 'admin-1', role: 'main_admin' });
     expect(db.query.mock.calls[0][0]).toContain("status = 'pending'");
+  });
+
+  it('rejects empty clarification messages before writing', async () => {
+    await expect(service.addLeaveComment('leave-1', 'member-1', '  ', {
+      id: 'member-1', role: 'project_member',
+    })).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  it('sends a reviewer clarification to the leave owner with a deep link', async () => {
+    const notifications = { create: jest.fn().mockResolvedValue({}) };
+    service = new SalaryService(db as unknown as DatabaseService, notifications as any);
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 'member-1' }] })
+      .mockResolvedValueOnce({ rows: [{ user_id: 'member-1', start_date: '2026-11-20', end_date: '2026-11-21', leave_type: 'casual' }] })
+      .mockResolvedValueOnce({ rows: [{ full_name: 'Manager', role: 'project_manager', avatar_url: null }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'comment-1', leave_id: 'leave-1', author_id: 'manager-1', author_name: 'Manager', author_role: 'project_manager', comment_text: 'Please clarify', created_at: new Date() }] });
+
+    await service.addLeaveComment('leave-1', 'manager-1', 'Please clarify', {
+      id: 'manager-1', role: 'main_admin',
+    });
+
+    expect(notifications.create).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'member-1', type: 'leave_comment', relatedLeaveId: 'leave-1',
+    }));
   });
 });
