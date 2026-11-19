@@ -65,9 +65,13 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
             category VARCHAR(50) NOT NULL,
             filename VARCHAR(255) NOT NULL UNIQUE,
             mime_type VARCHAR(100) NOT NULL,
+            file_size BIGINT DEFAULT 0,
             data_base64 TEXT NOT NULL,
-            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+            created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
         );
+        ALTER TABLE app_uploaded_files ADD COLUMN IF NOT EXISTS file_size BIGINT DEFAULT 0;
+        ALTER TABLE app_uploaded_files ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
         CREATE INDEX IF NOT EXISTS idx_uploaded_files_filename ON app_uploaded_files(filename);
       `);
 
