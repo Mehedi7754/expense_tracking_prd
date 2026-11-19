@@ -146,6 +146,9 @@ export class SalaryController {
 
   @Get('leaves/:id')
   async getLeaveById(@Param('id') id: string, @Request() req: any) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      throw new BadRequestException('Invalid leave request id');
+    }
     return this.salaryService.getLeaveById(id, req.user);
   }
 

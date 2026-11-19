@@ -454,14 +454,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const LeaveSettingsScreen(),
       ),
       GoRoute(
+        path: RoutePaths.applyLeave,
+        builder: (context, state) => const ApplyLeaveScreen(),
+      ),
+      GoRoute(
         path: RoutePaths.leaveDetailPattern,
         builder:
             (context, state) =>
                 LeaveDetailScreen(leaveId: state.pathParameters['id'] ?? ''),
-      ),
-      GoRoute(
-        path: RoutePaths.applyLeave,
-        builder: (context, state) => const ApplyLeaveScreen(),
       ),
 
       // Real-Time Corporate Chat & Messenger
