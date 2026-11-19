@@ -31,8 +31,8 @@ export class ProjectsController {
   }
 
   @Get(':id/members')
-  async getMembers(@Param('id') id: string) {
-    return this.projectsService.getProjectMembers(id);
+  async getMembers(@Param('id') id: string, @Request() req: any) {
+    return this.projectsService.getProjectMembers(id, req.user);
   }
 
   @Get(':id/my-permissions')

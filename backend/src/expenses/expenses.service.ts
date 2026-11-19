@@ -143,7 +143,11 @@ export class ExpensesService {
     const isGlobalAdminOrFinance = ['main_admin', 'admin', 'finance', 'finance_manager'].includes(user.role);
     if (!isGlobalAdminOrFinance) {
       if (user.role === 'project_manager') {
-        sql += ` AND EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.project_id AND pm.user_id = $${idx++})`;
+        sql += ` AND EXISTS (
+          SELECT 1 FROM project_members pm
+          WHERE pm.project_id = e.project_id AND pm.user_id = $${idx++}
+            AND (pm.can_approve_expenses = TRUE OR pm.can_view_expenses = TRUE)
+        )`;
         params.push(user.id);
       } else {
         sql += ` AND (
@@ -152,7 +156,7 @@ export class ExpensesService {
             SELECT 1 FROM project_members pm 
             WHERE pm.project_id = e.project_id 
               AND pm.user_id = $${idx} 
-              AND (pm.can_approve_expenses = TRUE OR pm.can_view_expenses = TRUE OR pm.role_in_project ILIKE '%Manager%' OR pm.role_in_project ILIKE '%Lead%')
+              AND (pm.can_approve_expenses = TRUE OR pm.can_view_expenses = TRUE)
           )
         )`;
         params.push(user.id);
@@ -859,7 +863,7 @@ export class ExpensesService {
           // Employee replied -> notify project managers and global admins
           const managersRes = await this.db.query(
             `SELECT user_id FROM project_members 
-             WHERE project_id = $1 AND (can_approve_expenses = TRUE OR role_in_project ILIKE '%Manager%' OR role_in_project ILIKE '%Lead%')`,
+             WHERE project_id = $1 AND can_approve_expenses = TRUE`,
             [exp.project_id],
           );
           const recipientIds = new Set<string>(managersRes.rows.map((r: any) => r.user_id));

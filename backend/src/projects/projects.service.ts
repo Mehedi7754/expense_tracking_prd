@@ -498,14 +498,10 @@ export class ProjectsService {
     const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'finance_manager' || user?.role === 'finance';
     if (user && !isAdminOrFinance) {
       const pmRes = await this.db.query(
-        'SELECT can_edit_project, role_in_project FROM project_members WHERE project_id = $1 AND user_id = $2',
+        'SELECT can_edit_project FROM project_members WHERE project_id = $1 AND user_id = $2',
         [id, user.id],
       );
-      const canEdit = pmRes.rows.length > 0 && (
-        pmRes.rows[0].can_edit_project === true ||
-        (pmRes.rows[0].role_in_project || '').toLowerCase().includes('manager') ||
-        (pmRes.rows[0].role_in_project || '').toLowerCase().includes('lead')
-      );
+      const canEdit = pmRes.rows.length > 0 && pmRes.rows[0].can_edit_project === true;
       if (!canEdit) {
         throw new ForbiddenException('You do not have permission to update this project');
       }
@@ -790,13 +786,51 @@ export class ProjectsService {
     };
   }
 
-  async getProjectMembers(projectId: string) {
+  private async getMemberManagementContext(projectId: string, actorUser: any) {
+    if (!actorUser?.id) throw new ForbiddenException('Authentication is required to manage project members');
     const rawTarget = (projectId || '').trim();
-    const pRes = await this.db.query('SELECT id FROM projects WHERE id::text = $1 OR project_code = $1', [rawTarget]);
-    if (!pRes.rows.length) {
-      throw new NotFoundException(`Project not found: ${projectId}`);
+    const pRes = await this.db.query(
+      'SELECT id, name, created_by FROM projects WHERE id::text = $1 OR project_code = $1',
+      [rawTarget],
+    );
+    if (!pRes.rows.length) throw new NotFoundException(`Project not found: ${projectId}`);
+
+    const project = pRes.rows[0];
+    const isSystemAdmin = ['main_admin', 'admin'].includes(actorUser.role);
+    const isCreator = project.created_by === actorUser.id;
+    let actorPermissions: Record<string, boolean> = {};
+
+    if (!isSystemAdmin && !isCreator) {
+      const actorRes = await this.db.query(
+        `SELECT can_view_budget, can_record_revenue, can_view_expenses, can_create_expenses,
+                can_approve_expenses, can_manage_tasks, can_update_progress, can_manage_team,
+                can_edit_project, can_view_attendance
+         FROM project_members WHERE project_id = $1 AND user_id = $2`,
+        [project.id, actorUser.id],
+      );
+      const actor = actorRes.rows[0];
+      if (!actor?.can_manage_team) {
+        throw new ForbiddenException('You do not have permission to manage members for this project');
+      }
+      actorPermissions = {
+        canViewBudget: Boolean(actor.can_view_budget),
+        canRecordRevenue: Boolean(actor.can_record_revenue),
+        canViewExpenses: Boolean(actor.can_view_expenses),
+        canCreateExpenses: Boolean(actor.can_create_expenses),
+        canApproveExpenses: Boolean(actor.can_approve_expenses),
+        canManageTasks: Boolean(actor.can_manage_tasks),
+        canUpdateProgress: Boolean(actor.can_update_progress),
+        canManageTeam: Boolean(actor.can_manage_team),
+        canEditProject: Boolean(actor.can_edit_project),
+        canViewAttendance: Boolean(actor.can_view_attendance),
+      };
     }
-    const actualId = pRes.rows[0].id;
+
+    return { project, isSystemAdmin, isCreator, actorPermissions };
+  }
+
+  async getProjectMembers(projectId: string, actorUser: any) {
+    const { project } = await this.getMemberManagementContext(projectId, actorUser);
 
     const res = await this.db.query(`
       SELECT 
@@ -815,28 +849,18 @@ export class ProjectsService {
         pm.can_edit_project as "canEditProject",
         pm.can_view_attendance as "canViewAttendance",
         u.full_name as "fullName",
-        u.email,
-        u.avatar_url as "avatarUrl",
-        u.role as "systemRole",
-        u.department,
-        u.designation,
-        u.phone
+        u.avatar_url as "avatarUrl"
       FROM project_members pm
       JOIN users u ON u.id = pm.user_id
       WHERE pm.project_id = $1
       ORDER BY pm.assigned_at ASC
-    `, [actualId]);
+    `, [project.id]);
 
     return res.rows.map(r => ({
       userId: r.userId,
       projectId: r.projectId,
       fullName: r.fullName,
-      email: r.email,
       avatarUrl: r.avatarUrl,
-      systemRole: r.systemRole,
-      department: r.department,
-      designation: r.designation,
-      phone: r.phone,
       roleInProject: r.roleInProject || 'Member',
       assignedAt: r.assignedAt,
       permissions: {
@@ -855,28 +879,87 @@ export class ProjectsService {
   }
 
   async addOrUpdateProjectMember(projectId: string, dto: any, actorUser: any) {
-    const rawTarget = (projectId || '').trim();
-    const pRes = await this.db.query('SELECT id, name FROM projects WHERE id::text = $1 OR project_code = $1', [rawTarget]);
-    if (!pRes.rows.length) {
-      throw new NotFoundException(`Project not found: ${projectId}`);
-    }
-    const actualId = pRes.rows[0].id;
-    const targetUserId = dto.userId || dto.user_id;
+    const { project, isSystemAdmin, isCreator, actorPermissions } =
+      await this.getMemberManagementContext(projectId, actorUser);
+    const targetUserId = String(dto?.userId || dto?.user_id || '').trim();
     if (!targetUserId) throw new BadRequestException('userId is required');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetUserId)) {
+      throw new BadRequestException('userId must be a valid user identifier');
+    }
 
-    const isGlobalAdmin = actorUser?.role === 'main_admin' || actorUser?.role === 'admin' || actorUser?.role === 'project_manager';
-    if (!isGlobalAdmin) {
-      const actorPm = await this.db.query(
-        'SELECT can_manage_team FROM project_members WHERE project_id = $1 AND user_id = $2',
-        [actualId, actorUser?.id]
-      );
-      if (!actorPm.rows.length || !actorPm.rows[0].can_manage_team) {
-        throw new ForbiddenException('You do not have permission to manage members for this project');
+    const rawRole = dto?.roleInProject ?? dto?.role_in_project ?? dto?.role ?? 'Member';
+    if (typeof rawRole !== 'string' || !rawRole.trim() || rawRole.trim().length > 80) {
+      throw new BadRequestException('Project role must be between 1 and 80 characters');
+    }
+    const roleInProject = rawRole.trim();
+
+    const targetRes = await this.db.query('SELECT id, role FROM users WHERE id::text = $1', [targetUserId]);
+    if (!targetRes.rows.length) throw new BadRequestException('Project member user was not found');
+    if (!isSystemAdmin && ['main_admin', 'admin'].includes(targetRes.rows[0].role)) {
+      throw new ForbiddenException('Only a system administrator can change another administrator’s project access');
+    }
+    if (!isSystemAdmin && !isCreator && targetUserId === actorUser.id) {
+      throw new ForbiddenException('Project team managers cannot change their own permissions');
+    }
+
+    const targetMemberRes = await this.db.query(
+      `SELECT can_view_budget, can_record_revenue, can_view_expenses, can_create_expenses,
+              can_approve_expenses, can_manage_tasks, can_update_progress, can_manage_team,
+              can_edit_project, can_view_attendance
+       FROM project_members WHERE project_id = $1 AND user_id = $2`,
+      [project.id, targetUserId],
+    );
+    const targetPermissions = targetMemberRes.rows[0]
+      ? {
+          canViewBudget: Boolean(targetMemberRes.rows[0].can_view_budget),
+          canRecordRevenue: Boolean(targetMemberRes.rows[0].can_record_revenue),
+          canViewExpenses: Boolean(targetMemberRes.rows[0].can_view_expenses),
+          canCreateExpenses: Boolean(targetMemberRes.rows[0].can_create_expenses),
+          canApproveExpenses: Boolean(targetMemberRes.rows[0].can_approve_expenses),
+          canManageTasks: Boolean(targetMemberRes.rows[0].can_manage_tasks),
+          canUpdateProgress: Boolean(targetMemberRes.rows[0].can_update_progress),
+          canManageTeam: Boolean(targetMemberRes.rows[0].can_manage_team),
+          canEditProject: Boolean(targetMemberRes.rows[0].can_edit_project),
+          canViewAttendance: Boolean(targetMemberRes.rows[0].can_view_attendance),
+        }
+      : {};
+
+    const rawPermissions = dto?.permissions ?? {};
+    if (!rawPermissions || typeof rawPermissions !== 'object' || Array.isArray(rawPermissions)) {
+      throw new BadRequestException('permissions must be an object');
+    }
+    const permissionKeys = [
+      'canViewBudget', 'canRecordRevenue', 'canViewExpenses', 'canCreateExpenses',
+      'canApproveExpenses', 'canManageTasks', 'canUpdateProgress', 'canManageTeam',
+      'canEditProject', 'canViewAttendance',
+    ];
+    const permissionDefaults: Record<string, boolean> = {
+      canViewBudget: false,
+      canRecordRevenue: false,
+      canViewExpenses: true,
+      canCreateExpenses: true,
+      canApproveExpenses: false,
+      canManageTasks: false,
+      canUpdateProgress: false,
+      canManageTeam: false,
+      canEditProject: false,
+      canViewAttendance: true,
+    };
+    const perms: Record<string, boolean> = {};
+    for (const key of permissionKeys) {
+      const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+      const value = rawPermissions[key] ?? rawPermissions[snakeKey];
+      if (value !== undefined && typeof value !== 'boolean') {
+        throw new BadRequestException(`${key} must be a boolean`);
+      }
+      const existingDefault = targetMemberRes.rows[0]
+        ? targetPermissions[key]
+        : (isSystemAdmin || isCreator ? permissionDefaults[key] : false);
+      perms[key] = value ?? existingDefault;
+      if (!isSystemAdmin && !isCreator && perms[key] && !actorPermissions[key] && !targetPermissions[key]) {
+        throw new ForbiddenException(`You cannot grant a project permission you do not hold: ${key}`);
       }
     }
-
-    const perms = dto.permissions || {};
-    const roleInProject = (dto.roleInProject || dto.role_in_project || dto.role || 'Member').trim();
 
     await this.db.query(`
       INSERT INTO project_members (
@@ -903,55 +986,47 @@ export class ProjectsService {
         can_edit_project = EXCLUDED.can_edit_project,
         can_view_attendance = EXCLUDED.can_view_attendance
     `, [
-      actualId,
+      project.id,
       targetUserId,
       roleInProject,
-      perms.canViewBudget ?? perms.can_view_budget ?? true,
-      perms.canRecordRevenue ?? perms.can_record_revenue ?? false,
-      perms.canViewExpenses ?? perms.can_view_expenses ?? true,
-      perms.canCreateExpenses ?? perms.can_create_expenses ?? true,
-      perms.canApproveExpenses ?? perms.can_approve_expenses ?? false,
-      perms.canManageTasks ?? perms.can_manage_tasks ?? false,
-      perms.canUpdateProgress ?? perms.can_update_progress ?? false,
-      perms.canManageTeam ?? perms.can_manage_team ?? false,
-      perms.canEditProject ?? perms.can_edit_project ?? false,
-      perms.canViewAttendance ?? perms.can_view_attendance ?? true,
+      perms.canViewBudget,
+      perms.canRecordRevenue,
+      perms.canViewExpenses,
+      perms.canCreateExpenses,
+      perms.canApproveExpenses,
+      perms.canManageTasks,
+      perms.canUpdateProgress,
+      perms.canManageTeam,
+      perms.canEditProject,
+      perms.canViewAttendance,
     ]);
 
     try {
       await this.notificationsService.create({
         userId: targetUserId,
         title: 'Project Role Updated',
-        message: `You were assigned the role "${roleInProject}" on project ${pRes.rows[0].name}${perms.canApproveExpenses ? ' with expense claim approval authority' : ''}.`,
+        message: `You were assigned the role "${roleInProject}" on project ${project.name}${perms.canApproveExpenses ? ' with expense claim approval authority' : ''}.`,
         type: 'project_assigned',
-        relatedProjectId: actualId,
+        relatedProjectId: project.id,
         actorId: actorUser?.id,
         actorName: actorUser?.fullName || actorUser?.name || 'Administrator',
       });
     } catch (_) {}
 
-    return this.getProjectMembers(actualId);
+    return this.getProjectMembers(project.id, actorUser);
   }
 
   async removeProjectMember(projectId: string, userId: string, actorUser: any) {
-    const rawTarget = (projectId || '').trim();
-    const pRes = await this.db.query('SELECT id FROM projects WHERE id::text = $1 OR project_code = $1', [rawTarget]);
-    if (!pRes.rows.length) throw new NotFoundException(`Project not found: ${projectId}`);
-    const actualId = pRes.rows[0].id;
-
-    const isGlobalAdmin = actorUser?.role === 'main_admin' || actorUser?.role === 'admin' || actorUser?.role === 'project_manager';
-    if (!isGlobalAdmin) {
-      const actorPm = await this.db.query(
-        'SELECT can_manage_team FROM project_members WHERE project_id = $1 AND user_id = $2',
-        [actualId, actorUser?.id]
-      );
-      if (!actorPm.rows.length || !actorPm.rows[0].can_manage_team) {
-        throw new ForbiddenException('You do not have permission to manage members for this project');
-      }
+    const { project, isSystemAdmin, isCreator } = await this.getMemberManagementContext(projectId, actorUser);
+    if (!isSystemAdmin && !isCreator && userId === actorUser.id) {
+      throw new ForbiddenException('Project team managers cannot remove themselves');
     }
-
-    await this.db.query('DELETE FROM project_members WHERE project_id = $1 AND user_id = $2', [actualId, userId]);
-    return { success: true, userId, projectId: actualId };
+    const targetRes = await this.db.query('SELECT role FROM users WHERE id::text = $1', [userId]);
+    if (targetRes.rows[0] && !isSystemAdmin && ['main_admin', 'admin'].includes(targetRes.rows[0].role)) {
+      throw new ForbiddenException('Only a system administrator can remove another administrator from a project');
+    }
+    await this.db.query('DELETE FROM project_members WHERE project_id = $1 AND user_id = $2', [project.id, userId]);
+    return { success: true, userId, projectId: project.id };
   }
 
   async getMyProjectPermissions(projectId: string, user: any) {

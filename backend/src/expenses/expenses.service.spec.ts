@@ -102,6 +102,17 @@ describe('ExpensesService Unit & Business Rules', () => {
   });
 
   describe('IDOR & Access Control', () => {
+    it('does not grant expense visibility based on the project role title', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+      await service.findAll({}, {
+        id: 'member-manager', role: 'project_member',
+      } as any);
+
+      const [sql] = mockDb.query.mock.calls[0];
+      expect(sql).toContain('pm.can_approve_expenses = TRUE OR pm.can_view_expenses = TRUE');
+      expect(sql).not.toMatch(/role_in_project\s+ILIKE/i);
+    });
+
     it('keeps uploaded receipts visible when older rows also contain device paths', async () => {
       mockDb.query.mockResolvedValue({ rows: [{
         id: 'exp-receipts', employee_id: 'owner', project_id: 'project-1',

@@ -139,5 +139,117 @@ describe('ProjectsService Unit & Access Rules', () => {
         ForbiddenException,
       );
     });
+
+    it('does not treat a Manager role title as project edit permission', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'proj-1', name: 'Project 1', teamMemberIds: ['member-manager'],
+      } as any);
+      mockDb.query.mockResolvedValueOnce({ rows: [{ can_edit_project: false, role_in_project: 'Manager' }] });
+
+      await expect(service.update('proj-1', { name: 'Changed' }, {
+        id: 'member-manager', role: 'project_member',
+      })).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('Project member access management', () => {
+    it('rejects reading project member permissions for an unrelated authenticated user', async () => {
+      mockDb.query.mockResolvedValueOnce({
+        rows: [{ id: 'proj-private', created_by: 'creator-id' }],
+      });
+
+      await expect(
+        (service.getProjectMembers as any)('proj-private', {
+          id: 'outsider-id',
+          role: 'project_member',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('prevents a delegated team manager from granting permissions they do not hold', async () => {
+      mockDb.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('SELECT id, name, created_by FROM projects')) {
+          return { rows: [{ id: 'proj-private', name: 'VAL_Access Review', created_by: 'creator-id' }] };
+        }
+        if (sql.includes('can_manage_team')) {
+          return {
+            rows: [{
+              can_manage_team: true,
+              can_view_budget: false,
+              can_record_revenue: false,
+              can_view_expenses: true,
+              can_create_expenses: true,
+              can_approve_expenses: false,
+              can_manage_tasks: true,
+              can_update_progress: true,
+              can_edit_project: false,
+              can_view_attendance: true,
+            }],
+          };
+        }
+        if (sql.includes('FROM users WHERE id::text = $1')) return { rows: [{ role: 'project_member' }] };
+        return { rows: [] };
+      });
+
+      await expect(
+        service.addOrUpdateProjectMember(
+          'proj-private',
+          {
+            userId: '11111111-1111-4111-8111-111111111111',
+            roleInProject: 'Auditor',
+            permissions: { canApproveExpenses: true },
+          },
+          { id: 'team-manager-id', role: 'project_member' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockDb.query).not.toHaveBeenCalledWith(expect.stringContaining('INSERT INTO project_members'), expect.anything());
+    });
+
+    it('preserves existing target permissions when a delegated manager submits a partial update', async () => {
+      let memberPermissionReads = 0;
+      mockDb.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('SELECT id, name, created_by FROM projects')) return { rows: [{ id: 'proj-private', name: 'VAL_Access Review', created_by: 'creator-id' }] };
+        if (sql.includes('FROM project_members WHERE project_id = $1 AND user_id = $2')) {
+          memberPermissionReads += 1;
+          if (memberPermissionReads % 2 === 1) return { rows: [{ can_manage_team: true, can_view_budget: false, can_record_revenue: false, can_view_expenses: true, can_create_expenses: true, can_approve_expenses: false, can_manage_tasks: true, can_update_progress: true, can_edit_project: false, can_view_attendance: true }] };
+          return { rows: [{ can_view_budget: true, can_record_revenue: true, can_view_expenses: true, can_create_expenses: true, can_approve_expenses: true, can_manage_tasks: true, can_update_progress: true, can_manage_team: false, can_edit_project: false, can_view_attendance: true }] };
+        }
+        if (sql.includes('FROM users WHERE id::text = $1')) return { rows: [{ role: 'project_member' }] };
+        if (sql.includes('INSERT INTO project_members')) return { rows: [] };
+        if (sql.includes('FROM project_members pm')) return { rows: [] };
+        return { rows: [] };
+      });
+
+      await service.addOrUpdateProjectMember('proj-private', {
+        userId: '11111111-1111-4111-8111-111111111111', roleInProject: 'Auditor', permissions: {},
+      }, { id: 'team-manager-id', role: 'project_member' });
+
+      const insertCall = mockDb.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO project_members'));
+      expect(insertCall[1].slice(3)).toEqual([true, true, true, true, true, true, true, false, false, true]);
+    });
+
+    it('defaults a new delegated member to least privilege when permissions are omitted', async () => {
+      let memberPermissionReads = 0;
+      mockDb.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('SELECT id, name, created_by FROM projects')) return { rows: [{ id: 'proj-private', name: 'VAL_Access Review', created_by: 'creator-id' }] };
+        if (sql.includes('FROM project_members WHERE project_id = $1 AND user_id = $2')) {
+          memberPermissionReads += 1;
+          return memberPermissionReads % 2 === 1
+            ? { rows: [{ can_manage_team: true, can_view_budget: false, can_record_revenue: false, can_view_expenses: true, can_create_expenses: true, can_approve_expenses: false, can_manage_tasks: true, can_update_progress: true, can_edit_project: false, can_view_attendance: true }] }
+            : { rows: [] };
+        }
+        if (sql.includes('FROM users WHERE id::text = $1')) return { rows: [{ role: 'project_member' }] };
+        if (sql.includes('INSERT INTO project_members')) return { rows: [] };
+        if (sql.includes('FROM project_members pm')) return { rows: [] };
+        return { rows: [] };
+      });
+
+      await service.addOrUpdateProjectMember('proj-private', {
+        userId: '11111111-1111-4111-8111-111111111111', roleInProject: 'Manager',
+      }, { id: 'team-manager-id', role: 'project_member' });
+
+      const insertCall = mockDb.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO project_members'));
+      expect(insertCall[1].slice(3)).toEqual(Array(10).fill(false));
+    });
   });
 });
