@@ -487,6 +487,12 @@ export class AttendanceService {
         timeZone: notifTz, hour: '2-digit', minute: '2-digit',
       });
       const dateStr = recordedAt.toLocaleDateString('en-US', { timeZone: notifTz });
+      const attendanceDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: notifTz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).format(recordedAt);
       
       const statusTag = isLate ? '⚠️ LATE' : '✅ ON TIME';
       const checkoutTag = isEarly ? '⚠️ BEFORE TIME' : '✅ ON TIME';
@@ -511,6 +517,7 @@ export class AttendanceService {
         actorId: userId,
         actorName: empName,
         actorAvatarUrl: empAvatar,
+        attendanceDate,
       });
 
       // Send Email to Employee
@@ -551,6 +558,7 @@ export class AttendanceService {
           actorId: userId,
           actorName: empName,
           actorAvatarUrl: empAvatar,
+          attendanceDate,
         });
       }
     } catch (e) {

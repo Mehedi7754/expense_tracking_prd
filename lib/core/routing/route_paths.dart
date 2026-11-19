@@ -55,6 +55,8 @@ class RoutePaths {
   static const String monthlyAttendance = '/attendance/monthly';
   static const String employeeMonthlyAttendancePattern =
       '/attendance/monthly/:userId';
+  static const String employeeAttendanceDayPattern =
+      '/attendance/day/:userId/:date';
   static const String myAttendance = '/attendance/my';
   static const String attendanceSettings = '/admin/attendance-settings';
   static const String homeLocation = '/set-home-location';
@@ -88,4 +90,6 @@ class RoutePaths {
   static String leaveDetail(String id) => '/leaves/$id';
   static String employeeMonthlyAttendance(String userId) =>
       '/attendance/monthly/$userId';
+  static String employeeAttendanceDay(String userId, String date) =>
+      '/attendance/day/$userId/$date';
 }

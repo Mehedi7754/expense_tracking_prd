@@ -68,6 +68,8 @@ class NotificationRouter {
     final attendanceEmployeeId =
         (data['attendanceUserId'] ?? data['actorId'] ?? data['userId'])
             ?.toString();
+    final attendanceDate =
+        data['attendanceDate']?.toString() ?? data['date']?.toString();
     final chatChannelId =
         (data['channelId'] ?? data['chatChannelId'])?.toString();
 
@@ -93,6 +95,13 @@ class NotificationRouter {
       if (canManageAttendance &&
           attendanceEmployeeId != null &&
           attendanceEmployeeId.isNotEmpty) {
+        if (attendanceDate != null &&
+            RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(attendanceDate)) {
+          return RoutePaths.employeeAttendanceDay(
+            attendanceEmployeeId,
+            attendanceDate,
+          );
+        }
         return RoutePaths.employeeMonthlyAttendance(attendanceEmployeeId);
       }
       return canManageAttendance

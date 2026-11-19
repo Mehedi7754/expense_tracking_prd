@@ -28,6 +28,7 @@ class _LeaveSettingsScreenState extends ConsumerState<LeaveSettingsScreen> {
   String _search = '';
   String _type = 'all';
   String? _selectedUserId;
+  String? _expandedUserId;
   List<LeaveAllowance> _allowances = const [];
   bool _loading = true;
   String? _error;
@@ -279,27 +280,97 @@ class _LeaveSettingsScreenState extends ConsumerState<LeaveSettingsScreen> {
               )
             else
               for (final user in filtered)
-                Card(
-                  margin: const EdgeInsets.only(top: 12),
+                Builder(
+                  builder: (context) {
+                    final expanded = _expandedUserId == user.id;
+                    final configured =
+                        _allowances
+                            .where((item) => item.userId == user.id)
+                            .length;
+                    final used = leaveTypes.fold<int>(
+                      0,
+                      (sum, type) => sum + _usedDays(user.id, type),
+                    );
+                    return Card(
+                      margin: const EdgeInsets.only(top: 10),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        children: [
+                          InkWell(
+                            onTap:
+                                () => setState(
+                                  () =>
+                                      _expandedUserId =
+                                          expanded ? null : user.id,
+                                ),
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 13,
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 21,
+                                    child: Text(
+                                      user.name.isEmpty
+                                          ? '?'
+                                          : user.name[0].toUpperCase(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 11),
+                                  Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                       children: [
                         Text(
                           user.name,
                           style: const TextStyle(
-                            fontSize: 15,
+                                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          user.department,
-                          style: Theme.of(context).textTheme.bodySmall,
+                                          '${user.department} · $configured/${leaveTypes.length} allowances · $used days used',
+                                          style:
+                                              Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                         ),
-                        const SizedBox(height: 8),
+                                  AnimatedRotation(
+                                    turns: expanded ? .5 : 0,
+                                    duration: const Duration(milliseconds: 180),
+                                    child: const Icon(
+                                      Icons.expand_more_rounded,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeInOut,
+                            child:
+                                expanded
+                                    ? Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        14,
+                                        0,
+                                        14,
+                                        10,
+                                      ),
+                                      child: Column(
+                                        children: [
                         for (final type in leaveTypes.where(
-                          (type) => _type == 'all' || _type == type,
+                                            (type) =>
+                                                _type == 'all' || _type == type,
                         ))
                           Builder(
                             builder: (context) {
@@ -307,16 +378,23 @@ class _LeaveSettingsScreenState extends ConsumerState<LeaveSettingsScreen> {
                                   _allowances
                                       .where(
                                         (item) =>
-                                            item.userId == user.id &&
-                                            item.leaveType == type,
+                                                              item.userId ==
+                                                                  user.id &&
+                                                              item.leaveType ==
+                                                                  type,
                                       )
                                       .firstOrNull;
-                              final used = _usedDays(user.id, type);
+                                                final used = _usedDays(
+                                                  user.id,
+                                                  type,
+                                                );
                               return ListTile(
-                                contentPadding: EdgeInsets.zero,
+                                                  contentPadding:
+                                                      EdgeInsets.zero,
                                 dense: true,
                                 title: Text(
-                                  type[0].toUpperCase() + type.substring(1),
+                                                    type[0].toUpperCase() +
+                                                        type.substring(1),
                                 ),
                                 subtitle: Text(
                                   allowance == null
@@ -327,13 +405,20 @@ class _LeaveSettingsScreenState extends ConsumerState<LeaveSettingsScreen> {
                                   Icons.edit_outlined,
                                   size: 19,
                                 ),
-                                onTap: () => _edit(user, type),
+                                                  onTap:
+                                                      () => _edit(user, type),
                               );
                             },
                           ),
                       ],
                     ),
+                                    )
+                                    : const SizedBox(width: double.infinity),
                   ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
           ],
         ),

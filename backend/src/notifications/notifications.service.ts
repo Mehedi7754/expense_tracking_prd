@@ -126,6 +126,7 @@ export class NotificationsService {
     actorAvatarUrl?: string;
     expenseDate?: string;
     submittedDate?: string;
+    attendanceDate?: string;
   }) {
     let savedNotification: any = null;
     try {
@@ -222,6 +223,7 @@ export class NotificationsService {
       if (data.actorAvatarUrl) payloadData.actorAvatarUrl = data.actorAvatarUrl;
       if (data.expenseDate) payloadData.expenseDate = String(data.expenseDate);
       if (data.submittedDate) payloadData.submittedDate = String(data.submittedDate);
+      if (data.attendanceDate) payloadData.attendanceDate = String(data.attendanceDate);
       if (data.type?.includes('attendance')) {
         const actor = data.actorId || data.userId || 'self';
         payloadData.tag = `attendance_${actor}_${new Date().toISOString().slice(0, 10)}`;

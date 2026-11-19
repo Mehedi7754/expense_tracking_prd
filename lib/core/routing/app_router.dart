@@ -14,6 +14,7 @@ import '../../screens/attendance/attendance_dashboard_screen.dart';
 import '../../screens/attendance/attendance_settings_screen.dart';
 import '../../screens/attendance/monthly_attendance_screen.dart';
 import '../../screens/attendance/employee_monthly_attendance_screen.dart';
+import '../../screens/attendance/employee_attendance_day_screen.dart';
 import '../../screens/attendance/my_attendance_screen.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/login_screen.dart';
@@ -90,8 +91,7 @@ class RouterNotifier extends ChangeNotifier {
 
     // Role-Based Guards
     if (isAuthenticated) {
-      if (loc == RoutePaths.leaveSettings &&
-          role != UserRole.mainAdmin) {
+      if (loc == RoutePaths.leaveSettings && role != UserRole.mainAdmin) {
         return RoutePaths.leaves;
       }
       // Admin routes guard
@@ -409,6 +409,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               userId: state.pathParameters['userId'] ?? '',
               initialMonth:
                   state.extra is DateTime ? state.extra as DateTime : null,
+            ),
+      ),
+      GoRoute(
+        path: RoutePaths.employeeAttendanceDayPattern,
+        builder:
+            (context, state) => EmployeeAttendanceDayScreen(
+              userId: state.pathParameters['userId'] ?? '',
+              date: state.pathParameters['date'] ?? '',
             ),
       ),
       GoRoute(

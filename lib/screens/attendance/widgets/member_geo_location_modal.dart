@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/routing/route_paths.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/notification_banner.dart';
 import '../../../models/attendance_model.dart';
@@ -21,11 +23,13 @@ import 'attendance_map_view.dart';
 class MemberGeoLocationModal extends ConsumerStatefulWidget {
   final EmployeeDailyAttendance employee;
   final String date;
+  final bool fullPage;
 
   const MemberGeoLocationModal({
     super.key,
     required this.employee,
     required this.date,
+    this.fullPage = false,
   });
 
   static void show(BuildContext context, EmployeeDailyAttendance emp, String date) {
@@ -343,10 +347,10 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
     }
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.88,
+      height: widget.fullPage ? null : MediaQuery.of(context).size.height * 0.88,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: widget.fullPage ? BorderRadius.zero : const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
@@ -437,6 +441,19 @@ class _MemberGeoLocationModalState extends ConsumerState<MemberGeoLocationModal>
                       _buildOverallStatusBadge(emp.status),
                     ],
                   ),
+
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push(
+                    RoutePaths.employeeMonthlyAttendance(emp.userId),
+                    extra: DateTime.tryParse(_currentDate),
+                  ),
+                  icon: const Icon(Icons.calendar_month_rounded),
+                  label: const Text('Monthly details'),
+                ),
+              ),
 
                   const SizedBox(height: 16),
 

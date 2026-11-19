@@ -254,35 +254,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Annual balances belong to one employee, never the whole team.
-              if (user?.role.canApproveMembers == true) ...[
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedEmployeeId ?? '',
-                  decoration: const InputDecoration(
-                    labelText: 'Employee balance',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: '',
-                      child: Text('Select employee'),
-                    ),
-                    ...users.map(
-                      (employee) => DropdownMenuItem(
-                        value: employee.id,
-                        child: Text(employee.name),
-                      ),
-                    ),
-                  ],
-                  onChanged:
-                      (value) => setState(() {
-                        _selectedEmployeeId = value == '' ? null : value;
-                        _showAllRecords = false;
-                      }),
-                ),
-                const SizedBox(height: 14),
-              ],
+              if (user?.role.canApproveMembers != true) ...[
               Text(
                 balanceEmployeeName == null
                     ? 'EMPLOYEE LEAVE BALANCE'
@@ -429,6 +401,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
                     ),
                   ],
                 ),
+              ],
               ],
 
               const SizedBox(height: 20),

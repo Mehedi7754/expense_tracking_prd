@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/services/notification_router.dart';
@@ -486,6 +487,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                           'projectId': notif.relatedProjectId,
                                           'relatedTaskId': notif.relatedTaskId,
                                           'actorId': notif.actorId,
+                                          'attendanceDate': DateFormat(
+                                            'yyyy-MM-dd',
+                                          ).format(notif.timestamp.toLocal()),
                                           'notificationId': notif.id,
                                         }),
                                       );
