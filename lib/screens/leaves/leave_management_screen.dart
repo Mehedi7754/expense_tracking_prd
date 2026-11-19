@@ -10,6 +10,8 @@ import '../../models/leave_model.dart';
 import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 import '../../state/leave_provider.dart';
+import '../../state/user_management_provider.dart';
+import '../../repositories/leave_repository.dart';
 
 class LeaveManagementScreen extends ConsumerStatefulWidget {
   const LeaveManagementScreen({super.key});
@@ -23,6 +25,76 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
   bool _showAllRecords = false;
   String? _selectedEmployeeId;
+  List<LeaveAllowance> _allowances = const [];
+  bool _allowancesLoading = true;
+  String? _allowancesError;
+
+  Future<void> _loadAllowances() async {
+    final user = ref.read(authProvider).currentUser;
+    if (user == null) return;
+    setState(() {
+      _allowancesLoading = true;
+      _allowancesError = null;
+    });
+    try {
+      final records = await ref
+          .read(leaveRepositoryProvider)
+          .getAllowances(
+            year: _selectedMonth.year,
+            userId: user.role.canApproveMembers ? null : user.id,
+          );
+      if (mounted)
+        setState(() {
+          _allowances = records;
+          _allowancesLoading = false;
+        });
+    } catch (_) {
+      if (mounted)
+        setState(() {
+          _allowancesLoading = false;
+          _allowancesError = 'Allowances could not be loaded.';
+        });
+    }
+  }
+
+  int _usedInYear(List<LeaveRecordModel> leaves, String userId, String type) {
+    final first = DateTime(_selectedMonth.year);
+    final last = DateTime(_selectedMonth.year, 12, 31);
+    return leaves
+        .where(
+          (leave) =>
+              leave.userId == userId &&
+              leave.leaveType.toLowerCase() == type &&
+              leave.isApproved &&
+              !leave.isRejected,
+        )
+        .fold<int>(0, (sum, leave) {
+          final start = DateTime.tryParse(leave.startDate);
+          final end = DateTime.tryParse(leave.endDate);
+          if (start == null || end == null) return sum;
+          final from = start.isBefore(first) ? first : start;
+          final to = end.isAfter(last) ? last : end;
+          return sum + (to.isBefore(from) ? 0 : to.difference(from).inDays + 1);
+        });
+  }
+
+  int? _allowed(String userId, String type) =>
+      _allowances
+          .where((item) => item.userId == userId && item.leaveType == type)
+          .firstOrNull
+          ?.allowedDays;
+
+  void _moveMonth(int offset) {
+    final previousYear = _selectedMonth.year;
+    setState(() {
+      _selectedMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month + offset,
+      );
+      _showAllRecords = false;
+    });
+    if (_selectedMonth.year != previousYear) _loadAllowances();
+  }
 
   int _daysInMonth(LeaveRecordModel leave) {
     final start = DateTime.tryParse(leave.startDate);
@@ -57,6 +129,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(leaveProvider.notifier).fetchLeaves(force: true);
+      _loadAllowances();
     });
   }
 
@@ -67,6 +140,26 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
     final leaveState = ref.watch(leaveProvider);
     final authState = ref.watch(authProvider);
     final user = authState.currentUser;
+    final users =
+        ref
+            .watch(userManagementProvider)
+            .where((employee) => employee.isActive)
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+    final balanceEmployeeId =
+        user?.role.canApproveMembers == true ? _selectedEmployeeId : user?.id;
+    final balanceEmployeeName =
+        balanceEmployeeId == null
+            ? null
+            : users
+                    .where((employee) => employee.id == balanceEmployeeId)
+                    .firstOrNull
+                    ?.name ??
+                leaveState.leaves
+                    .where((leave) => leave.userId == balanceEmployeeId)
+                    .firstOrNull
+                    ?.userName ??
+                user?.name;
     final canApplyLeave = user != null && user.role != UserRole.mainAdmin;
 
     final employeeLeaves =
@@ -117,6 +210,15 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         actions: [
+          if (user?.role == UserRole.mainAdmin)
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Leave allowance settings',
+              onPressed: () async {
+                await context.push(RoutePaths.leaveSettings);
+                if (mounted) _loadAllowances();
+              },
+            ),
           if (canApplyLeave)
             IconButton(
               icon: const Icon(
@@ -144,6 +246,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           await ref.read(leaveProvider.notifier).fetchLeaves(force: true);
+          await _loadAllowances();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -151,9 +254,39 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. LEAVE BALANCES OVERVIEW
+              // Annual balances belong to one employee, never the whole team.
+              if (user?.role.canApproveMembers == true) ...[
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedEmployeeId ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'Employee balance',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Select employee'),
+                    ),
+                    ...users.map(
+                      (employee) => DropdownMenuItem(
+                        value: employee.id,
+                        child: Text(employee.name),
+                      ),
+                    ),
+                  ],
+                  onChanged:
+                      (value) => setState(() {
+                        _selectedEmployeeId = value == '' ? null : value;
+                        _showAllRecords = false;
+                      }),
+                ),
+                const SizedBox(height: 14),
+              ],
               Text(
-                'APPROVED LEAVE USED',
+                balanceEmployeeName == null
+                    ? 'EMPLOYEE LEAVE BALANCE'
+                    : '${balanceEmployeeName.toUpperCase()} · ${_selectedMonth.year} BALANCE',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
@@ -166,7 +299,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Approved requests only. Remaining balances appear when your leave policy is configured.',
+                'Approved days used in the calendar year. Allowances are set per employee in Leave Settings.',
                 style: TextStyle(
                   fontSize: 10,
                   color:
@@ -177,53 +310,126 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
               ),
               const SizedBox(height: 8),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBalanceCard(
-                      title: 'Casual Leave',
-                      usedDays: leaveState.casualDaysUsed,
-                      totalAllowance: null,
-                      color: const Color(0xFF2563EB),
-                      isDark: isDark,
+              if (balanceEmployeeId == null)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Select an employee to see their allowed, used, and remaining leave days.',
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildBalanceCard(
-                      title: 'Medical / Sick',
-                      usedDays: leaveState.sickDaysUsed,
-                      totalAllowance: null,
-                      color: const Color(0xFF10B981),
-                      isDark: isDark,
-                    ),
+                )
+              else if (_allowancesLoading)
+                const Center(child: CircularProgressIndicator())
+              else ...[
+                if (_allowancesError != null)
+                  TextButton.icon(
+                    onPressed: _loadAllowances,
+                    icon: const Icon(Icons.refresh),
+                    label: Text(_allowancesError!),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildBalanceCard(
-                      title: 'Emergency',
-                      usedDays: leaveState.emergencyDaysUsed,
-                      totalAllowance: null,
-                      color: const Color(0xFFF59E0B),
-                      isDark: isDark,
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildBalanceCard(
+                        title: 'Casual Leave',
+                        usedDays: _usedInYear(
+                          leaveState.leaves,
+                          balanceEmployeeId,
+                          'casual',
+                        ),
+                        totalAllowance: _allowed(balanceEmployeeId, 'casual'),
+                        color: const Color(0xFF2563EB),
+                        isDark: isDark,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildBalanceCard(
-                      title: 'Unpaid Leave',
-                      usedDays: leaveState.unpaidDaysUsed,
-                      totalAllowance: null,
-                      color: const Color(0xFF8B5CF6),
-                      isDark: isDark,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildBalanceCard(
+                        title: 'Medical / Sick',
+                        usedDays: _usedInYear(
+                          leaveState.leaves,
+                          balanceEmployeeId,
+                          'sick',
+                        ),
+                        totalAllowance: _allowed(balanceEmployeeId, 'sick'),
+                        color: const Color(0xFF10B981),
+                        isDark: isDark,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildBalanceCard(
+                        title: 'Emergency',
+                        usedDays: _usedInYear(
+                          leaveState.leaves,
+                          balanceEmployeeId,
+                          'emergency',
+                        ),
+                        totalAllowance: _allowed(
+                          balanceEmployeeId,
+                          'emergency',
+                        ),
+                        color: const Color(0xFFF59E0B),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildBalanceCard(
+                        title: 'Unpaid Leave',
+                        usedDays: _usedInYear(
+                          leaveState.leaves,
+                          balanceEmployeeId,
+                          'unpaid',
+                        ),
+                        totalAllowance: _allowed(balanceEmployeeId, 'unpaid'),
+                        color: const Color(0xFF8B5CF6),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildBalanceCard(
+                        title: 'Paid Leave',
+                        usedDays: _usedInYear(
+                          leaveState.leaves,
+                          balanceEmployeeId,
+                          'paid',
+                        ),
+                        totalAllowance: _allowed(balanceEmployeeId, 'paid'),
+                        color: const Color(0xFF0EA5E9),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildBalanceCard(
+                        title: 'Maternity',
+                        usedDays: _usedInYear(
+                          leaveState.leaves,
+                          balanceEmployeeId,
+                          'maternity',
+                        ),
+                        totalAllowance: _allowed(
+                          balanceEmployeeId,
+                          'maternity',
+                        ),
+                        color: const Color(0xFFEC4899),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
 
               const SizedBox(height: 20),
 
@@ -250,14 +456,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   IconButton(
-                    onPressed:
-                        () => setState(
-                          () =>
-                              _selectedMonth = DateTime(
-                                _selectedMonth.year,
-                                _selectedMonth.month - 1,
-                              ),
-                        ),
+                    onPressed: () => _moveMonth(-1),
                     icon: const Icon(Icons.chevron_left),
                     tooltip: 'Previous month',
                   ),
@@ -270,52 +469,12 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
                     ),
                   ),
                   IconButton(
-                    onPressed:
-                        () => setState(
-                          () =>
-                              _selectedMonth = DateTime(
-                                _selectedMonth.year,
-                                _selectedMonth.month + 1,
-                              ),
-                        ),
+                    onPressed: () => _moveMonth(1),
                     icon: const Icon(Icons.chevron_right),
                     tooltip: 'Next month',
                   ),
                 ],
               ),
-              if (user?.role.canApproveMembers == true) ...[
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: _selectedEmployeeId ?? '',
-                  decoration: const InputDecoration(
-                    labelText: 'Employee',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: '',
-                      child: Text('All employees'),
-                    ),
-                    ...{
-                      for (final leave in leaveState.leaves)
-                        leave.userId: leave.userName,
-                    }.entries.map(
-                      (entry) => DropdownMenuItem(
-                        value: entry.key,
-                        child: Text(
-                          entry.value.isEmpty ? 'Employee' : entry.value,
-                        ),
-                      ),
-                    ),
-                  ],
-                  onChanged:
-                      (value) => setState(() {
-                        _selectedEmployeeId = value == '' ? null : value;
-                        _showAllRecords = false;
-                      }),
-                ),
-              ],
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -586,10 +745,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
     required bool isDark,
     String unit = 'days',
   }) {
-    final remaining =
-        totalAllowance != null
-            ? (totalAllowance - usedDays).clamp(0, totalAllowance)
-            : null;
+    final remaining = totalAllowance == null ? null : totalAllowance - usedDays;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -679,6 +835,11 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
               ),
             ),
           ],
+          if (totalAllowance == null)
+            const Text(
+              'Allowance not set',
+              style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+            ),
         ],
       ),
     );

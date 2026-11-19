@@ -462,6 +462,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
     required String note,
     required DateTime date,
     String? receiptPhotoUrl,
+    List<String>? receiptPhotoUrls,
   }) async {
     final index = state.indexWhere((expense) => expense.id == id);
     if (index < 0) return false;
@@ -501,9 +502,10 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
       receiptPhotoUrl: receiptPhotoUrl,
       clearReceiptPhoto: receiptPhotoUrl == null || receiptPhotoUrl.isEmpty,
       receiptPhotoUrls:
-          receiptPhotoUrl == null || receiptPhotoUrl.isEmpty
+          receiptPhotoUrls ??
+          (receiptPhotoUrl == null || receiptPhotoUrl.isEmpty
               ? const []
-              : [receiptPhotoUrl],
+              : [receiptPhotoUrl]),
       status: ExpenseStatus.pending,
       clearRejectionReason: true,
     );

@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -203,18 +200,12 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     setState(() => _isSaving = true);
     try {
       var receiptUrl = _receiptImagePath;
-      final isLocalReceipt =
-          receiptUrl != null &&
-          !kIsWeb &&
-          !receiptUrl.startsWith('data:') &&
-          File(receiptUrl).existsSync();
       if (receiptUrl != null &&
           receiptUrl.isNotEmpty &&
           !receiptUrl.startsWith('http://') &&
           !receiptUrl.startsWith('https://') &&
           !receiptUrl.startsWith('/uploads/') &&
-          !receiptUrl.startsWith('uploads/') &&
-          (!isLocalReceipt || receiptUrl.startsWith('data:'))) {
+          !receiptUrl.startsWith('uploads/')) {
         receiptUrl =
             (await ref
                 .read(fileUploadRepositoryProvider)
@@ -246,6 +237,15 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             note: _noteController.text.trim(),
             date: _selectedDate,
             receiptPhotoUrl: receiptUrl,
+            receiptPhotoUrls:
+                receiptUrl == null || receiptUrl.isEmpty
+                    ? const []
+                    : [
+                      receiptUrl,
+                      ...?expense?.receiptPhotoUrls.where(
+                        (url) => url != receiptUrl && url.isNotEmpty,
+                      ),
+                    ],
           );
 
       if (!saved) {
@@ -1112,7 +1112,11 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                              : const Text('Save Changes'),
+                              : Text(
+                                expense.status == ExpenseStatus.rejected
+                                    ? 'Resubmit for Approval'
+                                    : 'Save Changes',
+                              ),
                     ),
                   ),
                 ],

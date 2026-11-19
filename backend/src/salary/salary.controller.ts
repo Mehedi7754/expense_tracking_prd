@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -110,6 +111,23 @@ export class SalaryController {
   }
 
   // --- Leaves ---
+  @Get('leave-allowances')
+  async getLeaveAllowances(@Query('year') year: string, @Query('userId') userId: string, @Request() req: any) {
+    const targetYear = Number(year || new Date().getFullYear());
+    if (!Number.isInteger(targetYear) || targetYear < 2000 || targetYear > 2100) throw new BadRequestException('Invalid year');
+    if (userId && !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(userId)) throw new BadRequestException('Invalid employee');
+    if (userId) this.checkCanViewUserData(req.user, userId, 'You can only view your own leave allowance');
+    const canViewTeam = ['main_admin', 'finance_manager', 'finance', 'project_manager'].includes(req.user.role);
+    const queryUserId = userId || (canViewTeam ? undefined : req.user.id);
+    return this.salaryService.getLeaveAllowances(targetYear, queryUserId, req.user);
+  }
+
+  @Roles('main_admin', 'finance_manager')
+  @Post('leave-allowances')
+  async setLeaveAllowance(@Body() body: { userId: string; year: number; leaveType: string; allowedDays: number }, @Request() req: any) {
+    return this.salaryService.setLeaveAllowance(body, req.user.id);
+  }
+
   @Get('leaves')
   async getLeaves(
     @Query('userId') userId: string,

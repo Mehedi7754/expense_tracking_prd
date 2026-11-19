@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/widgets/app_back_button.dart';
@@ -28,10 +29,24 @@ class _LeaveDetailScreenState extends ConsumerState<LeaveDetailScreen> {
   bool _loading = true;
   String? _error;
   String? _commentsError;
+  List<LeaveRecordModel> _history = const [];
+  bool _historyLoading = true;
+  String? _historyError;
+  late DateTime _historyMonth;
+  bool _showAllHistory = false;
+
+  DateTime _historyMonthOrNow() {
+    final date = _leave == null ? null : DateTime.tryParse(_leave!.startDate);
+    return DateTime(
+      (date ?? DateTime.now()).year,
+      (date ?? DateTime.now()).month,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    _historyMonth = DateTime(DateTime.now().year, DateTime.now().month);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -61,7 +76,12 @@ class _LeaveDetailScreenState extends ConsumerState<LeaveDetailScreen> {
         _loading = false;
         _commentsLoading = true;
         _commentsError = null;
+        _historyMonth = _historyMonthOrNow();
+        _historyLoading = true;
+        _historyError = null;
       });
+      // History is loaded independently so a history error never hides the request.
+      _loadHistory(leave.userId);
       // Keep the leave visible even if its separate discussion request fails.
       try {
         final comments = await ref
@@ -179,6 +199,8 @@ class _LeaveDetailScreenState extends ConsumerState<LeaveDetailScreen> {
                   children: [
                     _detailCard(leave!, isDark),
                     const SizedBox(height: 14),
+                    _historyCard(leave, isDark),
+                    const SizedBox(height: 14),
                     if (_commentsError != null)
                       _ClarificationLoadError(
                         message: _commentsError!,
@@ -219,6 +241,202 @@ class _LeaveDetailScreenState extends ConsumerState<LeaveDetailScreen> {
       }
     }
   }
+
+  Future<void> _loadHistory(String userId) async {
+    try {
+      final records = await ref
+          .read(leaveRepositoryProvider)
+          .getLeaves(userId: userId);
+      if (!mounted || _leave?.userId != userId) return;
+      setState(() {
+        _history =
+            records
+                .where(
+                  (record) =>
+                      record.userId == userId && record.id != widget.leaveId,
+                )
+                .toList();
+        _historyLoading = false;
+        _historyError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _historyLoading = false;
+        _historyError = 'Past leave records could not be loaded.';
+      });
+    }
+  }
+
+  int _daysInMonth(LeaveRecordModel record) {
+    final start = DateTime.tryParse(record.startDate);
+    final end = DateTime.tryParse(record.endDate);
+    if (start == null || end == null) return 0;
+    final first = DateTime(_historyMonth.year, _historyMonth.month);
+    final last = DateTime(_historyMonth.year, _historyMonth.month + 1, 0);
+    final overlapStart = start.isAfter(first) ? start : first;
+    final overlapEnd = end.isBefore(last) ? end : last;
+    return overlapEnd.isBefore(overlapStart)
+        ? 0
+        : overlapEnd.difference(overlapStart).inDays + 1;
+  }
+
+  Widget _historyCard(LeaveRecordModel leave, bool dark) {
+    final records =
+        _history.where((record) => _daysInMonth(record) > 0).toList()
+          ..sort((a, b) => b.startDate.compareTo(a.startDate));
+    final approvedDays = records
+        .where((record) => record.isApproved && !record.isRejected)
+        .fold<int>(0, (sum, record) => sum + _daysInMonth(record));
+    return Card(
+      color: dark ? AppColors.darkSurface : Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Past Leave Records',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: dark ? Colors.white : const Color(0xFF101828),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${leave.userName.isEmpty ? 'This employee' : leave.userName}’s other leave requests',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF667085)),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(Icons.calendar_month_rounded, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  DateFormat('MMMM yyyy').format(_historyMonth),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Previous month',
+                  onPressed:
+                      () => setState(() {
+                        _historyMonth = DateTime(
+                          _historyMonth.year,
+                          _historyMonth.month - 1,
+                        );
+                        _showAllHistory = false;
+                      }),
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                IconButton(
+                  tooltip: 'Next month',
+                  onPressed:
+                      () => setState(() {
+                        _historyMonth = DateTime(
+                          _historyMonth.year,
+                          _historyMonth.month + 1,
+                        );
+                        _showAllHistory = false;
+                      }),
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+            if (_historyLoading)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_historyError != null)
+              TextButton.icon(
+                onPressed: () => _loadHistory(leave.userId),
+                icon: const Icon(Icons.refresh),
+                label: Text(_historyError!),
+              )
+            else ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _historyMetric(
+                      'Requests',
+                      '${records.length}',
+                      dark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _historyMetric(
+                      'Approved days',
+                      '$approvedDays',
+                      dark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (records.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('No other leave records in this month.'),
+                ),
+              for (final record
+                  in (_showAllHistory ? records : records.take(3)))
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(
+                    Icons.event_note_rounded,
+                    color: Color(0xFF5B6FDB),
+                  ),
+                  title: Text(
+                    record.typeDisplayName,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    '${record.startDate.substring(0, 10)} – ${record.endDate.substring(0, 10)} · ${record.statusText}',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/leaves/${record.id}'),
+                ),
+              if (records.length > 3)
+                TextButton(
+                  onPressed:
+                      () => setState(() => _showAllHistory = !_showAllHistory),
+                  child: Text(
+                    _showAllHistory
+                        ? 'Show less'
+                        : 'View all ${records.length} records',
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _historyMetric(String label, String value, bool dark) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: dark ? AppColors.darkBackground : const Color(0xFFF5F7FB),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: Color(0xFF667085)),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+        ),
+      ],
+    ),
+  );
 
   String _messageFor(Object error) {
     final message = error.toString().replaceFirst('Exception: ', '').trim();

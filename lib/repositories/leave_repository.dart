@@ -9,10 +9,73 @@ final leaveRepositoryProvider = Provider<LeaveRepository>((ref) {
   return LeaveRepository(client);
 });
 
+class LeaveAllowance {
+  final String userId;
+  final int year;
+  final String leaveType;
+  final int allowedDays;
+
+  const LeaveAllowance({
+    required this.userId,
+    required this.year,
+    required this.leaveType,
+    required this.allowedDays,
+  });
+
+  factory LeaveAllowance.fromJson(Map<String, dynamic> json) => LeaveAllowance(
+    userId: (json['userId'] ?? '').toString(),
+    year: (json['year'] as num).toInt(),
+    leaveType: (json['leaveType'] ?? '').toString(),
+    allowedDays: (json['allowedDays'] as num).toInt(),
+  );
+}
+
 class LeaveRepository {
   final ApiClient _client;
 
   LeaveRepository(this._client);
+
+  Future<List<LeaveAllowance>> getAllowances({
+    required int year,
+    String? userId,
+  }) async {
+    final query =
+        Uri(
+          queryParameters: {
+            'year': '$year',
+            if (userId != null) 'userId': userId,
+          },
+        ).query;
+    final response = await _client.get(
+      '${ApiEndpoints.salary}/leave-allowances?$query',
+    );
+    if (response is! List)
+      throw const FormatException('Invalid leave allowance response');
+    return response
+        .whereType<Map<String, dynamic>>()
+        .map(LeaveAllowance.fromJson)
+        .toList();
+  }
+
+  Future<LeaveAllowance> setAllowance({
+    required String userId,
+    required int year,
+    required String leaveType,
+    required int allowedDays,
+  }) async {
+    final response = await _client.post(
+      '${ApiEndpoints.salary}/leave-allowances',
+      body: {
+        'userId': userId,
+        'year': year,
+        'leaveType': leaveType,
+        'allowedDays': allowedDays,
+      },
+    );
+    if (response is! Map<String, dynamic>)
+      throw const FormatException('Invalid leave allowance response');
+    return LeaveAllowance.fromJson(response);
+  }
 
   /// Fetches leaves for the given user, or all visible leaves if admin/finance.
   Future<List<LeaveRecordModel>> getLeaves({

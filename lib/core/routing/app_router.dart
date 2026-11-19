@@ -44,6 +44,7 @@ import '../../screens/salary/salary_detail_screen.dart';
 import '../../screens/salary/my_salary_screen.dart';
 import '../../screens/salary/holidays_management_screen.dart';
 import '../../screens/leaves/leave_management_screen.dart';
+import '../../screens/leaves/leave_settings_screen.dart';
 import '../../screens/leaves/leave_detail_screen.dart';
 import '../../screens/leaves/apply_leave_screen.dart';
 import '../../screens/chat/chat_list_screen.dart';
@@ -89,6 +90,10 @@ class RouterNotifier extends ChangeNotifier {
 
     // Role-Based Guards
     if (isAuthenticated) {
+      if (loc == RoutePaths.leaveSettings &&
+          role != UserRole.mainAdmin) {
+        return RoutePaths.leaves;
+      }
       // Admin routes guard
       if (loc.startsWith('/admin') && role != UserRole.mainAdmin) {
         return RoutePaths.home;
@@ -435,6 +440,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.leaves,
         builder: (context, state) => const LeaveManagementScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.leaveSettings,
+        builder: (context, state) => const LeaveSettingsScreen(),
       ),
       GoRoute(
         path: RoutePaths.leaveDetailPattern,

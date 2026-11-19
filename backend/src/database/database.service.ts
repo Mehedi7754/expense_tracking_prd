@@ -148,6 +148,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         );
         CREATE INDEX IF NOT EXISTS idx_leave_records_user_dates ON leave_records(user_id, start_date, end_date);
 
+        CREATE TABLE IF NOT EXISTS leave_allowances (
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            year INT NOT NULL CHECK (year BETWEEN 2000 AND 2100),
+            leave_type VARCHAR(50) NOT NULL,
+            allowed_days INT NOT NULL CHECK (allowed_days >= 0 AND allowed_days <= 366),
+            updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+            PRIMARY KEY (user_id, year, leave_type)
+        );
+
         CREATE TABLE IF NOT EXISTS salary_calculations (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

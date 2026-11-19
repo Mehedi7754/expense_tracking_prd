@@ -205,6 +205,38 @@ export class SalaryService {
   }
 
   // --- Leaves ---
+  async getLeaveAllowances(year: number, userId?: string, reviewer?: { role: string; assignedProjectIds?: string[] }) {
+    if (reviewer?.role === 'project_manager' && !userId) {
+      const projects = reviewer.assignedProjectIds || [];
+      if (!projects.length) return [];
+      const result = await this.db.query(`SELECT a.user_id AS "userId", a.year, a.leave_type AS "leaveType", a.allowed_days AS "allowedDays"
+        FROM leave_allowances a WHERE a.year = $1 AND EXISTS
+        (SELECT 1 FROM project_members pm WHERE pm.user_id = a.user_id AND pm.project_id = ANY($2::uuid[]))`, [year, projects]);
+      return result.rows;
+    }
+    const result = await this.db.query(`SELECT user_id AS "userId", year, leave_type AS "leaveType", allowed_days AS "allowedDays"
+      FROM leave_allowances WHERE year = $1 AND ($2::uuid IS NULL OR user_id = $2::uuid) ORDER BY leave_type`, [year, userId || null]);
+    return result.rows;
+  }
+
+  async setLeaveAllowance(body: { userId: string; year: number; leaveType: string; allowedDays: number }, actorId: string) {
+    const allowedTypes = ['casual', 'sick', 'emergency', 'paid', 'unpaid', 'maternity'];
+    const year = Number(body.year);
+    const allowedDays = Number(body.allowedDays);
+    if (!body.userId || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(body.userId) ||
+        !Number.isInteger(year) || year < 2000 || year > 2100 ||
+        !allowedTypes.includes(body.leaveType) || !Number.isInteger(allowedDays) || allowedDays < 0 || allowedDays > 366) {
+      throw new BadRequestException('Enter a valid employee, year, leave type and allowed days');
+    }
+    const result = await this.db.query(`INSERT INTO leave_allowances (user_id, year, leave_type, allowed_days, updated_by)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (user_id, year, leave_type) DO UPDATE SET allowed_days = EXCLUDED.allowed_days,
+      updated_by = EXCLUDED.updated_by, updated_at = clock_timestamp()
+      RETURNING user_id AS "userId", year, leave_type AS "leaveType", allowed_days AS "allowedDays"`,
+      [body.userId, year, body.leaveType, allowedDays, actorId]);
+    return result.rows[0];
+  }
+
   async getLeaves(userId?: string, month?: number, year?: number, reviewer?: { id: string; role: string; assignedProjectIds?: string[] }) {
     let sql = `
       SELECT l.id, l.user_id, l.start_date::text, l.end_date::text, l.leave_type,

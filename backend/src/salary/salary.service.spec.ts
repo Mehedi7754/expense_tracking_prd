@@ -68,4 +68,17 @@ describe('SalaryService leave access and decisions', () => {
     await service.getLeaveComments('leave-1', { id: 'member-1', role: 'project_member' });
     expect(db.query.mock.calls[1][0]).toContain('COALESCE(u.role::text, c.author_role)');
   });
+
+  it('scopes allowance lookup to the requested employee and year', async () => {
+    await service.getLeaveAllowances(2026, '00000000-0000-0000-0000-000000000001');
+    expect(db.query.mock.calls[0][1]).toEqual([2026, '00000000-0000-0000-0000-000000000001']);
+  });
+
+  it('rejects invalid leave allowance before writing', async () => {
+    await expect(service.setLeaveAllowance({
+      userId: '00000000-0000-0000-0000-000000000001', year: 2026,
+      leaveType: 'casual', allowedDays: -1,
+    }, 'admin-1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.query).not.toHaveBeenCalled();
+  });
 });

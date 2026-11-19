@@ -67,6 +67,7 @@ class RoutePaths {
 
   // Leave Management & Requests
   static const String leaves = '/leaves';
+  static const String leaveSettings = '/leaves/settings';
   static const String leaveDetailPattern = '/leaves/:id';
   static const String applyLeave = '/leaves/apply';
 

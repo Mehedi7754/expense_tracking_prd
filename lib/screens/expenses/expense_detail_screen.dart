@@ -679,8 +679,8 @@ class ExpenseDetailScreen extends ConsumerWidget {
                           height: 48,
                           child: ElevatedButton.icon(
                             icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white),
-                            label: const Text(
-                              'Edit Expense',
+                            label: Text(
+                              expense.status == ExpenseStatus.rejected ? 'Edit & Resubmit' : 'Edit Expense',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
