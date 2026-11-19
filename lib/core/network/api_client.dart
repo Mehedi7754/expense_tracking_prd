@@ -126,10 +126,14 @@ class ApiClient {
     Map<String, dynamic>? queryParams,
     Map<String, String>? headers,
   }) async {
+    final reqHeaders = _buildHeaders(headers);
+    if (body == null) {
+      reqHeaders.remove('Content-Type');
+    }
     return _send(
       (activeUrl) => _httpClient.post(
         _buildUri(activeUrl, endpoint, queryParams),
-        headers: _buildHeaders(headers),
+        headers: reqHeaders,
         body: body != null ? jsonEncode(body) : null,
       ),
     );
@@ -141,10 +145,14 @@ class ApiClient {
     Map<String, dynamic>? queryParams,
     Map<String, String>? headers,
   }) async {
+    final reqHeaders = _buildHeaders(headers);
+    if (body == null) {
+      reqHeaders.remove('Content-Type');
+    }
     return _send(
       (activeUrl) => _httpClient.put(
         _buildUri(activeUrl, endpoint, queryParams),
-        headers: _buildHeaders(headers),
+        headers: reqHeaders,
         body: body != null ? jsonEncode(body) : null,
       ),
     );
@@ -156,10 +164,14 @@ class ApiClient {
     Map<String, dynamic>? queryParams,
     Map<String, String>? headers,
   }) async {
+    final reqHeaders = _buildHeaders(headers);
+    if (body == null) {
+      reqHeaders.remove('Content-Type');
+    }
     return _send(
       (activeUrl) => _httpClient.patch(
         _buildUri(activeUrl, endpoint, queryParams),
-        headers: _buildHeaders(headers),
+        headers: reqHeaders,
         body: body != null ? jsonEncode(body) : null,
       ),
     );

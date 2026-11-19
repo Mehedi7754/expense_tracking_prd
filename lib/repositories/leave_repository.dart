@@ -81,6 +81,7 @@ class LeaveRepository {
   }) async {
     final response = await _client.post(
       '${ApiEndpoints.leaveById(id)}/${approved ? 'approve' : 'reject'}',
+      body: const {},
     );
     if (response is Map<String, dynamic>) {
       return LeaveRecordModel.fromJson(response);

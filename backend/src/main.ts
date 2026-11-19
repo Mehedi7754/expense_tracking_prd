@@ -13,6 +13,21 @@ async function bootstrap() {
     bodyLimit: 150 * 1024 * 1024,
   });
 
+  // Support empty JSON bodies gracefully so Fastify does not throw 400 FST_ERR_CTP_INVALID_JSON_BODY
+  (fastifyAdapter as any).registerUrlencodedContentParser();
+  fastifyAdapter.useBodyParser('application/json', false, { bodyLimit: 150 * 1024 * 1024 }, (req, body, done) => {
+    if (!body || body.length === 0) {
+      done(null, {});
+      return;
+    }
+    try {
+      const parsed = JSON.parse(body.toString());
+      done(null, parsed);
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err, undefined);
+    }
+  });
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
