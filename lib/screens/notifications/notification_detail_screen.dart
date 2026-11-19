@@ -193,6 +193,17 @@ class NotificationDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+              if (notif.relatedLeaveId != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed:
+                        () => context.push('/leaves/${notif.relatedLeaveId}'),
+                    icon: const Icon(Icons.event_available_rounded, size: 18),
+                    label: const Text('View Leave Request'),
+                  ),
+                ),
+              ],
               if (notif.relatedProjectId != null) ...[
                 SizedBox(
                   width: double.infinity,

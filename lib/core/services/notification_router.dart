@@ -60,10 +60,14 @@ class NotificationRouter {
     final type = (data['type'] ?? '').toString().toLowerCase();
     final expenseId =
         (data['expenseId'] ?? data['relatedExpenseId'])?.toString();
+    final leaveId = (data['leaveId'] ?? data['relatedLeaveId'])?.toString();
     final projectId =
         (data['projectId'] ?? data['relatedProjectId'])?.toString();
     final taskId = (data['taskId'] ?? data['relatedTaskId'])?.toString();
     final notifId = data['notificationId']?.toString();
+    final attendanceEmployeeId =
+        (data['attendanceUserId'] ?? data['actorId'] ?? data['userId'])
+            ?.toString();
     final chatChannelId =
         (data['channelId'] ?? data['chatChannelId'])?.toString();
 
@@ -78,11 +82,19 @@ class NotificationRouter {
     if (expenseId != null && expenseId.isNotEmpty) {
       return RoutePaths.expenseDetail(expenseId);
     }
+    if (leaveId != null && leaveId.isNotEmpty) {
+      return RoutePaths.leaveDetail(leaveId);
+    }
     if (taskId != null && taskId.isNotEmpty) {
       return RoutePaths.taskDetail.replaceFirst(':id', taskId);
     }
     if (type.contains('leave')) return RoutePaths.leaves;
     if (type.contains('attendance')) {
+      if (canManageAttendance &&
+          attendanceEmployeeId != null &&
+          attendanceEmployeeId.isNotEmpty) {
+        return RoutePaths.employeeMonthlyAttendance(attendanceEmployeeId);
+      }
       return canManageAttendance
           ? RoutePaths.attendanceDashboard
           : RoutePaths.myAttendance;

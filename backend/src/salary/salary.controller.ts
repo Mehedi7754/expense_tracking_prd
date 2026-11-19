@@ -170,6 +170,19 @@ export class SalaryController {
     return leave;
   }
 
+  @Get('leaves/:id/comments')
+  async getLeaveComments(@Param('id') id: string, @Request() req: any) {
+    return this.salaryService.getLeaveComments(id, req.user);
+  }
+
+  @Post('leaves/:id/comments')
+  async addLeaveComment(@Param('id') id: string, @Body() body: any, @Request() req: any) {
+    const text = typeof body === 'string'
+      ? body
+      : (body?.comment ?? body?.text ?? body?.comment_text ?? '');
+    return this.salaryService.addLeaveComment(id, req.user.id, text, req.user);
+  }
+
   @Roles('main_admin', 'finance_manager')
   @Delete('leaves/:id')
   async deleteLeave(@Param('id') id: string) {

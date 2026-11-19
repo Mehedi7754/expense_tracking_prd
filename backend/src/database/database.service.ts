@@ -193,7 +193,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ADD COLUMN IF NOT EXISTS actor_name VARCHAR(255),
         ADD COLUMN IF NOT EXISTS actor_avatar_url TEXT,
         ADD COLUMN IF NOT EXISTS expense_date VARCHAR(100),
-        ADD COLUMN IF NOT EXISTS submitted_date VARCHAR(100);
+        ADD COLUMN IF NOT EXISTS submitted_date VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS related_leave_id UUID REFERENCES leave_records(id) ON DELETE CASCADE;
 
         DO $$
         BEGIN
@@ -265,6 +266,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'task_status_updated';");
       await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'leave_request';");
       await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'leave_decision';");
+      await this.pool.query("ALTER TYPE notification_type_enum ADD VALUE IF NOT EXISTS 'leave_comment';");
       await this.pool.query(`
         ALTER TABLE tasks ADD COLUMN IF NOT EXISTS priority VARCHAR(20) NOT NULL DEFAULT 'medium';
         CREATE TABLE IF NOT EXISTS task_assignees (
@@ -280,6 +282,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         ALTER TABLE notifications ADD COLUMN IF NOT EXISTS related_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE;
         ALTER TABLE leave_records ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'pending';
         UPDATE leave_records SET status = CASE WHEN is_approved THEN 'approved' ELSE 'pending' END WHERE status = 'pending';
+        CREATE TABLE IF NOT EXISTS leave_comments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          leave_id UUID NOT NULL REFERENCES leave_records(id) ON DELETE CASCADE,
+          author_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          author_name VARCHAR(255) NOT NULL,
+          author_role VARCHAR(100) NOT NULL DEFAULT 'project_member',
+          comment_text TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+        );
+        CREATE INDEX IF NOT EXISTS idx_leave_comments_leave_created ON leave_comments(leave_id, created_at);
       `);
       await this.pool.query("ALTER TABLE attendance_records ADD COLUMN IF NOT EXISTS work_mode VARCHAR(20) NOT NULL DEFAULT 'office';");
       await this.pool.query(`UPDATE attendance_records SET work_mode = CASE

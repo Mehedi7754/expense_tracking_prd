@@ -2108,6 +2108,11 @@ class _AttendanceDashboardScreenState
               onPressed: () => context.push(RoutePaths.attendanceSettings),
             ),
           IconButton(
+            icon: const Icon(Icons.calendar_month_rounded),
+            tooltip: 'Monthly team attendance',
+            onPressed: () => context.push(RoutePaths.monthlyAttendance),
+          ),
+          IconButton(
             icon: Icon(_showMap ? Icons.map : Icons.map_outlined),
             tooltip: _showMap ? 'Hide Map' : 'Show Map',
             onPressed: () => setState(() => _showMap = !_showMap),

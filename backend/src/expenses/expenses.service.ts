@@ -452,6 +452,10 @@ export class ExpensesService {
 
     const isAdminOrFinance = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'finance_manager' || user?.role === 'finance';
     const isProjectManager = user?.role === 'project_manager';
+    const isOwner = existing.employeeId === user?.id;
+    const isRejectedResubmission =
+      existing.status === 'rejected' && isOwner &&
+      (data.status === undefined || data.status === 'pending');
 
     if (user && !isAdminOrFinance && !isProjectManager) {
       if (existing.employeeId !== user.id) {
@@ -470,7 +474,10 @@ export class ExpensesService {
         const rejectionReason = data.rejectionReason || data.reason || data.note;
         return this.reject(id, user.id, rejectionReason, user);
       }
-      if (!isAdminOrFinance && !isProjectManager) {
+      const ownerKeepingPendingStatus =
+        isOwner && existing.status === 'pending' && data.status === 'pending';
+      if (!isAdminOrFinance && !isProjectManager &&
+          !ownerKeepingPendingStatus && !isRejectedResubmission) {
         throw new ForbiddenException('You do not have permission to change expense status');
       }
     }
@@ -480,7 +487,7 @@ export class ExpensesService {
     let idx = 1;
 
     // Resubmission of rejected expense
-    if (existing.status === 'rejected' && (!data.status || data.status === 'rejected')) {
+    if (isRejectedResubmission) {
       fields.push(`status = 'pending'`);
       fields.push(`rejection_reason = NULL`);
     }
@@ -493,7 +500,7 @@ export class ExpensesService {
       fields.push(`note = $${idx++}`);
       values.push(data.note);
     }
-    if (data.status !== undefined) {
+    if (data.status !== undefined && !isRejectedResubmission) {
       fields.push(`status = $${idx++}`);
       values.push(data.status);
     }
@@ -557,6 +564,37 @@ export class ExpensesService {
     values.push(id);
     await this.db.query(`UPDATE expenses SET ${fields.join(', ')} WHERE id = $${idx}`, values);
     const updated = await this.findOne(id, user);
+
+    if (isRejectedResubmission) {
+      try {
+        const recipients = await this.db.query(
+          `SELECT DISTINCT u.id
+           FROM users u
+           LEFT JOIN project_members pm
+             ON pm.user_id = u.id AND pm.project_id = $2
+           WHERE u.is_active = TRUE
+             AND u.id != $1
+             AND (u.role IN ('main_admin', 'admin', 'project_manager', 'finance', 'finance_manager')
+                  OR pm.can_approve_expenses = TRUE)`,
+          [updated.employeeId, updated.projectId],
+        );
+        await Promise.all(recipients.rows.map((recipient) =>
+          this.notificationsService.create({
+            userId: recipient.id,
+            title: 'Expense Resubmitted',
+            message: `${updated.employeeName} corrected and resubmitted a ${updated.categoryName} expense for ${updated.projectName}.`,
+            fullExplanation: `${updated.employeeName} corrected and resubmitted their previously rejected expense claim. It is ready for review.`,
+            type: 'expense_submitted',
+            relatedProjectId: updated.projectId,
+            relatedExpenseId: updated.id,
+            actorId: updated.employeeId,
+            actorName: updated.employeeName,
+          }),
+        ));
+      } catch (error) {
+        console.error('Failed to notify reviewers about expense resubmission:', error);
+      }
+    }
 
     try {
       await this.auditLogsService.log(
@@ -755,6 +793,8 @@ export class ExpensesService {
         userId: exp.employeeId,
         title: 'Expense Rejected',
         message: `Your expense report for ${exp.categoryName} (${exp.amount} ${exp.currency}) was rejected. Reason: ${cleanReason}`,
+        fullExplanation: `Your expense report was rejected. Reason: ${cleanReason}`,
+        rejectionReason: cleanReason,
         type: 'expense_rejected',
         relatedProjectId: exp.projectId,
         relatedExpenseId: id,

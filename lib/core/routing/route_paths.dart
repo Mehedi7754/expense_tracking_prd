@@ -52,6 +52,9 @@ class RoutePaths {
 
   // Attendance & Geo-Location Tracking
   static const String attendanceDashboard = '/attendance';
+  static const String monthlyAttendance = '/attendance/monthly';
+  static const String employeeMonthlyAttendancePattern =
+      '/attendance/monthly/:userId';
   static const String myAttendance = '/attendance/my';
   static const String attendanceSettings = '/admin/attendance-settings';
   static const String homeLocation = '/set-home-location';
@@ -64,6 +67,7 @@ class RoutePaths {
 
   // Leave Management & Requests
   static const String leaves = '/leaves';
+  static const String leaveDetailPattern = '/leaves/:id';
   static const String applyLeave = '/leaves/apply';
 
   // Storage & Document Retention
@@ -80,4 +84,7 @@ class RoutePaths {
   static String editExpense(String id) => '/expenses/$id/edit';
   static String employeeDetailPath(String id) => '/employees/$id';
   static String chatThread(String id) => '/chat/$id';
+  static String leaveDetail(String id) => '/leaves/$id';
+  static String employeeMonthlyAttendance(String userId) =>
+      '/attendance/monthly/$userId';
 }

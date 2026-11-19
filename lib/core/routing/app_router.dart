@@ -12,6 +12,8 @@ import '../../screens/admin/user_management_screen.dart';
 import '../../screens/approvals/approvals_queue_screen.dart';
 import '../../screens/attendance/attendance_dashboard_screen.dart';
 import '../../screens/attendance/attendance_settings_screen.dart';
+import '../../screens/attendance/monthly_attendance_screen.dart';
+import '../../screens/attendance/employee_monthly_attendance_screen.dart';
 import '../../screens/attendance/my_attendance_screen.dart';
 import '../../screens/auth/forgot_password_screen.dart';
 import '../../screens/auth/login_screen.dart';
@@ -42,6 +44,7 @@ import '../../screens/salary/salary_detail_screen.dart';
 import '../../screens/salary/my_salary_screen.dart';
 import '../../screens/salary/holidays_management_screen.dart';
 import '../../screens/leaves/leave_management_screen.dart';
+import '../../screens/leaves/leave_detail_screen.dart';
 import '../../screens/leaves/apply_leave_screen.dart';
 import '../../screens/chat/chat_list_screen.dart';
 import '../../screens/chat/chat_thread_screen.dart';
@@ -57,10 +60,7 @@ class RouterNotifier extends ChangeNotifier {
   final Ref _ref;
 
   RouterNotifier(this._ref) {
-    _ref.listen<AuthState>(
-      authProvider,
-      (_, __) => notifyListeners(),
-    );
+    _ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
   }
 
   String? redirect(BuildContext context, GoRouterState state) {
@@ -71,7 +71,8 @@ class RouterNotifier extends ChangeNotifier {
     final role = currentUser?.role ?? UserRole.projectMember;
 
     // Public auth routes
-    final isAuthRoute = loc == RoutePaths.splash ||
+    final isAuthRoute =
+        loc == RoutePaths.splash ||
         loc == RoutePaths.login ||
         loc == RoutePaths.register ||
         loc == RoutePaths.forgotPassword ||
@@ -81,7 +82,8 @@ class RouterNotifier extends ChangeNotifier {
       return RoutePaths.login;
     }
 
-    if (isAuthenticated && (loc == RoutePaths.login || loc == RoutePaths.register)) {
+    if (isAuthenticated &&
+        (loc == RoutePaths.login || loc == RoutePaths.register)) {
       return RoutePaths.home;
     }
 
@@ -113,7 +115,8 @@ class RouterNotifier extends ChangeNotifier {
       }
 
       // Total Portfolio Financials guard (Employees restricted)
-      if (loc == RoutePaths.portfolioValueDetail && role == UserRole.projectMember) {
+      if (loc == RoutePaths.portfolioValueDetail &&
+          role == UserRole.projectMember) {
         return RoutePaths.home;
       }
     }
@@ -122,7 +125,9 @@ class RouterNotifier extends ChangeNotifier {
   }
 }
 
-final routerNotifierProvider = Provider<RouterNotifier>((ref) => RouterNotifier(ref));
+final routerNotifierProvider = Provider<RouterNotifier>(
+  (ref) => RouterNotifier(ref),
+);
 
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = ref.watch(routerNotifierProvider);
@@ -151,7 +156,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.resetPassword,
         builder: (context, state) {
-          final email = state.uri.queryParameters['email'] ?? (state.extra as String?);
+          final email =
+              state.uri.queryParameters['email'] ?? (state.extra as String?);
           return ResetPasswordScreen(initialEmail: email);
         },
       ),
@@ -388,6 +394,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MyAttendanceScreen(),
       ),
       GoRoute(
+        path: RoutePaths.monthlyAttendance,
+        builder: (context, state) => const MonthlyAttendanceScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.employeeMonthlyAttendancePattern,
+        builder:
+            (context, state) => EmployeeMonthlyAttendanceScreen(
+              userId: state.pathParameters['userId'] ?? '',
+              initialMonth:
+                  state.extra is DateTime ? state.extra as DateTime : null,
+            ),
+      ),
+      GoRoute(
         path: RoutePaths.attendanceSettings,
         builder: (context, state) => const AttendanceSettingsScreen(),
       ),
@@ -416,6 +435,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: RoutePaths.leaves,
         builder: (context, state) => const LeaveManagementScreen(),
+      ),
+      GoRoute(
+        path: RoutePaths.leaveDetailPattern,
+        builder:
+            (context, state) =>
+                LeaveDetailScreen(leaveId: state.pathParameters['id'] ?? ''),
       ),
       GoRoute(
         path: RoutePaths.applyLeave,

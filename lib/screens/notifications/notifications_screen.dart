@@ -65,7 +65,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             notif.type == NotificationType.taskStatusUpdated;
       case NotificationCategoryFilter.leaves:
         return notif.type == NotificationType.leaveRequest ||
-            notif.type == NotificationType.leaveDecision;
+            notif.type == NotificationType.leaveDecision ||
+            notif.type == NotificationType.leaveComment;
       case NotificationCategoryFilter.attendance:
         return notif.type == NotificationType.attendanceReminder ||
             notif.type == NotificationType.attendanceLate ||
@@ -86,7 +87,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     // Registration notifications are ADMIN-ONLY — never shown to employees/project members.
     final userNotifs =
         notifications.where((n) {
-          if (user == null) return true; // In unit test harness where authProvider is uninitialized
+          if (user == null) {
+            return true; // In unit test harness where authProvider is uninitialized
+          }
           // Registration notifications: only mainAdmin can see these
           if (n.type == NotificationType.userRegistration) {
             return user.role == UserRole.mainAdmin;
@@ -479,8 +482,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                         NotificationRouter.resolve({
                                           'type': notif.type.name,
                                           'expenseId': notif.relatedExpenseId,
+                                          'leaveId': notif.relatedLeaveId,
                                           'projectId': notif.relatedProjectId,
                                           'relatedTaskId': notif.relatedTaskId,
+                                          'actorId': notif.actorId,
                                           'notificationId': notif.id,
                                         }),
                                       );
@@ -626,35 +631,35 @@ class _CategoryStyle {
 }
 
 _CategoryStyle _getCategoryStyle(NotificationType type, bool isDark) {
-    if (type == NotificationType.expenseRejected ||
-        type == NotificationType.justificationRejected) {
-      return _CategoryStyle(
-        label: 'REJECTED',
-        icon: Icons.cancel_outlined,
-        primaryColor: const Color(0xFFEF4444),
-        backgroundColor:
-            isDark
-                ? const Color(0xFF7F1D1D).withValues(alpha: 0.6)
-                : const Color(0xFFFEE2E2),
-      );
-    }
-    if (type == NotificationType.expenseApproved ||
-        type == NotificationType.expenseSubmitted ||
-        type == NotificationType.justificationSubmitted ||
-        type == NotificationType.justificationApproved ||
-        type == NotificationType.salaryReady ||
-        type == NotificationType.payrollFinalized ||
-        type == NotificationType.revenueReceived) {
-      return _CategoryStyle(
-        label: 'EXPENSE',
-        icon: Icons.receipt_long_rounded,
-        primaryColor: const Color(0xFFD97706),
-        backgroundColor:
-            isDark
-                ? const Color(0xFF451A03).withValues(alpha: 0.6)
-                : const Color(0xFFFEF3C7),
-      );
-    }
+  if (type == NotificationType.expenseRejected ||
+      type == NotificationType.justificationRejected) {
+    return _CategoryStyle(
+      label: 'REJECTED',
+      icon: Icons.cancel_outlined,
+      primaryColor: const Color(0xFFEF4444),
+      backgroundColor:
+          isDark
+              ? const Color(0xFF7F1D1D).withValues(alpha: 0.6)
+              : const Color(0xFFFEE2E2),
+    );
+  }
+  if (type == NotificationType.expenseApproved ||
+      type == NotificationType.expenseSubmitted ||
+      type == NotificationType.justificationSubmitted ||
+      type == NotificationType.justificationApproved ||
+      type == NotificationType.salaryReady ||
+      type == NotificationType.payrollFinalized ||
+      type == NotificationType.revenueReceived) {
+    return _CategoryStyle(
+      label: 'EXPENSE',
+      icon: Icons.receipt_long_rounded,
+      primaryColor: const Color(0xFFD97706),
+      backgroundColor:
+          isDark
+              ? const Color(0xFF451A03).withValues(alpha: 0.6)
+              : const Color(0xFFFEF3C7),
+    );
+  }
   if (type == NotificationType.projectAssigned ||
       type == NotificationType.taskAssigned ||
       type == NotificationType.taskStatusUpdated ||
@@ -673,7 +678,8 @@ _CategoryStyle _getCategoryStyle(NotificationType type, bool isDark) {
     );
   }
   if (type == NotificationType.leaveRequest ||
-      type == NotificationType.leaveDecision) {
+      type == NotificationType.leaveDecision ||
+      type == NotificationType.leaveComment) {
     return _CategoryStyle(
       label: 'LEAVE',
       icon: Icons.event_available_rounded,
@@ -956,22 +962,37 @@ class _NotificationCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         if ((notif.type == NotificationType.expenseSubmitted ||
-                                notif.type == NotificationType.expenseApproved ||
-                                notif.type == NotificationType.expenseRejected) &&
-                            (notif.expenseDate != null || notif.submittedDate != null)) ...[
+                                notif.type ==
+                                    NotificationType.expenseApproved ||
+                                notif.type ==
+                                    NotificationType.expenseRejected) &&
+                            (notif.expenseDate != null ||
+                                notif.submittedDate != null)) ...[
                           const SizedBox(height: 6),
                           Wrap(
                             spacing: 6,
                             runSpacing: 4,
                             children: [
-                              if (notif.expenseDate != null && notif.expenseDate!.isNotEmpty)
+                              if (notif.expenseDate != null &&
+                                  notif.expenseDate!.isNotEmpty)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                                    color:
+                                        isDark
+                                            ? const Color(0xFF1E293B)
+                                            : const Color(0xFFEFF6FF),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: isDark ? const Color(0xFF3B82F6).withValues(alpha: 0.3) : const Color(0xFFBFDBFE),
+                                      color:
+                                          isDark
+                                              ? const Color(
+                                                0xFF3B82F6,
+                                              ).withValues(alpha: 0.3)
+                                              : const Color(0xFFBFDBFE),
                                       width: 0.8,
                                     ),
                                   ),
@@ -981,7 +1002,10 @@ class _NotificationCard extends StatelessWidget {
                                       Icon(
                                         Icons.calendar_today_rounded,
                                         size: 10,
-                                        color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                                        color:
+                                            isDark
+                                                ? const Color(0xFF60A5FA)
+                                                : const Color(0xFF2563EB),
                                       ),
                                       const SizedBox(width: 3),
                                       Text(
@@ -989,20 +1013,33 @@ class _NotificationCard extends StatelessWidget {
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w600,
-                                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                                          color:
+                                              isDark
+                                                  ? const Color(0xFF93C5FD)
+                                                  : const Color(0xFF1D4ED8),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              if (notif.submittedDate != null && notif.submittedDate!.isNotEmpty)
+                              if (notif.submittedDate != null &&
+                                  notif.submittedDate!.isNotEmpty)
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                                    color:
+                                        isDark
+                                            ? const Color(0xFF0F172A)
+                                            : const Color(0xFFF1F5F9),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                                      color:
+                                          isDark
+                                              ? const Color(0xFF475569)
+                                              : const Color(0xFFCBD5E1),
                                       width: 0.8,
                                     ),
                                   ),
@@ -1012,7 +1049,10 @@ class _NotificationCard extends StatelessWidget {
                                       Icon(
                                         Icons.send_rounded,
                                         size: 9.5,
-                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                        color:
+                                            isDark
+                                                ? const Color(0xFF94A3B8)
+                                                : const Color(0xFF64748B),
                                       ),
                                       const SizedBox(width: 3),
                                       Text(
@@ -1020,7 +1060,10 @@ class _NotificationCard extends StatelessWidget {
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w600,
-                                          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                                          color:
+                                              isDark
+                                                  ? const Color(0xFFCBD5E1)
+                                                  : const Color(0xFF475569),
                                         ),
                                       ),
                                     ],
@@ -1030,7 +1073,9 @@ class _NotificationCard extends StatelessWidget {
                           ),
                         ],
                         if (notif.type == NotificationType.expenseRejected &&
-                            notif.message.toLowerCase().contains('reason:')) ...[
+                            notif.message.toLowerCase().contains(
+                              'reason:',
+                            )) ...[
                           const SizedBox(height: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -1038,14 +1083,20 @@ class _NotificationCard extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: isDark
-                                  ? const Color(0xFF7F1D1D).withValues(alpha: 0.3)
-                                  : const Color(0xFFFEF2F2),
+                              color:
+                                  isDark
+                                      ? const Color(
+                                        0xFF7F1D1D,
+                                      ).withValues(alpha: 0.3)
+                                      : const Color(0xFFFEF2F2),
                               borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: isDark
-                                    ? const Color(0xFFDC2626).withValues(alpha: 0.4)
-                                    : const Color(0xFFFECACA),
+                                color:
+                                    isDark
+                                        ? const Color(
+                                          0xFFDC2626,
+                                        ).withValues(alpha: 0.4)
+                                        : const Color(0xFFFECACA),
                                 width: 0.8,
                               ),
                             ),
@@ -1060,9 +1111,14 @@ class _NotificationCard extends StatelessWidget {
                                 const SizedBox(width: 5),
                                 Flexible(
                                   child: Text(
-                                    notif.message.substring(
-                                      notif.message.toLowerCase().indexOf('reason:') + 7,
-                                    ).trim(),
+                                    notif.message
+                                        .substring(
+                                          notif.message.toLowerCase().indexOf(
+                                                'reason:',
+                                              ) +
+                                              7,
+                                        )
+                                        .trim(),
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,

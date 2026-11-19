@@ -68,7 +68,9 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
         );
         widget.onImageChanged(result.url);
       } catch (uploadError) {
-        debugPrint('[ReceiptUploader] Backend upload failed, using local path: $uploadError');
+        debugPrint(
+          '[ReceiptUploader] Backend upload failed, using local path: $uploadError',
+        );
         // Fallback: use local path if backend is unreachable
         widget.onImageChanged(pickedFile.path);
       }
@@ -90,132 +92,182 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Attach Receipt',
-                style: AppTextStyles.titleMedium.copyWith(color: AppColors.getTextPrimary(context)),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Select receipt source for financial verification',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextMuted(context)),
-              ),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(10),
+      builder:
+          (ctx) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Attach Receipt',
+                    style: AppTextStyles.titleMedium.copyWith(
+                      color: AppColors.getTextPrimary(context),
+                    ),
                   ),
-                  child: Icon(Icons.camera_alt_rounded, color: isDark ? AppColors.darkPrimary : AppColors.primary),
-                ),
-                title: Text('Take Photo', style: AppTextStyles.labelLarge),
-                subtitle: Text('Capture with device camera', style: AppTextStyles.bodySmall),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndUpload(context, ImageSource.camera);
-                },
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(10),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Select receipt source for financial verification',
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.getTextMuted(context),
+                    ),
                   ),
-                  child: Icon(Icons.photo_library_rounded, color: isDark ? AppColors.darkPrimary : AppColors.primary),
-                ),
-                title: Text('Choose from Gallery', style: AppTextStyles.labelLarge),
-                subtitle: Text('Upload saved photo or PDF receipt', style: AppTextStyles.bodySmall),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _pickAndUpload(context, ImageSource.gallery);
-                },
+                  const SizedBox(height: 20),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color:
+                            isDark
+                                ? AppColors.darkSurfaceSubtle
+                                : AppColors.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.camera_alt_rounded,
+                        color:
+                            isDark ? AppColors.darkPrimary : AppColors.primary,
+                      ),
+                    ),
+                    title: Text('Take Photo', style: AppTextStyles.labelLarge),
+                    subtitle: Text(
+                      'Capture with device camera',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickAndUpload(context, ImageSource.camera);
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color:
+                            isDark
+                                ? AppColors.darkSurfaceSubtle
+                                : AppColors.surfaceSubtle,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.photo_library_rounded,
+                        color:
+                            isDark ? AppColors.darkPrimary : AppColors.primary,
+                      ),
+                    ),
+                    title: Text(
+                      'Choose from Gallery',
+                      style: AppTextStyles.labelLarge,
+                    ),
+                    subtitle: Text(
+                      'Upload saved photo or PDF receipt',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _pickAndUpload(context, ImageSource.gallery);
+                    },
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
     );
   }
 
   void _showFullScreen(BuildContext context) {
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
-                onPressed: () => Navigator.pop(ctx),
-              ),
+      builder:
+          (ctx) => Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 24,
             ),
-            const SizedBox(height: 8),
-            Flexible(
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: 480,
-                  maxHeight: MediaQuery.of(context).size.height * 0.75,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: AppColors.getSurface(context),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: AppColors.floatingShadow(true),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Receipt Full View', style: AppTextStyles.titleMedium),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.emeraldLight,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Verified File',
-                              style: AppTextStyles.labelSmall.copyWith(color: AppColors.emeraldDark),
+                const SizedBox(height: 8),
+                Flexible(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth: 480,
+                      maxHeight: MediaQuery.of(context).size.height * 0.75,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.getSurface(context),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: AppColors.floatingShadow(true),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Receipt Full View',
+                                style: AppTextStyles.titleMedium,
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: AppColors.emeraldLight,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Verified File',
+                                  style: AppTextStyles.labelSmall.copyWith(
+                                    color: AppColors.emeraldDark,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Divider(height: 1),
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: _buildReceiptVisual(
+                              context: context,
+                              isExpanded: true,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const Divider(height: 1),
-                    Flexible(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: _buildReceiptVisual(context: context, isExpanded: true),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
     );
   }
 
-  Widget _buildReceiptVisual({required BuildContext context, bool isExpanded = false}) {
+  Widget _buildReceiptVisual({
+    required BuildContext context,
+    bool isExpanded = false,
+  }) {
     if (widget.imagePath == null || widget.imagePath!.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -224,9 +276,14 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
     final path = widget.imagePath!;
 
     // Determine if this is a server URL, a sample, or a real local file
-    final bool isServerUrl = path.startsWith('/uploads/') || path.startsWith('http');
+    final bool isServerUrl =
+        path.startsWith('/uploads/') ||
+        path.startsWith('uploads/') ||
+        path.startsWith('http://') ||
+        path.startsWith('https://');
     final bool isSample = path.contains('sample_receipt');
-    final bool isLocalFile = !kIsWeb && !isServerUrl && !isSample && File(path).existsSync();
+    final bool isLocalFile =
+        !kIsWeb && !isServerUrl && !isSample && File(path).existsSync();
 
     final bool isDataUri = path.startsWith('data:');
 
@@ -240,14 +297,15 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
       );
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: isExpanded
-            ? InteractiveViewer(
-                panEnabled: true,
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: img,
-              )
-            : img,
+        child:
+            isExpanded
+                ? InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: img,
+                )
+                : img,
       );
     }
 
@@ -257,19 +315,21 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
         height: isExpanded ? null : 160,
         width: double.infinity,
         fit: isExpanded ? BoxFit.contain : BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildPlaceholder(context, isDark, isExpanded),
+        errorBuilder:
+            (_, __, ___) => _buildPlaceholder(context, isDark, isExpanded),
       );
-      
+
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: isExpanded
-            ? InteractiveViewer(
-                panEnabled: true,
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: img,
-              )
-            : img,
+        child:
+            isExpanded
+                ? InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: img,
+                )
+                : img,
       );
     }
 
@@ -280,19 +340,37 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
         height: isExpanded ? null : 160,
         width: double.infinity,
         fit: isExpanded ? BoxFit.contain : BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildPlaceholder(context, isDark, isExpanded),
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return SizedBox(
+            height: isExpanded ? 220 : 160,
+            child: Center(
+              child: CircularProgressIndicator(
+                value:
+                    progress.expectedTotalBytes == null
+                        ? null
+                        : progress.cumulativeBytesLoaded /
+                            progress.expectedTotalBytes!,
+                strokeWidth: 2,
+              ),
+            ),
+          );
+        },
+        errorBuilder:
+            (_, __, ___) => _buildPlaceholder(context, isDark, isExpanded),
       );
-      
+
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: isExpanded
-            ? InteractiveViewer(
-                panEnabled: true,
-                minScale: 0.5,
-                maxScale: 4.0,
-                child: img,
-              )
-            : img,
+        child:
+            isExpanded
+                ? InteractiveViewer(
+                  panEnabled: true,
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: img,
+                )
+                : img,
       );
     }
 
@@ -301,6 +379,40 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
   }
 
   Widget _buildPlaceholder(BuildContext context, bool isDark, bool isExpanded) {
+    if (!isExpanded) {
+      return Container(
+        width: double.infinity,
+        height: 160,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurfaceSubtle : const Color(0xFFFAFAFA),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.getBorder(context), width: 1),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.receipt_long_rounded,
+              size: 30,
+              color: isDark ? AppColors.darkPrimary : AppColors.primary,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Receipt preview unavailable',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelSmall.copyWith(
+                color: AppColors.getTextMuted(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -308,7 +420,10 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.getBorder(context), width: 1),
       ),
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: isExpanded ? 24 : 14),
+      padding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: isExpanded ? 24 : 14,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -339,17 +454,24 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
           const SizedBox(height: 2),
           Text(
             'Verified Enterprise Merchant Document',
-            style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: AppColors.getTextMuted(context)),
+            style: AppTextStyles.bodySmall.copyWith(
+              fontSize: 11,
+              color: AppColors.getTextMuted(context),
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight,
+              color:
+                  isDark ? AppColors.darkEmeraldLight : AppColors.emeraldLight,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isDark ? AppColors.darkEmeraldBorder : AppColors.emeraldBorder,
+                color:
+                    isDark
+                        ? AppColors.darkEmeraldBorder
+                        : AppColors.emeraldBorder,
               ),
             ),
             child: Text(
@@ -375,9 +497,10 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
       return Container(
         padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
         decoration: BoxDecoration(
-          color: isDark
-              ? AppColors.darkSurfaceSubtle.withValues(alpha: 0.6)
-              : AppColors.surfaceSubtle.withValues(alpha: 0.6),
+          color:
+              isDark
+                  ? AppColors.darkSurfaceSubtle.withValues(alpha: 0.6)
+                  : AppColors.surfaceSubtle.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.getBorder(context), width: 1.2),
         ),
@@ -393,7 +516,9 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
               const SizedBox(height: 12),
               Text(
                 'Uploading receipt...',
-                style: AppTextStyles.labelMedium.copyWith(color: AppColors.getTextMuted(context)),
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.getTextMuted(context),
+                ),
               ),
             ],
           ),
@@ -413,37 +538,49 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.emerald),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          'Receipt Attached',
-                          style: AppTextStyles.labelSmall.copyWith(
-                            color: isDark ? AppColors.emeraldAccent : AppColors.emeraldDark,
-                            fontWeight: FontWeight.w600,
-                          ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final narrow = constraints.maxWidth < 250;
+                final receiptLabel = Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: AppColors.emerald,
+                    ),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Receipt Attached',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color:
+                              isDark
+                                  ? AppColors.emeraldAccent
+                                  : AppColors.emeraldDark,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Row(
+                    ),
+                  ],
+                );
+                final actions = Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextButton.icon(
                       icon: const Icon(Icons.zoom_in_rounded, size: 15),
-                      label: const Text('View Full', style: TextStyle(fontSize: 11)),
+                      label: const Text(
+                        'View Full',
+                        style: TextStyle(fontSize: 11),
+                      ),
                       onPressed: () => _showFullScreen(context),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 4,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
@@ -451,22 +588,50 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
                     if (!widget.isReadOnly) ...[
                       const SizedBox(width: 4),
                       TextButton.icon(
-                        icon: const Icon(Icons.delete_outline_rounded, size: 15, color: AppColors.crimson),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 15,
+                          color: AppColors.crimson,
+                        ),
                         label: Text(
                           'Remove',
-                          style: AppTextStyles.labelSmall.copyWith(color: AppColors.crimson, fontSize: 11),
+                          style: AppTextStyles.labelSmall.copyWith(
+                            color: AppColors.crimson,
+                            fontSize: 11,
+                          ),
                         ),
                         onPressed: () => widget.onImageChanged(null),
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 4,
+                          ),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                     ],
                   ],
-                ),
-              ],
+                );
+
+                if (narrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      receiptLabel,
+                      Align(alignment: Alignment.centerRight, child: actions),
+                    ],
+                  );
+                }
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: receiptLabel),
+                    const SizedBox(width: 4),
+                    actions,
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 10),
             GestureDetector(
@@ -490,12 +655,18 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.image_not_supported_outlined, size: 18, color: AppColors.getTextMuted(context)),
+              Icon(
+                Icons.image_not_supported_outlined,
+                size: 18,
+                color: AppColors.getTextMuted(context),
+              ),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   'No receipt attached to this claim',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.getTextMuted(context)),
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.getTextMuted(context),
+                  ),
                 ),
               ),
             ],
@@ -510,9 +681,10 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         decoration: BoxDecoration(
-          color: isDark
-              ? AppColors.darkSurfaceSubtle.withValues(alpha: 0.6)
-              : AppColors.surfaceSubtle.withValues(alpha: 0.6),
+          color:
+              isDark
+                  ? AppColors.darkSurfaceSubtle.withValues(alpha: 0.6)
+                  : AppColors.surfaceSubtle.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.getBorder(context), width: 1.2),
         ),
@@ -526,7 +698,10 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
                   color: AppColors.getSurface(context),
                   shape: BoxShape.circle,
                   border: Border.all(color: AppColors.getBorder(context)),
-                  boxShadow: isDark ? AppColors.darkCardShadow() : AppColors.cardShadow,
+                  boxShadow:
+                      isDark
+                          ? AppColors.darkCardShadow()
+                          : AppColors.cardShadow,
                 ),
                 child: Icon(
                   Icons.camera_alt_outlined,
@@ -537,7 +712,9 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
               const SizedBox(height: 10),
               Text(
                 'Upload Receipt Photo',
-                style: AppTextStyles.labelMedium.copyWith(color: AppColors.getTextPrimary(context)),
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.getTextPrimary(context),
+                ),
               ),
               const SizedBox(height: 4),
               Text(

@@ -568,14 +568,14 @@ class ExpenseDetailScreen extends ConsumerWidget {
                       const SizedBox(height: 12),
                       if (expense.receiptPhotoUrls.length > 1) ...[
                         SizedBox(
-                          height: 160,
+                          height: 280,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: expense.receiptPhotoUrls.length,
                             separatorBuilder: (_, __) => const SizedBox(width: 12),
                             itemBuilder: (ctx, idx) {
                               return SizedBox(
-                                width: 140,
+                                width: 260,
                                 child: ReceiptUploader(
                                   imagePath: expense.receiptPhotoUrls[idx],
                                   isReadOnly: true,

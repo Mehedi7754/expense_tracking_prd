@@ -37,7 +37,8 @@ class MemberReceiptSummary {
   });
 }
 
-class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin {
+class ExpenseNotifier extends Notifier<List<ExpenseModel>>
+    with FetchCacheMixin {
   @override
   List<ExpenseModel> build() {
     _loadCachedExpenses();
@@ -51,10 +52,11 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       final jsonStr = prefs.getString(_kCustomExpensesKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(jsonStr);
-        final customExpenses = decoded
-            .whereType<Map<String, dynamic>>()
-            .map(ExpenseModel.fromJson)
-            .toList();
+        final customExpenses =
+            decoded
+                .whereType<Map<String, dynamic>>()
+                .map(ExpenseModel.fromJson)
+                .toList();
 
         state = customExpenses;
       } else {
@@ -94,12 +96,14 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       );
       if (projectId == null && employeeId == null && status == null) {
         // Authoritative catalog sync: retain only un-synced offline creations
-        final localPending = state.where((e) => e.id.startsWith('exp_')).toList();
+        final localPending =
+            state.where((e) => e.id.startsWith('exp_')).toList();
         state = [...remoteExpenses, ...localPending];
         await _persistExpenses();
       } else {
         final remoteIds = remoteExpenses.map((e) => e.id).toSet();
-        final localOnly = state.where((e) => !remoteIds.contains(e.id)).toList();
+        final localOnly =
+            state.where((e) => !remoteIds.contains(e.id)).toList();
         state = [...remoteExpenses, ...localOnly];
         await _persistExpenses();
       }
@@ -122,10 +126,18 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     }
     if (user.role == UserRole.projectManager) {
       // Manager sees expenses for assigned projects
-      return state.where((e) => user.assignedProjectIds.contains(e.projectId)).toList();
+      return state
+          .where((e) => user.assignedProjectIds.contains(e.projectId))
+          .toList();
     }
     // Project Member & Viewer see only their own expenses or assigned project
-    return state.where((e) => e.employeeId == user.id || user.assignedProjectIds.contains(e.projectId)).toList();
+    return state
+        .where(
+          (e) =>
+              e.employeeId == user.id ||
+              user.assignedProjectIds.contains(e.projectId),
+        )
+        .toList();
   }
 
   /// PRD Section 11 & 12: Dual Indicator Monitoring
@@ -143,7 +155,8 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     final unreceiptedAmount = filtered
         .where((e) => !e.hasReceipt)
         .fold<double>(0.0, (sum, e) => sum + e.amount);
-    final ratio = totalClaimed > 0 ? (unreceiptedAmount / totalClaimed) * 100 : 0.0;
+    final ratio =
+        totalClaimed > 0 ? (unreceiptedAmount / totalClaimed) * 100 : 0.0;
 
     return {
       'totalClaimed': totalClaimed,
@@ -153,7 +166,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
   }
 
   /// PRD Section 11: Admin dashboard list of members requiring justification (> threshold, default 50%)
-  List<MemberReceiptSummary> getMembersRequiringJustification({double redFlagThreshold = 50.0}) {
+  List<MemberReceiptSummary> getMembersRequiringJustification({
+    double redFlagThreshold = 50.0,
+  }) {
     final Map<String, List<ExpenseModel>> grouped = {};
     for (final e in state) {
       final key = '${e.employeeId}_${e.projectId}';
@@ -166,21 +181,25 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       if (list.isEmpty) continue;
       final first = list.first;
       final total = list.fold<double>(0.0, (sum, e) => sum + e.amount);
-      final noReceipt = list.where((e) => !e.hasReceipt).fold<double>(0.0, (sum, e) => sum + e.amount);
+      final noReceipt = list
+          .where((e) => !e.hasReceipt)
+          .fold<double>(0.0, (sum, e) => sum + e.amount);
       final ratio = total > 0 ? (noReceipt / total) * 100 : 0.0;
       final unreceiptedCount = list.where((e) => !e.hasReceipt).length;
 
-      summaries.add(MemberReceiptSummary(
-        memberId: first.employeeId,
-        memberName: first.employeeName,
-        projectId: first.projectId,
-        projectName: first.projectName,
-        totalClaimed: total,
-        unreceiptedAmount: noReceipt,
-        unreceiptedRatio: ratio,
-        isExceedingThreshold: ratio >= redFlagThreshold,
-        unreceiptedCount: unreceiptedCount,
-      ));
+      summaries.add(
+        MemberReceiptSummary(
+          memberId: first.employeeId,
+          memberName: first.employeeName,
+          projectId: first.projectId,
+          projectName: first.projectName,
+          totalClaimed: total,
+          unreceiptedAmount: noReceipt,
+          unreceiptedRatio: ratio,
+          isExceedingThreshold: ratio >= redFlagThreshold,
+          unreceiptedCount: unreceiptedCount,
+        ),
+      );
     }
 
     return summaries;
@@ -217,10 +236,15 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     OfficeCostDetails? officeCostDetails,
   }) async {
     final officeBenefit = amount * officeBenefitRate;
-    final effectiveReceiptUrls = receiptPhotoUrls.isNotEmpty
-        ? receiptPhotoUrls
-        : (receiptPhotoUrl != null && receiptPhotoUrl.isNotEmpty ? [receiptPhotoUrl] : <String>[]);
-    final effectiveReceiptUrl = receiptPhotoUrl ?? (effectiveReceiptUrls.isNotEmpty ? effectiveReceiptUrls.first : null);
+    final effectiveReceiptUrls =
+        receiptPhotoUrls.isNotEmpty
+            ? receiptPhotoUrls
+            : (receiptPhotoUrl != null && receiptPhotoUrl.isNotEmpty
+                ? [receiptPhotoUrl]
+                : <String>[]);
+    final effectiveReceiptUrl =
+        receiptPhotoUrl ??
+        (effectiveReceiptUrls.isNotEmpty ? effectiveReceiptUrls.first : null);
     final newExpense = ExpenseModel(
       id: 'exp_${DateTime.now().microsecondsSinceEpoch}',
       employeeId: employeeId,
@@ -246,7 +270,8 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       receiptPhotoUrl: effectiveReceiptUrl,
       receiptPhotoUrls: effectiveReceiptUrls,
       status: ExpenseStatus.pending,
-      justificationStatus: hasReceipt ? JustificationStatus.none : JustificationStatus.required,
+      justificationStatus:
+          hasReceipt ? JustificationStatus.none : JustificationStatus.required,
       createdAt: DateTime.now(),
       equipmentDetails: equipmentDetails,
       transportationDetails: transportationDetails,
@@ -272,7 +297,8 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       // Fire OS-level push notification to confirm submission
       PushNotificationService.instance.showExpenseAlert(
         title: 'Expense Submitted ✓',
-        body: '$categoryName claim of $currency ${amount.toStringAsFixed(0)} submitted for review.',
+        body:
+            '$categoryName claim of $currency ${amount.toStringAsFixed(0)} submitted for review.',
         expenseId: saved.id,
       );
 
@@ -284,7 +310,6 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
       rethrow;
     }
   }
-
 
   /// PRD Section 13: Justification Workflow
   Future<void> submitJustification({
@@ -332,7 +357,8 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
           exp.copyWith(
             justificationStatus: JustificationStatus.approved,
             justificationReviewedBy: reviewerName,
-            justificationReviewComment: reviewComment ?? 'Justification approved by management.',
+            justificationReviewComment:
+                reviewComment ?? 'Justification approved by management.',
             justificationReviewedAt: DateTime.now(),
           )
         else
@@ -417,7 +443,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     }
   }
 
-  Future<void> editExpense({
+  Future<bool> editExpense({
     required String id,
     required String projectId,
     required String projectName,
@@ -437,44 +463,75 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     required DateTime date,
     String? receiptPhotoUrl,
   }) async {
+    final index = state.indexWhere((expense) => expense.id == id);
+    if (index < 0) return false;
+    final previous = state[index];
+    if (previous.status != ExpenseStatus.pending &&
+        previous.status != ExpenseStatus.rejected) {
+      return false;
+    }
+
+    final updated = previous.copyWith(
+      projectId: projectId,
+      projectName: projectName,
+      taskId: taskId,
+      taskTitle: taskTitle,
+      amount: amount,
+      baseCost: baseCost ?? amount,
+      vatRate: vatRate,
+      vatAmount:
+          vatAmount ??
+          (baseCost != null && vatRate > 0
+              ? (baseCost * (vatRate / 100.0))
+              : 0.0),
+      taxRate: taxRate,
+      taxAmount:
+          taxAmount ??
+          (baseCost != null && taxRate > 0
+              ? (baseCost * (taxRate / 100.0))
+              : 0.0),
+      officeBenefitAmount: amount * 0.30,
+      currency: currency,
+      categoryId: categoryId,
+      categoryName: categoryName,
+      categoryIcon: categoryIcon,
+      note: note,
+      date: date,
+      hasReceipt: receiptPhotoUrl != null && receiptPhotoUrl.isNotEmpty,
+      receiptPhotoUrl: receiptPhotoUrl,
+      clearReceiptPhoto: receiptPhotoUrl == null || receiptPhotoUrl.isEmpty,
+      receiptPhotoUrls:
+          receiptPhotoUrl == null || receiptPhotoUrl.isEmpty
+              ? const []
+              : [receiptPhotoUrl],
+      status: ExpenseStatus.pending,
+      clearRejectionReason: true,
+    );
     state = [
-      for (final exp in state)
-        if (exp.id == id && exp.status == ExpenseStatus.pending)
-          exp.copyWith(
-            projectId: projectId,
-            projectName: projectName,
-            taskId: taskId,
-            taskTitle: taskTitle,
-            amount: amount,
-            baseCost: baseCost ?? amount,
-            vatRate: vatRate,
-            vatAmount: vatAmount ?? (baseCost != null && vatRate > 0 ? (baseCost * (vatRate / 100.0)) : 0.0),
-            taxRate: taxRate,
-            taxAmount: taxAmount ?? (baseCost != null && taxRate > 0 ? (baseCost * (taxRate / 100.0)) : 0.0),
-            officeBenefitAmount: amount * 0.30,
-            currency: currency,
-            categoryId: categoryId,
-            categoryName: categoryName,
-            categoryIcon: categoryIcon,
-            note: note,
-            date: date,
-            hasReceipt: receiptPhotoUrl != null && receiptPhotoUrl.isNotEmpty,
-            receiptPhotoUrl: receiptPhotoUrl,
-          )
-        else
-          exp,
+      for (var i = 0; i < state.length; i++)
+        if (i == index) updated else state[i],
     ];
     await _persistExpenses();
     invalidateCache();
 
-    final idx = state.indexWhere((e) => e.id == id);
-    if (idx == -1) return;
-    final updated = state[idx];
     try {
       final repo = ref.read(expenseRepositoryProvider);
-      await repo.updateExpense(updated);
-    } catch (_) {
-      // Offline fallback
+      final saved = await repo.updateExpense(updated);
+      state = [
+        for (final expense in state)
+          if (expense.id == id) saved else expense,
+      ];
+      await _persistExpenses();
+      invalidateCache();
+      return true;
+    } catch (e) {
+      state = [
+        for (final expense in state)
+          if (expense.id == id) previous else expense,
+      ];
+      await _persistExpenses();
+      invalidateCache();
+      return false;
     }
   }
 
@@ -496,7 +553,8 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     if (exp != null) {
       PushNotificationService.instance.showExpenseAlert(
         title: 'Expense Approved ✅',
-        body: 'Expense report for ${exp.categoryName} (${exp.currency} ${exp.amount.toStringAsFixed(0)}) has been approved.',
+        body:
+            'Expense report for ${exp.categoryName} (${exp.currency} ${exp.amount.toStringAsFixed(0)}) has been approved.',
         expenseId: id,
       );
     }
@@ -546,7 +604,13 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
     try {
       final repo = ref.read(expenseRepositoryProvider);
       await Future.wait(
-        ids.map((id) => repo.updateStatus(id, ExpenseStatus.rejected, rejectionReason: reason)),
+        ids.map(
+          (id) => repo.updateStatus(
+            id,
+            ExpenseStatus.rejected,
+            rejectionReason: reason,
+          ),
+        ),
         eagerError: false,
       );
     } catch (_) {
@@ -580,7 +644,11 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
 
     try {
       final repo = ref.read(expenseRepositoryProvider);
-      await repo.updateStatus(id, ExpenseStatus.rejected, rejectionReason: reason);
+      await repo.updateStatus(
+        id,
+        ExpenseStatus.rejected,
+        rejectionReason: reason,
+      );
     } catch (_) {
       // Offline fallback
     }
@@ -653,7 +721,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
               exp.copyWith(
                 comments: [
                   for (final c in exp.comments)
-                    if (c.id == newComment.id) created else c
+                    if (c.id == newComment.id) created else c,
                 ],
               )
             else
@@ -667,5 +735,6 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>> with FetchCacheMixin 
   }
 }
 
-final expenseProvider =
-    NotifierProvider<ExpenseNotifier, List<ExpenseModel>>(ExpenseNotifier.new);
+final expenseProvider = NotifierProvider<ExpenseNotifier, List<ExpenseModel>>(
+  ExpenseNotifier.new,
+);

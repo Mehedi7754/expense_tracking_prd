@@ -10,12 +10,14 @@ class CommentThreadWidget extends StatefulWidget {
   final List<CommentModel> comments;
   final ValueChanged<String> onAddComment;
   final bool isReadOnly;
+  final bool isLoading;
 
   const CommentThreadWidget({
     super.key,
     required this.comments,
     required this.onAddComment,
     this.isReadOnly = false,
+    this.isLoading = false,
   });
 
   @override
@@ -59,7 +61,11 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
         children: [
           Row(
             children: [
-              const Icon(Icons.chat_bubble_outline_rounded, size: 18, color: AppColors.primary),
+              const Icon(
+                Icons.chat_bubble_outline_rounded,
+                size: 18,
+                color: AppColors.primary,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -71,18 +77,34 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle,
+                  color:
+                      isDark
+                          ? AppColors.darkSurfaceSubtle
+                          : AppColors.surfaceSubtle,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '${widget.comments.length}',
-                  style: AppTextStyles.labelSmall.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.labelSmall.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (widget.comments.isEmpty)
+          if (widget.isLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (widget.comments.isEmpty)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 20),
               alignment: Alignment.center,
@@ -105,14 +127,24 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
                 return Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isReviewer
-                        ? (isDark ? const Color(0xFF1E1B4B).withAlpha(120) : const Color(0xFFEEF2FF))
-                        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC)),
+                    color:
+                        isReviewer
+                            ? (isDark
+                                ? const Color(0xFF1E1B4B).withAlpha(120)
+                                : const Color(0xFFEEF2FF))
+                            : (isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF8FAFC)),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: isReviewer
-                          ? (isDark ? const Color(0xFF4F46E5).withAlpha(80) : const Color(0xFFC7D2FE))
-                          : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                      color:
+                          isReviewer
+                              ? (isDark
+                                  ? const Color(0xFF4F46E5).withAlpha(80)
+                                  : const Color(0xFFC7D2FE))
+                              : (isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0)),
                       width: 1,
                     ),
                   ),
@@ -124,14 +156,19 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
                         children: [
                           Row(
                             children: [
-                              Text(c.authorName, style: AppTextStyles.labelMedium),
+                              Text(
+                                c.authorName,
+                                style: AppTextStyles.labelMedium,
+                              ),
                               const SizedBox(width: 6),
                               RoleBadge(role: c.authorRole, compact: true),
                             ],
                           ),
                           Text(
                             DateFormatter.formatRelative(c.timestamp),
-                            style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
+                            style: AppTextStyles.bodySmall.copyWith(
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -152,9 +189,16 @@ class _CommentThreadWidgetState extends State<CommentThreadWidget> {
                     style: AppTextStyles.bodyMedium,
                     decoration: InputDecoration(
                       hintText: 'Ask for clarification or reply...',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       suffixIcon: IconButton(
-                        icon: const Icon(Icons.send_rounded, size: 18, color: AppColors.primary),
+                        icon: const Icon(
+                          Icons.send_rounded,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                         onPressed: _submit,
                       ),
                     ),

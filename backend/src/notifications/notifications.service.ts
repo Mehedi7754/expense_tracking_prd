@@ -103,6 +103,7 @@ export class NotificationsService {
       createdAt: r.created_at,
       relatedProjectId: r.related_project_id,
       relatedExpenseId: r.related_expense_id,
+      relatedLeaveId: r.related_leave_id,
       relatedTaskId: r.related_task_id,
       expenseDate: r.expense_date || null,
       submittedDate: r.submitted_date || null,
@@ -114,9 +115,11 @@ export class NotificationsService {
     title: string;
     message: string;
     fullExplanation?: string;
+    rejectionReason?: string;
     type?: string;
     relatedProjectId?: string;
     relatedExpenseId?: string;
+    relatedLeaveId?: string;
     relatedTaskId?: string;
     actorId?: string;
     actorName?: string;
@@ -127,8 +130,8 @@ export class NotificationsService {
     let savedNotification: any = null;
     try {
       const res = await this.db.query(
-        `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id, expense_date, submitted_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, related_leave_id, actor_id, actor_name, actor_avatar_url, related_task_id, expense_date, submitted_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING *`,
         [
           data.userId || null,
@@ -138,6 +141,7 @@ export class NotificationsService {
           data.type || 'general',
           data.relatedProjectId || null,
           data.relatedExpenseId || null,
+          data.relatedLeaveId || null,
           data.actorId || null,
           data.actorName || null,
           data.actorAvatarUrl || null,
@@ -150,8 +154,8 @@ export class NotificationsService {
     } catch (dbErr) {
       try {
         const fallbackRes = await this.db.query(
-          `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, actor_id, actor_name, actor_avatar_url, related_task_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `INSERT INTO notifications (user_id, title, message, full_explanation, type, related_project_id, related_expense_id, related_leave_id, actor_id, actor_name, actor_avatar_url, related_task_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
            RETURNING *`,
           [
             data.userId || null,
@@ -161,6 +165,7 @@ export class NotificationsService {
             data.type || 'general',
             data.relatedProjectId || null,
             data.relatedExpenseId || null,
+            data.relatedLeaveId || null,
             data.actorId || null,
             data.actorName || null,
             data.actorAvatarUrl || null,
@@ -190,6 +195,7 @@ export class NotificationsService {
           createdAt: savedNotification.created_at || new Date().toISOString(),
           relatedProjectId: savedNotification.related_project_id,
           relatedExpenseId: savedNotification.related_expense_id,
+          relatedLeaveId: savedNotification.related_leave_id || data.relatedLeaveId || null,
           relatedTaskId: savedNotification.related_task_id,
           expenseDate: savedNotification.expense_date || data.expenseDate || null,
           submittedDate: savedNotification.submitted_date || data.submittedDate || null,
@@ -207,8 +213,10 @@ export class NotificationsService {
         notificationId: savedNotification?.id || '',
       };
       if (data.relatedExpenseId) payloadData.expenseId = data.relatedExpenseId;
+      if (data.relatedLeaveId) payloadData.leaveId = data.relatedLeaveId;
       if (data.relatedProjectId) payloadData.projectId = data.relatedProjectId;
       if (data.relatedTaskId) payloadData.taskId = data.relatedTaskId;
+      if (data.rejectionReason) payloadData.rejectionReason = data.rejectionReason.slice(0, 500);
       if (data.actorId) payloadData.actorId = data.actorId;
       if (data.actorName) payloadData.actorName = data.actorName;
       if (data.actorAvatarUrl) payloadData.actorAvatarUrl = data.actorAvatarUrl;

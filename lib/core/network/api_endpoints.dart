@@ -28,44 +28,68 @@ class ApiEndpoints {
   static String get refreshToken => resolve(AppEnv.endpointAuthRefresh);
   static String get logout => resolve(AppEnv.endpointAuthLogout);
   static String get updateProfile => resolve(AppEnv.endpointAuthProfile);
-  static String get forgotPassword => resolve(AppEnv.endpointAuthForgotPassword);
+  static String get forgotPassword =>
+      resolve(AppEnv.endpointAuthForgotPassword);
   static String get resetPassword => resolve(AppEnv.endpointAuthResetPassword);
 
   // Projects & Budget Endpoints
   static String get projects => resolve(AppEnv.endpointProjects);
-  static String projectById(String id) => resolve('${AppEnv.endpointProjects}/$id');
-  static String projectRevenues(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/revenues');
-  static String projectMembers(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/members');
-  static String projectMemberById(String projectId, String userId) => resolve('${AppEnv.endpointProjects}/$projectId/members/$userId');
-  static String myProjectPermissions(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/my-permissions');
-  static String projectNotes(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/notes');
-  static String closeProject(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/close');
-  static String reopenProject(String projectId) => resolve('${AppEnv.endpointProjects}/$projectId/reopen');
-  static String get projectCostBreakdown => resolve(AppEnv.endpointProjectCostBreakdown);
+  static String projectById(String id) =>
+      resolve('${AppEnv.endpointProjects}/$id');
+  static String projectRevenues(String projectId) =>
+      resolve('${AppEnv.endpointProjects}/$projectId/revenues');
+  static String projectMembers(String projectId) =>
+      resolve('${AppEnv.endpointProjects}/$projectId/members');
+  static String projectMemberById(String projectId, String userId) =>
+      resolve('${AppEnv.endpointProjects}/$projectId/members/$userId');
+  static String myProjectPermissions(String projectId) =>
+      resolve('${AppEnv.endpointProjects}/$projectId/my-permissions');
+  static String projectNotes(String projectId) =>
+      resolve('${AppEnv.endpointProjects}/$projectId/notes');
+  static String closeProject(String projectId) =>
+      resolve('${AppEnv.endpointProjects}/$projectId/close');
+  static String reopenProject(String projectId) =>
+      resolve('${AppEnv.endpointProjects}/$projectId/reopen');
+  static String get projectCostBreakdown =>
+      resolve(AppEnv.endpointProjectCostBreakdown);
 
   // Expense Claims & Receipts Endpoints
   static String get expenses => resolve(AppEnv.endpointExpenses);
-  static String expenseById(String id) => resolve('${AppEnv.endpointExpenses}/$id');
-  static String expenseStatus(String id) => resolve('${AppEnv.endpointExpenses}/$id/status');
-  static String expenseComments(String expenseId) => resolve('${AppEnv.endpointExpenses}/$expenseId/comments');
-  static String submitJustification(String expenseId) => resolve('${AppEnv.endpointExpenses}/$expenseId/justification');
-  static String reviewJustification(String expenseId) => resolve('${AppEnv.endpointExpenses}/$expenseId/justification/review');
+  static String expenseById(String id) =>
+      resolve('${AppEnv.endpointExpenses}/$id');
+  static String expenseStatus(String id) =>
+      resolve('${AppEnv.endpointExpenses}/$id/status');
+  static String expenseComments(String expenseId) =>
+      resolve('${AppEnv.endpointExpenses}/$expenseId/comments');
+  static String submitJustification(String expenseId) =>
+      resolve('${AppEnv.endpointExpenses}/$expenseId/justification');
+  static String reviewJustification(String expenseId) =>
+      resolve('${AppEnv.endpointExpenses}/$expenseId/justification/review');
   static String get submitExpense => resolve(AppEnv.endpointExpensesSubmit);
-  static String updateExpense(String id) => resolve('${AppEnv.endpointExpenses}/$id');
-  static String deleteExpense(String id) => resolve('${AppEnv.endpointExpenses}/$id');
-  static String approveExpense(String id) => resolve('${AppEnv.endpointExpenses}/$id/approve');
-  static String rejectExpense(String id) => resolve('${AppEnv.endpointExpenses}/$id/reject');
-  static String uploadReceipt(String id) => resolve('${AppEnv.endpointExpenses}/$id/receipt');
-  static String get receiptCompliance => resolve(AppEnv.endpointExpensesCompliance);
+  static String updateExpense(String id) =>
+      resolve('${AppEnv.endpointExpenses}/$id');
+  static String deleteExpense(String id) =>
+      resolve('${AppEnv.endpointExpenses}/$id');
+  static String approveExpense(String id) =>
+      resolve('${AppEnv.endpointExpenses}/$id/approve');
+  static String rejectExpense(String id) =>
+      resolve('${AppEnv.endpointExpenses}/$id/reject');
+  static String uploadReceipt(String id) =>
+      resolve('${AppEnv.endpointExpenses}/$id/receipt');
+  static String get receiptCompliance =>
+      resolve(AppEnv.endpointExpensesCompliance);
 
   // Categories & Policy Caps Endpoints
   static String get categories => resolve(AppEnv.endpointCategories);
-  static String categoryById(String id) => resolve('${AppEnv.endpointCategories}/$id');
+  static String categoryById(String id) =>
+      resolve('${AppEnv.endpointCategories}/$id');
 
   // Clients & Cost Estimation Endpoints
   static String get clients => resolve(AppEnv.endpointClients);
-  static String clientById(String id) => resolve('${AppEnv.endpointClients}/$id');
-  static String clientAnalysis(String id) => resolve('${AppEnv.endpointClients}/$id/analysis');
+  static String clientById(String id) =>
+      resolve('${AppEnv.endpointClients}/$id');
+  static String clientAnalysis(String id) =>
+      resolve('${AppEnv.endpointClients}/$id/analysis');
   static String get costEstimator => resolve(AppEnv.endpointCostEstimator);
   static String get benchmarks => resolve(AppEnv.endpointBenchmarks);
 
@@ -80,43 +104,64 @@ class ApiEndpoints {
   // Audit Trail & Notifications Endpoints
   static String get auditLogs => resolve(AppEnv.endpointAuditLogs);
   static String get notifications => resolve(AppEnv.endpointNotifications);
-  static String notificationById(String id) => resolve('${AppEnv.endpointNotifications}/$id');
-  static String markNotificationRead(String id) => resolve('${AppEnv.endpointNotifications}/$id/read');
-  static String deleteNotification(String id) => resolve('${AppEnv.endpointNotifications}/$id');
-  static String get deleteAllNotifications => resolve('${AppEnv.endpointNotifications}/all');
+  static String notificationById(String id) =>
+      resolve('${AppEnv.endpointNotifications}/$id');
+  static String markNotificationRead(String id) =>
+      resolve('${AppEnv.endpointNotifications}/$id/read');
+  static String deleteNotification(String id) =>
+      resolve('${AppEnv.endpointNotifications}/$id');
+  static String get deleteAllNotifications =>
+      resolve('${AppEnv.endpointNotifications}/all');
 
   // Danger Zone / System Administration
   static String get wipeAllData => resolve('/admin/wipe-all-data');
   static String get dataBackups => resolve('/admin/data-backups');
-  static String revertBackup(String id) => resolve('/admin/data-backups/$id/revert');
-
+  static String revertBackup(String id) =>
+      resolve('/admin/data-backups/$id/revert');
 
   // Reports & Financial Analytics
-  static String get financialSummaryReport => resolve(AppEnv.endpointReportsFinancialSummary);
-  static String get receiptComplianceReport => resolve(AppEnv.endpointReportsReceiptCompliance);
+  static String get financialSummaryReport =>
+      resolve(AppEnv.endpointReportsFinancialSummary);
+  static String get receiptComplianceReport =>
+      resolve(AppEnv.endpointReportsReceiptCompliance);
   static String get reportsSummary => resolve(AppEnv.endpointReportsSummary);
   static String get exportReport => resolve(AppEnv.endpointReportsExport);
 
   // Attendance & Geo-Location Tracking
   static String get attendance => resolve(AppEnv.endpointAttendance);
-  static String get attendanceCheckIn => resolve(AppEnv.endpointAttendanceCheckIn);
-  static String get attendanceSummary => resolve(AppEnv.endpointAttendanceSummary);
-  static String get attendanceOverview => resolve(AppEnv.endpointAttendanceOverview);
-  static String get confirmAbsence => resolve('${AppEnv.endpointAttendance}/confirm-absence');
-  static String get attendanceOverride => resolve('${AppEnv.endpointAttendance}/override');
-  static String get attendanceWorkLocations => resolve('${AppEnv.endpointAttendance}/work-locations');
-  static String get attendanceWorkLocationsAssign => resolve('${AppEnv.endpointAttendance}/work-locations/assign');
+  static String get attendanceCheckIn =>
+      resolve(AppEnv.endpointAttendanceCheckIn);
+  static String get attendanceSummary =>
+      resolve(AppEnv.endpointAttendanceSummary);
+  static String get attendanceOverview =>
+      resolve(AppEnv.endpointAttendanceOverview);
+  static String get confirmAbsence =>
+      resolve('${AppEnv.endpointAttendance}/confirm-absence');
+  static String get attendanceOverride =>
+      resolve('${AppEnv.endpointAttendance}/override');
+  static String get attendanceWorkLocations =>
+      resolve('${AppEnv.endpointAttendance}/work-locations');
+  static String get attendanceWorkLocationsAssign =>
+      resolve('${AppEnv.endpointAttendance}/work-locations/assign');
 
   // Salary & Attendance Deductions
   static String get salary => resolve(AppEnv.endpointSalary);
-  static String employeeSalary(String userId) => resolve('${AppEnv.endpointSalary}/employee/$userId');
-  static String calculateSalary(String userId) => resolve('${AppEnv.endpointSalary}/calculate/$userId');
-  static String get saveSalaryCalculation => resolve('${AppEnv.endpointSalary}/save-calculation');
+  static String employeeSalary(String userId) =>
+      resolve('${AppEnv.endpointSalary}/employee/$userId');
+  static String calculateSalary(String userId) =>
+      resolve('${AppEnv.endpointSalary}/calculate/$userId');
+  static String get saveSalaryCalculation =>
+      resolve('${AppEnv.endpointSalary}/save-calculation');
   static String get salaryReport => resolve(AppEnv.endpointSalaryReport);
   static String get holidays => resolve(AppEnv.endpointHolidays);
-  static String holidayById(String id) => resolve('${AppEnv.endpointHolidays}/$id');
+  static String holidayById(String id) =>
+      resolve('${AppEnv.endpointHolidays}/$id');
   static String get leaves => resolve(AppEnv.endpointLeaves);
+  static String leaveComments(String leaveId) =>
+      resolve('${AppEnv.endpointLeaves}/$leaveId/comments');
   static String leaveById(String id) => resolve('${AppEnv.endpointLeaves}/$id');
-  static String salaryAdjustments(String userId) => resolve('${AppEnv.endpointSalary}/adjustments/$userId');
-  static String get addSalaryAdjustment => resolve('${AppEnv.endpointSalary}/adjustments');
+  static String salaryAdjustments(String userId) =>
+      resolve('${AppEnv.endpointSalary}/adjustments/$userId');
+  static String get addSalaryAdjustment =>
+      resolve('${AppEnv.endpointSalary}/adjustments');
 }

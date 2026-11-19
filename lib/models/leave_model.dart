@@ -3,6 +3,7 @@ class LeaveRecordModel {
   final String userId;
   final String userName;
   final String userEmail;
+  final String? userAvatarUrl;
   final String startDate;
   final String endDate;
   final String
@@ -16,15 +17,17 @@ class LeaveRecordModel {
     required this.userId,
     this.userName = '',
     this.userEmail = '',
+    this.userAvatarUrl,
     required this.startDate,
     required this.endDate,
     required this.leaveType,
     this.reason = '',
     this.isApproved = true,
-  this.status = '',
+    this.status = '',
   });
 
-  bool get isPending => status.isEmpty ? !isApproved : status.toLowerCase() == 'pending';
+  bool get isPending =>
+      status.isEmpty ? !isApproved : status.toLowerCase() == 'pending';
   bool get isRejected => status.toLowerCase() == 'rejected';
 
   bool get isPaid => leaveType.toLowerCase() != 'unpaid';
@@ -79,6 +82,11 @@ class LeaveRecordModel {
           json['user_email'] ??
           json['email'] ??
           '',
+      userAvatarUrl:
+          (json['userAvatarUrl'] ??
+                  json['user_avatar_url'] ??
+                  json['avatar_url'])
+              ?.toString(),
       startDate:
           json['startDate']?.toString() ?? json['start_date']?.toString() ?? '',
       endDate:

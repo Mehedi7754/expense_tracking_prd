@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_endpoints.dart';
 import '../models/leave_model.dart';
+import '../models/comment_model.dart';
 
 final leaveRepositoryProvider = Provider<LeaveRepository>((ref) {
   final client = ref.watch(apiClientProvider);
@@ -31,14 +32,17 @@ class LeaveRepository {
     }
 
     final response = await _client.get(url);
-    if (response is List) {
-      return response
-          .map(
-            (item) => LeaveRecordModel.fromJson(item as Map<String, dynamic>),
-          )
-          .toList();
+    dynamic rows = response;
+    while (rows is Map<String, dynamic>) {
+      final nested = rows['data'] ?? rows['leaves'] ?? rows['results'];
+      if (nested == null || identical(nested, rows)) break;
+      rows = nested;
     }
-    return const [];
+    if (rows is! List) return const [];
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(LeaveRecordModel.fromJson)
+        .toList();
   }
 
   /// Submits a new leave application to the live backend.
@@ -88,6 +92,41 @@ class LeaveRepository {
     }
     throw const FormatException(
       'Invalid server response when updating leave request',
+    );
+  }
+
+  Future<List<CommentModel>> getComments(String leaveId) async {
+    dynamic rows = await _client.get(ApiEndpoints.leaveComments(leaveId));
+    while (rows is Map<String, dynamic>) {
+      final nested = rows['data'] ?? rows['comments'] ?? rows['results'];
+      if (nested == null || identical(nested, rows)) break;
+      rows = nested;
+    }
+    if (rows is! List) {
+      throw const FormatException(
+        'Invalid server response when loading leave clarification messages',
+      );
+    }
+    return rows
+        .whereType<Map<String, dynamic>>()
+        .map(CommentModel.fromJson)
+        .toList();
+  }
+
+  Future<CommentModel> addComment(String leaveId, String text) async {
+    final response = await _client.post(
+      ApiEndpoints.leaveComments(leaveId),
+      body: {'comment': text, 'text': text, 'comment_text': text},
+    );
+    if (response is Map<String, dynamic>) {
+      final data =
+          response['data'] is Map<String, dynamic>
+              ? response['data'] as Map<String, dynamic>
+              : response;
+      return CommentModel.fromJson(data);
+    }
+    throw const FormatException(
+      'Invalid server response when adding leave comment',
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'comment_model.dart';
 
 enum ExpenseStatus {
@@ -91,11 +93,15 @@ class EquipmentDetails {
 
   factory EquipmentDetails.fromJson(Map<String, dynamic> json) {
     return EquipmentDetails(
-      equipmentType: (json['equipment_type'] ?? json['equipmentType'] ?? '').toString(),
+      equipmentType:
+          (json['equipment_type'] ?? json['equipmentType'] ?? '').toString(),
       isRental: json['is_rental'] ?? json['isRental'] ?? true,
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
-      rentalAmount: (json['rental_amount'] ?? json['rentalAmount'] as num?)?.toDouble() ?? 0.0,
-      rentalPeriod: (json['rental_period'] ?? json['rentalPeriod'] ?? '').toString(),
+      rentalAmount:
+          (json['rental_amount'] ?? json['rentalAmount'] as num?)?.toDouble() ??
+          0.0,
+      rentalPeriod:
+          (json['rental_period'] ?? json['rentalPeriod'] ?? '').toString(),
     );
   }
 
@@ -143,7 +149,11 @@ enum TransportationType {
   }
 
   static TransportationType fromString(String val) {
-    switch (val.toLowerCase().replaceAll(' ', '').replaceAll('/', '').replaceAll('_', '')) {
+    switch (val
+        .toLowerCase()
+        .replaceAll(' ', '')
+        .replaceAll('/', '')
+        .replaceAll('_', '')) {
       case 'privatecar':
       case 'car':
         return TransportationType.privateCar;
@@ -189,18 +199,26 @@ class TransportationDetails {
   });
 
   double get costPerKm =>
-      (distanceKm != null && distanceKm! > 0) ? ((fuelCost ?? 0) + (otherTransportCost ?? 0)) / distanceKm! : 0.0;
+      (distanceKm != null && distanceKm! > 0)
+          ? ((fuelCost ?? 0) + (otherTransportCost ?? 0)) / distanceKm!
+          : 0.0;
 
   factory TransportationDetails.fromJson(Map<String, dynamic> json) {
-    final typeStr = (json['transportation_type'] ?? json['transportationType'] ?? 'local').toString();
+    final typeStr =
+        (json['transportation_type'] ?? json['transportationType'] ?? 'local')
+            .toString();
     return TransportationDetails(
       transportationType: TransportationType.fromString(typeStr),
-      fromLocation: (json['from_location'] ?? json['fromLocation'] ?? '').toString(),
+      fromLocation:
+          (json['from_location'] ?? json['fromLocation'] ?? '').toString(),
       toLocation: (json['to_location'] ?? json['toLocation'] ?? '').toString(),
       vehicle: json['vehicle']?.toString(),
-      distanceKm: (json['distance_km'] ?? json['distanceKm'] as num?)?.toDouble(),
+      distanceKm:
+          (json['distance_km'] ?? json['distanceKm'] as num?)?.toDouble(),
       fuelCost: (json['fuel_cost'] ?? json['fuelCost'] as num?)?.toDouble(),
-      otherTransportCost: (json['other_transport_cost'] ?? json['otherTransportCost'] as num?)?.toDouble(),
+      otherTransportCost:
+          (json['other_transport_cost'] ?? json['otherTransportCost'] as num?)
+              ?.toDouble(),
     );
   }
 
@@ -212,7 +230,8 @@ class TransportationDetails {
       if (vehicle != null) 'vehicle': vehicle,
       if (distanceKm != null) 'distance_km': distanceKm,
       if (fuelCost != null) 'fuel_cost': fuelCost,
-      if (otherTransportCost != null) 'other_transport_cost': otherTransportCost,
+      if (otherTransportCost != null)
+        'other_transport_cost': otherTransportCost,
     };
   }
 }
@@ -237,9 +256,15 @@ class FoodDetails {
     return FoodDetails(
       location: (json['location'] ?? '').toString(),
       attendees: (json['attendees'] ?? '').toString(),
-      numberOfPeople: (json['number_of_people'] ?? json['numberOfPeople'] as num?)?.toInt() ?? 1,
+      numberOfPeople:
+          (json['number_of_people'] ?? json['numberOfPeople'] as num?)
+              ?.toInt() ??
+          1,
       mealType: (json['meal_type'] ?? json['mealType'] ?? 'Lunch').toString(),
-      exceedsFoodAllowance: json['exceeds_food_allowance'] ?? json['exceedsFoodAllowance'] ?? false,
+      exceedsFoodAllowance:
+          json['exceeds_food_allowance'] ??
+          json['exceedsFoodAllowance'] ??
+          false,
     );
   }
 
@@ -271,15 +296,23 @@ class AccommodationDetails {
   });
 
   double get costPerPersonNight =>
-      numberOfNights > 0 ? (ratePerNight * numberOfNights) / numberOfNights : ratePerNight;
+      numberOfNights > 0
+          ? (ratePerNight * numberOfNights) / numberOfNights
+          : ratePerNight;
 
   factory AccommodationDetails.fromJson(Map<String, dynamic> json) {
     return AccommodationDetails(
       hotelName: (json['hotel_name'] ?? json['hotelName'] ?? '').toString(),
       location: (json['location'] ?? '').toString(),
       guests: (json['guests'] ?? '').toString(),
-      numberOfNights: (json['number_of_nights'] ?? json['numberOfNights'] as num?)?.toInt() ?? 1,
-      ratePerNight: (json['rate_per_night'] ?? json['ratePerNight'] as num?)?.toDouble() ?? 0.0,
+      numberOfNights:
+          (json['number_of_nights'] ?? json['numberOfNights'] as num?)
+              ?.toInt() ??
+          1,
+      ratePerNight:
+          (json['rate_per_night'] ?? json['ratePerNight'] as num?)
+              ?.toDouble() ??
+          0.0,
     );
   }
 
@@ -296,22 +329,20 @@ class AccommodationDetails {
 
 // Category E: Office Cost
 class OfficeCostDetails {
-  final String subCategory; // Printing, Photocopy, Stationery, Internet, Communication, Meeting expenses, Temporary office, Other
+  final String
+  subCategory; // Printing, Photocopy, Stationery, Internet, Communication, Meeting expenses, Temporary office, Other
 
-  const OfficeCostDetails({
-    required this.subCategory,
-  });
+  const OfficeCostDetails({required this.subCategory});
 
   factory OfficeCostDetails.fromJson(Map<String, dynamic> json) {
     return OfficeCostDetails(
-      subCategory: (json['sub_category'] ?? json['subCategory'] ?? '').toString(),
+      subCategory:
+          (json['sub_category'] ?? json['subCategory'] ?? '').toString(),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'sub_category': subCategory,
-    };
+    return {'sub_category': subCategory};
   }
 }
 
@@ -404,9 +435,9 @@ class ExpenseModel {
     this.foodDetails,
     this.accommodationDetails,
     this.officeCostDetails,
-  })  : baseCost = baseCost ?? amount,
-        vatAmount = vatAmount ?? 0.0,
-        taxAmount = taxAmount ?? 0.0;
+  }) : baseCost = baseCost ?? amount,
+       vatAmount = vatAmount ?? 0.0,
+       taxAmount = taxAmount ?? 0.0;
 
   /// Explicit getter for total cost (Gross invoice total: Base Cost + VAT + Tax Amount).
   double get totalCost {
@@ -453,6 +484,8 @@ class ExpenseModel {
     bool? hasReceipt,
     String? receiptPhotoUrl,
     List<String>? receiptPhotoUrls,
+    bool clearReceiptPhoto = false,
+    bool clearRejectionReason = false,
     ExpenseStatus? status,
     String? rejectionReason,
     List<CommentModel>? comments,
@@ -494,21 +527,30 @@ class ExpenseModel {
       note: note ?? this.note,
       date: date ?? this.date,
       hasReceipt: hasReceipt ?? this.hasReceipt,
-      receiptPhotoUrl: receiptPhotoUrl ?? this.receiptPhotoUrl,
+      receiptPhotoUrl:
+          clearReceiptPhoto ? null : (receiptPhotoUrl ?? this.receiptPhotoUrl),
       receiptPhotoUrls: receiptPhotoUrls ?? this.receiptPhotoUrls,
       status: status ?? this.status,
-      rejectionReason: rejectionReason ?? this.rejectionReason,
+      rejectionReason:
+          clearRejectionReason
+              ? null
+              : (rejectionReason ?? this.rejectionReason),
       comments: comments ?? this.comments,
       createdAt: createdAt ?? this.createdAt,
       justificationStatus: justificationStatus ?? this.justificationStatus,
       justificationReason: justificationReason ?? this.justificationReason,
       justificationComment: justificationComment ?? this.justificationComment,
-      justificationAttachmentUrl: justificationAttachmentUrl ?? this.justificationAttachmentUrl,
-      justificationReviewedBy: justificationReviewedBy ?? this.justificationReviewedBy,
-      justificationReviewComment: justificationReviewComment ?? this.justificationReviewComment,
-      justificationReviewedAt: justificationReviewedAt ?? this.justificationReviewedAt,
+      justificationAttachmentUrl:
+          justificationAttachmentUrl ?? this.justificationAttachmentUrl,
+      justificationReviewedBy:
+          justificationReviewedBy ?? this.justificationReviewedBy,
+      justificationReviewComment:
+          justificationReviewComment ?? this.justificationReviewComment,
+      justificationReviewedAt:
+          justificationReviewedAt ?? this.justificationReviewedAt,
       equipmentDetails: equipmentDetails ?? this.equipmentDetails,
-      transportationDetails: transportationDetails ?? this.transportationDetails,
+      transportationDetails:
+          transportationDetails ?? this.transportationDetails,
       foodDetails: foodDetails ?? this.foodDetails,
       accommodationDetails: accommodationDetails ?? this.accommodationDetails,
       officeCostDetails: officeCostDetails ?? this.officeCostDetails,
@@ -520,7 +562,9 @@ class ExpenseModel {
       if (raw is List) {
         return raw
             .whereType<Map>()
-            .map((item) => CommentModel.fromJson(Map<String, dynamic>.from(item)))
+            .map(
+              (item) => CommentModel.fromJson(Map<String, dynamic>.from(item)),
+            )
             .toList();
       }
       return const [];
@@ -546,124 +590,253 @@ class ExpenseModel {
     }
 
     final statusStr = (json['status'] ?? 'pending').toString();
-    final justStatusStr = (json['justification_status'] ?? json['justificationStatus'] ?? 'none').toString();
+    final justStatusStr =
+        (json['justification_status'] ?? json['justificationStatus'] ?? 'none')
+            .toString();
 
     // Check category details object (from JSONB in PostgreSQL or nested camelCase)
-    final categoryDetails = json['category_details'] is Map<String, dynamic>
-        ? json['category_details'] as Map<String, dynamic>
-        : null;
+    final categoryDetails =
+        json['category_details'] is Map<String, dynamic>
+            ? json['category_details'] as Map<String, dynamic>
+            : null;
 
-    final eqData = json['equipment_details'] ?? json['equipmentDetails'] ?? categoryDetails?['equipment'];
-    final trData = json['transportation_details'] ?? json['transportationDetails'] ?? categoryDetails?['transportation'];
-    final fdData = json['food_details'] ?? json['foodDetails'] ?? categoryDetails?['food'];
-    final acData = json['accommodation_details'] ?? json['accommodationDetails'] ?? categoryDetails?['accommodation'];
-    final ofData = json['office_cost_details'] ?? json['officeCostDetails'] ?? categoryDetails?['office'];
+    final eqData =
+        json['equipment_details'] ??
+        json['equipmentDetails'] ??
+        categoryDetails?['equipment'];
+    final trData =
+        json['transportation_details'] ??
+        json['transportationDetails'] ??
+        categoryDetails?['transportation'];
+    final fdData =
+        json['food_details'] ?? json['foodDetails'] ?? categoryDetails?['food'];
+    final acData =
+        json['accommodation_details'] ??
+        json['accommodationDetails'] ??
+        categoryDetails?['accommodation'];
+    final ofData =
+        json['office_cost_details'] ??
+        json['officeCostDetails'] ??
+        categoryDetails?['office'];
 
-    final receiptPhoto = json['receipt_photo_url']?.toString() ?? json['receiptPhotoUrl']?.toString();
+    final receiptPhoto =
+        json['receipt_photo_url']?.toString() ??
+        json['receiptPhotoUrl']?.toString();
     List<String> parsedReceiptUrls = [];
-    final rawReceiptUrls = json['receipt_photo_urls'] ?? json['receiptPhotoUrls'];
-    if (rawReceiptUrls is List) {
-      parsedReceiptUrls = rawReceiptUrls.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
-    } else if (rawReceiptUrls is String && rawReceiptUrls.isNotEmpty) {
-      if (rawReceiptUrls.startsWith('{') && rawReceiptUrls.endsWith('}')) {
-        parsedReceiptUrls = rawReceiptUrls.substring(1, rawReceiptUrls.length - 1).split(',').map((s) => s.trim().replaceAll('"', '')).where((s) => s.isNotEmpty).toList();
-      } else {
-        parsedReceiptUrls = [rawReceiptUrls];
+    final rawReceiptUrls =
+        json['receipt_photo_urls'] ?? json['receiptPhotoUrls'];
+    void addReceiptValue(dynamic value) {
+      String? url;
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+          parsedReceiptUrls.addAll(
+            trimmed
+                .substring(1, trimmed.length - 1)
+                .split(',')
+                .map((item) => item.trim().replaceAll('"', ''))
+                .where((item) => item.isNotEmpty),
+          );
+          return;
+        }
+        if (trimmed.startsWith('[')) {
+          try {
+            final decoded = jsonDecode(trimmed);
+            if (decoded is List) {
+              for (final item in decoded) {
+                addReceiptValue(item);
+              }
+              return;
+            }
+          } catch (_) {}
+        }
+        url = trimmed;
+      } else if (value is Map) {
+        url =
+            (value['url'] ??
+                    value['fileUrl'] ??
+                    value['file_url'] ??
+                    value['receiptPhotoUrl'] ??
+                    value['receipt_photo_url'] ??
+                    value['path'] ??
+                    value['filePath'] ??
+                    value['file_path'])
+                ?.toString();
+      }
+      if (url != null && url.isNotEmpty && !parsedReceiptUrls.contains(url)) {
+        parsedReceiptUrls.add(url);
       }
     }
-    if (parsedReceiptUrls.isEmpty && receiptPhoto != null && receiptPhoto.isNotEmpty) {
+
+    if (rawReceiptUrls is List) {
+      for (final value in rawReceiptUrls) {
+        addReceiptValue(value);
+      }
+    } else if (rawReceiptUrls != null) {
+      addReceiptValue(rawReceiptUrls);
+    }
+    final rawReceiptPhotos = json['receipt_photos'] ?? json['receiptPhotos'];
+    if (rawReceiptPhotos is List) {
+      for (final value in rawReceiptPhotos) {
+        addReceiptValue(value);
+      }
+    }
+    if (parsedReceiptUrls.isEmpty &&
+        receiptPhoto != null &&
+        receiptPhoto.isNotEmpty) {
       parsedReceiptUrls = [receiptPhoto];
     }
 
     final rawReceipt = json['has_receipt'] ?? json['hasReceipt'];
-    final bool parsedHasReceipt = rawReceipt != null
-        ? parseBool(rawReceipt, false)
-        : (parsedReceiptUrls.isNotEmpty || (receiptPhoto != null && receiptPhoto.isNotEmpty));
+    final bool parsedHasReceipt =
+        rawReceipt != null
+            ? parseBool(rawReceipt, false)
+            : (parsedReceiptUrls.isNotEmpty ||
+                (receiptPhoto != null && receiptPhoto.isNotEmpty));
 
     double parsedVatRate = parseDouble(json['vat_rate'] ?? json['vatRate']);
-    double? parsedVatAmount = (json['vat_amount'] != null || json['vatAmount'] != null)
-        ? parseDouble(json['vat_amount'] ?? json['vatAmount'])
-        : null;
+    double? parsedVatAmount =
+        (json['vat_amount'] != null || json['vatAmount'] != null)
+            ? parseDouble(json['vat_amount'] ?? json['vatAmount'])
+            : null;
     double parsedTaxRate = parseDouble(json['tax_rate'] ?? json['taxRate']);
-    double? parsedTaxAmount = (json['tax_amount'] != null || json['taxAmount'] != null)
-        ? parseDouble(json['tax_amount'] ?? json['taxAmount'])
-        : null;
-    double? parsedBaseCost = (json['base_cost'] != null || json['baseCost'] != null || json['base_amount'] != null)
-        ? parseDouble(json['base_cost'] ?? json['baseCost'] ?? json['base_amount'])
-        : null;
+    double? parsedTaxAmount =
+        (json['tax_amount'] != null || json['taxAmount'] != null)
+            ? parseDouble(json['tax_amount'] ?? json['taxAmount'])
+            : null;
+    double? parsedBaseCost =
+        (json['base_cost'] != null ||
+                json['baseCost'] != null ||
+                json['base_amount'] != null)
+            ? parseDouble(
+              json['base_cost'] ?? json['baseCost'] ?? json['base_amount'],
+            )
+            : null;
 
     final rawNote = (json['note'] ?? '').toString();
     String displayNote = rawNote;
 
-    final taxMatch = RegExp(r'\[TAX_META:vat=(\d+\.?\d*):(\d+\.?\d*)\|tax=(\d+\.?\d*):(\d+\.?\d*)\|base[:=](\d+\.?\d*)\]').firstMatch(rawNote);
+    final taxMatch = RegExp(
+      r'\[TAX_META:vat=(\d+\.?\d*):(\d+\.?\d*)\|tax=(\d+\.?\d*):(\d+\.?\d*)\|base[:=](\d+\.?\d*)\]',
+    ).firstMatch(rawNote);
     if (taxMatch != null) {
-      if (parsedVatRate == 0) parsedVatRate = double.tryParse(taxMatch.group(1)!) ?? 0;
+      if (parsedVatRate == 0)
+        parsedVatRate = double.tryParse(taxMatch.group(1)!) ?? 0;
       parsedVatAmount ??= double.tryParse(taxMatch.group(2)!);
-      if (parsedTaxRate == 0) parsedTaxRate = double.tryParse(taxMatch.group(3)!) ?? 0;
+      if (parsedTaxRate == 0)
+        parsedTaxRate = double.tryParse(taxMatch.group(3)!) ?? 0;
       parsedTaxAmount ??= double.tryParse(taxMatch.group(4)!);
       parsedBaseCost ??= double.tryParse(taxMatch.group(5)!);
       displayNote = rawNote.replaceAll(taxMatch.group(0)!, '').trim();
     } else {
       // Fallback cleanup if any other TAX_META format exists
-      displayNote = displayNote.replaceAll(RegExp(r'\[TAX_META:[^\]]+\]'), '').trim();
+      displayNote =
+          displayNote.replaceAll(RegExp(r'\[TAX_META:[^\]]+\]'), '').trim();
     }
 
     return ExpenseModel(
       id: (json['id'] ?? '').toString(),
       employeeId: (json['employee_id'] ?? json['employeeId'] ?? '').toString(),
-      employeeName: (json['employee_name'] ?? json['employeeName'] ?? '').toString(),
-      employeeAvatar: (json['employee_avatar'] ?? json['employeeAvatar'])?.toString(),
+      employeeName:
+          (json['employee_name'] ?? json['employeeName'] ?? '').toString(),
+      employeeAvatar:
+          (json['employee_avatar'] ?? json['employeeAvatar'])?.toString(),
       projectId: (json['project_id'] ?? json['projectId'] ?? '').toString(),
-      projectName: (json['project_name'] ?? json['projectName'] ?? '').toString(),
-      projectImageUrl: (json['project_image_url'] ?? json['projectImageUrl'])?.toString(),
+      projectName:
+          (json['project_name'] ?? json['projectName'] ?? '').toString(),
+      projectImageUrl:
+          (json['project_image_url'] ?? json['projectImageUrl'])?.toString(),
       taskId: json['task_id']?.toString() ?? json['taskId']?.toString(),
-      taskTitle: json['task_title']?.toString() ?? json['taskTitle']?.toString(),
+      taskTitle:
+          json['task_title']?.toString() ?? json['taskTitle']?.toString(),
       amount: parseDouble(json['amount']),
       baseCost: parsedBaseCost,
       vatRate: parsedVatRate,
       vatAmount: parsedVatAmount,
       taxRate: parsedTaxRate,
       taxAmount: parsedTaxAmount,
-      officeBenefitAmount: parseDouble(json['office_benefit_amount'] ?? json['officeBenefitAmount']),
+      officeBenefitAmount: parseDouble(
+        json['office_benefit_amount'] ?? json['officeBenefitAmount'],
+      ),
       currency: (json['currency'] ?? 'BDT').toString(),
       categoryId: (json['category_id'] ?? json['categoryId'] ?? '').toString(),
-      categoryName: (json['category_name'] ?? json['categoryName'] ?? '').toString(),
-      categoryIcon: (json['category_icon'] ?? json['categoryIcon'] ?? 'receipt').toString(),
+      categoryName:
+          (json['category_name'] ?? json['categoryName'] ?? '').toString(),
+      categoryIcon:
+          (json['category_icon'] ?? json['categoryIcon'] ?? 'receipt')
+              .toString(),
       note: displayNote,
-      date: json['date'] != null
-          ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
-          : DateTime.now(),
+      date:
+          json['date'] != null
+              ? DateTime.tryParse(json['date'].toString()) ?? DateTime.now()
+              : DateTime.now(),
       hasReceipt: parsedHasReceipt,
-      receiptPhotoUrl: receiptPhoto ?? (parsedReceiptUrls.isNotEmpty ? parsedReceiptUrls.first : null),
+      receiptPhotoUrl:
+          receiptPhoto ??
+          (parsedReceiptUrls.isNotEmpty ? parsedReceiptUrls.first : null),
       receiptPhotoUrls: parsedReceiptUrls,
       status: ExpenseStatus.fromString(statusStr),
-      rejectionReason: json['rejection_reason']?.toString() ?? json['rejectionReason']?.toString(),
+      rejectionReason:
+          json['rejection_reason']?.toString() ??
+          json['rejectionReason']?.toString(),
       comments: parseComments(json['comments']),
-      createdAt: (json['created_at'] != null || json['createdAt'] != null)
-          ? DateTime.tryParse((json['created_at'] ?? json['createdAt']).toString()) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt:
+          (json['created_at'] != null || json['createdAt'] != null)
+              ? DateTime.tryParse(
+                    (json['created_at'] ?? json['createdAt']).toString(),
+                  ) ??
+                  DateTime.now()
+              : DateTime.now(),
       justificationStatus: JustificationStatus.fromString(justStatusStr),
-      justificationReason: json['justification_reason']?.toString() ?? json['justificationReason']?.toString(),
-      justificationComment: json['justification_comment']?.toString() ?? json['justificationComment']?.toString(),
-      justificationAttachmentUrl: json['justification_attachment_url']?.toString() ?? json['justificationAttachmentUrl']?.toString(),
-      justificationReviewedBy: json['justification_reviewed_by']?.toString() ?? json['justificationReviewedBy']?.toString(),
-      justificationReviewComment: json['justification_review_comment']?.toString() ?? json['justificationReviewComment']?.toString(),
-      justificationReviewedAt: json['justification_reviewed_at'] != null
-          ? DateTime.tryParse(json['justification_reviewed_at'].toString())
-          : null,
-      equipmentDetails: eqData is Map<String, dynamic> ? EquipmentDetails.fromJson(eqData) : null,
-      transportationDetails: trData is Map<String, dynamic> ? TransportationDetails.fromJson(trData) : null,
-      foodDetails: fdData is Map<String, dynamic> ? FoodDetails.fromJson(fdData) : null,
-      accommodationDetails: acData is Map<String, dynamic> ? AccommodationDetails.fromJson(acData) : null,
-      officeCostDetails: ofData is Map<String, dynamic> ? OfficeCostDetails.fromJson(ofData) : null,
+      justificationReason:
+          json['justification_reason']?.toString() ??
+          json['justificationReason']?.toString(),
+      justificationComment:
+          json['justification_comment']?.toString() ??
+          json['justificationComment']?.toString(),
+      justificationAttachmentUrl:
+          json['justification_attachment_url']?.toString() ??
+          json['justificationAttachmentUrl']?.toString(),
+      justificationReviewedBy:
+          json['justification_reviewed_by']?.toString() ??
+          json['justificationReviewedBy']?.toString(),
+      justificationReviewComment:
+          json['justification_review_comment']?.toString() ??
+          json['justificationReviewComment']?.toString(),
+      justificationReviewedAt:
+          json['justification_reviewed_at'] != null
+              ? DateTime.tryParse(json['justification_reviewed_at'].toString())
+              : null,
+      equipmentDetails:
+          eqData is Map<String, dynamic>
+              ? EquipmentDetails.fromJson(eqData)
+              : null,
+      transportationDetails:
+          trData is Map<String, dynamic>
+              ? TransportationDetails.fromJson(trData)
+              : null,
+      foodDetails:
+          fdData is Map<String, dynamic> ? FoodDetails.fromJson(fdData) : null,
+      accommodationDetails:
+          acData is Map<String, dynamic>
+              ? AccommodationDetails.fromJson(acData)
+              : null,
+      officeCostDetails:
+          ofData is Map<String, dynamic>
+              ? OfficeCostDetails.fromJson(ofData)
+              : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     final String encodedNote;
     if (hasVat || hasTax) {
-      final tag = '[TAX_META:vat=$vatRate:${vatAmount.toStringAsFixed(2)}|tax=$taxRate:${taxAmount.toStringAsFixed(2)}|base:${baseCost.toStringAsFixed(2)}]';
-      encodedNote = note.contains('[TAX_META:') ? note : (note.isEmpty ? tag : '$note $tag');
+      final tag =
+          '[TAX_META:vat=$vatRate:${vatAmount.toStringAsFixed(2)}|tax=$taxRate:${taxAmount.toStringAsFixed(2)}|base:${baseCost.toStringAsFixed(2)}]';
+      encodedNote =
+          note.contains('[TAX_META:')
+              ? note
+              : (note.isEmpty ? tag : '$note $tag');
     } else {
       encodedNote = note;
     }
@@ -693,31 +866,43 @@ class ExpenseModel {
       'note': encodedNote,
       'date': date.toIso8601String(),
       'has_receipt': hasReceipt,
-      if (receiptPhotoUrl != null) 'receipt_photo_url': receiptPhotoUrl,
+      'receipt_photo_url': receiptPhotoUrl,
       'receipt_photo_urls': receiptPhotoUrls,
       'status': status.name,
       if (rejectionReason != null) 'rejection_reason': rejectionReason,
       'comments': comments.map((c) => c.toJson()).toList(),
       'created_at': createdAt.toIso8601String(),
       'justification_status': justificationStatus.name,
-      if (justificationReason != null) 'justification_reason': justificationReason,
-      if (justificationComment != null) 'justification_comment': justificationComment,
-      if (justificationAttachmentUrl != null) 'justification_attachment_url': justificationAttachmentUrl,
-      if (justificationReviewedBy != null) 'justification_reviewed_by': justificationReviewedBy,
-      if (justificationReviewComment != null) 'justification_review_comment': justificationReviewComment,
-      if (justificationReviewedAt != null) 'justification_reviewed_at': justificationReviewedAt!.toIso8601String(),
-      if (equipmentDetails != null) 'equipment_details': equipmentDetails!.toJson(),
-      if (transportationDetails != null) 'transportation_details': transportationDetails!.toJson(),
+      if (justificationReason != null)
+        'justification_reason': justificationReason,
+      if (justificationComment != null)
+        'justification_comment': justificationComment,
+      if (justificationAttachmentUrl != null)
+        'justification_attachment_url': justificationAttachmentUrl,
+      if (justificationReviewedBy != null)
+        'justification_reviewed_by': justificationReviewedBy,
+      if (justificationReviewComment != null)
+        'justification_review_comment': justificationReviewComment,
+      if (justificationReviewedAt != null)
+        'justification_reviewed_at': justificationReviewedAt!.toIso8601String(),
+      if (equipmentDetails != null)
+        'equipment_details': equipmentDetails!.toJson(),
+      if (transportationDetails != null)
+        'transportation_details': transportationDetails!.toJson(),
       if (foodDetails != null) 'food_details': foodDetails!.toJson(),
-      if (accommodationDetails != null) 'accommodation_details': accommodationDetails!.toJson(),
-      if (officeCostDetails != null) 'office_cost_details': officeCostDetails!.toJson(),
+      if (accommodationDetails != null)
+        'accommodation_details': accommodationDetails!.toJson(),
+      if (officeCostDetails != null)
+        'office_cost_details': officeCostDetails!.toJson(),
     };
   }
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is ExpenseModel && runtimeType == other.runtimeType && id == other.id;
+      other is ExpenseModel &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
   @override
   int get hashCode => id.hashCode;

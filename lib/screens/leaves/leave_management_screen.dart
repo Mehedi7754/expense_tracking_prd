@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/routing/route_paths.dart';
+import 'leave_applicant_avatar.dart';
 import '../../core/widgets/app_back_button.dart';
 import '../../models/leave_model.dart';
+import '../../models/user_role.dart';
 import '../../state/auth_provider.dart';
 import '../../state/leave_provider.dart';
 
@@ -33,6 +35,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
     final leaveState = ref.watch(leaveProvider);
     final authState = ref.watch(authProvider);
     final user = authState.currentUser;
+    final canApplyLeave = user != null && user.role != UserRole.mainAdmin;
 
     final filtered = leaveState.filteredLeaves;
 
@@ -54,26 +57,30 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(
-              CupertinoIcons.plus_circle_fill,
-              color: Color(0xFF2563EB),
+          if (canApplyLeave)
+            IconButton(
+              icon: const Icon(
+                CupertinoIcons.plus_circle_fill,
+                color: Color(0xFF2563EB),
+              ),
+              tooltip: 'Apply for Leave',
+              onPressed: () => context.push(RoutePaths.applyLeave),
             ),
-            tooltip: 'Apply for Leave',
-            onPressed: () => context.push(RoutePaths.applyLeave),
-          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push(RoutePaths.applyLeave),
-        backgroundColor: const Color(0xFF2563EB),
-        foregroundColor: Colors.white,
-        icon: const Icon(CupertinoIcons.plus, size: 18),
-        label: const Text(
-          'Apply Leave',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-        ),
-      ),
+      floatingActionButton:
+          canApplyLeave
+              ? FloatingActionButton.extended(
+                onPressed: () => context.push(RoutePaths.applyLeave),
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                icon: const Icon(CupertinoIcons.plus, size: 18),
+                label: const Text(
+                  'Apply Leave',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                ),
+              )
+              : null,
       body: RefreshIndicator(
         onRefresh: () async {
           await ref.read(leaveProvider.notifier).fetchLeaves(force: true);
@@ -258,29 +265,30 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => context.push(RoutePaths.applyLeave),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
+                      if (canApplyLeave) const SizedBox(height: 16),
+                      if (canApplyLeave)
+                        ElevatedButton.icon(
+                          onPressed: () => context.push(RoutePaths.applyLeave),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                          icon: const Icon(CupertinoIcons.plus, size: 14),
+                          label: const Text(
+                            'Apply for Leave',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                        icon: const Icon(CupertinoIcons.plus, size: 14),
-                        label: const Text(
-                          'Apply for Leave',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 )
@@ -470,6 +478,70 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => context.push(RoutePaths.leaveDetail(leave.id)),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    LeaveApplicantAvatar(
+                      name: leave.userName,
+                      imageUrl: leave.userAvatarUrl,
+                      radius: 21,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            leave.userName.isEmpty
+                                ? 'Employee'
+                                : leave.userName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color:
+                                  isDark
+                                      ? Colors.white
+                                      : const Color(0xFF0F172A),
+                            ),
+                          ),
+                          if (leave.userEmail.isNotEmpty)
+                            Text(
+                              leave.userEmail,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color:
+                                    isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF64748B),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.open_in_new_rounded,
+                      size: 16,
+                      color:
+                          isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF94A3B8),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

@@ -10,6 +10,7 @@ enum NotificationType {
   taskStatusUpdated,
   leaveRequest,
   leaveDecision,
+  leaveComment,
   budgetWarning,
   budgetCritical,
   commentAdded,
@@ -49,6 +50,8 @@ enum NotificationType {
         return 'Leave Request';
       case NotificationType.leaveDecision:
         return 'Leave Decision';
+      case NotificationType.leaveComment:
+        return 'Leave Clarification';
       case NotificationType.budgetWarning:
         return 'Budget Warning';
       case NotificationType.budgetCritical:
@@ -104,6 +107,8 @@ enum NotificationType {
         return NotificationType.leaveRequest;
       case 'leavedecision':
         return NotificationType.leaveDecision;
+      case 'leavecomment':
+        return NotificationType.leaveComment;
       case 'budgetwarning':
         return NotificationType.budgetWarning;
       case 'budgetcritical':
@@ -150,6 +155,7 @@ class NotificationModel {
   final String fullExplanation;
   final NotificationType type;
   final String? relatedExpenseId;
+  final String? relatedLeaveId;
   final String? relatedProjectId;
   final String? relatedTaskId;
   final String? expenseDate;
@@ -168,6 +174,7 @@ class NotificationModel {
     required this.fullExplanation,
     required this.type,
     this.relatedExpenseId,
+    this.relatedLeaveId,
     this.relatedProjectId,
     this.relatedTaskId,
     this.expenseDate,
@@ -187,6 +194,7 @@ class NotificationModel {
     String? fullExplanation,
     NotificationType? type,
     String? relatedExpenseId,
+    String? relatedLeaveId,
     String? relatedProjectId,
     String? relatedTaskId,
     String? expenseDate,
@@ -205,6 +213,7 @@ class NotificationModel {
       fullExplanation: fullExplanation ?? this.fullExplanation,
       type: type ?? this.type,
       relatedExpenseId: relatedExpenseId ?? this.relatedExpenseId,
+      relatedLeaveId: relatedLeaveId ?? this.relatedLeaveId,
       relatedProjectId: relatedProjectId ?? this.relatedProjectId,
       relatedTaskId: relatedTaskId ?? this.relatedTaskId,
       expenseDate: expenseDate ?? this.expenseDate,
@@ -234,6 +243,9 @@ class NotificationModel {
       relatedExpenseId:
           json['related_expense_id']?.toString() ??
           json['relatedExpenseId']?.toString(),
+      relatedLeaveId:
+          json['related_leave_id']?.toString() ??
+          json['relatedLeaveId']?.toString(),
       relatedProjectId:
           json['related_project_id']?.toString() ??
           json['relatedProjectId']?.toString(),
@@ -276,6 +288,7 @@ class NotificationModel {
       'full_explanation': fullExplanation,
       'type': type.name,
       if (relatedExpenseId != null) 'related_expense_id': relatedExpenseId,
+      if (relatedLeaveId != null) 'related_leave_id': relatedLeaveId,
       if (relatedProjectId != null) 'related_project_id': relatedProjectId,
       if (relatedTaskId != null) 'related_task_id': relatedTaskId,
       if (expenseDate != null) 'expense_date': expenseDate,

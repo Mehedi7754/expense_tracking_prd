@@ -4,6 +4,7 @@ import { SetSalaryDto } from './dto/set-salary.dto';
 import { CreateHolidayDto } from './dto/holiday.dto';
 import { CreateLeaveDto } from './dto/leave.dto';
 import { CreateAdjustmentDto } from './dto/adjustment.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface DailyBreakdownItem {
   date: string;
@@ -62,7 +63,10 @@ export interface SalaryCalculationResult {
 export class SalaryService {
   private readonly logger = new Logger(SalaryService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly notifications?: NotificationsService,
+  ) {}
 
   /**
    * Fetch employee base salary profile. Creates default if not set yet.
@@ -204,7 +208,7 @@ export class SalaryService {
   async getLeaves(userId?: string, month?: number, year?: number, reviewer?: { id: string; role: string; assignedProjectIds?: string[] }) {
     let sql = `
       SELECT l.id, l.user_id, l.start_date::text, l.end_date::text, l.leave_type,
-             l.reason, l.is_approved, l.status, u.full_name, u.email
+             l.reason, l.is_approved, l.status, u.full_name, u.email, u.avatar_url
       FROM leave_records l
       JOIN users u ON u.id = l.user_id
     `;
@@ -243,6 +247,7 @@ export class SalaryService {
       userId: r.user_id,
       userName: r.full_name,
       userEmail: r.email,
+      userAvatarUrl: r.avatar_url,
       startDate: r.start_date,
       endDate: r.end_date,
       leaveType: r.leave_type,
@@ -260,6 +265,10 @@ export class SalaryService {
       [dto.userId, dto.startDate, dto.endDate, dto.leaveType, dto.reason || '', dto.isApproved ?? false, dto.isApproved ? 'approved' : 'pending', dto.isApproved ? approvedBy || null : null],
     );
     const row = res.rows[0];
+    const applicant = await this.db.query(
+      'SELECT full_name, email, avatar_url FROM users WHERE id = $1',
+      [row.user_id],
+    );
     return {
       id: row.id,
       userId: row.user_id,
@@ -269,6 +278,9 @@ export class SalaryService {
       reason: row.reason,
       isApproved: row.is_approved,
       status: row.status,
+      userName: applicant.rows[0]?.full_name || '',
+      userEmail: applicant.rows[0]?.email || '',
+      userAvatarUrl: applicant.rows[0]?.avatar_url || null,
     };
   }
 
@@ -288,12 +300,13 @@ export class SalaryService {
       [id, approved, approved ? 'approved' : 'rejected', reviewer.id],
     );
     if (!result.rows.length) throw new NotFoundException('Pending leave request not found');
-    const user = await this.db.query('SELECT full_name, email FROM users WHERE id = $1', [result.rows[0].user_id]);
+    const user = await this.db.query('SELECT full_name, email, avatar_url FROM users WHERE id = $1', [result.rows[0].user_id]);
     return {
       id: result.rows[0].id,
       userId: result.rows[0].user_id,
       userName: user.rows[0]?.full_name || '',
       userEmail: user.rows[0]?.email || '',
+      userAvatarUrl: user.rows[0]?.avatar_url || null,
       startDate: result.rows[0].start_date,
       endDate: result.rows[0].end_date,
       leaveType: result.rows[0].leave_type,
@@ -306,6 +319,127 @@ export class SalaryService {
   async deleteLeave(id: string) {
     await this.db.query('DELETE FROM leave_records WHERE id = $1', [id]);
     return { success: true };
+  }
+
+  private async assertLeaveCommentAccess(leaveId: string, user: { id: string; role: string; assignedProjectIds?: string[] }) {
+    const result = await this.db.query(
+      'SELECT user_id FROM leave_records WHERE id = $1',
+      [leaveId],
+    );
+    if (!result.rows.length) throw new NotFoundException('Leave request not found');
+    const ownerId = result.rows[0].user_id as string;
+    if (ownerId === user.id || ['main_admin', 'admin', 'finance', 'finance_manager'].includes(user.role)) {
+      return ownerId;
+    }
+    if (user.role === 'project_manager') {
+      const projects = user.assignedProjectIds || [];
+      const access = projects.length
+        ? await this.db.query(
+            `SELECT 1 FROM project_members pm
+             WHERE pm.user_id = $1 AND pm.project_id = ANY($2::uuid[]) LIMIT 1`,
+            [ownerId, projects],
+          )
+        : { rows: [] };
+      if (access.rows.length) return ownerId;
+    }
+    throw new ForbiddenException('You cannot view this leave clarification thread');
+  }
+
+  async getLeaveComments(leaveId: string, user: { id: string; role: string; assignedProjectIds?: string[] }) {
+    await this.assertLeaveCommentAccess(leaveId, user);
+    const result = await this.db.query(
+      `SELECT c.id, c.leave_id, c.author_id,
+              COALESCE(u.full_name, c.author_name) AS author_name,
+              COALESCE(u.role, c.author_role) AS author_role,
+              u.avatar_url AS author_avatar_url,
+              c.comment_text, c.created_at
+       FROM leave_comments c LEFT JOIN users u ON u.id = c.author_id
+       WHERE c.leave_id = $1 ORDER BY c.created_at ASC`,
+      [leaveId],
+    );
+    return result.rows.map((row) => ({
+      id: row.id,
+      expenseId: row.leave_id,
+      leaveId: row.leave_id,
+      authorId: row.author_id,
+      authorName: row.author_name || 'Team Member',
+      authorRole: row.author_role || 'project_member',
+      authorAvatarUrl: row.author_avatar_url || null,
+      comment: row.comment_text || '',
+      text: row.comment_text || '',
+      createdAt: row.created_at,
+    }));
+  }
+
+  async addLeaveComment(leaveId: string, authorId: string, rawComment: string, user: { id: string; role: string; assignedProjectIds?: string[] }) {
+    const comment = (rawComment || '').trim();
+    if (!comment) throw new BadRequestException('Comment text cannot be empty');
+    if (comment.length > 2000) {
+      throw new BadRequestException('Clarification messages must be 2,000 characters or fewer');
+    }
+    const ownerId = await this.assertLeaveCommentAccess(leaveId, user);
+    const leaveResult = await this.db.query(
+      `SELECT l.user_id, l.start_date::text, l.end_date::text, l.leave_type, u.full_name
+       FROM leave_records l JOIN users u ON u.id = l.user_id WHERE l.id = $1`,
+      [leaveId],
+    );
+    const leave = leaveResult.rows[0];
+    const authorResult = await this.db.query(
+      'SELECT full_name, role, avatar_url FROM users WHERE id = $1',
+      [authorId],
+    );
+    const author = authorResult.rows[0] || {};
+    const inserted = await this.db.query(
+      `INSERT INTO leave_comments (leave_id, author_id, author_name, author_role, comment_text)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, leave_id, author_id, author_name, author_role, comment_text, created_at`,
+      [leaveId, authorId, author.full_name || 'Team Member', author.role || 'project_member', comment],
+    );
+
+    const recipients = new Set<string>();
+    if (authorId === ownerId) {
+      const reviewers = await this.db.query(
+        `SELECT DISTINCT u.id
+         FROM users u LEFT JOIN project_members pm ON pm.user_id = u.id
+         WHERE u.is_active = TRUE AND u.id != $1
+           AND (u.role IN ('main_admin', 'admin', 'finance', 'finance_manager')
+                OR (u.role = 'project_manager' AND pm.project_id IS NOT NULL
+                    AND EXISTS (SELECT 1 FROM project_members pma WHERE pma.user_id = $1 AND pma.project_id = pm.project_id)))`,
+        [ownerId],
+      );
+      reviewers.rows.forEach((row) => recipients.add(row.id));
+    } else {
+      recipients.add(ownerId);
+    }
+
+    const preview = comment.length > 120 ? `${comment.slice(0, 117)}...` : comment;
+    await Promise.all([...recipients].map((recipientId) =>
+      this.notifications?.create({
+        userId: recipientId,
+        title: `Leave clarification: ${leave.leave_type}`,
+        message: `${author.full_name || 'Team Member'}: ${preview}`,
+        fullExplanation: `${author.full_name || 'Team Member'} sent a clarification message about a leave request (${leave.start_date} to ${leave.end_date}). ${comment}`,
+        type: 'leave_comment',
+        relatedLeaveId: leaveId,
+        actorId: authorId,
+        actorName: author.full_name || 'Team Member',
+        actorAvatarUrl: author.avatar_url || undefined,
+      }),
+    ));
+
+    const row = inserted.rows[0];
+    return {
+      id: row.id,
+      expenseId: row.leave_id,
+      leaveId: row.leave_id,
+      authorId: row.author_id,
+      authorName: row.author_name,
+      authorRole: row.author_role,
+      authorAvatarUrl: author.avatar_url || null,
+      comment: row.comment_text,
+      text: row.comment_text,
+      createdAt: row.created_at,
+    };
   }
 
   // --- Adjustments ---
