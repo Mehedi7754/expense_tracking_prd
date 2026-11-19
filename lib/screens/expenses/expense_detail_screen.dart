@@ -418,7 +418,7 @@ class ExpenseDetailScreen extends ConsumerWidget {
                             Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 18),
                             SizedBox(width: 8),
                             Text(
-                              'Reason for Rejection',
+                              'Reason:',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -679,12 +679,18 @@ class ExpenseDetailScreen extends ConsumerWidget {
                           height: 48,
                           child: ElevatedButton.icon(
                             icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white),
-                            label: Text(
-                              expense.status == ExpenseStatus.rejected ? 'Edit & Resubmit' : 'Edit Expense',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                            label: Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  expense.status == ExpenseStatus.rejected ? 'Edit & Resubmit' : 'Edit Expense',
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
                             style: ElevatedButton.styleFrom(

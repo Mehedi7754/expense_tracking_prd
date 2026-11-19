@@ -1112,10 +1112,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                              : Text(
-                                expense.status == ExpenseStatus.rejected
-                                    ? 'Resubmit for Approval'
-                                    : 'Save Changes',
+                              : FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  expense.status == ExpenseStatus.rejected
+                                      ? 'Resubmit for Approval'
+                                      : 'Save Changes',
+                                  maxLines: 1,
+                                ),
                               ),
                     ),
                   ),

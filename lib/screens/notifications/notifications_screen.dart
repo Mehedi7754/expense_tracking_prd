@@ -1114,19 +1114,26 @@ class _NotificationCard extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 5),
                                 Flexible(
-                                  child: Text(
-                                    notif.message
-                                        .substring(
-                                          notif.message.toLowerCase().indexOf(
-                                                'reason:',
-                                              ) +
-                                              7,
-                                        )
-                                        .trim(),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFFDC2626),
+                                  child: Text.rich(
+                                    TextSpan(
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFFDC2626),
+                                      ),
+                                      children: [
+                                        const TextSpan(
+                                          text: 'Reason: ',
+                                          style: TextStyle(fontWeight: FontWeight.w800),
+                                        ),
+                                        TextSpan(
+                                          text: notif.message
+                                              .substring(
+                                                notif.message.toLowerCase().indexOf('reason:') + 7,
+                                              )
+                                              .trim(),
+                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
                                     ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
