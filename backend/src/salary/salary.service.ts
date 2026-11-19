@@ -350,7 +350,7 @@ export class SalaryService {
     const result = await this.db.query(
       `SELECT c.id, c.leave_id, c.author_id,
               COALESCE(u.full_name, c.author_name) AS author_name,
-              COALESCE(u.role, c.author_role) AS author_role,
+              COALESCE(u.role::text, c.author_role) AS author_role,
               u.avatar_url AS author_avatar_url,
               c.comment_text, c.created_at
        FROM leave_comments c LEFT JOIN users u ON u.id = c.author_id

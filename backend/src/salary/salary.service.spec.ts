@@ -60,4 +60,12 @@ describe('SalaryService leave access and decisions', () => {
       userId: 'member-1', type: 'leave_comment', relatedLeaveId: 'leave-1',
     }));
   });
+
+  it('casts the user role enum before reading clarification authors', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 'member-1' }] })
+      .mockResolvedValueOnce({ rows: [] });
+    await service.getLeaveComments('leave-1', { id: 'member-1', role: 'project_member' });
+    expect(db.query.mock.calls[1][0]).toContain('COALESCE(u.role::text, c.author_role)');
+  });
 });
