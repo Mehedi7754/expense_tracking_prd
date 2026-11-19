@@ -178,89 +178,52 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
   }
 
   void _showFullScreen(BuildContext context) {
-    showDialog(
-      context: context,
-      builder:
-          (ctx) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 24,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Flexible(
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: 480,
-                      maxHeight: MediaQuery.of(context).size.height * 0.75,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.getSurface(context),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: AppColors.floatingShadow(true),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Receipt Full View',
-                                style: AppTextStyles.titleMedium,
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.emeraldLight,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  'Verified File',
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColors.emeraldDark,
-                                  ),
-                                ),
-                              ),
-                            ],
+    final imagePath = widget.imagePath;
+    if (imagePath == null || imagePath.isEmpty) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder:
+            (viewerContext) => Scaffold(
+              backgroundColor: Colors.black,
+              body: SafeArea(
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Center(
+                        child: InteractiveViewer(
+                          panEnabled: true,
+                          minScale: 0.75,
+                          maxScale: 5,
+                          child: _buildReceiptVisual(
+                            context: viewerContext,
+                            isExpanded: true,
                           ),
                         ),
-                        const Divider(height: 1),
-                        Flexible(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: _buildReceiptVisual(
-                              context: context,
-                              isExpanded: true,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Material(
+                        color: Colors.black54,
+                        shape: const CircleBorder(),
+                        child: IconButton(
+                          tooltip: 'Close receipt preview',
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => Navigator.of(viewerContext).pop(),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+      ),
     );
   }
 
@@ -296,16 +259,8 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
         height: isExpanded ? null : 160,
       );
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child:
-            isExpanded
-                ? InteractiveViewer(
-                  panEnabled: true,
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: img,
-                )
-                : img,
+        borderRadius: BorderRadius.circular(isExpanded ? 0 : 12),
+        child: img,
       );
     }
 
@@ -320,16 +275,8 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
       );
 
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child:
-            isExpanded
-                ? InteractiveViewer(
-                  panEnabled: true,
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: img,
-                )
-                : img,
+        borderRadius: BorderRadius.circular(isExpanded ? 0 : 12),
+        child: img,
       );
     }
 
@@ -361,16 +308,8 @@ class _ReceiptUploaderState extends ConsumerState<ReceiptUploader> {
       );
 
       return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child:
-            isExpanded
-                ? InteractiveViewer(
-                  panEnabled: true,
-                  minScale: 0.5,
-                  maxScale: 4.0,
-                  child: img,
-                )
-                : img,
+        borderRadius: BorderRadius.circular(isExpanded ? 0 : 12),
+        child: img,
       );
     }
 
