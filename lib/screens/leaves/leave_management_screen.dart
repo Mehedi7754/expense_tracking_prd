@@ -20,6 +20,38 @@ class LeaveManagementScreen extends ConsumerStatefulWidget {
 }
 
 class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
+  DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  bool _showAllRecords = false;
+  String? _selectedEmployeeId;
+
+  int _daysInMonth(LeaveRecordModel leave) {
+    final start = DateTime.tryParse(leave.startDate);
+    final end = DateTime.tryParse(leave.endDate);
+    if (start == null || end == null || end.isBefore(start)) return 0;
+    final monthEnd = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+    final first = start.isBefore(_selectedMonth) ? _selectedMonth : start;
+    final last = end.isAfter(monthEnd) ? monthEnd : end;
+    return last.isBefore(first) ? 0 : last.difference(first).inDays + 1;
+  }
+
+  String get _monthLabel {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    return '${months[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +69,35 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
     final user = authState.currentUser;
     final canApplyLeave = user != null && user.role != UserRole.mainAdmin;
 
-    final filtered = leaveState.filteredLeaves;
+    final employeeLeaves =
+        leaveState.leaves
+            .where(
+              (leave) =>
+                  _selectedEmployeeId == null ||
+                  leave.userId == _selectedEmployeeId,
+            )
+            .toList();
+    final monthlyLeaves =
+        employeeLeaves.where((leave) => _daysInMonth(leave) > 0).toList();
+    final filtered =
+        monthlyLeaves
+            .where(
+              (leave) => switch (leaveState.activeFilter) {
+                'approved' => leave.isApproved,
+                'pending' => leave.isPending,
+                'rejected' => leave.isRejected,
+                _ => true,
+              },
+            )
+            .toList();
+    final displayed = _showAllRecords ? filtered : filtered.take(4).toList();
+    final approvedDays = monthlyLeaves
+        .where((leave) => leave.isApproved)
+        .fold<int>(0, (sum, leave) => sum + _daysInMonth(leave));
+    final requestedDays = monthlyLeaves.fold<int>(
+      0,
+      (sum, leave) => sum + _daysInMonth(leave),
+    );
 
     return Scaffold(
       backgroundColor:
@@ -167,37 +227,188 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
 
               const SizedBox(height: 20),
 
-              // 2. STATUS FILTER TABS
+              Text(
+                'Past Leave Records',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                'Leave history and clarification messages',
+                style: TextStyle(
+                  fontSize: 11,
+                  color:
+                      isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(height: 8),
               Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _buildFilterChip(
-                    'all',
-                    'All (${leaveState.leaves.length})',
-                    leaveState.activeFilter,
-                    isDark,
+                  IconButton(
+                    onPressed:
+                        () => setState(
+                          () =>
+                              _selectedMonth = DateTime(
+                                _selectedMonth.year,
+                                _selectedMonth.month - 1,
+                              ),
+                        ),
+                    icon: const Icon(Icons.chevron_left),
+                    tooltip: 'Previous month',
                   ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'approved',
-                    'Approved (${leaveState.leaves.where((l) => l.isApproved).length})',
-                    leaveState.activeFilter,
-                    isDark,
+                  Text(
+                    _monthLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'pending',
-                    'Pending (${leaveState.leaves.where((l) => l.isPending).length})',
-                    leaveState.activeFilter,
-                    isDark,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    'rejected',
-                    'Declined (${leaveState.leaves.where((l) => l.isRejected).length})',
-                    leaveState.activeFilter,
-                    isDark,
+                  IconButton(
+                    onPressed:
+                        () => setState(
+                          () =>
+                              _selectedMonth = DateTime(
+                                _selectedMonth.year,
+                                _selectedMonth.month + 1,
+                              ),
+                        ),
+                    icon: const Icon(Icons.chevron_right),
+                    tooltip: 'Next month',
                   ),
                 ],
+              ),
+              if (user?.role.canApproveMembers == true) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedEmployeeId ?? '',
+                  decoration: const InputDecoration(
+                    labelText: 'Employee',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('All employees'),
+                    ),
+                    ...{
+                      for (final leave in leaveState.leaves)
+                        leave.userId: leave.userName,
+                    }.entries.map(
+                      (entry) => DropdownMenuItem(
+                        value: entry.key,
+                        child: Text(
+                          entry.value.isEmpty ? 'Employee' : entry.value,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged:
+                      (value) => setState(() {
+                        _selectedEmployeeId = value == '' ? null : value;
+                        _showAllRecords = false;
+                      }),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildBalanceCard(
+                      title: 'Requests',
+                      usedDays: monthlyLeaves.length,
+                      totalAllowance: null,
+                      color: const Color(0xFF2563EB),
+                      isDark: isDark,
+                      unit: 'requests',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildBalanceCard(
+                      title: 'Requested days',
+                      usedDays: requestedDays,
+                      totalAllowance: null,
+                      color: const Color(0xFF8B5CF6),
+                      isDark: isDark,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildBalanceCard(
+                      title: 'Approved days',
+                      usedDays: approvedDays,
+                      totalAllowance: null,
+                      color: const Color(0xFF10B981),
+                      isDark: isDark,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (leaveState.errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Material(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(10),
+                    child: ListTile(
+                      title: const Text(
+                        'Could not load leave records',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      trailing: TextButton(
+                        onPressed:
+                            () => ref
+                                .read(leaveProvider.notifier)
+                                .fetchLeaves(force: true),
+                        child: const Text('Retry'),
+                      ),
+                    ),
+                  ),
+                ),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip(
+                      'all',
+                      'All (${monthlyLeaves.length})',
+                      leaveState.activeFilter,
+                      isDark,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'approved',
+                      'Approved (${monthlyLeaves.where((l) => l.isApproved).length})',
+                      leaveState.activeFilter,
+                      isDark,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'pending',
+                      'Pending (${monthlyLeaves.where((l) => l.isPending).length})',
+                      leaveState.activeFilter,
+                      isDark,
+                    ),
+                    const SizedBox(width: 8),
+                    _buildFilterChip(
+                      'rejected',
+                      'Declined (${monthlyLeaves.where((l) => l.isRejected).length})',
+                      leaveState.activeFilter,
+                      isDark,
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 14),
@@ -293,11 +504,27 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
                   ),
                 )
               else
-                ...filtered.map(
+                ...displayed.map(
                   (leave) => _buildLeaveCard(
                     leave,
                     isDark,
                     user?.role.canApproveMembers == true,
+                  ),
+                ),
+              if (filtered.length > 4)
+                Center(
+                  child: TextButton.icon(
+                    onPressed:
+                        () =>
+                            setState(() => _showAllRecords = !_showAllRecords),
+                    icon: Icon(
+                      _showAllRecords ? Icons.expand_less : Icons.expand_more,
+                    ),
+                    label: Text(
+                      _showAllRecords
+                          ? 'Show less'
+                          : 'View all ${filtered.length} records',
+                    ),
                   ),
                 ),
             ],
@@ -357,6 +584,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
     required int? totalAllowance,
     required Color color,
     required bool isDark,
+    String unit = 'days',
   }) {
     final remaining =
         totalAllowance != null
@@ -427,7 +655,7 @@ class _LeaveManagementScreenState extends ConsumerState<LeaveManagementScreen> {
                 ),
               ] else ...[
                 Text(
-                  ' days',
+                  ' $unit',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
