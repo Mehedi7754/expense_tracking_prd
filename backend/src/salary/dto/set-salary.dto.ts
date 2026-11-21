@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class SetSalaryDto {
   @IsNumber()
@@ -13,6 +13,7 @@ export class SetSalaryDto {
   @IsOptional()
   @IsNumber()
   @Min(1)
+  @Max(31)
   standardWorkingDays?: number;
 
   @IsOptional()

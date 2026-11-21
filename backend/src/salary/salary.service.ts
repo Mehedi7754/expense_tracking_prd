@@ -18,9 +18,13 @@ export interface DailyBreakdownItem {
   isFuture: boolean;
   morningAttended: boolean;
   morningTime?: string;
+  morningStatus?: string;
+  morningWorkMode?: string;
   morningLocation?: { lat: number; lng: number; address: string };
   afternoonAttended: boolean;
   afternoonTime?: string;
+  afternoonStatus?: string;
+  afternoonWorkMode?: string;
   afternoonLocation?: { lat: number; lng: number; address: string };
   status: 'present' | 'half_day' | 'missing_record' | 'confirmed_absent' | 'paid_leave' | 'unpaid_leave' | 'holiday' | 'weekend' | 'upcoming' | 'not_employed';
   presentWeight: number; // 1.0, 0.5, or 0.0
@@ -46,12 +50,14 @@ export interface SalaryCalculationResult {
   configuredPayableWorkingDays: number;
   dailySalaryRate: number;
   presentDays: number;
+  attendanceDays: number;
   halfDays: number;
   paidLeaveDays: number;
   unpaidLeaveDays: number;
   missingLoginDays: number;
   confirmedAbsentDays: number;
   totalAbsenceDeductions: number;
+  attendanceDeductionsEnabled: boolean;
   totalAdditions: number;
   totalPenalties: number;
   finalPayableSalary: number;
@@ -557,7 +563,7 @@ export class SalaryService {
 
     // Fetch attendance records for this user in this month
     const attRes = await this.db.query(
-      `SELECT id, date::text, session_type, login_time, latitude, longitude, address_text, status, notes
+      `SELECT id, date::text, session_type, login_time, latitude, longitude, address_text, status, notes, work_mode
        FROM attendance_records
        WHERE user_id = $1
          AND EXTRACT(MONTH FROM date) = $2
@@ -587,8 +593,12 @@ export class SalaryService {
       }
     }
 
-    // Fetch office timing settings and shift assignment to determine dynamic weekend days
+    // Fetch attendance and payroll settings used for weekends and attendance deductions.
     let userWeekendDays: number[] = [5, 6]; // Default 5=Fri, 6=Sat
+    let isDeductionEnabled = true;
+    let deductionType: 'rate_based' | 'fixed_amount' = 'rate_based';
+    let fullDayDeductionAmount = 1;
+    let halfDayDeductionAmount = 0.5;
     try {
       const settingsRes = await this.db.query(
         `SELECT value FROM app_settings WHERE key = 'attendance_timing_settings'`,
@@ -600,6 +610,12 @@ export class SalaryService {
         const shifts = settings?.shifts || [];
         const userShifts = settings?.userShifts || {};
         const userShiftId = userShifts[userId];
+        isDeductionEnabled = settings?.isDeductionEnabled !== false;
+        deductionType = settings?.deductionType === 'fixed_amount' ? 'fixed_amount' : 'rate_based';
+        const configuredFullDay = Number(settings?.fullDayDeductionAmount);
+        const configuredHalfDay = Number(settings?.halfDayDeductionAmount);
+        if (Number.isFinite(configuredFullDay) && configuredFullDay >= 0) fullDayDeductionAmount = configuredFullDay;
+        if (Number.isFinite(configuredHalfDay) && configuredHalfDay >= 0) halfDayDeductionAmount = configuredHalfDay;
         let matchedShift = shifts.find((s: any) => s.id === userShiftId);
         if (!matchedShift) {
           matchedShift = shifts.find((s: any) => s.isDefault) || shifts[0];
@@ -752,6 +768,8 @@ export class SalaryService {
         isFuture,
         morningAttended,
         morningTime: morningRecord?.login_time,
+        morningStatus: morningRecord?.status,
+        morningWorkMode: morningRecord?.work_mode,
         morningLocation: morningRecord?.latitude
           ? {
               lat: parseFloat(morningRecord.latitude),
@@ -761,6 +779,8 @@ export class SalaryService {
           : undefined,
         afternoonAttended,
         afternoonTime: afternoonRecord?.login_time,
+        afternoonStatus: afternoonRecord?.status,
+        afternoonWorkMode: afternoonRecord?.work_mode,
         afternoonLocation: afternoonRecord?.latitude
           ? {
               lat: parseFloat(afternoonRecord.latitude),
@@ -770,7 +790,7 @@ export class SalaryService {
           : undefined,
         status,
         presentWeight,
-        deductionUnits,
+        deductionUnits: isDeductionEnabled || status === 'unpaid_leave' ? deductionUnits : 0,
         notes,
       });
     }
@@ -781,9 +801,23 @@ export class SalaryService {
     // Daily Salary Rate = Monthly Salary ÷ Configured Payable Working Days
     const dailySalaryRate = Math.round((salaryProfile.monthlySalary / configuredPayableWorkingDays) * 100) / 100;
 
-    // Total deductions = (confirmedAbsentDays + unpaidLeaveDays + missingLoginDays + halfDays * 0.5) * dailySalaryRate
-    const totalDeductionUnits = confirmedAbsentDays + unpaidLeaveDays + missingLoginDays + halfDays * 0.5;
-    const totalAbsenceDeductions = Math.round(totalDeductionUnits * dailySalaryRate * 100) / 100;
+    // Unpaid leave remains a salary deduction; the attendance switch controls
+    // only missed punches/absence and half-day attendance deductions.
+    let attendanceDeductions = unpaidLeaveDays * dailySalaryRate;
+    if (isDeductionEnabled) {
+      for (const day of breakdown) {
+        if (day.status === 'missing_record' || day.status === 'confirmed_absent') {
+          attendanceDeductions += deductionType === 'fixed_amount'
+            ? fullDayDeductionAmount
+            : fullDayDeductionAmount * dailySalaryRate;
+        } else if (day.status === 'half_day' && day.deductionUnits > 0) {
+          attendanceDeductions += deductionType === 'fixed_amount'
+            ? halfDayDeductionAmount
+            : halfDayDeductionAmount * dailySalaryRate;
+        }
+      }
+    }
+    const totalAbsenceDeductions = Math.round(attendanceDeductions * 100) / 100;
 
     // Base salary proration if employee joined mid-month
     const firstDayOfMonthStr = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -828,12 +862,14 @@ export class SalaryService {
       configuredPayableWorkingDays,
       dailySalaryRate,
       presentDays,
+      attendanceDays: breakdown.filter((day) => day.morningAttended || day.afternoonAttended).length,
       halfDays,
       paidLeaveDays,
       unpaidLeaveDays,
       missingLoginDays,
       confirmedAbsentDays,
       totalAbsenceDeductions,
+      attendanceDeductionsEnabled: isDeductionEnabled,
       totalAdditions,
       totalPenalties,
       finalPayableSalary,
@@ -929,7 +965,7 @@ export class SalaryService {
       const calc = await this.calculateSalary(u.id, month, year);
       calculations.push(calc);
       totalBaseSalary += calc.monthlyBaseSalary;
-      totalDeductions += calc.totalAbsenceDeductions;
+      totalDeductions += calc.totalAbsenceDeductions + calc.totalPenalties;
       totalPayable += calc.finalPayableSalary;
     }
 

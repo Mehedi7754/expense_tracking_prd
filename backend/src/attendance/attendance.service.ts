@@ -452,7 +452,7 @@ export class AttendanceService {
              address_text = COALESCE($4, address_text),
              device_info = COALESCE($5, device_info),
              status = $6,
-             notes = CASE WHEN notes IS NULL OR notes = '' THEN $7 ELSE notes END,
+             notes = CASE WHEN $7 IS NOT NULL THEN $7 ELSE notes END,
              work_mode = COALESCE($8, work_mode)
          WHERE id = $1
          RETURNING id`,
