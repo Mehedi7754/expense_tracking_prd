@@ -53,6 +53,12 @@ export class UsersController {
     return this.usersService.renameDepartment(id, name);
   }
 
+  @Roles('main_admin', 'admin')
+  @Post('departments/:id/merge')
+  async mergeDepartment(@Param('id') id: string, @Body('targetDepartmentId') targetDepartmentId: string) {
+    return this.usersService.mergeDepartments(id, targetDepartmentId);
+  }
+
   @Get(':id')
   async getUser(@Param('id') id: string) {
     return this.usersService.findOne(id);

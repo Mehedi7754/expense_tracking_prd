@@ -72,6 +72,25 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           AND LOWER(TRIM(u.department)) = LOWER(TRIM(d.name))
           AND u.department <> d.name;
       `);
+      // Merge the two obvious misspellings visible in the existing directory screenshot.
+      for (const [misspelling, canonicalName] of [['Engineerig', 'Engineering'], ['Survy', 'Survey']]) {
+        const matchingDepartment = await this.pool.query(
+          `SELECT source.id AS source_id, source.name AS source_name, target.name AS target_name
+           FROM departments source
+           JOIN departments target ON LOWER(TRIM(target.name)) = LOWER($2)
+           WHERE LOWER(TRIM(source.name)) = LOWER($1) AND source.id <> target.id
+           LIMIT 1`,
+          [misspelling, canonicalName],
+        );
+        if (matchingDepartment.rows.length) {
+          const match = matchingDepartment.rows[0];
+          await this.pool.query(
+            'UPDATE users SET department = $1, updated_at = NOW() WHERE LOWER(TRIM(department)) = LOWER($2)',
+            [match.target_name, match.source_name],
+          );
+          await this.pool.query('DELETE FROM departments WHERE id = $1', [match.source_id]);
+        }
+      }
 
       // Auto-migrate project_members custom roles and granular permissions
       await this.pool.query(`

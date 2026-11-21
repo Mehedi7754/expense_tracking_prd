@@ -71,6 +71,27 @@ export class UsersService {
     }
   }
 
+  async mergeDepartments(sourceId: string, targetId: string) {
+    if (!sourceId || !targetId || sourceId === targetId) {
+      throw new BadRequestException('Choose two different departments to merge');
+    }
+    return this.db.transaction(async (client) => {
+      const result = await client.query(
+        'SELECT id, name FROM departments WHERE id = ANY($1::uuid[])',
+        [[sourceId, targetId]],
+      );
+      const source = result.rows.find((row) => row.id === sourceId);
+      const target = result.rows.find((row) => row.id === targetId);
+      if (!source || !target) throw new NotFoundException('Source or target department was not found');
+      await client.query(
+        'UPDATE users SET department = $1, updated_at = NOW() WHERE LOWER(TRIM(department)) = LOWER($2)',
+        [target.name, source.name],
+      );
+      await client.query('DELETE FROM departments WHERE id = $1', [sourceId]);
+      return target;
+    });
+  }
+
   private cleanDepartmentName(input: unknown): string {
     const name = (typeof input === 'string' ? input : '').trim().replace(/\s+/g, ' ');
     if (!name) throw new BadRequestException('Department name is required');

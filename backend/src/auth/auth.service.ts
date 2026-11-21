@@ -19,6 +19,11 @@ export class AuthService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  async getDepartments() {
+    const result = await this.db.query('SELECT id, name FROM departments ORDER BY LOWER(name), name');
+    return result.rows;
+  }
+
   private mapRole(role: string): string {
     const clean = role.toLowerCase().replace(/_/g, '');
     switch (clean) {

@@ -6,6 +6,18 @@ export function isAttendanceDeductionEnabled(value: unknown): boolean {
   if (value === false || value === 0) return false;
   return !['false', '0', 'off', 'disabled', 'no'].includes(String(value).trim().toLowerCase());
 }
+
+export function calculatePayrollNet(input: {
+  baseSalary: number;
+  absenceDeductions: number;
+  additions: number;
+  otherDeductions: number;
+  attendanceDeductionsEnabled: boolean;
+}) {
+  const appliedAbsenceDeductions = input.attendanceDeductionsEnabled ? input.absenceDeductions : 0;
+  const netPayable = Math.max(0, Math.round((input.baseSalary - appliedAbsenceDeductions + input.additions - input.otherDeductions) * 100) / 100);
+  return { appliedAbsenceDeductions, netPayable };
+}
 import { SetSalaryDto } from './dto/set-salary.dto';
 import { CreateHolidayDto } from './dto/holiday.dto';
 import { CreateLeaveDto } from './dto/leave.dto';
@@ -842,9 +854,16 @@ export class SalaryService {
       ) / 100;
     }
 
-    // Final Payable Salary = Effective Base Salary − Total Unpaid Absence Deductions + Additions - Penalties
-    const grossPayable = effectiveBaseSalary - totalAbsenceDeductions + totalAdditions - totalPenalties;
-    const finalPayableSalary = Math.max(0, Math.round(grossPayable * 100) / 100);
+    // Keep the switch at the final net calculation boundary as well as in the
+    // attendance-unit calculation, so stale/non-zero breakdowns cannot reduce pay.
+    const payable = calculatePayrollNet({
+      baseSalary: effectiveBaseSalary,
+      absenceDeductions: totalAbsenceDeductions,
+      additions: totalAdditions,
+      otherDeductions: totalPenalties,
+      attendanceDeductionsEnabled: isDeductionEnabled,
+    });
+    const finalPayableSalary = payable.netPayable;
 
     // Check if saved calculation exists in salary_calculations
     const calcRes = await this.db.query(
@@ -876,7 +895,7 @@ export class SalaryService {
       unpaidLeaveDays,
       missingLoginDays,
       confirmedAbsentDays,
-      totalAbsenceDeductions,
+      totalAbsenceDeductions: payable.appliedAbsenceDeductions,
       attendanceDeductionsEnabled: isDeductionEnabled,
       totalAdditions,
       totalPenalties,

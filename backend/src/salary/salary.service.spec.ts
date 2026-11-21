@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { isAttendanceDeductionEnabled, SalaryService } from './salary.service';
+import { calculatePayrollNet, isAttendanceDeductionEnabled, SalaryService } from './salary.service';
 
 describe('attendance deduction setting normalization', () => {
   it.each([undefined, null, false, 0, 'false', 'off', 'disabled', 'no'])(
@@ -14,6 +14,28 @@ describe('attendance deduction setting normalization', () => {
       expect(isAttendanceDeductionEnabled(value)).toBe(true);
     },
   );
+});
+
+describe('payroll net salary calculation', () => {
+  it('does not subtract absence deductions from net pay when the setting is off', () => {
+    expect(calculatePayrollNet({
+      baseSalary: 25000,
+      absenceDeductions: 3846.16,
+      additions: 0,
+      otherDeductions: 0,
+      attendanceDeductionsEnabled: false,
+    })).toEqual({ appliedAbsenceDeductions: 0, netPayable: 25000 });
+  });
+
+  it('keeps explicit payroll adjustments visible and applies them separately', () => {
+    expect(calculatePayrollNet({
+      baseSalary: 25000,
+      absenceDeductions: 3846.16,
+      additions: 500,
+      otherDeductions: 250,
+      attendanceDeductionsEnabled: false,
+    })).toEqual({ appliedAbsenceDeductions: 0, netPayable: 25250 });
+  });
 });
 
 describe('SalaryService leave access and decisions', () => {
