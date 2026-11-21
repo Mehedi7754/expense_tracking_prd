@@ -465,6 +465,7 @@ class ExpenseModel {
   final String? employeeAvatar;
   final String projectId;
   final String projectName;
+  final String expenseType;
   final String? projectImageUrl;
   final String? taskId;
   final String? taskTitle;
@@ -513,6 +514,7 @@ class ExpenseModel {
     this.employeeAvatar,
     required this.projectId,
     required this.projectName,
+    this.expenseType = 'project',
     this.projectImageUrl,
     this.taskId,
     this.taskTitle,
@@ -579,6 +581,7 @@ class ExpenseModel {
     String? employeeAvatar,
     String? projectId,
     String? projectName,
+    String? expenseType,
     String? projectImageUrl,
     String? taskId,
     String? taskTitle,
@@ -625,6 +628,7 @@ class ExpenseModel {
       employeeAvatar: employeeAvatar ?? this.employeeAvatar,
       projectId: projectId ?? this.projectId,
       projectName: projectName ?? this.projectName,
+      expenseType: expenseType ?? this.expenseType,
       projectImageUrl: projectImageUrl ?? this.projectImageUrl,
       taskId: taskId ?? this.taskId,
       taskTitle: taskTitle ?? this.taskTitle,
@@ -882,6 +886,16 @@ class ExpenseModel {
       projectId: (json['project_id'] ?? json['projectId'] ?? '').toString(),
       projectName:
           (json['project_name'] ?? json['projectName'] ?? '').toString(),
+      expenseType:
+          (json['expense_type'] ??
+                  json['expenseType'] ??
+                  ((json['project_id'] ?? json['projectId']) == null ||
+                          (json['project_id'] ?? json['projectId'])
+                              .toString()
+                              .isEmpty
+                      ? 'office'
+                      : 'project'))
+              .toString(),
       projectImageUrl:
           (json['project_image_url'] ?? json['projectImageUrl'])?.toString(),
       taskId: json['task_id']?.toString() ?? json['taskId']?.toString(),
@@ -985,6 +999,7 @@ class ExpenseModel {
       if (employeeAvatar != null) 'employee_avatar': employeeAvatar,
       'project_id': projectId,
       'project_name': projectName,
+      'expense_type': expenseType,
       if (projectImageUrl != null) 'project_image_url': projectImageUrl,
       if (taskId != null) 'task_id': taskId,
       if (taskTitle != null) 'task_title': taskTitle,

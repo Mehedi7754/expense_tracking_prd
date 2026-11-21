@@ -131,6 +131,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   String? _receiptImagePath;
   bool _isSaving = false;
   bool _initialized = false;
+  bool _categoriesLoaded = false;
+  bool _categoryLoadSucceeded = false;
   final List<_EditableExpenseCategory> _editableCategories = [];
   bool _isUploadingCategoryReceipt = false;
   bool _editingGroupedClaim = false;
@@ -148,6 +150,16 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     _customVatController = TextEditingController();
     _customTaxController = TextEditingController();
     _noteController = TextEditingController();
+    _loadServerCategories();
+  }
+
+  Future<void> _loadServerCategories() async {
+    final loaded = await ref.read(categoryProvider.notifier).fetchCategories();
+    if (!mounted) return;
+    setState(() {
+      _categoriesLoaded = true;
+      _categoryLoadSucceeded = loaded;
+    });
   }
 
   void _initFields(
@@ -336,14 +348,12 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   ) {
     final activeCategories =
         categories.where((category) => category.isActive).toList();
-    final selectedCategory = line.category;
     final availableCategoryIds =
         activeCategories.map((category) => category.id).toSet();
+    final savedCategoryId = line.categoryId;
+    final dropdownCategories = activeCategories;
     final dropdownValue =
-        selectedCategory != null &&
-                availableCategoryIds.contains(selectedCategory.id)
-            ? selectedCategory.id
-            : null;
+        availableCategoryIds.contains(savedCategoryId) ? savedCategoryId : null;
     return Container(
       key: ValueKey('expense-category-$index'),
       margin: const EdgeInsets.only(bottom: 12),
@@ -366,7 +376,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Category *'),
                   items:
-                      activeCategories
+                      dropdownCategories
                           .map(
                             (category) => DropdownMenuItem(
                               value: category.id,
@@ -379,7 +389,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                           .toList(),
                   onChanged: (id) {
                     if (id == null) return;
-                    final category = activeCategories.firstWhere(
+                    final category = dropdownCategories.firstWhere(
                       (item) => item.id == id,
                     );
                     setState(() {
@@ -406,6 +416,16 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 ),
             ],
           ),
+          if (line.category == null) ...[
+            const SizedBox(height: 6),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'This saved category is not available on the server. Choose a current category to continue.',
+                style: TextStyle(color: Colors.deepOrange, fontSize: 12),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [
@@ -673,6 +693,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (!_categoriesLoaded || !_categoryLoadSucceeded) {
+      NotificationBanner.showError(
+        context,
+        'Could not load expense categories from the server. Check your connection and try again.',
+      );
+      return;
+    }
+
     final expense =
         ref
             .read(expenseProvider)
@@ -723,7 +751,12 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     var saveReceiptUrls = <String>[];
     if (isGroupedClaim) {
       if (_editableCategories.isEmpty ||
-          _editableCategories.any((line) => line.category == null)) {
+          _editableCategories.any(
+            (line) =>
+                line.category == null ||
+                line.categoryId.trim().isEmpty ||
+                line.categoryName.trim().isEmpty,
+          )) {
         NotificationBanner.showError(
           context,
           'Choose a category for every expense line.',
@@ -731,9 +764,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
         return;
       }
       final categoryIds =
-          _editableCategories
-              .map((line) => line.category?.id ?? line.categoryId)
-              .toSet();
+          _editableCategories.map((line) => line.categoryId).toSet();
       if (categoryIds.length != _editableCategories.length) {
         NotificationBanner.showError(
           context,
@@ -747,9 +778,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             final vat = base * line.vatRate / 100;
             final tax = base * line.taxRate / 100;
             return ExpenseCategoryItem(
-              categoryId: line.category?.id ?? line.categoryId,
-              categoryName: line.category?.name ?? line.categoryName,
-              categoryIcon: line.category?.iconName ?? line.categoryIcon,
+              categoryId: line.categoryId,
+              categoryName: line.categoryName,
+              categoryIcon: line.categoryIcon,
               amount: base + vat + tax,
               baseCost: base,
               vatRate: line.vatRate,
@@ -954,13 +985,19 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
     _initFields(expense, allProjects, allCategories, allTasks);
     for (final line in _editableCategories) {
-      line.category ??= _firstOrNull(
+      final serverCategory = _firstOrNull(
         allCategories,
         (category) =>
             category.id == line.categoryId ||
             category.name.trim().toLowerCase() ==
                 line.categoryName.trim().toLowerCase(),
       );
+      line.category = serverCategory;
+      if (serverCategory != null) {
+        line.categoryId = serverCategory.id;
+        line.categoryName = serverCategory.name;
+        line.categoryIcon = serverCategory.iconName;
+      }
     }
 
     final projectTasks =

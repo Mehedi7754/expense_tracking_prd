@@ -25,9 +25,13 @@ export class ExpensesController {
     @Query('projectId') projectId: string,
     @Query('employeeId') employeeId: string,
     @Query('status') status: string,
+    @Query('expenseType') expenseType: string,
+    @Query('categoryId') categoryId: string,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
     @Request() req: any,
   ) {
-    return this.expensesService.findAll({ projectId, employeeId, status }, req.user);
+    return this.expensesService.findAll({ projectId, employeeId, status, expenseType, categoryId, fromDate, toDate }, req.user);
   }
 
   @Get(':id')

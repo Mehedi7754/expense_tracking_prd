@@ -101,6 +101,28 @@ describe('ExpensesService Unit & Business Rules', () => {
     });
   });
 
+  describe('Office expense submissions', () => {
+    it('stores an office claim without a project while retaining its explicit expense type', async () => {
+      mockDb.query.mockResolvedValue({ rows: [] });
+      mockDb.query.mockResolvedValueOnce({ rows: [{ id: 'expense-office-1' }] });
+      jest.spyOn(service, 'findOne').mockResolvedValue({
+        id: 'expense-office-1', employeeId: 'employee-1', projectId: null,
+        projectName: 'Office / Non-project', amount: 100, categoryName: 'Office Supplies',
+      } as any);
+
+      await service.create({
+        expenseType: 'office', categoryId: '123e4567-e89b-42d3-a456-426614174000',
+        categoryName: 'Office Supplies', amount: 100, baseAmount: 100,
+      }, { id: 'employee-1', role: 'project_member', name: 'Employee' });
+
+      const insert = mockDb.query.mock.calls.find(([sql]: [string]) => sql.includes('INSERT INTO expenses'));
+      expect(insert).toBeDefined();
+      expect(insert[0]).toContain('expense_type');
+      expect(insert[1]).toContain('office');
+      expect(insert[1]).toContain(null);
+    });
+  });
+
   describe('IDOR & Access Control', () => {
     it('does not grant expense visibility based on the project role title', async () => {
       mockDb.query.mockResolvedValue({ rows: [] });

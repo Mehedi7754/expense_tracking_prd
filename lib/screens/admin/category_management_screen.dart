@@ -10,10 +10,7 @@ import '../../state/category_provider.dart';
 class CategoryManagementScreen extends ConsumerWidget {
   final bool isEmbedded;
 
-  const CategoryManagementScreen({
-    super.key,
-    this.isEmbedded = false,
-  });
+  const CategoryManagementScreen({super.key, this.isEmbedded = false});
 
   IconData _getIcon(String iconName) {
     switch (iconName.toLowerCase()) {
@@ -36,11 +33,54 @@ class CategoryManagementScreen extends ConsumerWidget {
     }
   }
 
-  void _showAddEditDialog(BuildContext context, WidgetRef ref, [CategoryModel? existing]) {
+  void _showAddEditDialog(
+    BuildContext context,
+    WidgetRef ref, [
+    CategoryModel? existing,
+  ]) {
     showDialog(
       context: context,
-      builder: (ctx) => _CategoryAddEditDialog(existing: existing, getIcon: _getIcon),
+      builder:
+          (ctx) =>
+              _CategoryAddEditDialog(existing: existing, getIcon: _getIcon),
     );
+  }
+
+  Future<void> _deactivateCategory(
+    BuildContext context,
+    WidgetRef ref,
+    CategoryModel category,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove category?'),
+        content: Text(
+          '“${category.name}” will be hidden from new expense claims. Existing expenses will keep their category history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(categoryProvider.notifier).removeCategory(category.id);
+      if (context.mounted) {
+        NotificationBanner.showSuccess(context, 'Category removed from new claims.');
+      }
+    } catch (error) {
+      if (context.mounted) {
+        NotificationBanner.showError(context, 'Could not remove category: $error');
+      }
+    }
   }
 
   @override
@@ -49,17 +89,18 @@ class CategoryManagementScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
-      appBar: isEmbedded
-          ? null
-          : AppBar(
-              title: const Text('Category Management'),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded),
-                onPressed: () => context.pop(),
+      appBar:
+          isEmbedded
+              ? null
+              : AppBar(
+                title: const Text('Category Management'),
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  onPressed: () => context.pop(),
+                ),
+                // Bug 10 Fix: Removed duplicate 'Add Category' AppBar icon
+                // — the FAB below is the single, canonical entry point.
               ),
-              // Bug 10 Fix: Removed duplicate 'Add Category' AppBar icon
-              // — the FAB below is the single, canonical entry point.
-            ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'admin_add_category_fab',
         onPressed: () => _showAddEditDialog(context, ref),
@@ -81,11 +122,18 @@ class CategoryManagementScreen extends ConsumerWidget {
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
-                  color: cat.isActive
-                      ? AppColors.getSurface(context)
-                      : (isDark ? AppColors.darkSurfaceSubtle : AppColors.surfaceSubtle).withValues(alpha: 0.6),
+                  color:
+                      cat.isActive
+                          ? AppColors.getSurface(context)
+                          : (isDark
+                                  ? AppColors.darkSurfaceSubtle
+                                  : AppColors.surfaceSubtle)
+                              .withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.getBorder(context)),
                   boxShadow: isDark ? [] : AppColors.cardShadow,
@@ -96,10 +144,19 @@ class CategoryManagementScreen extends ConsumerWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.getPrimary(context).withValues(alpha: 0.16) : const Color(0xFFEEF2FF),
+                        color:
+                            isDark
+                                ? AppColors.getPrimary(
+                                  context,
+                                ).withValues(alpha: 0.16)
+                                : const Color(0xFFEEF2FF),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(_getIcon(cat.iconName), color: AppColors.getPrimary(context), size: 20),
+                      child: Icon(
+                        _getIcon(cat.iconName),
+                        color: AppColors.getPrimary(context),
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -112,29 +169,41 @@ class CategoryManagementScreen extends ConsumerWidget {
                                 child: Text(
                                   cat.name,
                                   style: AppTextStyles.titleSmall.copyWith(
-                                    decoration: cat.isActive ? null : TextDecoration.lineThrough,
+                                    decoration:
+                                        cat.isActive
+                                            ? null
+                                            : TextDecoration.lineThrough,
                                   ),
                                 ),
                               ),
                               if (cat.isDefault) ...[
                                 const SizedBox(width: 6),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.surfaceSubtle,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
                                     'System Default',
-                                    style: AppTextStyles.labelSmall.copyWith(fontSize: 9.5),
+                                    style: AppTextStyles.labelSmall.copyWith(
+                                      fontSize: 9.5,
+                                    ),
                                   ),
                                 ),
                               ],
                             ],
                           ),
                           Text(
-                            cat.isActive ? 'Active for claim submission' : 'Inactive (Hidden from users)',
-                            style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
+                            cat.isActive
+                                ? 'Active for claim submission'
+                                : 'Inactive (Hidden from users)',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
@@ -147,9 +216,27 @@ class CategoryManagementScreen extends ConsumerWidget {
                     Switch(
                       value: cat.isActive,
                       activeTrackColor: AppColors.emerald,
-                      onChanged: (_) {
-                        ref.read(categoryProvider.notifier).toggleActive(cat.id);
+                      onChanged: (isActive) async {
+                        try {
+                          await ref
+                              .read(categoryProvider.notifier)
+                              .setCategoryActive(cat.id, isActive);
+                        } catch (error) {
+                          if (ctx.mounted) {
+                            NotificationBanner.showError(
+                              ctx,
+                              'Could not update category: $error',
+                            );
+                          }
+                        }
                       },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, size: 19),
+                      tooltip: 'Remove category from new claims',
+                      onPressed: cat.isActive
+                          ? () => _deactivateCategory(context, ref, cat)
+                          : null,
                     ),
                   ],
                 ),
@@ -166,19 +253,19 @@ class _CategoryAddEditDialog extends ConsumerStatefulWidget {
   final CategoryModel? existing;
   final IconData Function(String) getIcon;
 
-  const _CategoryAddEditDialog({
-    this.existing,
-    required this.getIcon,
-  });
+  const _CategoryAddEditDialog({this.existing, required this.getIcon});
 
   @override
-  ConsumerState<_CategoryAddEditDialog> createState() => _CategoryAddEditDialogState();
+  ConsumerState<_CategoryAddEditDialog> createState() =>
+      _CategoryAddEditDialogState();
 }
 
-class _CategoryAddEditDialogState extends ConsumerState<_CategoryAddEditDialog> {
+class _CategoryAddEditDialogState
+    extends ConsumerState<_CategoryAddEditDialog> {
   late final TextEditingController _controller;
   late String _selectedIcon;
   final _formKey = GlobalKey<FormState>();
+  bool _saving = false;
 
   @override
   void initState() {
@@ -214,7 +301,11 @@ class _CategoryAddEditDialogState extends ConsumerState<_CategoryAddEditDialog> 
                 labelText: 'Category Title *',
                 hintText: 'e.g. Client Entertainment, Training...',
               ),
-              validator: (val) => val == null || val.trim().isEmpty ? 'Title required' : null,
+              validator:
+                  (val) =>
+                      val == null || val.trim().isEmpty
+                          ? 'Title required'
+                          : null,
             ),
             const SizedBox(height: 16),
             Text('Category Icon', style: AppTextStyles.labelMedium),
@@ -222,54 +313,85 @@ class _CategoryAddEditDialogState extends ConsumerState<_CategoryAddEditDialog> 
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                'travel',
-                'meal',
-                'lodging',
-                'hardware',
-                'software',
-                'transport',
-                'office',
-              ].map((iconKey) {
-                final isSel = _selectedIcon == iconKey;
-                return InkWell(
-                  onTap: () => setState(() => _selectedIcon = iconKey),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isSel ? AppColors.primary : AppColors.surfaceSubtle,
+              children:
+                  [
+                    'travel',
+                    'meal',
+                    'lodging',
+                    'hardware',
+                    'software',
+                    'transport',
+                    'office',
+                  ].map((iconKey) {
+                    final isSel = _selectedIcon == iconKey;
+                    return InkWell(
+                      onTap: () => setState(() => _selectedIcon = iconKey),
                       borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      widget.getIcon(iconKey),
-                      size: 20,
-                      color: isSel ? AppColors.textWhite : AppColors.textPrimary,
-                    ),
-                  ),
-                );
-              }).toList(),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color:
+                              isSel
+                                  ? AppColors.primary
+                                  : AppColors.surfaceSubtle,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          widget.getIcon(iconKey),
+                          size: 20,
+                          color:
+                              isSel
+                                  ? AppColors.textWhite
+                                  : AppColors.textPrimary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
             ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
         ElevatedButton(
-          onPressed: () {
-            if (_formKey.currentState!.validate()) {
-              final name = _controller.text.trim();
-              if (existing == null) {
-                ref.read(categoryProvider.notifier).addCategory(name, _selectedIcon);
-                NotificationBanner.showSuccess(context, 'Category "$name" created.');
-              } else {
-                ref.read(categoryProvider.notifier).updateCategory(existing.id, name, _selectedIcon);
-                NotificationBanner.showSuccess(context, 'Category updated.');
-              }
-              Navigator.pop(context);
-            }
-          },
-          child: const Text('Save Category'),
+          onPressed:
+              _saving
+                  ? null
+                  : () async {
+                    if (!_formKey.currentState!.validate()) return;
+                    final name = _controller.text.trim();
+                    setState(() => _saving = true);
+                    try {
+                      if (existing == null) {
+                        await ref
+                            .read(categoryProvider.notifier)
+                            .addCategory(name, _selectedIcon);
+                      } else {
+                        await ref
+                            .read(categoryProvider.notifier)
+                            .updateCategory(existing.id, name, _selectedIcon);
+                      }
+                      if (!mounted) return;
+                      NotificationBanner.showSuccess(
+                        context,
+                        existing == null
+                            ? 'Category "$name" created.'
+                            : 'Category updated.',
+                      );
+                      Navigator.pop(context);
+                    } catch (error) {
+                      if (!mounted) return;
+                      setState(() => _saving = false);
+                      NotificationBanner.showError(
+                        context,
+                        'Could not save category: $error',
+                      );
+                    }
+                  },
+          child: Text(_saving ? 'Saving…' : 'Save Category'),
         ),
       ],
     );

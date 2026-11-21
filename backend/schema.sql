@@ -263,7 +263,8 @@ CREATE TABLE IF NOT EXISTS task_assignees (
 CREATE TABLE IF NOT EXISTS expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     employee_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    expense_type VARCHAR(20) NOT NULL DEFAULT 'project' CHECK (expense_type IN ('project', 'office')),
     task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
     amount NUMERIC(15, 2) NOT NULL CHECK (amount >= 0),
     office_benefit_amount NUMERIC(15, 2) NOT NULL DEFAULT 0.00 CHECK (office_benefit_amount >= 0),

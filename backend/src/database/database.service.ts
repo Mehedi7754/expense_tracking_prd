@@ -311,11 +311,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
         CREATE INDEX IF NOT EXISTS idx_chat_messages_channel_created ON chat_messages(channel_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_chat_messages_project ON chat_messages(project_id);
 
-        -- Ensure expenses cascade on project deletion
+        -- Preserve expense records when a project is removed and support office expenses.
+        ALTER TABLE expenses ALTER COLUMN project_id DROP NOT NULL;
+        ALTER TABLE expenses ADD COLUMN IF NOT EXISTS expense_type VARCHAR(20) NOT NULL DEFAULT 'project';
+        UPDATE expenses SET expense_type = 'office' WHERE project_id IS NULL AND expense_type <> 'office';
         DO $$
         BEGIN
             ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_project_id_fkey;
-            ALTER TABLE expenses ADD CONSTRAINT expenses_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE;
+            ALTER TABLE expenses ADD CONSTRAINT expenses_project_id_fkey FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL;
         EXCEPTION
             WHEN others THEN null;
         END $$;

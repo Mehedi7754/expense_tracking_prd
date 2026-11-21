@@ -211,6 +211,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
     required String employeeName,
     required String projectId,
     required String projectName,
+    String expenseType = 'project',
     String? taskId,
     String? taskTitle,
     required double amount,
@@ -252,6 +253,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
       employeeName: employeeName,
       projectId: projectId,
       projectName: projectName,
+      expenseType: expenseType,
       taskId: taskId,
       taskTitle: taskTitle,
       amount: amount,
@@ -305,7 +307,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
       );
 
       return saved;
-    } catch (e) {
+    } catch (_) {
       // Revert optimistic insert on network/server rejection
       state = state.where((exp) => exp.id != newExpense.id).toList();
       await _persistExpenses();
@@ -468,11 +470,13 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
     List<ExpenseCategoryItem>? categoryItems,
   }) async {
     final index = state.indexWhere((expense) => expense.id == id);
-    if (index < 0) return false;
+    if (index < 0) {
+      throw StateError('Expense is no longer loaded. Refresh and reopen it.');
+    }
     final previous = state[index];
     if (previous.status != ExpenseStatus.pending &&
         previous.status != ExpenseStatus.rejected) {
-      return false;
+      throw StateError('Only pending or rejected expenses can be edited.');
     }
 
     final updated = previous.copyWith(
@@ -537,7 +541,9 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
       ];
       await _persistExpenses();
       invalidateCache();
-      return false;
+      // Preserve the API/network error so the edit screen can show the actual
+      // reason (for example validation, permissions, or connectivity).
+      rethrow;
     }
   }
 

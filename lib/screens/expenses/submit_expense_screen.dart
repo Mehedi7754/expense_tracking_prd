@@ -7,9 +7,11 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../core/widgets/notification_banner.dart';
 import '../../models/expense_model.dart';
+import '../../models/category_model.dart';
 import '../../models/project_model.dart';
 import '../../repositories/file_upload_repository.dart';
 import '../../state/auth_provider.dart';
+import '../../state/category_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
 import '../../state/settings_provider.dart';
@@ -26,8 +28,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
 
   ProjectModel? _selectedProject;
-  String _selectedCategory =
-      'transportation'; // equipment, transportation, food, accommodation, office, other
+  bool _isOfficeExpense = false;
+  String? _selectedCategory;
   final Map<String, ExpenseCategoryItem> _categoryDrafts = {};
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
@@ -53,6 +55,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   final Map<String, String> _uploadedReceiptUrlsByPath = {};
   bool _isUploadingReceipt = false;
   bool _isSubmitting = false;
+  bool _categoriesLoaded = false;
+  bool _categoryLoadSucceeded = false;
 
   // Category A: Equipment
   final _equipTypeController = TextEditingController();
@@ -88,6 +92,27 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
   // Category F: Other Custom Category Name
   final _otherCategoryNameController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadServerCategories();
+  }
+
+  Future<void> _loadServerCategories({bool force = false}) async {
+    final loaded = await ref
+        .read(categoryProvider.notifier)
+        .fetchCategories(force: force);
+    if (!mounted) return;
+    final activeCategories = ref
+        .read(categoryProvider)
+        .where((category) => category.isActive);
+    setState(() {
+      _categoriesLoaded = true;
+      _categoryLoadSucceeded = loaded;
+      _selectedCategory ??= activeCategories.firstOrNull?.id;
+    });
+  }
 
   @override
   void dispose() {
@@ -153,26 +178,60 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   double get _submittedTotal => _categoryDrafts.values.fold<double>(
     _currentAmount,
     (total, item) =>
-        item.categoryId == 'cat_$_selectedCategory'
-            ? total
-            : total + item.amount,
+        item.categoryId == _selectedCategory ? total : total + item.amount,
   );
 
   int get _categoryCount =>
       _categoryDrafts.keys.where((key) => key != _selectedCategory).length +
       (_currentAmount > 0 ? 1 : 0);
 
-  static const Map<String, Color> _categoryColors = {
-    'transportation': Color(0xFF0D9488),
-    'food': Color(0xFFF59E0B),
-    'accommodation': Color(0xFF8B5CF6),
-    'equipment': Color(0xFF4F46E5),
-    'office': Color(0xFF0284C7),
-    'other': Color(0xFF64748B),
-  };
+  CategoryModel? _categoryById(String? id) {
+    if (id == null) return null;
+    for (final category in ref.read(categoryProvider)) {
+      if (category.id == id) return category;
+    }
+    return null;
+  }
+
+  String _categoryKind(String? id) {
+    final category = _categoryById(id);
+    final value =
+        '${category?.name ?? ''} ${category?.iconName ?? ''}'.toLowerCase();
+    if (value.contains('equip') ||
+        value.contains('hardware') ||
+        value.contains('device'))
+      return 'equipment';
+    if (value.contains('transport') ||
+        value.contains('taxi') ||
+        value.contains('travel') ||
+        value.contains('flight'))
+      return 'transportation';
+    if (value.contains('food') ||
+        value.contains('meal') ||
+        value.contains('dining'))
+      return 'food';
+    if (value.contains('accommod') ||
+        value.contains('lodg') ||
+        value.contains('hotel'))
+      return 'accommodation';
+    if (value.contains('office') || value.contains('suppl')) return 'office';
+    return 'other';
+  }
+
+  Color _categoryColor(String? id) {
+    const palette = [
+      Color(0xFF0D9488),
+      Color(0xFFF59E0B),
+      Color(0xFF8B5CF6),
+      Color(0xFF4F46E5),
+      Color(0xFF0284C7),
+      Color(0xFF64748B),
+    ];
+    return palette[(id?.hashCode ?? 0).abs() % palette.length];
+  }
 
   Map<String, dynamic> _currentCategoryDetails() {
-    switch (_selectedCategory) {
+    switch (_categoryKind(_selectedCategory)) {
       case 'equipment':
         return {
           'equipment_type': _equipTypeController.text.trim(),
@@ -216,22 +275,22 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       case 'office':
         return {'sub_category': _officeSubCategory};
       default:
-        return {
-          'custom_category_name': _otherCategoryNameController.text.trim(),
-        };
+        return {'additional_details': _otherCategoryNameController.text.trim()};
     }
   }
 
   void _storeCurrentCategory() {
     final key = _selectedCategory;
+    final category = _categoryById(key);
+    if (key == null || category == null) return;
     if (_enteredAmount <= 0 && _receiptPaths.isEmpty) {
       _categoryDrafts.remove(key);
       return;
     }
     _categoryDrafts[key] = ExpenseCategoryItem(
-      categoryId: 'cat_$key',
-      categoryName: _getCategoryDisplayName(key),
-      categoryIcon: _getCategoryIconName(key),
+      categoryId: category.id,
+      categoryName: category.name,
+      categoryIcon: category.iconName,
       amount: _netCost,
       baseCost: _baseCost,
       vatRate: _vatRate,
@@ -328,7 +387,8 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     _hotelRateController.text = (details['rate_per_night'] ?? '').toString();
     _officeSubCategory = (details['sub_category'] ?? 'Printing').toString();
     _otherCategoryNameController.text =
-        (details['custom_category_name'] ?? '').toString();
+        (details['additional_details'] ?? details['custom_category_name'] ?? '')
+            .toString();
     _hasReceipt = item.hasReceipt;
     _receiptPaths.addAll(item.receiptPhotoUrls);
     _receiptFileNames.addAll(
@@ -348,7 +408,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
 
   // PRD Section 6: Food allowance check
   bool get _exceedsFoodAllowance {
-    if (_selectedCategory != 'food') return false;
+    if (_categoryKind(_selectedCategory) != 'food') return false;
     final people = int.tryParse(_foodPeopleCountController.text.trim()) ?? 1;
     final projectAllowance = _selectedProject?.dailyFoodAllowance;
     final baseAllowance =
@@ -532,7 +592,15 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedProject == null) {
+    if (_categoryById(_selectedCategory) == null) {
+      NotificationBanner.showError(
+        context,
+        'Select an expense category from the server list.',
+      );
+      return;
+    }
+
+    if (!_isOfficeExpense && _selectedProject == null) {
       NotificationBanner.showError(
         context,
         'Please select an assigned project',
@@ -540,8 +608,9 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
       return;
     }
 
-    if (_selectedProject!.isClosed ||
-        _selectedProject!.status == ProjectStatus.completed) {
+    if (!_isOfficeExpense &&
+        (_selectedProject!.isClosed ||
+            _selectedProject!.status == ProjectStatus.completed)) {
       NotificationBanner.showError(
         context,
         'Cannot submit expenses for a closed project',
@@ -660,8 +729,12 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           .submitExpense(
             employeeId: user.id,
             employeeName: user.name,
-            projectId: _selectedProject!.id,
-            projectName: _selectedProject!.name,
+            projectId: _isOfficeExpense ? '' : _selectedProject!.id,
+            projectName:
+                _isOfficeExpense
+                    ? 'Office / Non-project'
+                    : _selectedProject!.name,
+            expenseType: _isOfficeExpense ? 'office' : 'project',
             amount: totalAmount,
             baseCost: baseCost,
             vatRate: vatRate,
@@ -703,45 +776,63 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     }
   }
 
-  String _getCategoryDisplayName(String cat) {
-    switch (cat) {
-      case 'equipment':
-        return 'Equipment';
-      case 'transportation':
-        return 'Transportation';
-      case 'food':
-        return 'Food';
-      case 'accommodation':
-        return 'Accommodation';
-      case 'office':
-        return 'Office Cost';
-      default:
-        final customName = _otherCategoryNameController.text.trim();
-        return customName.isNotEmpty ? customName : 'Other';
-    }
-  }
+  String _getCategoryDisplayName(String? id) =>
+      _categoryById(id)?.name ?? 'Expense Category';
 
-  String _getCategoryIconName(String cat) {
-    switch (cat) {
-      case 'equipment':
-        return 'hardware';
-      case 'transportation':
-        return 'transport';
-      case 'food':
-        return 'meal';
-      case 'accommodation':
-        return 'hotel';
-      case 'office':
-        return 'office';
-      default:
-        return 'other';
+  IconData _getCategoryIcon(String? id) {
+    final icon = _categoryById(id)?.iconName.toLowerCase() ?? '';
+    if (icon.contains('transport') || icon.contains('taxi')) {
+      return Icons.directions_car_rounded;
     }
+    if (icon.contains('food') || icon.contains('meal')) {
+      return Icons.restaurant_rounded;
+    }
+    if (icon.contains('hotel') || icon.contains('lodg')) {
+      return Icons.hotel_rounded;
+    }
+    if (icon.contains('hardware') || icon.contains('equip')) {
+      return Icons.precision_manufacturing_rounded;
+    }
+    if (icon.contains('office')) return Icons.business_rounded;
+    return Icons.category_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final categories =
+        ref.watch(categoryProvider).where((c) => c.isActive).toList();
+    if (!_categoriesLoaded) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (!_categoryLoadSucceeded || categories.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Submit Expense')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Expense categories could not be loaded from settings.',
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () {
+                    setState(() => _categoriesLoaded = false);
+                    _loadServerCategories(force: true);
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    final selectedCategoryKind = _categoryKind(_selectedCategory);
 
     final user = ref.watch(authProvider).currentUser;
     // Watch projectProvider for state reactivity across updates
@@ -781,68 +872,95 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
             child: ListView(
               padding: const EdgeInsets.all(18),
               children: [
-                // Project Selector (PRD Section 1: Assigned projects only)
-                DropdownButtonFormField<ProjectModel>(
-                  isExpanded: true,
-                  value: _selectedProject,
-                  decoration: InputDecoration(
-                    labelText: 'Select Assigned Project *',
-                    prefixIcon: Icon(
-                      Icons.folder_shared_rounded,
-                      color: AppColors.getPrimary(context),
-                    ),
-                    filled: true,
-                    fillColor: isDark ? AppColors.darkSurface : Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color:
-                            isDark
-                                ? AppColors.darkBorder
-                                : AppColors.lightBorder,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color:
-                            isDark
-                                ? AppColors.darkBorder
-                                : AppColors.lightBorder,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
-                      borderSide: BorderSide(
-                        color: AppColors.getPrimary(context),
-                        width: 1.8,
-                      ),
-                    ),
+                Text(
+                  'Expense type',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-                  items:
-                      assignedProjects.map((p) {
-                        return DropdownMenuItem(
-                          value: p,
-                          child: Text(
-                            '${p.projectId} - ${p.name}',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                  onChanged: (p) => setState(() => _selectedProject = p),
-                  validator:
-                      (v) => v == null ? 'Please select a project' : null,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Project expense'),
+                      selected: !_isOfficeExpense,
+                      onSelected:
+                          (_) => setState(() => _isOfficeExpense = false),
+                    ),
+                    ChoiceChip(
+                      label: const Text('Office / non-project'),
+                      selected: _isOfficeExpense,
+                      onSelected:
+                          (_) => setState(() => _isOfficeExpense = true),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (!_isOfficeExpense) ...[
+                  // Project Selector (PRD Section 1: Assigned projects only)
+                  DropdownButtonFormField<ProjectModel>(
+                    isExpanded: true,
+                    value: _selectedProject,
+                    decoration: InputDecoration(
+                      labelText: 'Select Assigned Project *',
+                      prefixIcon: Icon(
+                        Icons.folder_shared_rounded,
+                        color: AppColors.getPrimary(context),
+                      ),
+                      filled: true,
+                      fillColor: isDark ? AppColors.darkSurface : Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color:
+                              isDark
+                                  ? AppColors.darkBorder
+                                  : AppColors.lightBorder,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color:
+                              isDark
+                                  ? AppColors.darkBorder
+                                  : AppColors.lightBorder,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: AppColors.getPrimary(context),
+                          width: 1.8,
+                        ),
+                      ),
+                    ),
+                    items:
+                        assignedProjects.map((p) {
+                          return DropdownMenuItem(
+                            value: p,
+                            child: Text(
+                              '${p.projectId} - ${p.name}',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                    onChanged: (p) => setState(() => _selectedProject = p),
+                    validator:
+                        (v) => v == null ? 'Please select a project' : null,
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
                 // Category Selector Chips (PRD Section 5 & 17)
                 Text(
@@ -856,47 +974,11 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildCategoryChip(
-                        'transportation',
-                        'Transportation',
-                        Icons.directions_car_rounded,
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildCategoryChip(
-                        'food',
-                        'Food',
-                        Icons.restaurant_rounded,
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildCategoryChip(
-                        'accommodation',
-                        'Accommodation',
-                        Icons.hotel_rounded,
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildCategoryChip(
-                        'equipment',
-                        'Equipment',
-                        Icons.precision_manufacturing_rounded,
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildCategoryChip(
-                        'office',
-                        'Office Cost',
-                        Icons.business_rounded,
-                        isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildCategoryChip(
-                        'other',
-                        'Other',
-                        Icons.category_rounded,
-                        isDark,
-                      ),
+                      for (final category in categories) ...[
+                        _buildCategoryChip(category, isDark),
+                        if (category != categories.last)
+                          const SizedBox(width: 8),
+                      ],
                     ],
                   ),
                 ),
@@ -907,9 +989,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                     runSpacing: 8,
                     children:
                         _categoryDrafts.entries.map((entry) {
-                          final color =
-                              _categoryColors[entry.key] ??
-                              AppColors.brandPrimary;
+                          final color = _categoryColor(entry.key);
                           final isActive = entry.key == _selectedCategory;
                           final amount =
                               isActive ? _currentAmount : entry.value.amount;
@@ -971,15 +1051,15 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
                         ),
                       ),
                       const Divider(height: 20),
-                      if (_selectedCategory == 'equipment')
+                      if (selectedCategoryKind == 'equipment')
                         _buildEquipmentForm(),
-                      if (_selectedCategory == 'transportation')
+                      if (selectedCategoryKind == 'transportation')
                         _buildTransportationForm(),
-                      if (_selectedCategory == 'food') _buildFoodForm(),
-                      if (_selectedCategory == 'accommodation')
+                      if (selectedCategoryKind == 'food') _buildFoodForm(),
+                      if (selectedCategoryKind == 'accommodation')
                         _buildAccommodationForm(),
-                      if (_selectedCategory == 'office') _buildOfficeForm(),
-                      if (_selectedCategory == 'other') _buildOtherForm(),
+                      if (selectedCategoryKind == 'office') _buildOfficeForm(),
+                      if (selectedCategoryKind == 'other') _buildOtherForm(),
                     ],
                   ),
                 ),
@@ -2131,14 +2211,11 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
     );
   }
 
-  Widget _buildCategoryChip(
-    String id,
-    String label,
-    IconData icon,
-    bool isDark,
-  ) {
+  Widget _buildCategoryChip(CategoryModel category, bool isDark) {
+    final id = category.id;
+    final label = category.name;
     final isSelected = _selectedCategory == id;
-    final categoryColor = _categoryColors[id] ?? AppColors.brandPrimary;
+    final categoryColor = _categoryColor(id);
     final primaryColor =
         isSelected
             ? categoryColor
@@ -2168,7 +2245,7 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon,
+              _getCategoryIcon(id),
               size: 16,
               color:
                   isSelected
@@ -2511,17 +2588,10 @@ class _SubmitExpenseScreenState extends ConsumerState<SubmitExpenseScreen> {
         TextFormField(
           controller: _otherCategoryNameController,
           decoration: InputDecoration(
-            labelText: 'Custom Category Name *',
-            hintText: 'e.g. Legal & Professional, Stationery, Cloud Hosting',
+            labelText: '${_getCategoryDisplayName(_selectedCategory)} Details',
+            hintText: 'Add details about this expense category',
             prefixIcon: Icon(Icons.edit_note_rounded),
           ),
-          validator: (v) {
-            if (_selectedCategory == 'other' &&
-                (v == null || v.trim().isEmpty)) {
-              return 'Please enter the expense category name';
-            }
-            return null;
-          },
         ),
         const SizedBox(height: 8),
         const Text(

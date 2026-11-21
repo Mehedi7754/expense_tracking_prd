@@ -46,8 +46,11 @@ export class ExpensesService {
       employeeName: e.employee_name || 'Team Member',
       employeeAvatar: e.employee_avatar || null,
       employee_avatar: e.employee_avatar || null,
+      employeeDepartment: e.employee_department || '',
+      employeeDesignation: e.employee_designation || '',
       projectId: e.project_id,
-      projectName: e.project_name || 'Project',
+      expenseType: e.expense_type || (e.project_id ? 'project' : 'office'),
+      projectName: e.project_name || (e.project_id ? 'Project' : 'Office / Non-project'),
       taskId: e.task_id,
       amount: Number(e.amount),
       baseCost: Number(e.base_amount || e.amount),
@@ -131,12 +134,14 @@ export class ExpensesService {
     };
   }
 
-  async findAll(query: { projectId?: string; employeeId?: string; status?: string }, user: any) {
+  async findAll(query: { projectId?: string; employeeId?: string; status?: string; expenseType?: string; categoryId?: string; fromDate?: string; toDate?: string }, user: any) {
     let sql = `
       SELECT e.*,
         u.full_name AS employee_name,
         u.avatar_url AS employee_avatar,
-        p.name AS project_name,
+        u.department AS employee_department,
+        u.designation AS employee_designation,
+        COALESCE(p.name, CASE WHEN e.expense_type = 'office' OR e.project_id IS NULL THEN 'Office / Non-project' ELSE 'Deleted project' END) AS project_name,
         p.image_url AS project_image_url,
         c.name AS category_name,
         c.icon_name AS category_icon,
@@ -156,8 +161,8 @@ export class ExpensesService {
         ) AS comments
       FROM expenses e
       JOIN users u ON u.id = e.employee_id
-      JOIN projects p ON p.id = e.project_id
-      JOIN categories c ON c.id = e.category_id
+      LEFT JOIN projects p ON p.id = e.project_id
+      LEFT JOIN categories c ON c.id = e.category_id
       WHERE 1=1
     `;
 
@@ -168,12 +173,13 @@ export class ExpensesService {
     const isGlobalAdminOrFinance = ['main_admin', 'admin', 'finance', 'finance_manager'].includes(user.role);
     if (!isGlobalAdminOrFinance) {
       if (user.role === 'project_manager') {
-        sql += ` AND EXISTS (
+        sql += ` AND (e.employee_id = $${idx} OR EXISTS (
           SELECT 1 FROM project_members pm
-          WHERE pm.project_id = e.project_id AND pm.user_id = $${idx++}
+          WHERE pm.project_id = e.project_id AND pm.user_id = $${idx}
             AND (pm.can_approve_expenses = TRUE OR pm.can_view_expenses = TRUE)
-        )`;
+        ))`;
         params.push(user.id);
+        idx++;
       } else {
         sql += ` AND (
           e.employee_id = $${idx} 
@@ -202,6 +208,22 @@ export class ExpensesService {
       sql += ` AND e.status = $${idx++}`;
       params.push(query.status);
     }
+    if (query.expenseType === 'project' || query.expenseType === 'office') {
+      sql += ` AND e.expense_type = $${idx++}`;
+      params.push(query.expenseType);
+    }
+    if (query.categoryId) {
+      sql += ` AND e.category_id = $${idx++}`;
+      params.push(query.categoryId);
+    }
+    if (query.fromDate) {
+      sql += ` AND e.date >= $${idx++}::date`;
+      params.push(query.fromDate);
+    }
+    if (query.toDate) {
+      sql += ` AND e.date <= $${idx++}::date`;
+      params.push(query.toDate);
+    }
 
     sql += ` ORDER BY e.created_at DESC`;
 
@@ -214,7 +236,9 @@ export class ExpensesService {
       SELECT e.*,
         u.full_name AS employee_name,
         u.avatar_url AS employee_avatar,
-        p.name AS project_name,
+        u.department AS employee_department,
+        u.designation AS employee_designation,
+        COALESCE(p.name, CASE WHEN e.expense_type = 'office' OR e.project_id IS NULL THEN 'Office / Non-project' ELSE 'Deleted project' END) AS project_name,
         p.image_url AS project_image_url,
         c.name AS category_name,
         c.icon_name AS category_icon,
@@ -234,8 +258,8 @@ export class ExpensesService {
         ) AS comments
       FROM expenses e
       JOIN users u ON u.id = e.employee_id
-      JOIN projects p ON p.id = e.project_id
-      JOIN categories c ON c.id = e.category_id
+      LEFT JOIN projects p ON p.id = e.project_id
+      LEFT JOIN categories c ON c.id = e.category_id
       WHERE e.id = $1
     `;
 
@@ -267,25 +291,28 @@ export class ExpensesService {
     const employeeId = (isAdmin && (data.employeeId || data.employee_id)) ? (data.employeeId || data.employee_id) : user.id;
     const initialStatus = (isAdmin && data.status) ? data.status : 'pending';
 
-    const rawProjectId = data.projectId || data.project_id;
-    if (!rawProjectId) {
+    const expenseType = data.expenseType === 'office' || data.expense_type === 'office' ? 'office' : 'project';
+    const rawProjectId = expenseType === 'office' ? null : (data.projectId || data.project_id);
+    if (expenseType === 'project' && !rawProjectId) {
       throw new BadRequestException('Project ID is required');
     }
 
-    const projRes = await this.db.query(
-      `SELECT id, name, is_closed, status FROM projects WHERE id::text = $1 OR project_code = $1 LIMIT 1`,
-      [rawProjectId],
-    );
-    if (!projRes.rows.length) {
-      throw new NotFoundException(`Project not found: ${rawProjectId}`);
+    let project: any = null;
+    let validProjectId: string | null = null;
+    if (rawProjectId) {
+      const projRes = await this.db.query(
+        `SELECT id, name, is_closed, status FROM projects WHERE id::text = $1 OR project_code = $1 LIMIT 1`,
+        [rawProjectId],
+      );
+      if (!projRes.rows.length) throw new NotFoundException(`Project not found: ${rawProjectId}`);
+      project = projRes.rows[0];
+      if (project.is_closed === true || (project.status && ['closed', 'completed'].includes(project.status.toLowerCase()))) {
+        throw new BadRequestException('Cannot submit expenses for a closed project');
+      }
+      validProjectId = project.id;
     }
-    const project = projRes.rows[0];
-    if (project.is_closed === true || (project.status && ['closed', 'completed'].includes(project.status.toLowerCase()))) {
-      throw new BadRequestException('Cannot submit expenses for a closed project');
-    }
-    const validProjectId = project.id;
 
-    if (!isAdmin && user?.role !== 'finance_manager' && user?.role !== 'finance') {
+    if (expenseType === 'project' && !isAdmin && user?.role !== 'finance_manager' && user?.role !== 'finance') {
       const memberCheck = await this.db.query(
         'SELECT can_create_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',
         [validProjectId, user.id],
@@ -379,21 +406,22 @@ export class ExpensesService {
 
     const res = await this.db.query(
       `INSERT INTO expenses (
-        employee_id, project_id, task_id, amount, currency, category_id,
+        employee_id, project_id, expense_type, task_id, amount, currency, category_id,
         note, date, has_receipt, receipt_photo_url, status,
         justification_status, justification_reason, justification_comment,
         category_details, base_amount, vat_rate, vat_amount, tax_rate, tax_amount,
         receipt_photo_urls, receipt_photos
       ) VALUES (
-        $1, $2, $3, $4, $5, $6,
-        $7, $8, $9, $10, $11,
-        $12, $13, $14,
-        $15, $16, $17, $18, $19, $20,
-        $21, $22
+        $1, $2, $3, $4, $5, $6, $7,
+        $8, $9, $10, $11, $12,
+        $13, $14, $15,
+        $16, $17, $18, $19, $20, $21,
+        $22, $23
       ) RETURNING id`,
       [
         employeeId,
         validProjectId,
+        expenseType,
         data.taskId || data.task_id || null,
         Number(data.amount),
         data.currency || 'BDT',
@@ -465,8 +493,8 @@ export class ExpensesService {
         await this.notificationsService.create({
           userId: recipient.id,
           title: 'New Expense Submitted',
-          message: `${submitterName} submitted a ${created.categoryName} expense of ${created.amount} ${created.currency} for ${created.projectName} (Expense Date: ${expenseDateFormatted} • Submitted: ${submittedDateFormatted}).`,
-          fullExplanation: `${submitterName} submitted a new expense claim:\n• Category: ${created.categoryName}\n• Amount: ${created.amount} ${created.currency}\n• Project: ${created.projectName}\n• Expense Date: ${expenseDateFormatted}\n• Submitted On: ${submittedDateFormatted}\n\nPlease review and approve or reject from the Approvals section.`,
+          message: `${submitterName} submitted a ${created.categoryName} expense of ${created.amount} ${created.currency}${created.expenseType === 'office' ? ' for office / non-project costs' : ` for ${created.projectName}`} (Expense Date: ${expenseDateFormatted} • Submitted: ${submittedDateFormatted}).`,
+          fullExplanation: `${submitterName} submitted a new expense claim:\n• Category: ${created.categoryName}\n• Amount: ${created.amount} ${created.currency}\n• ${created.expenseType === 'office' ? 'Expense type: Office / non-project' : `Project: ${created.projectName}`}\n• Expense Date: ${expenseDateFormatted}\n• Submitted On: ${submittedDateFormatted}\n\nPlease review and approve or reject from the Expenses section.`,
           type: 'expense_submitted',
           relatedProjectId: created.projectId,
           relatedExpenseId: created.id,
@@ -537,8 +565,13 @@ export class ExpensesService {
     const values: any[] = [];
     let idx = 1;
 
+    const requestedExpenseType = data.expenseType ?? data.expense_type;
     const rawProjectId = data.projectId ?? data.project_id;
-    if (rawProjectId !== undefined && rawProjectId !== null && rawProjectId !== '') {
+    if (requestedExpenseType === 'office') {
+      if (!isOwner && !isAdminOrFinance) throw new ForbiddenException('Only the expense submitter or finance can change the expense type');
+      fields.push(`project_id = NULL`);
+      fields.push(`expense_type = 'office'`);
+    } else if (rawProjectId !== undefined && rawProjectId !== null && rawProjectId !== '') {
       const projectRes = await this.db.query(
         `SELECT id, name, is_closed, status FROM projects WHERE id::text = $1 OR project_code = $1 LIMIT 1`,
         [rawProjectId],
@@ -565,6 +598,7 @@ export class ExpensesService {
       }
       fields.push(`project_id = $${idx++}`);
       values.push(project.id);
+      fields.push(`expense_type = 'project'`);
     }
     if (data.taskId !== undefined || data.task_id !== undefined) {
       fields.push(`task_id = $${idx++}`);
@@ -784,7 +818,7 @@ export class ExpensesService {
       throw new BadRequestException('Cannot approve expenses for a closed project');
     }
 
-    const isGlobalAdmin = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'project_manager';
+    const isGlobalAdmin = ['main_admin', 'admin', 'project_manager', 'finance_manager', 'finance'].includes(user?.role);
     if (!isGlobalAdmin) {
       const pmRes = await this.db.query(
         'SELECT can_approve_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',
@@ -854,7 +888,7 @@ export class ExpensesService {
       throw new ForbiddenException('Anti-fraud rule: You cannot reject your own expense report');
     }
 
-    const isGlobalAdmin = user?.role === 'main_admin' || user?.role === 'admin' || user?.role === 'project_manager';
+    const isGlobalAdmin = ['main_admin', 'admin', 'project_manager', 'finance_manager', 'finance'].includes(user?.role);
     if (!isGlobalAdmin) {
       const pmRes = await this.db.query(
         'SELECT can_approve_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',

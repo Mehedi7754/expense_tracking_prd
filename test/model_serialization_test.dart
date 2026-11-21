@@ -246,6 +246,29 @@ void main() {
       },
     );
 
+    test('ExpenseModel preserves office expense type without a project', () {
+      final expense = ExpenseModel(
+        id: 'exp_office_001',
+        employeeId: 'usr_001',
+        employeeName: 'Fahim Ahmed',
+        projectId: '',
+        projectName: 'Office / Non-project',
+        amount: 800,
+        categoryId: 'cat_supplies',
+        categoryName: 'Office Supplies',
+        categoryIcon: 'office',
+        note: 'Printer paper',
+        date: DateTime(2026, 11, 21),
+        createdAt: DateTime(2026, 11, 21),
+      );
+      final wireJson = expense.toJson()..['expense_type'] = 'office';
+
+      final parsed = ExpenseModel.fromJson(wireJson);
+
+      expect(parsed.toJson()['expense_type'], 'office');
+      expect(parsed.toJson()['project_id'], '');
+    });
+
     test(
       'CategoryModel, ClientModel, TaskModel, AuditLogModel, NotificationModel round-trip',
       () {
