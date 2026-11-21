@@ -73,7 +73,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
           AND u.department <> d.name;
       `);
       // Merge the two obvious misspellings visible in the existing directory screenshot.
-      for (const [misspelling, canonicalName] of [['Engineerig', 'Engineering'], ['Survy', 'Survey']]) {
+      for (const [misspelling, canonicalName] of [['Engineerig', 'Engineering'], ['Eingineering', 'Engineering'], ['Survy', 'Survey']]) {
         const matchingDepartment = await this.pool.query(
           `SELECT source.id AS source_id, source.name AS source_name, target.name AS target_name
            FROM departments source
