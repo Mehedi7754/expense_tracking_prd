@@ -1,6 +1,9 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_text_styles.dart';
@@ -19,6 +22,90 @@ import '../../state/category_provider.dart';
 import '../../state/expense_provider.dart';
 import '../../state/project_provider.dart';
 import '../../state/task_provider.dart';
+
+class _EditableExpenseCategory {
+  _EditableExpenseCategory(
+    ExpenseCategoryItem item,
+    List<CategoryModel> categories,
+  ) : categoryId = item.categoryId,
+      categoryName = item.categoryName,
+      categoryIcon = item.categoryIcon,
+      baseAmountController = TextEditingController(
+        text: item.baseCost.toStringAsFixed(
+          item.baseCost.truncateToDouble() == item.baseCost ? 0 : 2,
+        ),
+      ),
+      vatRateController = TextEditingController(text: _rateText(item.vatRate)),
+      taxRateController = TextEditingController(text: _rateText(item.taxRate)),
+      details = Map<String, dynamic>.from(item.details),
+      receipts = List<String>.from(item.receiptPhotoUrls),
+      hasReceipt = item.hasReceipt {
+    category = _findCategory(categories, item.categoryId, item.categoryName);
+    for (final entry in details.entries) {
+      detailControllers[entry.key] = TextEditingController(
+        text: entry.value?.toString() ?? '',
+      );
+    }
+  }
+
+  static String _rateText(double value) =>
+      value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 2);
+
+  static CategoryModel? _findCategory(
+    List<CategoryModel> categories,
+    String id,
+    String name,
+  ) {
+    for (final category in categories) {
+      if (category.id == id ||
+          category.name.trim().toLowerCase() == name.trim().toLowerCase()) {
+        return category;
+      }
+    }
+    return null;
+  }
+
+  String categoryId;
+  String categoryName;
+  String categoryIcon;
+  CategoryModel? category;
+  final TextEditingController baseAmountController;
+  final TextEditingController vatRateController;
+  final TextEditingController taxRateController;
+  final Map<String, dynamic> details;
+  final Map<String, TextEditingController> detailControllers = {};
+  final List<String> receipts;
+  bool hasReceipt;
+
+  double get baseAmount =>
+      double.tryParse(baseAmountController.text.trim()) ?? 0;
+  double get vatRate => double.tryParse(vatRateController.text.trim()) ?? 0;
+  double get taxRate => double.tryParse(taxRateController.text.trim()) ?? 0;
+
+  Map<String, dynamic> editedDetails() => {
+    for (final entry in details.entries)
+      entry.key: _convertDetail(
+        entry.value,
+        detailControllers[entry.key]?.text ?? '',
+      ),
+  };
+
+  static dynamic _convertDetail(dynamic original, String value) {
+    if (original is bool) return value.trim().toLowerCase() == 'true';
+    if (original is int) return int.tryParse(value) ?? value;
+    if (original is num) return num.tryParse(value) ?? value;
+    return value;
+  }
+
+  void dispose() {
+    baseAmountController.dispose();
+    vatRateController.dispose();
+    taxRateController.dispose();
+    for (final controller in detailControllers.values) {
+      controller.dispose();
+    }
+  }
+}
 
 class EditExpenseScreen extends ConsumerStatefulWidget {
   final String expenseId;
@@ -44,6 +131,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   String? _receiptImagePath;
   bool _isSaving = false;
   bool _initialized = false;
+  final List<_EditableExpenseCategory> _editableCategories = [];
+  bool _isUploadingCategoryReceipt = false;
+  bool _editingGroupedClaim = false;
 
   double _selectedVatRate = 0.0;
   bool _isCustomVat = false;
@@ -66,49 +156,451 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     List<CategoryModel> categories,
     List<TaskModel> tasks,
   ) {
-    if (_initialized) return;
-    _initialized = true;
+    if (!_initialized) {
+      _initialized = true;
+      _editingGroupedClaim = true;
 
-    final initialBase = expense.baseCost;
-    _amountController.text = initialBase.toStringAsFixed(
-      initialBase.truncateToDouble() == initialBase ? 0 : 2,
+      final initialBase = expense.baseCost;
+      _amountController.text = initialBase.toStringAsFixed(
+        initialBase.truncateToDouble() == initialBase ? 0 : 2,
+      );
+      _noteController.text = expense.note;
+      _selectedCurrency = expense.currency;
+      _selectedDate = expense.date;
+      _receiptImagePath = expense.receiptPhotoUrl;
+
+      _selectedVatRate = expense.vatRate;
+      final defaultVatRates = [0.0, 5.0, 7.5, 10.0, 15.0];
+      if (expense.vatRate > 0 && !defaultVatRates.contains(expense.vatRate)) {
+        _isCustomVat = true;
+        _customVatController.text = expense.vatRate.toStringAsFixed(1);
+      }
+
+      _selectedTaxRate = expense.taxRate;
+      final defaultRates = [0.0, 2.0, 3.0, 5.0, 7.5, 10.0];
+      if (expense.taxRate > 0 && !defaultRates.contains(expense.taxRate)) {
+        _isCustomTax = true;
+        _customTaxController.text = expense.taxRate.toStringAsFixed(1);
+      }
+
+      final expenseCategoryItems =
+          expense.categoryItems.isNotEmpty
+              ? expense.categoryItems
+              : [
+                ExpenseCategoryItem(
+                  categoryId: expense.categoryId,
+                  categoryName: expense.categoryName,
+                  categoryIcon: expense.categoryIcon,
+                  amount: expense.amount,
+                  baseCost: expense.baseCost,
+                  vatRate: expense.vatRate,
+                  vatAmount: expense.vatAmount,
+                  taxRate: expense.taxRate,
+                  taxAmount: expense.taxAmount,
+                  details:
+                      expense.transportationDetails?.toJson() ??
+                      expense.equipmentDetails?.toJson() ??
+                      expense.foodDetails?.toJson() ??
+                      expense.accommodationDetails?.toJson() ??
+                      expense.officeCostDetails?.toJson() ??
+                      const {},
+                  receiptPhotoUrls:
+                      expense.receiptPhotoUrls.isNotEmpty
+                          ? expense.receiptPhotoUrls
+                          : (expense.receiptPhotoUrl == null
+                              ? const []
+                              : [expense.receiptPhotoUrl!]),
+                  hasReceipt: expense.hasReceipt,
+                ),
+              ];
+      _editableCategories.addAll(
+        expenseCategoryItems.map(
+          (item) => _EditableExpenseCategory(item, categories),
+        ),
+      );
+    }
+
+    // Project/category providers can finish loading after the expense form's
+    // text fields are initialized. Retry resolving selections on each build.
+    _selectedProject ??= _firstOrNull(
+      projects,
+      (p) => p.id == expense.projectId || p.projectId == expense.projectId,
     );
-    _noteController.text = expense.note;
-    _selectedCurrency = expense.currency;
-    _selectedDate = expense.date;
-    _receiptImagePath = expense.receiptPhotoUrl;
 
-    _selectedVatRate = expense.vatRate;
-    final defaultVatRates = [0.0, 5.0, 7.5, 10.0, 15.0];
-    if (expense.vatRate > 0 && !defaultVatRates.contains(expense.vatRate)) {
-      _isCustomVat = true;
-      _customVatController.text = expense.vatRate.toStringAsFixed(1);
+    _selectedCategory ??= _firstOrNull(
+      categories,
+      (category) =>
+          category.id == expense.categoryId ||
+          category.name.trim().toLowerCase() ==
+              expense.categoryName.trim().toLowerCase(),
+    );
+
+    if (_selectedTask == null && expense.taskId != null) {
+      _selectedTask = _firstOrNull(tasks, (task) => task.id == expense.taskId);
     }
+  }
 
-    _selectedTaxRate = expense.taxRate;
-    final defaultRates = [0.0, 2.0, 3.0, 5.0, 7.5, 10.0];
-    if (expense.taxRate > 0 && !defaultRates.contains(expense.taxRate)) {
-      _isCustomTax = true;
-      _customTaxController.text = expense.taxRate.toStringAsFixed(1);
+  T? _firstOrNull<T>(Iterable<T> values, bool Function(T value) matches) {
+    for (final value in values) {
+      if (matches(value)) return value;
     }
+    return null;
+  }
 
-    try {
-      _selectedProject = projects.firstWhere(
-        (p) => p.id == expense.projectId || p.projectId == expense.projectId,
+  Future<void> _addExpenseCategory(List<CategoryModel> categories) async {
+    final available = categories.where(
+      (category) =>
+          category.isActive &&
+          !_editableCategories.any((line) => line.category?.id == category.id),
+    );
+    if (available.isEmpty) {
+      NotificationBanner.showError(
+        context,
+        'No additional categories are available.',
       );
-    } catch (_) {}
-
-    try {
-      _selectedCategory = categories.firstWhere(
-        (c) => c.id == expense.categoryId,
-      );
-    } catch (_) {}
-
-    if (expense.taskId != null) {
-      try {
-        _selectedTask = tasks.firstWhere((t) => t.id == expense.taskId);
-      } catch (_) {}
+      return;
     }
+    final selected = await showModalBottomSheet<CategoryModel>(
+      context: context,
+      showDragHandle: true,
+      builder:
+          (context) => SafeArea(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                const ListTile(title: Text('Add expense category')),
+                ...available.map(
+                  (category) => ListTile(
+                    leading: const Icon(Icons.category_outlined),
+                    title: Text(category.name),
+                    onTap: () => Navigator.pop(context, category),
+                  ),
+                ),
+              ],
+            ),
+          ),
+    );
+    if (selected == null || !mounted) return;
+    final item = ExpenseCategoryItem(
+      categoryId: selected.id,
+      categoryName: selected.name,
+      categoryIcon: selected.iconName,
+      amount: 0,
+      baseCost: 0,
+      details: const {},
+      receiptPhotoUrls: const [],
+      hasReceipt: false,
+    );
+    setState(
+      () => _editableCategories.add(_EditableExpenseCategory(item, categories)),
+    );
+  }
+
+  Future<void> _addCategoryReceipts(_EditableExpenseCategory line) async {
+    try {
+      final images = await ImagePicker().pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+      if (images.isEmpty || !mounted) return;
+      setState(() => _isUploadingCategoryReceipt = true);
+      final uploaded = await ref
+          .read(fileUploadRepositoryProvider)
+          .uploadBatch(
+            filePathsOrDataUris: images.map((image) => image.path).toList(),
+            category: UploadCategory.receipts,
+            entityId: widget.expenseId,
+          );
+      if (!mounted) return;
+      setState(() {
+        line.receipts.addAll(uploaded.map((result) => result.url));
+        line.hasReceipt = line.receipts.isNotEmpty;
+        _isUploadingCategoryReceipt = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isUploadingCategoryReceipt = false);
+      NotificationBanner.showError(
+        context,
+        'Could not upload receipts: $error',
+      );
+    }
+  }
+
+  Widget _buildCategoryEditor(
+    _EditableExpenseCategory line,
+    int index,
+    List<CategoryModel> categories,
+    bool isDark,
+  ) {
+    final activeCategories =
+        categories.where((category) => category.isActive).toList();
+    final selectedCategory = line.category;
+    final availableCategoryIds =
+        activeCategories.map((category) => category.id).toSet();
+    final dropdownValue =
+        selectedCategory != null &&
+                availableCategoryIds.contains(selectedCategory.id)
+            ? selectedCategory.id
+            : null;
+    return Container(
+      key: ValueKey('expense-category-$index'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppColors.darkBorder : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: dropdownValue,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Category *'),
+                  items:
+                      activeCategories
+                          .map(
+                            (category) => DropdownMenuItem(
+                              value: category.id,
+                              child: Text(
+                                category.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (id) {
+                    if (id == null) return;
+                    final category = activeCategories.firstWhere(
+                      (item) => item.id == id,
+                    );
+                    setState(() {
+                      line.category = category;
+                      line.categoryId = category.id;
+                      line.categoryName = category.name;
+                      line.categoryIcon = category.iconName;
+                    });
+                  },
+                ),
+              ),
+              if (_editableCategories.length > 1)
+                IconButton(
+                  tooltip: 'Remove category',
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                  ),
+                  onPressed: () {
+                    setState(
+                      () => _editableCategories.removeAt(index).dispose(),
+                    );
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: line.baseAmountController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Base amount *'),
+                  onChanged: (_) => setState(() {}),
+                  validator:
+                      (value) =>
+                          double.tryParse(value?.trim() ?? '') == null ||
+                                  (double.tryParse(value!.trim()) ?? 0) <= 0
+                              ? 'Enter a valid amount'
+                              : null,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextFormField(
+                  controller: line.vatRateController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'VAT %'),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextFormField(
+                  controller: line.taxRateController,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Tax %'),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+          for (final entry in line.detailControllers.entries) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: entry.value,
+                    decoration: InputDecoration(
+                      labelText: _formatDetailLabel(entry.key),
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Remove detail',
+                  icon: const Icon(
+                    Icons.remove_circle_outline,
+                    color: Colors.redAccent,
+                  ),
+                  onPressed:
+                      () => setState(() {
+                        line.details.remove(entry.key);
+                        line.detailControllers.remove(entry.key)?.dispose();
+                      }),
+                ),
+              ],
+            ),
+          ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed:
+                  () => setState(() {
+                    var index = 1;
+                    while (line.details.containsKey(
+                      'additional_detail_$index',
+                    )) {
+                      index++;
+                    }
+                    final key = 'additional_detail_$index';
+                    line.details[key] = '';
+                    line.detailControllers[key] = TextEditingController();
+                  }),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Add detail'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Receipts (${line.receipts.length})',
+                  style: AppTextStyles.labelMedium,
+                ),
+              ),
+              TextButton.icon(
+                onPressed:
+                    _isUploadingCategoryReceipt
+                        ? null
+                        : () => _addCategoryReceipts(line),
+                icon:
+                    _isUploadingCategoryReceipt
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.add_photo_alternate_outlined),
+                label: const Text('Add photos'),
+              ),
+            ],
+          ),
+          if (line.receipts.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final receipt in List<String>.from(line.receipts))
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: SizedBox(
+                          width: 72,
+                          height: 72,
+                          child: _buildReceiptThumbnail(receipt),
+                        ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Material(
+                          color: Colors.black54,
+                          shape: const CircleBorder(),
+                          child: InkWell(
+                            customBorder: const CircleBorder(),
+                            onTap:
+                                () => setState(() {
+                                  line.receipts.remove(receipt);
+                                  line.hasReceipt = line.receipts.isNotEmpty;
+                                }),
+                            child: const Padding(
+                              padding: EdgeInsets.all(3),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 15,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'Category total: ${CurrencyFormatter.format(line.baseAmount * (1 + line.vatRate / 100 + line.taxRate / 100), currency: _selectedCurrency)}',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDetailLabel(String key) => key
+      .replaceAll('_', ' ')
+      .split(' ')
+      .where((word) => word.isNotEmpty)
+      .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+      .join(' ');
+
+  Widget _buildReceiptThumbnail(String receipt) {
+    if (receipt.startsWith('http://') ||
+        receipt.startsWith('https://') ||
+        receipt.startsWith('/uploads/') ||
+        receipt.startsWith('/api/v1/uploads/')) {
+      return Image.network(
+        receipt.startsWith('http')
+            ? receipt
+            : ReceiptUploader.resolveImageUrl(receipt),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined),
+      );
+    }
+    if (!kIsWeb && File(receipt).existsSync())
+      return Image.file(File(receipt), fit: BoxFit.cover);
+    return const Icon(Icons.receipt_long_rounded);
   }
 
   @override
@@ -117,6 +609,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     _customVatController.dispose();
     _customTaxController.dispose();
     _noteController.dispose();
+    for (final category in _editableCategories) {
+      category.dispose();
+    }
     super.dispose();
   }
 
@@ -147,10 +642,20 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
   double get _baseCost => _enteredAmount;
 
-  double get _currentAmount => _netCost;
+  double get _currentAmount =>
+      _editingGroupedClaim
+          ? _editableCategories.fold<double>(
+            0,
+            (sum, line) =>
+                sum +
+                line.baseAmount * (1 + line.vatRate / 100 + line.taxRate / 100),
+          )
+          : _netCost;
   bool get _exceedsThresholdWithoutReceipt =>
       _currentAmount > AppConstants.receiptRequiredThreshold &&
-      (_receiptImagePath == null || _receiptImagePath!.isEmpty);
+      (_editingGroupedClaim
+          ? !_editableCategories.any((line) => line.receipts.isNotEmpty)
+          : (_receiptImagePath == null || _receiptImagePath!.isEmpty));
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -174,10 +679,10 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             .where((item) => item.id == widget.expenseId)
             .firstOrNull;
 
-    if (_selectedProject == null || _selectedCategory == null) {
+    if (_selectedProject == null) {
       NotificationBanner.showError(
         context,
-        'Please ensure all required fields are chosen',
+        'Please select a project before saving',
       );
       return;
     }
@@ -190,13 +695,97 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       return;
     }
 
-    if ((_receiptImagePath == null || _receiptImagePath!.isEmpty) &&
-        _noteController.text.trim().isEmpty) {
+    final hasAnyReceipt =
+        _editingGroupedClaim
+            ? _editableCategories.any((line) => line.receipts.isNotEmpty)
+            : _receiptImagePath != null && _receiptImagePath!.isNotEmpty;
+    if (!hasAnyReceipt && _noteController.text.trim().isEmpty) {
       NotificationBanner.showError(
         context,
         'A justification is required in the Note field when saving without a receipt.',
       );
       return;
+    }
+
+    final isGroupedClaim = _editingGroupedClaim;
+    List<ExpenseCategoryItem>? editedCategoryItems;
+    var saveAmount = _netCost;
+    var saveBaseCost = _baseCost;
+    var saveVatRate = _vatRate;
+    var saveVatAmount = _vatAmount;
+    var saveTaxRate = _taxRate;
+    var saveTaxAmount = _taxAmount;
+    var saveCategoryId = _selectedCategory?.id ?? expense?.categoryId ?? '';
+    var saveCategoryName =
+        _selectedCategory?.name ?? expense?.categoryName ?? 'Expense';
+    var saveCategoryIcon =
+        _selectedCategory?.iconName ?? expense?.categoryIcon ?? '';
+    var saveReceiptUrls = <String>[];
+    if (isGroupedClaim) {
+      if (_editableCategories.isEmpty ||
+          _editableCategories.any((line) => line.category == null)) {
+        NotificationBanner.showError(
+          context,
+          'Choose a category for every expense line.',
+        );
+        return;
+      }
+      final categoryIds =
+          _editableCategories
+              .map((line) => line.category?.id ?? line.categoryId)
+              .toSet();
+      if (categoryIds.length != _editableCategories.length) {
+        NotificationBanner.showError(
+          context,
+          'Each expense category can only be added once.',
+        );
+        return;
+      }
+      editedCategoryItems =
+          _editableCategories.map((line) {
+            final base = line.baseAmount;
+            final vat = base * line.vatRate / 100;
+            final tax = base * line.taxRate / 100;
+            return ExpenseCategoryItem(
+              categoryId: line.category?.id ?? line.categoryId,
+              categoryName: line.category?.name ?? line.categoryName,
+              categoryIcon: line.category?.iconName ?? line.categoryIcon,
+              amount: base + vat + tax,
+              baseCost: base,
+              vatRate: line.vatRate,
+              vatAmount: vat,
+              taxRate: line.taxRate,
+              taxAmount: tax,
+              details: line.editedDetails(),
+              receiptPhotoUrls: List<String>.from(line.receipts),
+              hasReceipt: line.receipts.isNotEmpty,
+            );
+          }).toList();
+      saveBaseCost = editedCategoryItems.fold(
+        0,
+        (sum, item) => sum + item.baseCost,
+      );
+      saveVatAmount = editedCategoryItems.fold(
+        0,
+        (sum, item) => sum + item.vatAmount,
+      );
+      saveTaxAmount = editedCategoryItems.fold(
+        0,
+        (sum, item) => sum + item.taxAmount,
+      );
+      saveAmount = saveBaseCost + saveVatAmount + saveTaxAmount;
+      saveVatRate = saveBaseCost > 0 ? saveVatAmount / saveBaseCost * 100 : 0;
+      saveTaxRate = saveBaseCost > 0 ? saveTaxAmount / saveBaseCost * 100 : 0;
+      saveCategoryId = editedCategoryItems.first.categoryId;
+      saveCategoryName = editedCategoryItems
+          .map((item) => item.categoryName)
+          .join(' + ');
+      saveCategoryIcon = editedCategoryItems.first.categoryIcon;
+      saveReceiptUrls =
+          editedCategoryItems
+              .expand((item) => item.receiptPhotoUrls)
+              .toSet()
+              .toList();
     }
 
     setState(() => _isSaving = true);
@@ -226,29 +815,34 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             projectName: _selectedProject!.name,
             taskId: _selectedTask?.id,
             taskTitle: _selectedTask?.title,
-            amount: _netCost,
-            baseCost: _baseCost,
-            vatRate: _vatRate,
-            vatAmount: _vatAmount,
-            taxRate: _taxRate,
-            taxAmount: _taxAmount,
+            amount: saveAmount,
+            baseCost: saveBaseCost,
+            vatRate: saveVatRate,
+            vatAmount: saveVatAmount,
+            taxRate: saveTaxRate,
+            taxAmount: saveTaxAmount,
             currency: _selectedCurrency,
-            categoryId: _selectedCategory!.id,
-            categoryName: _selectedCategory!.name,
-            categoryIcon: _selectedCategory!.iconName,
+            categoryId: saveCategoryId,
+            categoryName: saveCategoryName,
+            categoryIcon: saveCategoryIcon,
             note: _noteController.text.trim(),
             date: _selectedDate,
-            receiptPhotoUrl: receiptUrl,
+            receiptPhotoUrl:
+                isGroupedClaim
+                    ? (saveReceiptUrls.isEmpty ? null : saveReceiptUrls.first)
+                    : receiptUrl,
             receiptPhotoUrls:
-                receiptUrl == null || receiptUrl.isEmpty
-                    ? const []
-                    : [
-                      receiptUrl,
-                      ...?expense?.receiptPhotoUrls.where(
-                        (url) => url != receiptUrl && url.isNotEmpty,
-                      ),
-                    ],
-            categoryItems: expense?.categoryItems,
+                isGroupedClaim
+                    ? saveReceiptUrls
+                    : (receiptUrl == null || receiptUrl.isEmpty
+                        ? const []
+                        : [
+                          receiptUrl,
+                          ...?expense?.receiptPhotoUrls.where(
+                            (url) => url != receiptUrl && url.isNotEmpty,
+                          ),
+                        ]),
+            categoryItems: editedCategoryItems ?? expense?.categoryItems,
           );
 
       if (!saved) {
@@ -359,6 +953,15 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     }
 
     _initFields(expense, allProjects, allCategories, allTasks);
+    for (final line in _editableCategories) {
+      line.category ??= _firstOrNull(
+        allCategories,
+        (category) =>
+            category.id == line.categoryId ||
+            category.name.trim().toLowerCase() ==
+                line.categoryName.trim().toLowerCase(),
+      );
+    }
 
     final projectTasks =
         _selectedProject != null
@@ -368,7 +971,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             : <TaskModel>[];
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMultiCategory = expense.categoryItems.length > 1;
+    final isMultiCategory = _editableCategories.isNotEmpty;
+    final hasMultipleExpenseCategories = _editableCategories.length > 1;
 
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
@@ -412,22 +1016,24 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Grouped expense categories',
+                          Text(
+                            hasMultipleExpenseCategories
+                                ? 'Expense category lines'
+                                : 'Expense category',
                             style: TextStyle(
                               fontWeight: FontWeight.w800,
                               color: Color(0xFF3730A3),
                             ),
                           ),
                           const SizedBox(height: 8),
-                          ...expense.categoryItems.map(
+                          ..._editableCategories.map(
                             (item) => Padding(
                               padding: const EdgeInsets.symmetric(vertical: 3),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      item.categoryName,
+                                      item.category?.name ?? item.categoryName,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -435,7 +1041,10 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                                   ),
                                   Text(
                                     CurrencyFormatter.format(
-                                      item.amount,
+                                      item.baseAmount *
+                                          (1 +
+                                              item.vatRate / 100 +
+                                              item.taxRate / 100),
                                       currency: expense.currency,
                                     ),
                                     style: const TextStyle(
@@ -444,7 +1053,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    '${item.receiptPhotoUrls.length} receipt${item.receiptPhotoUrls.length == 1 ? '' : 's'}',
+                                    '${item.receipts.length} receipt${item.receipts.length == 1 ? '' : 's'}',
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: Color(0xFF64748B),
@@ -455,14 +1064,40 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                             ),
                           ),
                           const SizedBox(height: 5),
-                          const Text(
-                            'Category amounts and receipts stay grouped while you change the project.',
+                          Text(
+                            hasMultipleExpenseCategories
+                                ? 'Edit each category, its amount, details, and receipts.'
+                                : 'Edit the category, amount, details, and all receipts.',
                             style: TextStyle(
                               fontSize: 11,
                               color: Color(0xFF64748B),
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Edit category lines and receipts',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: () => _addExpenseCategory(allCategories),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Add category'),
+                        ),
+                      ],
+                    ),
+                    ..._editableCategories.asMap().entries.map(
+                      (entry) => _buildCategoryEditor(
+                        entry.value,
+                        entry.key,
+                        allCategories,
+                        isDark,
                       ),
                     ),
                   ],
@@ -1167,11 +1802,12 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
                   Text('Receipt Attachment', style: AppTextStyles.labelMedium),
                   const SizedBox(height: 8),
-                  ReceiptUploader(
-                    imagePath: _receiptImagePath,
-                    onImageChanged:
-                        (path) => setState(() => _receiptImagePath = path),
-                  ),
+                  if (!isMultiCategory)
+                    ReceiptUploader(
+                      imagePath: _receiptImagePath,
+                      onImageChanged:
+                          (path) => setState(() => _receiptImagePath = path),
+                    ),
 
                   if (_exceedsThresholdWithoutReceipt) ...[
                     const SizedBox(height: 14),
