@@ -40,7 +40,8 @@ VALUES
     ('c0000000-0000-0000-0000-000000000004', 'Accommodation', 'lodging', TRUE, TRUE),
     ('c0000000-0000-0000-0000-000000000005', 'Office Cost', 'office', TRUE, TRUE),
     ('c0000000-0000-0000-0000-000000000006', 'Travel & Flights', 'travel', TRUE, TRUE),
-    ('c0000000-0000-0000-0000-000000000007', 'Software & Tools', 'software', TRUE, TRUE)
+    ('c0000000-0000-0000-0000-000000000007', 'Software & Tools', 'software', TRUE, TRUE),
+    ('c0000000-0000-0000-0000-000000000008', 'Others', 'category', TRUE, TRUE)
 ON CONFLICT (name) DO NOTHING;
 
 -- 3. Insert Corporate Clients
