@@ -1,6 +1,20 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
-import { SalaryService } from './salary.service';
+import { isAttendanceDeductionEnabled, SalaryService } from './salary.service';
+
+describe('attendance deduction setting normalization', () => {
+  it.each([undefined, null, false, 0, 'false', 'off', 'disabled', 'no'])(
+    'keeps deductions disabled for %p', (value) => {
+      expect(isAttendanceDeductionEnabled(value)).toBe(false);
+    },
+  );
+
+  it.each([true, 1, 'true', 'on', 'enabled'])(
+    'enables deductions only for explicit enabled value %p', (value) => {
+      expect(isAttendanceDeductionEnabled(value)).toBe(true);
+    },
+  );
+});
 
 describe('SalaryService leave access and decisions', () => {
   let service: SalaryService;

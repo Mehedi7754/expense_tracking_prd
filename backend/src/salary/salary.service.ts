@@ -1,5 +1,11 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+
+export function isAttendanceDeductionEnabled(value: unknown): boolean {
+  if (value == null) return false;
+  if (value === false || value === 0) return false;
+  return !['false', '0', 'off', 'disabled', 'no'].includes(String(value).trim().toLowerCase());
+}
 import { SetSalaryDto } from './dto/set-salary.dto';
 import { CreateHolidayDto } from './dto/holiday.dto';
 import { CreateLeaveDto } from './dto/leave.dto';
@@ -595,7 +601,9 @@ export class SalaryService {
 
     // Fetch attendance and payroll settings used for weekends and attendance deductions.
     let userWeekendDays: number[] = [5, 6]; // Default 5=Fri, 6=Sat
-    let isDeductionEnabled = true;
+    // Absence deductions are opt-in. Older settings rows may not have this key;
+    // treating a missing value as enabled made payroll disagree with Settings.
+    let isDeductionEnabled = false;
     let deductionType: 'rate_based' | 'fixed_amount' = 'rate_based';
     let fullDayDeductionAmount = 1;
     let halfDayDeductionAmount = 0.5;
@@ -610,15 +618,7 @@ export class SalaryService {
         const shifts = settings?.shifts || [];
         const userShifts = settings?.userShifts || {};
         const userShiftId = userShifts[userId];
-        const configuredDeductionState = settings?.isDeductionEnabled;
-        if (configuredDeductionState != null) {
-          const normalizedDeductionState = String(configuredDeductionState).trim().toLowerCase();
-          isDeductionEnabled = !(
-            configuredDeductionState === false ||
-            configuredDeductionState === 0 ||
-            ['false', '0', 'off', 'disabled', 'no'].includes(normalizedDeductionState)
-          );
-        }
+        isDeductionEnabled = isAttendanceDeductionEnabled(settings?.isDeductionEnabled);
         deductionType = settings?.deductionType === 'fixed_amount' ? 'fixed_amount' : 'rate_based';
         const configuredFullDay = Number(settings?.fullDayDeductionAmount);
         const configuredHalfDay = Number(settings?.halfDayDeductionAmount);
