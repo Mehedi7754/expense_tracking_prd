@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, Logger, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { FcmService } from '../notifications/fcm.service';
 import { EmailService } from '../email/email.service';
+import { resolveCanonicalDepartment } from './department.util';
 import * as bcrypt from 'bcryptjs';
 
 @Injectable()
@@ -13,6 +14,69 @@ export class UsersService {
     private readonly fcmService: FcmService,
     private readonly emailService: EmailService,
   ) {}
+
+  async getDepartments() {
+    const result = await this.db.query(`
+      SELECT d.id, d.name, COUNT(u.id)::int AS employee_count
+      FROM departments d
+      LEFT JOIN users u ON LOWER(TRIM(u.department)) = LOWER(TRIM(d.name))
+      GROUP BY d.id, d.name
+      ORDER BY LOWER(d.name), d.name
+    `);
+    return result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      employeeCount: Number(row.employee_count || 0),
+    }));
+  }
+
+  async createDepartment(input: unknown) {
+    const name = this.cleanDepartmentName(input);
+    try {
+      await this.db.query(
+        'INSERT INTO departments (name) VALUES ($1) ON CONFLICT DO NOTHING',
+        [name],
+      );
+      const result = await this.db.query(
+        'SELECT id, name FROM departments WHERE LOWER(TRIM(name)) = LOWER($1) LIMIT 1',
+        [name],
+      );
+      return result.rows[0];
+    } catch (error: any) {
+      if (error?.code === '23505') throw new ConflictException('A department with this name already exists');
+      throw error;
+    }
+  }
+
+  async renameDepartment(id: string, input: unknown) {
+    const name = this.cleanDepartmentName(input);
+    try {
+      return await this.db.transaction(async (client) => {
+        const currentResult = await client.query('SELECT id, name FROM departments WHERE id = $1', [id]);
+        if (!currentResult.rows.length) throw new NotFoundException('Department not found');
+        const currentName = currentResult.rows[0].name;
+        const updatedResult = await client.query(
+          'UPDATE departments SET name = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name',
+          [name, id],
+        );
+        await client.query(
+          'UPDATE users SET department = $1, updated_at = NOW() WHERE LOWER(TRIM(department)) = LOWER($2)',
+          [updatedResult.rows[0].name, currentName],
+        );
+        return updatedResult.rows[0];
+      });
+    } catch (error: any) {
+      if (error?.code === '23505') throw new ConflictException('A department with this name already exists');
+      throw error;
+    }
+  }
+
+  private cleanDepartmentName(input: unknown): string {
+    const name = (typeof input === 'string' ? input : '').trim().replace(/\s+/g, ' ');
+    if (!name) throw new BadRequestException('Department name is required');
+    if (name.length > 100) throw new BadRequestException('Department name must be 100 characters or fewer');
+    return name;
+  }
 
   async findAll(query?: string) {
     let sql = `
@@ -145,7 +209,7 @@ export class UsersService {
       }
     }
 
-    const department = data.department || '';
+    const department = await resolveCanonicalDepartment(this.db, data.department || 'General');
     const designation = data.designation || '';
     const employeeCode = (data.employeeCode ?? data.employee_code ?? '').toString().trim();
     if (employeeCode.length > 64) throw new ConflictException('Employee ID must be 64 characters or fewer');
@@ -240,7 +304,7 @@ export class UsersService {
     }
     if (data.department !== undefined) {
       fields.push(`department = $${idx++}`);
-      values.push(data.department);
+      values.push(await resolveCanonicalDepartment(this.db, data.department || 'General'));
     }
     if (data.designation !== undefined) {
       fields.push(`designation = $${idx++}`);

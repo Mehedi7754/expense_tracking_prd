@@ -6,6 +6,7 @@ import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { resolveCanonicalDepartment } from '../users/department.util';
 
 @Injectable()
 export class AuthService {
@@ -142,7 +143,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const department = (dto.department || '').trim() || 'General';
+    const department = await resolveCanonicalDepartment(this.db, dto.department || 'General');
     const designation = (dto.designation || '').trim() || 'Employee';
     const phone = (dto.phone || '').trim() || null;
 
@@ -282,7 +283,7 @@ export class AuthService {
     }
     if (data.department !== undefined) {
       fields.push(`department = $${idx++}`);
-      values.push(data.department);
+      values.push(await resolveCanonicalDepartment(this.db, data.department));
     }
 
     if (data.homeLatitude !== undefined || data.home_latitude !== undefined || data.homeLongitude !== undefined || data.home_longitude !== undefined) {

@@ -36,6 +36,23 @@ export class UsersController {
     return this.usersService.findAll(q);
   }
 
+  @Get('departments')
+  async getDepartments() {
+    return this.usersService.getDepartments();
+  }
+
+  @Roles('main_admin', 'admin')
+  @Post('departments')
+  async createDepartment(@Body('name') name: string) {
+    return this.usersService.createDepartment(name);
+  }
+
+  @Roles('main_admin', 'admin')
+  @Patch('departments/:id')
+  async renameDepartment(@Param('id') id: string, @Body('name') name: string) {
+    return this.usersService.renameDepartment(id, name);
+  }
+
   @Get(':id')
   async getUser(@Param('id') id: string) {
     return this.usersService.findOne(id);

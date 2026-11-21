@@ -42,6 +42,37 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       await this.pool.query('ALTER TABLE users ALTER COLUMN designation DROP NOT NULL;').catch(() => {});
       await this.pool.query('ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;').catch(() => {});
 
+      // Keep one canonical department name per case-insensitive value and migrate legacy free-text values.
+      await this.pool.query(`
+        CREATE TABLE IF NOT EXISTS departments (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          name VARCHAR(100) NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_name_ci ON departments (LOWER(TRIM(name)));
+        WITH department_counts AS (
+          SELECT TRIM(department) AS name, COUNT(*) AS user_count
+          FROM users
+          WHERE department IS NOT NULL AND TRIM(department) <> ''
+          GROUP BY TRIM(department)
+        ), ranked AS (
+          SELECT name, ROW_NUMBER() OVER (
+            PARTITION BY LOWER(name) ORDER BY user_count DESC, name ASC
+          ) AS choice
+          FROM department_counts
+        )
+        INSERT INTO departments (name)
+        SELECT name FROM ranked WHERE choice = 1
+        ON CONFLICT DO NOTHING;
+        UPDATE users u
+        SET department = d.name
+        FROM departments d
+        WHERE u.department IS NOT NULL
+          AND LOWER(TRIM(u.department)) = LOWER(TRIM(d.name))
+          AND u.department <> d.name;
+      `);
+
       // Auto-migrate project_members custom roles and granular permissions
       await this.pool.query(`
         ALTER TABLE project_members ALTER COLUMN role_in_project TYPE VARCHAR(100);
