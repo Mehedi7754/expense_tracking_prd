@@ -309,7 +309,7 @@ export class AppReleasesService {
 
   async getApkFromDatabase(): Promise<Buffer | null> {
     const res = await this.db.query(
-      `SELECT data_base64 FROM app_uploaded_files WHERE id = 'apk_latest_binary' OR category = 'apps' LIMIT 1`,
+      `SELECT data_base64 FROM app_uploaded_files WHERE id = 'apk_latest_binary' OR category = 'apps' ORDER BY CASE WHEN id = 'apk_latest_binary' THEN 0 ELSE 1 END LIMIT 1`,
     );
     if (!res.rows.length) return null;
     let b64 = res.rows[0].data_base64 as string;

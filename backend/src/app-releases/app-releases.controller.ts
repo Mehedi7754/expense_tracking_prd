@@ -22,9 +22,19 @@ export class AppReleasesController {
   async downloadLatest(@Res() reply: FastifyReply) {
     const latest = await this.releasesService.getLatestRelease();
     
-    // Check if a local physical APK exists on server
-    const localApkPath = path.join(process.cwd(), 'uploads', 'apps', 'geospatial-works.apk');
-    if (fs.existsSync(localApkPath)) {
+    // Persistent upload volumes can keep an older APK after a new image is
+    // deployed. Only serve a local file when it matches the registered release.
+    const appsDir = path.join(process.cwd(), 'uploads', 'apps');
+    const localApkPaths = [
+      path.join(appsDir, `geospatial-works-${latest.versionName}.apk`),
+      path.join(appsDir, 'geospatial-works.apk'),
+    ];
+    for (const localApkPath of localApkPaths) {
+      if (!fs.existsSync(localApkPath)) continue;
+      const fileSize = (await fs.promises.stat(localApkPath)).size;
+      if (Number(latest.fileSizeBytes) <= 0 || fileSize !== Number(latest.fileSizeBytes)) {
+        continue;
+      }
       const stream = fs.createReadStream(localApkPath);
       return reply
         .header('Content-Type', 'application/vnd.android.package-archive')
