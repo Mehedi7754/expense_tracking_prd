@@ -53,32 +53,39 @@ class CategoryManagementScreen extends ConsumerWidget {
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Remove category?'),
-        content: Text(
-          '“${category.name}” will be hidden from new expense claims. Existing expenses will keep their category history.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+      builder:
+          (dialogContext) => AlertDialog(
+            title: const Text('Remove category?'),
+            content: Text(
+              '“${category.name}” will be hidden from new expense claims. Existing expenses will keep their category history.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Remove'),
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
     );
     if (confirmed != true) return;
     try {
       await ref.read(categoryProvider.notifier).removeCategory(category.id);
       if (context.mounted) {
-        NotificationBanner.showSuccess(context, 'Category removed from new claims.');
+        NotificationBanner.showSuccess(
+          context,
+          'Category removed from new claims.',
+        );
       }
     } catch (error) {
       if (context.mounted) {
-        NotificationBanner.showError(context, 'Could not remove category: $error');
+        NotificationBanner.showError(
+          context,
+          'Could not remove category: $error',
+        );
       }
     }
   }
@@ -234,9 +241,10 @@ class CategoryManagementScreen extends ConsumerWidget {
                     IconButton(
                       icon: const Icon(Icons.delete_outline_rounded, size: 19),
                       tooltip: 'Remove category from new claims',
-                      onPressed: cat.isActive
-                          ? () => _deactivateCategory(context, ref, cat)
-                          : null,
+                      onPressed:
+                          cat.isActive
+                              ? () => _deactivateCategory(context, ref, cat)
+                              : null,
                     ),
                   ],
                 ),

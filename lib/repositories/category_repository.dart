@@ -32,9 +32,11 @@ class CategoryRepository {
       body: category.toJson(),
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return CategoryModel.fromJson(data);
   }
 
@@ -44,9 +46,34 @@ class CategoryRepository {
       body: category.toJson(),
     );
 
-    final data = response is Map<String, dynamic> && response['data'] is Map<String, dynamic>
-        ? response['data'] as Map<String, dynamic>
-        : response as Map<String, dynamic>;
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
+    return CategoryModel.fromJson(data);
+  }
+
+  Future<CategoryModel> setCategoryActive(String id, bool isActive) async {
+    final response = await _client.put(
+      ApiEndpoints.categoryById(id),
+      body: {'isActive': isActive},
+    );
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
+    return CategoryModel.fromJson(data);
+  }
+
+  Future<CategoryModel> removeCategory(String id) async {
+    final response = await _client.delete(ApiEndpoints.categoryById(id));
+    final data =
+        response is Map<String, dynamic> &&
+                response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response as Map<String, dynamic>;
     return CategoryModel.fromJson(data);
   }
 }
