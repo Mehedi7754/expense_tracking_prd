@@ -610,7 +610,15 @@ export class SalaryService {
         const shifts = settings?.shifts || [];
         const userShifts = settings?.userShifts || {};
         const userShiftId = userShifts[userId];
-        isDeductionEnabled = settings?.isDeductionEnabled !== false;
+        const configuredDeductionState = settings?.isDeductionEnabled;
+        if (configuredDeductionState != null) {
+          const normalizedDeductionState = String(configuredDeductionState).trim().toLowerCase();
+          isDeductionEnabled = !(
+            configuredDeductionState === false ||
+            configuredDeductionState === 0 ||
+            ['false', '0', 'off', 'disabled', 'no'].includes(normalizedDeductionState)
+          );
+        }
         deductionType = settings?.deductionType === 'fixed_amount' ? 'fixed_amount' : 'rate_based';
         const configuredFullDay = Number(settings?.fullDayDeductionAmount);
         const configuredHalfDay = Number(settings?.halfDayDeductionAmount);
@@ -790,7 +798,7 @@ export class SalaryService {
           : undefined,
         status,
         presentWeight,
-        deductionUnits: isDeductionEnabled || status === 'unpaid_leave' ? deductionUnits : 0,
+        deductionUnits: isDeductionEnabled ? deductionUnits : 0,
         notes,
       });
     }
@@ -801,12 +809,12 @@ export class SalaryService {
     // Daily Salary Rate = Monthly Salary ÷ Configured Payable Working Days
     const dailySalaryRate = Math.round((salaryProfile.monthlySalary / configuredPayableWorkingDays) * 100) / 100;
 
-    // Unpaid leave remains a salary deduction; the attendance switch controls
-    // only missed punches/absence and half-day attendance deductions.
-    let attendanceDeductions = unpaidLeaveDays * dailySalaryRate;
+    let attendanceDeductions = 0;
     if (isDeductionEnabled) {
       for (const day of breakdown) {
-        if (day.status === 'missing_record' || day.status === 'confirmed_absent') {
+        if (day.status === 'unpaid_leave') {
+          attendanceDeductions += dailySalaryRate;
+        } else if (day.status === 'missing_record' || day.status === 'confirmed_absent') {
           attendanceDeductions += deductionType === 'fixed_amount'
             ? fullDayDeductionAmount
             : fullDayDeductionAmount * dailySalaryRate;
