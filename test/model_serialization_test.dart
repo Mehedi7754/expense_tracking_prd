@@ -189,6 +189,64 @@ void main() {
     });
 
     test(
+      'ExpenseModel keeps multiple category line items and receipt labels',
+      () {
+        final expense = ExpenseModel(
+          id: 'exp_multi_001',
+          employeeId: 'usr_001',
+          employeeName: 'Fahim Ahmed',
+          projectId: 'proj_001',
+          projectName: 'Survey Project',
+          amount: 1650,
+          categoryId: 'cat_transportation',
+          categoryName: 'Transportation',
+          categoryIcon: 'transport',
+          note: 'Field visit',
+          date: DateTime(2026, 11, 21),
+          createdAt: DateTime(2026, 11, 21),
+          categoryItems: const [
+            ExpenseCategoryItem(
+              categoryId: 'cat_transportation',
+              categoryName: 'Transportation',
+              categoryIcon: 'transport',
+              amount: 1200,
+              baseCost: 1200,
+              details: {'from_location': 'Office', 'to_location': 'Site'},
+              receiptPhotoUrls: ['https://example.com/transport.jpg'],
+            ),
+            ExpenseCategoryItem(
+              categoryId: 'cat_food',
+              categoryName: 'Food',
+              categoryIcon: 'meal',
+              amount: 450,
+              baseCost: 450,
+              details: {'meal_type': 'Lunch'},
+              receiptPhotoUrls: ['https://example.com/food.jpg'],
+            ),
+          ],
+        );
+
+        final parsed = ExpenseModel.fromJson(expense.toJson());
+
+        expect(parsed.categoryItems, hasLength(2));
+        expect(parsed.categoryItems.map((item) => item.categoryName), [
+          'Transportation',
+          'Food',
+        ]);
+        expect(parsed.categoryItems.last.receiptPhotoUrls, [
+          'https://example.com/food.jpg',
+        ]);
+        expect(
+          parsed.categoryItems.fold<double>(
+            0,
+            (sum, item) => sum + item.amount,
+          ),
+          1650,
+        );
+      },
+    );
+
+    test(
       'CategoryModel, ClientModel, TaskModel, AuditLogModel, NotificationModel round-trip',
       () {
         final category = CategoryModel(

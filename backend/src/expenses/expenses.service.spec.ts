@@ -215,6 +215,67 @@ describe('ExpensesService Unit & Business Rules', () => {
         /Cannot edit an expense that has already been approved/,
       );
     });
+
+    it('persists the selected project and multi-category details on an editable expense', async () => {
+      const existing = {
+        id: 'exp-1', employeeId: 'u-1', projectId: 'project-old',
+        status: 'pending', amount: 100, categoryName: 'Transportation',
+      };
+      const updated = { ...existing, projectId: 'project-new' };
+      jest.spyOn(service, 'findOne')
+        .mockResolvedValueOnce(existing as any)
+        .mockResolvedValueOnce(updated as any);
+      mockDb.query
+        .mockResolvedValueOnce({ rows: [{ id: 'project-new', name: 'New Project', is_closed: false, status: 'ongoing' }] })
+        .mockResolvedValueOnce({ rows: [{ can_create_expenses: true }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await service.update('exp-1', {
+        projectId: 'project-new',
+        categoryItems: [{ categoryId: 'cat_food', categoryName: 'Food', amount: 40 }],
+      }, { id: 'u-1', role: 'project_member' });
+
+      const updateCall = mockDb.query.mock.calls[2];
+      expect(updateCall[0]).toContain('project_id =');
+      expect(updateCall[0]).toContain('category_details =');
+      expect(updateCall[1]).toContain('project-new');
+      expect(updateCall[1]).toContainEqual(expect.stringContaining('category_items'));
+    });
+
+    it('rejects moving an expense to a project where its submitter cannot create expenses', async () => {
+      jest.spyOn(service, 'findOne').mockResolvedValueOnce({
+        id: 'exp-1', employeeId: 'u-1', projectId: 'project-old', status: 'pending',
+      } as any);
+      mockDb.query
+        .mockResolvedValueOnce({ rows: [{ id: 'project-new', name: 'New Project', is_closed: false, status: 'ongoing' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await expect(service.update('exp-1', { projectId: 'project-new' }, {
+        id: 'u-1', role: 'project_member',
+      })).rejects.toThrow(/do not have permission to submit expenses for this project/);
+      expect(mockDb.query).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE expenses'), expect.anything());
+    });
+
+    it('returns category line items and categorized receipt metadata from stored details', async () => {
+      mockDb.query.mockResolvedValueOnce({ rows: [{
+        id: 'exp-multi', employee_id: 'u-1', project_id: 'project-1',
+        amount: '150', currency: 'BDT', status: 'pending', category_name: 'Transportation',
+        category_details: { category_items: [{
+          categoryId: 'cat_food', categoryName: 'Food', amount: 50,
+          receiptPhotoUrls: ['https://example.com/food.jpg'],
+        }] },
+        receipt_photos: [{ url: 'https://example.com/food.jpg', categoryName: 'Food' }],
+      }] });
+
+      const expense = await service.findOne('exp-multi', { id: 'u-1', role: 'project_member' });
+
+      expect((expense as any).categoryItems).toEqual(expect.arrayContaining([
+        expect.objectContaining({ categoryName: 'Food', amount: 50 }),
+      ]));
+      expect((expense as any).receiptPhotos).toEqual([
+        expect.objectContaining({ url: 'https://example.com/food.jpg', categoryName: 'Food' }),
+      ]);
+    });
   });
 
   describe('Closed Project Business Rules', () => {

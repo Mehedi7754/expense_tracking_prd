@@ -19,17 +19,17 @@ import '../../state/user_management_provider.dart';
 class ExpenseDetailScreen extends ConsumerWidget {
   final String expenseId;
 
-  const ExpenseDetailScreen({
-    super.key,
-    required this.expenseId,
-  });
+  const ExpenseDetailScreen({super.key, required this.expenseId});
 
-  static (Color, Color, IconData) _getCategoryTheme(String categoryId, bool isDark) {
+  static (Color, Color, IconData) _getCategoryTheme(
+    String categoryId,
+    bool isDark,
+  ) {
     Color iconColor;
     Color iconBg;
     IconData icon;
 
-    switch (categoryId.toLowerCase()) {
+    switch (categoryId.toLowerCase().replaceFirst('cat_', '')) {
       case 'food':
         iconColor = const Color(0xFFF59E0B);
         iconBg = const Color(0xFFFFFBEB);
@@ -79,23 +79,49 @@ class ExpenseDetailScreen extends ConsumerWidget {
     final expense = expenseList.first;
     final isEmployeeOwner = user?.id == expense.employeeId;
     final projects = ref.watch(projectProvider);
-    final relatedProject = projects.where((p) => p.id == expense.projectId || p.projectId == expense.projectId).firstOrNull;
-    final hasProjectApproval = user != null && relatedProject != null && relatedProject.canMemberApproveExpenses(user.id);
-    final isReviewer = user != null && (user.role.canApproveExpenses || hasProjectApproval);
+    final relatedProject =
+        projects
+            .where(
+              (p) =>
+                  p.id == expense.projectId || p.projectId == expense.projectId,
+            )
+            .firstOrNull;
+    final hasProjectApproval =
+        user != null &&
+        relatedProject != null &&
+        relatedProject.canMemberApproveExpenses(user.id);
+    final isReviewer =
+        user != null && (user.role.canApproveExpenses || hasProjectApproval);
 
     final isPending = expense.status == ExpenseStatus.pending;
-    final isEditableByOwner = isEmployeeOwner && (expense.status == ExpenseStatus.pending || expense.status == ExpenseStatus.rejected);
+    final isEditableByOwner =
+        isEmployeeOwner &&
+        (expense.status == ExpenseStatus.pending ||
+            expense.status == ExpenseStatus.rejected);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final allUsers = ref.watch(userManagementProvider);
-    final submitterAvatar = (expense.employeeAvatar != null && expense.employeeAvatar!.isNotEmpty)
-        ? expense.employeeAvatar
-        : allUsers.where((u) => u.id == expense.employeeId || u.name.toLowerCase() == expense.employeeName.toLowerCase()).firstOrNull?.avatarUrl;
+    final submitterAvatar =
+        (expense.employeeAvatar != null && expense.employeeAvatar!.isNotEmpty)
+            ? expense.employeeAvatar
+            : allUsers
+                .where(
+                  (u) =>
+                      u.id == expense.employeeId ||
+                      u.name.toLowerCase() ==
+                          expense.employeeName.toLowerCase(),
+                )
+                .firstOrNull
+                ?.avatarUrl;
 
-    final (catColor, catBg, catIcon) = _getCategoryTheme(expense.categoryId, isDark);
+    final (catColor, catBg, catIcon) = _getCategoryTheme(
+      expense.categoryId,
+      isDark,
+    );
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
+      backgroundColor:
+          isDark ? AppColors.darkBackground : const Color(0xFFF8F9FD),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -105,7 +131,11 @@ class ExpenseDetailScreen extends ConsumerWidget {
         ),
         title: const Text(
           'Expense Detail',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: -0.3,
+          ),
         ),
         actions: [
           Padding(
@@ -130,17 +160,23 @@ class ExpenseDetailScreen extends ConsumerWidget {
                     color: isDark ? AppColors.darkSurface : Colors.white,
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      color:
+                          isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFF1F5F9),
                     ),
-                    boxShadow: isDark
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                    boxShadow:
+                        isDark
+                            ? []
+                            : [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF0F172A,
+                                ).withValues(alpha: 0.04),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,7 +212,10 @@ class ExpenseDetailScreen extends ConsumerWidget {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
-                                    color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                    color:
+                                        isDark
+                                            ? AppColors.darkTextSecondary
+                                            : const Color(0xFF64748B),
                                   ),
                                 ),
                               ],
@@ -193,12 +232,18 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                          color:
+                              isDark
+                                  ? AppColors.darkTextSecondary
+                                  : const Color(0xFF64748B),
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        CurrencyFormatter.format(expense.amount, currency: expense.currency),
+                        CurrencyFormatter.format(
+                          expense.amount,
+                          currency: expense.currency,
+                        ),
                         style: const TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w900,
@@ -211,96 +256,181 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                            color:
+                                isDark
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                              color:
+                                  isDark
+                                      ? const Color(0xFF334155)
+                                      : const Color(0xFFE2E8F0),
                             ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Expanded(
                                     child: Text(
                                       'Tax Calculation Breakdown',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withAlpha(25),
+                                      color: const Color(
+                                        0xFF10B981,
+                                      ).withAlpha(25),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: const Text(
                                       'Itemized',
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF059669),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Flexible(
                                     child: Text(
                                       'Base Cost:',
-                                      style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color:
+                                            isDark
+                                                ? AppColors.darkTextSecondary
+                                                : const Color(0xFF64748B),
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(CurrencyFormatter.format(expense.baseCost, currency: expense.currency), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    CurrencyFormatter.format(
+                                      expense.baseCost,
+                                      currency: expense.currency,
+                                    ),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ],
                               ),
                               if (expense.hasVat) ...[
                                 const SizedBox(height: 4),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Flexible(
                                       child: Text(
                                         'VAT (${expense.vatRate.toStringAsFixed(expense.vatRate.truncateToDouble() == expense.vatRate ? 0 : 1)}%):',
-                                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color:
+                                              isDark
+                                                  ? AppColors.darkTextSecondary
+                                                  : const Color(0xFF64748B),
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text('+ ${CurrencyFormatter.format(expense.vatAmount, currency: expense.currency)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF8B5CF6))),
+                                    Text(
+                                      '+ ${CurrencyFormatter.format(expense.vatAmount, currency: expense.currency)}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF8B5CF6),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ],
                               if (expense.hasTax) ...[
                                 const SizedBox(height: 4),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Flexible(
                                       child: Text(
                                         'Tax / AIT (${expense.taxRate.toStringAsFixed(expense.taxRate.truncateToDouble() == expense.taxRate ? 0 : 1)}%):',
-                                        style: TextStyle(fontSize: 12, color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B)),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color:
+                                              isDark
+                                                  ? AppColors.darkTextSecondary
+                                                  : const Color(0xFF64748B),
+                                        ),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text('+ ${CurrencyFormatter.format(expense.taxAmount, currency: expense.currency)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0284C7))),
+                                    Text(
+                                      '+ ${CurrencyFormatter.format(expense.taxAmount, currency: expense.currency)}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF0284C7),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ],
-                              Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1), height: 12),
+                              Divider(
+                                color:
+                                    isDark
+                                        ? const Color(0xFF334155)
+                                        : const Color(0xFFCBD5E1),
+                                height: 12,
+                              ),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Expanded(
-                                    child: Text('Total Gross Cost:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    child: Text(
+                                      'Total Gross Cost:',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
-                                  Text(CurrencyFormatter.format(expense.totalCost, currency: expense.currency), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+                                  Text(
+                                    CurrencyFormatter.format(
+                                      expense.totalCost,
+                                      currency: expense.currency,
+                                    ),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ],
@@ -309,7 +439,13 @@ class ExpenseDetailScreen extends ConsumerWidget {
                       ],
 
                       const SizedBox(height: 14),
-                      Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), height: 1),
+                      Divider(
+                        color:
+                            isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFF1F5F9),
+                        height: 1,
+                      ),
                       const SizedBox(height: 16),
 
                       // Metadata Rows
@@ -349,7 +485,10 @@ class ExpenseDetailScreen extends ConsumerWidget {
                           Icon(
                             Icons.receipt_outlined,
                             size: 16,
-                            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                            color:
+                                isDark
+                                    ? AppColors.darkTextSecondary
+                                    : const Color(0xFF64748B),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -357,34 +496,59 @@ class ExpenseDetailScreen extends ConsumerWidget {
                               'Receipt Status',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+                                color:
+                                    isDark
+                                        ? AppColors.darkTextSecondary
+                                        : const Color(0xFF64748B),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
                             decoration: BoxDecoration(
-                              color: expense.hasReceipt
-                                  ? (isDark ? const Color(0xFF064E3B).withAlpha(40) : const Color(0xFFECFDF5))
-                                  : (isDark ? const Color(0xFF7F1D1D).withAlpha(40) : const Color(0xFFFEF2F2)),
+                              color:
+                                  expense.hasReceipt
+                                      ? (isDark
+                                          ? const Color(
+                                            0xFF064E3B,
+                                          ).withAlpha(40)
+                                          : const Color(0xFFECFDF5))
+                                      : (isDark
+                                          ? const Color(
+                                            0xFF7F1D1D,
+                                          ).withAlpha(40)
+                                          : const Color(0xFFFEF2F2)),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  expense.hasReceipt ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                                  expense.hasReceipt
+                                      ? Icons.check_circle_rounded
+                                      : Icons.cancel_rounded,
                                   size: 13,
-                                  color: expense.hasReceipt ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                                  color:
+                                      expense.hasReceipt
+                                          ? const Color(0xFF10B981)
+                                          : const Color(0xFFEF4444),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  expense.hasReceipt ? 'Verified Receipt' : 'No Receipt (Justified)',
+                                  expense.hasReceipt
+                                      ? 'Verified Receipt'
+                                      : 'No Receipt (Justified)',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: expense.hasReceipt ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                                    color:
+                                        expense.hasReceipt
+                                            ? const Color(0xFF059669)
+                                            : const Color(0xFFDC2626),
                                   ),
                                 ),
                               ],
@@ -397,16 +561,23 @@ class ExpenseDetailScreen extends ConsumerWidget {
                 ),
 
                 // 2. REJECTION REASON BANNER (If rejected)
-                if (expense.status == ExpenseStatus.rejected && expense.rejectionReason != null) ...[
+                if (expense.status == ExpenseStatus.rejected &&
+                    expense.rejectionReason != null) ...[
                   const SizedBox(height: 16),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF7F1D1D).withAlpha(30) : const Color(0xFFFEF2F2),
+                      color:
+                          isDark
+                              ? const Color(0xFF7F1D1D).withAlpha(30)
+                              : const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isDark ? const Color(0xFFDC2626).withAlpha(50) : const Color(0xFFFECACA),
+                        color:
+                            isDark
+                                ? const Color(0xFFDC2626).withAlpha(50)
+                                : const Color(0xFFFECACA),
                         width: 1.2,
                       ),
                     ),
@@ -415,7 +586,11 @@ class ExpenseDetailScreen extends ConsumerWidget {
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.cancel_rounded, color: Color(0xFFEF4444), size: 18),
+                            Icon(
+                              Icons.cancel_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 18,
+                            ),
                             SizedBox(width: 8),
                             Text(
                               'Reason:',
@@ -432,7 +607,10 @@ class ExpenseDetailScreen extends ConsumerWidget {
                           expense.rejectionReason!,
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark ? const Color(0xFFFECACA) : const Color(0xFF991B1B),
+                            color:
+                                isDark
+                                    ? const Color(0xFFFECACA)
+                                    : const Color(0xFF991B1B),
                           ),
                         ),
                       ],
@@ -450,17 +628,23 @@ class ExpenseDetailScreen extends ConsumerWidget {
                       color: isDark ? AppColors.darkSurface : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        color:
+                            isDark
+                                ? const Color(0xFF334155)
+                                : const Color(0xFFF1F5F9),
                       ),
-                      boxShadow: isDark
-                          ? []
-                          : [
-                              BoxShadow(
-                                color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                      boxShadow:
+                          isDark
+                              ? []
+                              : [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF0F172A,
+                                  ).withValues(alpha: 0.04),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,14 +655,121 @@ class ExpenseDetailScreen extends ConsumerWidget {
                             const SizedBox(width: 8),
                             Text(
                               '${expense.categoryName} Details',
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 14),
-                        Divider(color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9), height: 1),
+                        Divider(
+                          color:
+                              isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFF1F5F9),
+                          height: 1,
+                        ),
                         const SizedBox(height: 14),
-                        ..._buildCategoryDetails(expense, isDark),
+                        if (expense.categoryItems.isNotEmpty)
+                          ...expense.categoryItems.map((item) {
+                            final (
+                              lineColor,
+                              lineBg,
+                              lineIcon,
+                            ) = _getCategoryTheme(item.categoryId, isDark);
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: lineBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: lineColor.withAlpha(70),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        lineIcon,
+                                        size: 18,
+                                        color: lineColor,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          item.categoryName,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            color: lineColor,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        CurrencyFormatter.format(
+                                          item.amount,
+                                          currency: expense.currency,
+                                        ),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          color: lineColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (item.details.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    ...item.details.entries
+                                        .where(
+                                          (entry) =>
+                                              entry.value != null &&
+                                              entry.value.toString().isNotEmpty,
+                                        )
+                                        .take(5)
+                                        .map(
+                                          (entry) => Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: 3,
+                                            ),
+                                            child: Text(
+                                              '${entry.key.replaceAll('_', ' ')}: ${entry.value}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color:
+                                                    isDark
+                                                        ? AppColors
+                                                            .darkTextSecondary
+                                                        : const Color(
+                                                          0xFF475569,
+                                                        ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                  ],
+                                  if (item.vatAmount > 0 ||
+                                      item.taxAmount > 0) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Base ${CurrencyFormatter.format(item.baseCost, currency: expense.currency)} · VAT ${CurrencyFormatter.format(item.vatAmount, currency: expense.currency)} · Tax ${CurrencyFormatter.format(item.taxAmount, currency: expense.currency)}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color:
+                                            isDark
+                                                ? AppColors.darkTextSecondary
+                                                : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          })
+                        else
+                          ..._buildCategoryDetails(expense, isDark),
                       ],
                     ),
                   ),
@@ -493,40 +784,57 @@ class ExpenseDetailScreen extends ConsumerWidget {
                     color: isDark ? AppColors.darkSurface : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      color:
+                          isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFF1F5F9),
                     ),
-                    boxShadow: isDark
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                    boxShadow:
+                        isDark
+                            ? []
+                            : [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF0F172A,
+                                ).withValues(alpha: 0.04),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         'Business Purpose & Description',
-                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       Builder(
                         builder: (context) {
-                          final cleanedNote = expense.note
-                              .replaceAll(RegExp(r'\[TAX_META:[^\]]+\]'), '')
-                              .trim();
-                          final displayText = cleanedNote.isEmpty
-                              ? 'No additional business notes provided.'
-                              : cleanedNote;
+                          final cleanedNote =
+                              expense.note
+                                  .replaceAll(
+                                    RegExp(r'\[TAX_META:[^\]]+\]'),
+                                    '',
+                                  )
+                                  .trim();
+                          final displayText =
+                              cleanedNote.isEmpty
+                                  ? 'No additional business notes provided.'
+                                  : cleanedNote;
                           return Text(
                             displayText,
                             style: TextStyle(
                               fontSize: 14,
                               height: 1.45,
-                              color: isDark ? AppColors.darkTextPrimary : const Color(0xFF1E293B),
+                              color:
+                                  isDark
+                                      ? AppColors.darkTextPrimary
+                                      : const Color(0xFF1E293B),
                             ),
                           );
                         },
@@ -544,35 +852,117 @@ class ExpenseDetailScreen extends ConsumerWidget {
                     color: isDark ? AppColors.darkSurface : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                      color:
+                          isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFF1F5F9),
                     ),
-                    boxShadow: isDark
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: const Color(0xFF0F172A).withValues(alpha: 0.04),
-                              blurRadius: 14,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                    boxShadow:
+                        isDark
+                            ? []
+                            : [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF0F172A,
+                                ).withValues(alpha: 0.04),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        expense.receiptPhotoUrls.length > 1
+                        expense.categoryItems.isNotEmpty
+                            ? 'Category Receipts'
+                            : expense.receiptPhotoUrls.length > 1
                             ? 'Receipt Documentation (${expense.receiptPhotoUrls.length} Files)'
                             : 'Receipt Documentation',
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                       ),
                       const SizedBox(height: 12),
-                      if (expense.receiptPhotoUrls.length > 1) ...[
+                      if (expense.categoryItems.isNotEmpty) ...[
+                        ...expense.categoryItems.map((item) {
+                          final (lineColor, lineBg, _) = _getCategoryTheme(
+                            item.categoryId,
+                            isDark,
+                          );
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: lineBg,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: lineColor.withAlpha(70),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    item.categoryName,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: lineColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                if (item.receiptPhotoUrls.isEmpty)
+                                  Text(
+                                    item.hasReceipt
+                                        ? 'No receipt attached to this category.'
+                                        : 'No receipt required for this category.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color:
+                                          isDark
+                                              ? AppColors.darkTextSecondary
+                                              : const Color(0xFF64748B),
+                                    ),
+                                  )
+                                else
+                                  SizedBox(
+                                    height: 280,
+                                    child: ListView.separated(
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: item.receiptPhotoUrls.length,
+                                      separatorBuilder:
+                                          (_, __) => const SizedBox(width: 12),
+                                      itemBuilder:
+                                          (ctx, idx) => SizedBox(
+                                            width: 260,
+                                            child: ReceiptUploader(
+                                              imagePath:
+                                                  item.receiptPhotoUrls[idx],
+                                              isReadOnly: true,
+                                              onImageChanged: (_) {},
+                                            ),
+                                          ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ] else if (expense.receiptPhotoUrls.length > 1) ...[
                         SizedBox(
                           height: 280,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: expense.receiptPhotoUrls.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            separatorBuilder:
+                                (_, __) => const SizedBox(width: 12),
                             itemBuilder: (ctx, idx) {
                               return SizedBox(
                                 width: 260,
@@ -603,14 +993,19 @@ class ExpenseDetailScreen extends ConsumerWidget {
                   isReadOnly: false,
                   onAddComment: (text) {
                     if (user != null) {
-                      ref.read(expenseProvider.notifier).addComment(
+                      ref
+                          .read(expenseProvider.notifier)
+                          .addComment(
                             expenseId: expense.id,
                             text: text,
                             authorId: user.id,
                             authorName: user.name,
                             authorRole: user.role,
                           );
-                      NotificationBanner.showSuccess(context, 'Comment posted to thread.');
+                      NotificationBanner.showSuccess(
+                        context,
+                        'Comment posted to thread.',
+                      );
                     }
                   },
                 ),
@@ -626,9 +1021,15 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         child: SizedBox(
                           height: 48,
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 18),
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 18,
+                            ),
                             label: Text(
-                              expense.status == ExpenseStatus.rejected ? 'Delete Claim' : 'Withdraw Claim',
+                              expense.status == ExpenseStatus.rejected
+                                  ? 'Delete Claim'
+                                  : 'Withdraw Claim',
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -636,37 +1037,63 @@ class ExpenseDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              side: const BorderSide(
+                                color: Color(0xFFFECACA),
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: () async {
-                              final isRejected = expense.status == ExpenseStatus.rejected;
+                              final isRejected =
+                                  expense.status == ExpenseStatus.rejected;
                               final confirm = await showDialog<bool>(
                                 context: context,
-                                builder: (ctx) => AlertDialog(
-                                  title: Text(isRejected ? 'Delete Expense Claim?' : 'Withdraw Expense Claim?'),
-                                  content: Text(isRejected
-                                      ? 'Are you sure you want to delete this rejected expense claim?'
-                                      : 'Are you sure you want to withdraw this pending expense claim?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFFEF4444),
-                                        foregroundColor: Colors.white,
+                                builder:
+                                    (ctx) => AlertDialog(
+                                      title: Text(
+                                        isRejected
+                                            ? 'Delete Expense Claim?'
+                                            : 'Withdraw Expense Claim?',
                                       ),
-                                      onPressed: () => Navigator.pop(ctx, true),
-                                      child: Text(isRejected ? 'Delete' : 'Withdraw'),
+                                      content: Text(
+                                        isRejected
+                                            ? 'Are you sure you want to delete this rejected expense claim?'
+                                            : 'Are you sure you want to withdraw this pending expense claim?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed:
+                                              () => Navigator.pop(ctx, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(
+                                              0xFFEF4444,
+                                            ),
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          onPressed:
+                                              () => Navigator.pop(ctx, true),
+                                          child: Text(
+                                            isRejected ? 'Delete' : 'Withdraw',
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
                               );
                               if (confirm == true && context.mounted) {
-                                ref.read(expenseProvider.notifier).deleteExpense(expense.id);
-                                NotificationBanner.showSuccess(context, isRejected ? 'Expense claim deleted.' : 'Expense claim withdrawn.');
+                                ref
+                                    .read(expenseProvider.notifier)
+                                    .deleteExpense(expense.id);
+                                NotificationBanner.showSuccess(
+                                  context,
+                                  isRejected
+                                      ? 'Expense claim deleted.'
+                                      : 'Expense claim withdrawn.',
+                                );
                                 context.pop();
                               }
                             },
@@ -678,12 +1105,18 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         child: SizedBox(
                           height: 48,
                           child: ElevatedButton.icon(
-                            icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white),
+                            icon: const Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: Colors.white,
+                            ),
                             label: Flexible(
                               child: FittedBox(
                                 fit: BoxFit.scaleDown,
                                 child: Text(
-                                  expense.status == ExpenseStatus.rejected ? 'Edit & Resubmit' : 'Edit Expense',
+                                  expense.status == ExpenseStatus.rejected
+                                      ? 'Edit & Resubmit'
+                                      : 'Edit Expense',
                                   maxLines: 1,
                                   style: const TextStyle(
                                     fontSize: 13,
@@ -696,9 +1129,14 @@ class ExpenseDetailScreen extends ConsumerWidget {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF4F46E5),
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                            onPressed: () => context.push('/expenses/${expense.id}/edit'),
+                            onPressed:
+                                () => context.push(
+                                  '/expenses/${expense.id}/edit',
+                                ),
                           ),
                         ),
                       ),
@@ -714,7 +1152,11 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         child: SizedBox(
                           height: 48,
                           child: OutlinedButton.icon(
-                            icon: const Icon(Icons.close_rounded, color: Color(0xFFEF4444), size: 18),
+                            icon: const Icon(
+                              Icons.close_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 18,
+                            ),
                             label: const Text(
                               'Reject',
                               style: TextStyle(
@@ -724,24 +1166,40 @@ class ExpenseDetailScreen extends ConsumerWidget {
                               ),
                             ),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFFFECACA), width: 1.2),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              side: const BorderSide(
+                                color: Color(0xFFFECACA),
+                                width: 1.2,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: () async {
-                              final reason = await ApproveRejectDialog.showRejectDialog(
-                                context,
-                                title: 'Reject Expense Claim',
-                                subtitle: 'Provide an explanatory reason for ${expense.employeeName}.',
-                              );
+                              final reason =
+                                  await ApproveRejectDialog.showRejectDialog(
+                                    context,
+                                    title: 'Reject Expense Claim',
+                                    subtitle:
+                                        'Provide an explanatory reason for ${expense.employeeName}.',
+                                  );
                               if (reason != null && context.mounted) {
                                 try {
-                                  await ref.read(expenseProvider.notifier).rejectExpense(expense.id, reason);
+                                  await ref
+                                      .read(expenseProvider.notifier)
+                                      .rejectExpense(expense.id, reason);
                                   if (context.mounted) {
-                                    NotificationBanner.showWarning(context, 'Expense claim rejected.');
+                                    NotificationBanner.showWarning(
+                                      context,
+                                      'Expense claim rejected.',
+                                    );
                                     context.pop();
                                   }
                                 } catch (error) {
-                                  if (context.mounted) NotificationBanner.showError(context, 'Could not reject expense: $error');
+                                  if (context.mounted)
+                                    NotificationBanner.showError(
+                                      context,
+                                      'Could not reject expense: $error',
+                                    );
                                 }
                               }
                             },
@@ -753,7 +1211,11 @@ class ExpenseDetailScreen extends ConsumerWidget {
                         child: SizedBox(
                           height: 48,
                           child: ElevatedButton.icon(
-                            icon: const Icon(Icons.check_rounded, size: 18, color: Colors.white),
+                            icon: const Icon(
+                              Icons.check_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
                             label: const Text(
                               'Approve Claim',
                               style: TextStyle(
@@ -766,18 +1228,26 @@ class ExpenseDetailScreen extends ConsumerWidget {
                               backgroundColor: const Color(0xFF10B981),
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
                             onPressed: () async {
-                              final confirm = await ApproveRejectDialog.showConfirmApprovalDialog(
-                                context,
-                                title: 'Approve Expense Claim',
-                                message:
-                                    'Approve ${CurrencyFormatter.format(expense.amount)} for ${expense.projectName}?',
-                              );
+                              final confirm =
+                                  await ApproveRejectDialog.showConfirmApprovalDialog(
+                                    context,
+                                    title: 'Approve Expense Claim',
+                                    message:
+                                        'Approve ${CurrencyFormatter.format(expense.amount)} for ${expense.projectName}?',
+                                  );
                               if (confirm && context.mounted) {
-                                ref.read(expenseProvider.notifier).approveExpense(expense.id);
-                                NotificationBanner.showSuccess(context, 'Expense approved successfully.');
+                                ref
+                                    .read(expenseProvider.notifier)
+                                    .approveExpense(expense.id);
+                                NotificationBanner.showSuccess(
+                                  context,
+                                  'Expense approved successfully.',
+                                );
                                 context.pop();
                               }
                             },
@@ -798,7 +1268,8 @@ class ExpenseDetailScreen extends ConsumerWidget {
   }
 
   bool _hasCategoryBreakdown(ExpenseModel exp) {
-    return exp.foodDetails != null ||
+    return exp.categoryItems.isNotEmpty ||
+        exp.foodDetails != null ||
         exp.transportationDetails != null ||
         exp.accommodationDetails != null ||
         exp.equipmentDetails != null ||
@@ -810,51 +1281,170 @@ class ExpenseDetailScreen extends ConsumerWidget {
 
     if (exp.foodDetails != null) {
       final f = exp.foodDetails!;
-      list.add(_DetailRow(label: 'Meal Type', value: f.mealType, icon: Icons.fastfood_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Meal Type',
+          value: f.mealType,
+          icon: Icons.fastfood_outlined,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Location / Restaurant', value: f.location, icon: Icons.place_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Location / Restaurant',
+          value: f.location,
+          icon: Icons.place_outlined,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Number of People', value: '${f.numberOfPeople} Person(s)', icon: Icons.people_outline, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Number of People',
+          value: '${f.numberOfPeople} Person(s)',
+          icon: Icons.people_outline,
+          isDark: isDark,
+        ),
+      );
       if (f.attendees.isNotEmpty) {
         list.add(const SizedBox(height: 8));
-        list.add(_DetailRow(label: 'Attendees', value: f.attendees, icon: Icons.badge_outlined, isDark: isDark));
+        list.add(
+          _DetailRow(
+            label: 'Attendees',
+            value: f.attendees,
+            icon: Icons.badge_outlined,
+            isDark: isDark,
+          ),
+        );
       }
     } else if (exp.transportationDetails != null) {
       final t = exp.transportationDetails!;
-      list.add(_DetailRow(label: 'Vehicle / Mode', value: t.transportationType.displayName, icon: Icons.directions_car_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Vehicle / Mode',
+          value: t.transportationType.displayName,
+          icon: Icons.directions_car_outlined,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Route', value: '${t.fromLocation} → ${t.toLocation}', icon: Icons.route_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Route',
+          value: '${t.fromLocation} → ${t.toLocation}',
+          icon: Icons.route_outlined,
+          isDark: isDark,
+        ),
+      );
       if (t.distanceKm != null && t.distanceKm! > 0) {
         list.add(const SizedBox(height: 8));
-        list.add(_DetailRow(label: 'Distance', value: '${t.distanceKm} km', icon: Icons.straighten_outlined, isDark: isDark));
+        list.add(
+          _DetailRow(
+            label: 'Distance',
+            value: '${t.distanceKm} km',
+            icon: Icons.straighten_outlined,
+            isDark: isDark,
+          ),
+        );
       }
       if (t.fuelCost != null && t.fuelCost! > 0) {
         list.add(const SizedBox(height: 8));
-        list.add(_DetailRow(label: 'Fuel / CNG Cost', value: CurrencyFormatter.format(t.fuelCost!), icon: Icons.local_gas_station_outlined, isDark: isDark));
+        list.add(
+          _DetailRow(
+            label: 'Fuel / CNG Cost',
+            value: CurrencyFormatter.format(t.fuelCost!),
+            icon: Icons.local_gas_station_outlined,
+            isDark: isDark,
+          ),
+        );
       }
     } else if (exp.accommodationDetails != null) {
       final a = exp.accommodationDetails!;
-      list.add(_DetailRow(label: 'Hotel / Accommodation', value: a.hotelName, icon: Icons.hotel_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Hotel / Accommodation',
+          value: a.hotelName,
+          icon: Icons.hotel_outlined,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Location', value: a.location, icon: Icons.location_on_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Location',
+          value: a.location,
+          icon: Icons.location_on_outlined,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Nights Stayed', value: '${a.numberOfNights} Night(s)', icon: Icons.night_shelter_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Nights Stayed',
+          value: '${a.numberOfNights} Night(s)',
+          icon: Icons.night_shelter_outlined,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Rate per Night', value: CurrencyFormatter.format(a.ratePerNight), icon: Icons.payments_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Rate per Night',
+          value: CurrencyFormatter.format(a.ratePerNight),
+          icon: Icons.payments_outlined,
+          isDark: isDark,
+        ),
+      );
     } else if (exp.equipmentDetails != null) {
       final eq = exp.equipmentDetails!;
-      list.add(_DetailRow(label: 'Equipment Type', value: eq.equipmentType, icon: Icons.hardware_outlined, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Equipment Type',
+          value: eq.equipmentType,
+          icon: Icons.hardware_outlined,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Type', value: eq.isRental ? 'Rental' : 'Purchase', icon: Icons.info_outline, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Type',
+          value: eq.isRental ? 'Rental' : 'Purchase',
+          icon: Icons.info_outline,
+          isDark: isDark,
+        ),
+      );
       list.add(const SizedBox(height: 8));
-      list.add(_DetailRow(label: 'Quantity', value: '${eq.quantity}', icon: Icons.format_list_numbered_rounded, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Quantity',
+          value: '${eq.quantity}',
+          icon: Icons.format_list_numbered_rounded,
+          isDark: isDark,
+        ),
+      );
       if (eq.rentalPeriod.isNotEmpty) {
         list.add(const SizedBox(height: 8));
-        list.add(_DetailRow(label: 'Rental Period', value: eq.rentalPeriod, icon: Icons.timelapse_rounded, isDark: isDark));
+        list.add(
+          _DetailRow(
+            label: 'Rental Period',
+            value: eq.rentalPeriod,
+            icon: Icons.timelapse_rounded,
+            isDark: isDark,
+          ),
+        );
       }
     } else if (exp.officeCostDetails != null) {
       final o = exp.officeCostDetails!;
-      list.add(_DetailRow(label: 'Expense Sub-Type', value: o.subCategory, icon: Icons.work_outline, isDark: isDark));
+      list.add(
+        _DetailRow(
+          label: 'Expense Sub-Type',
+          value: o.subCategory,
+          icon: Icons.work_outline,
+          isDark: isDark,
+        ),
+      );
     }
 
     return list;
@@ -891,7 +1481,8 @@ class _DetailRow extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 13,
-            color: isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
+            color:
+                isDark ? AppColors.darkTextSecondary : const Color(0xFF64748B),
           ),
         ),
         const SizedBox(width: 12),
@@ -900,11 +1491,7 @@ class _DetailRow extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               if (avatarUrl != null || label == 'Submitted By') ...[
-                AppAvatar(
-                  imageUrl: avatarUrl,
-                  name: value,
-                  size: 26,
-                ),
+                AppAvatar(imageUrl: avatarUrl, name: value, size: 26),
                 const SizedBox(width: 8),
               ],
               Flexible(

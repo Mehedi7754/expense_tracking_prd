@@ -346,6 +346,118 @@ class OfficeCostDetails {
   }
 }
 
+/// One category within a single submitted expense claim.
+class ExpenseCategoryItem {
+  final String categoryId;
+  final String categoryName;
+  final String categoryIcon;
+  final double amount;
+  final double baseCost;
+  final double vatRate;
+  final double vatAmount;
+  final double taxRate;
+  final double taxAmount;
+  final Map<String, dynamic> details;
+  final List<String> receiptPhotoUrls;
+  final bool hasReceipt;
+
+  const ExpenseCategoryItem({
+    required this.categoryId,
+    required this.categoryName,
+    required this.categoryIcon,
+    required this.amount,
+    required this.baseCost,
+    this.vatRate = 0,
+    this.vatAmount = 0,
+    this.taxRate = 0,
+    this.taxAmount = 0,
+    this.details = const {},
+    this.receiptPhotoUrls = const [],
+    this.hasReceipt = true,
+  });
+
+  ExpenseCategoryItem copyWith({
+    double? amount,
+    double? baseCost,
+    double? vatRate,
+    double? vatAmount,
+    double? taxRate,
+    double? taxAmount,
+    Map<String, dynamic>? details,
+    List<String>? receiptPhotoUrls,
+    bool? hasReceipt,
+  }) => ExpenseCategoryItem(
+    categoryId: categoryId,
+    categoryName: categoryName,
+    categoryIcon: categoryIcon,
+    amount: amount ?? this.amount,
+    baseCost: baseCost ?? this.baseCost,
+    vatRate: vatRate ?? this.vatRate,
+    vatAmount: vatAmount ?? this.vatAmount,
+    taxRate: taxRate ?? this.taxRate,
+    taxAmount: taxAmount ?? this.taxAmount,
+    details: details ?? this.details,
+    receiptPhotoUrls: receiptPhotoUrls ?? this.receiptPhotoUrls,
+    hasReceipt: hasReceipt ?? this.hasReceipt,
+  );
+
+  factory ExpenseCategoryItem.fromJson(Map<String, dynamic> json) {
+    double number(dynamic value) =>
+        value is num
+            ? value.toDouble()
+            : double.tryParse(value?.toString() ?? '') ?? 0;
+    final rawDetails = json['details'] ?? json['categoryDetails'] ?? const {};
+    final rawReceipts = json['receiptPhotoUrls'] ?? json['receipt_photo_urls'];
+    return ExpenseCategoryItem(
+      categoryId: (json['categoryId'] ?? json['category_id'] ?? '').toString(),
+      categoryName:
+          (json['categoryName'] ?? json['category_name'] ?? 'Expense')
+              .toString(),
+      categoryIcon:
+          (json['categoryIcon'] ?? json['category_icon'] ?? 'expense')
+              .toString(),
+      amount: number(json['amount']),
+      baseCost: number(
+        json['baseCost'] ??
+            json['base_cost'] ??
+            json['baseAmount'] ??
+            json['base_amount'] ??
+            json['amount'],
+      ),
+      vatRate: number(json['vatRate'] ?? json['vat_rate']),
+      vatAmount: number(json['vatAmount'] ?? json['vat_amount']),
+      taxRate: number(json['taxRate'] ?? json['tax_rate']),
+      taxAmount: number(json['taxAmount'] ?? json['tax_amount']),
+      details:
+          rawDetails is Map ? Map<String, dynamic>.from(rawDetails) : const {},
+      receiptPhotoUrls:
+          rawReceipts is List
+              ? rawReceipts
+                  .map((value) => value.toString())
+                  .where((value) => value.isNotEmpty)
+                  .toList()
+              : const [],
+      hasReceipt:
+          json['hasReceipt'] as bool? ?? json['has_receipt'] as bool? ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'category_id': categoryId,
+    'category_name': categoryName,
+    'category_icon': categoryIcon,
+    'amount': amount,
+    'base_cost': baseCost,
+    'vat_rate': vatRate,
+    'vat_amount': vatAmount,
+    'tax_rate': taxRate,
+    'tax_amount': taxAmount,
+    'details': details,
+    'receipt_photo_urls': receiptPhotoUrls,
+    'has_receipt': hasReceipt,
+  };
+}
+
 class ExpenseModel {
   final String id;
   final String employeeId;
@@ -392,6 +504,7 @@ class ExpenseModel {
   final FoodDetails? foodDetails;
   final AccommodationDetails? accommodationDetails;
   final OfficeCostDetails? officeCostDetails;
+  final List<ExpenseCategoryItem> categoryItems;
 
   const ExpenseModel({
     required this.id,
@@ -435,6 +548,7 @@ class ExpenseModel {
     this.foodDetails,
     this.accommodationDetails,
     this.officeCostDetails,
+    this.categoryItems = const [],
   }) : baseCost = baseCost ?? amount,
        vatAmount = vatAmount ?? 0.0,
        taxAmount = taxAmount ?? 0.0;
@@ -502,6 +616,7 @@ class ExpenseModel {
     FoodDetails? foodDetails,
     AccommodationDetails? accommodationDetails,
     OfficeCostDetails? officeCostDetails,
+    List<ExpenseCategoryItem>? categoryItems,
   }) {
     return ExpenseModel(
       id: id ?? this.id,
@@ -554,6 +669,7 @@ class ExpenseModel {
       foodDetails: foodDetails ?? this.foodDetails,
       accommodationDetails: accommodationDetails ?? this.accommodationDetails,
       officeCostDetails: officeCostDetails ?? this.officeCostDetails,
+      categoryItems: categoryItems ?? this.categoryItems,
     );
   }
 
@@ -618,6 +734,21 @@ class ExpenseModel {
         json['office_cost_details'] ??
         json['officeCostDetails'] ??
         categoryDetails?['office'];
+    final rawCategoryItems =
+        json['categoryItems'] ??
+        json['category_items'] ??
+        categoryDetails?['category_items'];
+    final categoryItems =
+        rawCategoryItems is List
+            ? rawCategoryItems
+                .whereType<Map>()
+                .map(
+                  (item) => ExpenseCategoryItem.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ),
+                )
+                .toList()
+            : <ExpenseCategoryItem>[];
 
     final receiptPhoto =
         json['receipt_photo_url']?.toString() ??
@@ -831,6 +962,7 @@ class ExpenseModel {
           ofData is Map<String, dynamic>
               ? OfficeCostDetails.fromJson(ofData)
               : null,
+      categoryItems: categoryItems,
     );
   }
 
@@ -900,6 +1032,8 @@ class ExpenseModel {
         'accommodation_details': accommodationDetails!.toJson(),
       if (officeCostDetails != null)
         'office_cost_details': officeCostDetails!.toJson(),
+      if (categoryItems.isNotEmpty)
+        'category_items': categoryItems.map((item) => item.toJson()).toList(),
     };
   }
 

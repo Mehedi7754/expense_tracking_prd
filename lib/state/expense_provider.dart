@@ -234,6 +234,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
     FoodDetails? foodDetails,
     AccommodationDetails? accommodationDetails,
     OfficeCostDetails? officeCostDetails,
+    List<ExpenseCategoryItem> categoryItems = const [],
   }) async {
     final officeBenefit = amount * officeBenefitRate;
     final effectiveReceiptUrls =
@@ -278,6 +279,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
       foodDetails: foodDetails,
       accommodationDetails: accommodationDetails,
       officeCostDetails: officeCostDetails,
+      categoryItems: categoryItems,
     );
 
     // Optimistic local update & instant persistence so it's NEVER lost on restart
@@ -463,6 +465,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
     required DateTime date,
     String? receiptPhotoUrl,
     List<String>? receiptPhotoUrls,
+    List<ExpenseCategoryItem>? categoryItems,
   }) async {
     final index = state.indexWhere((expense) => expense.id == id);
     if (index < 0) return false;
@@ -506,6 +509,7 @@ class ExpenseNotifier extends Notifier<List<ExpenseModel>>
           (receiptPhotoUrl == null || receiptPhotoUrl.isEmpty
               ? const []
               : [receiptPhotoUrl]),
+      categoryItems: categoryItems,
       status: ExpenseStatus.pending,
       clearRejectionReason: true,
     );

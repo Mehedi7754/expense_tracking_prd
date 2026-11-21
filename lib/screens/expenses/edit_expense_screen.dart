@@ -93,7 +93,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     }
 
     try {
-      _selectedProject = projects.firstWhere((p) => p.id == expense.projectId);
+      _selectedProject = projects.firstWhere(
+        (p) => p.id == expense.projectId || p.projectId == expense.projectId,
+      );
     } catch (_) {}
 
     try {
@@ -246,6 +248,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                         (url) => url != receiptUrl && url.isNotEmpty,
                       ),
                     ],
+            categoryItems: expense?.categoryItems,
           );
 
       if (!saved) {
@@ -277,7 +280,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     final allExpenses = ref.watch(expenseProvider);
-    final allProjects = ref.watch(projectProvider);
+    final loadedProjects = ref.watch(projectProvider);
     final allCategories = ref.watch(categoryProvider);
     final allTasks = ref.watch(taskProvider);
 
@@ -289,6 +292,32 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       );
     }
     final expense = expenseList.first;
+
+    final allProjects = List<ProjectModel>.from(loadedProjects);
+    final hasSubmittedProject = allProjects.any(
+      (project) =>
+          project.id == expense.projectId ||
+          project.projectId == expense.projectId,
+    );
+    if (!hasSubmittedProject) {
+      final now = DateTime.now();
+      allProjects.add(
+        ProjectModel(
+          id: expense.projectId,
+          projectId: expense.projectId,
+          name: expense.projectName,
+          description: 'Project attached to this expense claim',
+          client: '',
+          grossProjectValue: 0,
+          expectedNetRevenue: 0,
+          amountReceivable: 0,
+          budget: 0,
+          startDate: now,
+          endDate: now,
+          teamMemberIds: const [],
+        ),
+      );
+    }
 
     // Security check: PRD & Client feedback: pending and rejected claims can be edited
     if (expense.status != ExpenseStatus.pending &&
@@ -339,6 +368,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             : <TaskModel>[];
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMultiCategory = expense.categoryItems.length > 1;
 
     return Scaffold(
       backgroundColor: AppColors.getBackground(context),
@@ -369,6 +399,73 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                       });
                     },
                   ),
+                  if (isMultiCategory) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEEF2FF),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFC7D2FE)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Grouped expense categories',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF3730A3),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ...expense.categoryItems.map(
+                            (item) => Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.categoryName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    CurrencyFormatter.format(
+                                      item.amount,
+                                      currency: expense.currency,
+                                    ),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${item.receiptPhotoUrls.length} receipt${item.receiptPhotoUrls.length == 1 ? '' : 's'}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF64748B),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          const Text(
+                            'Category amounts and receipts stay grouped while you change the project.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 18),
 
                   if (_selectedProject != null && projectTasks.isNotEmpty) ...[
@@ -441,14 +538,18 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                       Expanded(
                         child: TextFormField(
                           controller: _amountController,
+                          readOnly: isMultiCategory,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
                           style: AppTextStyles.currencyLarge.copyWith(
                             fontSize: 20,
                           ),
-                          decoration: const InputDecoration(
-                            labelText: 'Total Cost *',
+                          decoration: InputDecoration(
+                            labelText:
+                                isMultiCategory
+                                    ? 'Grouped Total Cost'
+                                    : 'Total Cost *',
                           ),
                           onChanged: (_) => setState(() {}),
                           validator: (val) {
@@ -545,12 +646,15 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                                       : '${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 1)}%',
                                 ),
                                 selected: isSelected,
-                                onSelected: (val) {
-                                  setState(() {
-                                    _isCustomVat = false;
-                                    _selectedVatRate = rate;
-                                  });
-                                },
+                                onSelected:
+                                    isMultiCategory
+                                        ? null
+                                        : (val) {
+                                          setState(() {
+                                            _isCustomVat = false;
+                                            _selectedVatRate = rate;
+                                          });
+                                        },
                                 selectedColor: const Color(0xFF8B5CF6),
                                 labelStyle: TextStyle(
                                   fontSize: 12,
@@ -582,11 +686,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                             ChoiceChip(
                               label: const Text('Custom %'),
                               selected: _isCustomVat,
-                              onSelected: (val) {
-                                setState(() {
-                                  _isCustomVat = true;
-                                });
-                              },
+                              onSelected:
+                                  isMultiCategory
+                                      ? null
+                                      : (val) {
+                                        setState(() {
+                                          _isCustomVat = true;
+                                        });
+                                      },
                               selectedColor: const Color(0xFF8B5CF6),
                               labelStyle: TextStyle(
                                 fontSize: 12,
@@ -620,6 +727,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                           const SizedBox(height: 10),
                           TextFormField(
                             controller: _customVatController,
+                            readOnly: isMultiCategory,
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
@@ -734,12 +842,15 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                                       : '${rate.toStringAsFixed(rate.truncateToDouble() == rate ? 0 : 1)}%',
                                 ),
                                 selected: isSelected,
-                                onSelected: (val) {
-                                  setState(() {
-                                    _isCustomTax = false;
-                                    _selectedTaxRate = rate;
-                                  });
-                                },
+                                onSelected:
+                                    isMultiCategory
+                                        ? null
+                                        : (val) {
+                                          setState(() {
+                                            _isCustomTax = false;
+                                            _selectedTaxRate = rate;
+                                          });
+                                        },
                                 selectedColor: AppColors.getPrimary(context),
                                 labelStyle: TextStyle(
                                   fontSize: 12,
@@ -771,11 +882,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                             ChoiceChip(
                               label: const Text('Custom %'),
                               selected: _isCustomTax,
-                              onSelected: (val) {
-                                setState(() {
-                                  _isCustomTax = true;
-                                });
-                              },
+                              onSelected:
+                                  isMultiCategory
+                                      ? null
+                                      : (val) {
+                                        setState(() {
+                                          _isCustomTax = true;
+                                        });
+                                      },
                               selectedColor: AppColors.getPrimary(context),
                               labelStyle: TextStyle(
                                 fontSize: 12,
@@ -809,6 +923,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                           const SizedBox(height: 10),
                           TextFormField(
                             controller: _customTaxController,
+                            readOnly: isMultiCategory,
                             keyboardType: const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
@@ -1005,11 +1120,13 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   ),
                   const SizedBox(height: 18),
 
-                  CategoryDropdown(
-                    categories: allCategories,
-                    selectedCategoryId: _selectedCategory?.id,
-                    onChanged: (cat) => setState(() => _selectedCategory = cat),
-                  ),
+                  if (!isMultiCategory)
+                    CategoryDropdown(
+                      categories: allCategories,
+                      selectedCategoryId: _selectedCategory?.id,
+                      onChanged:
+                          (cat) => setState(() => _selectedCategory = cat),
+                    ),
                   const SizedBox(height: 18),
 
                   InkWell(

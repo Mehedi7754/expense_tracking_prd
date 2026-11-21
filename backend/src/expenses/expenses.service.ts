@@ -15,6 +15,28 @@ export class ExpensesService {
 
   private mapExpenseRow(e: any, comments: any[] = []) {
     const details = typeof e.category_details === 'string' ? JSON.parse(e.category_details) : e.category_details || {};
+    const categoryItems = Array.isArray(details.category_items)
+      ? details.category_items.map((item: any) => ({
+          categoryId: item.categoryId || item.category_id || '',
+          categoryName: item.categoryName || item.category_name || 'Expense',
+          categoryIcon: item.categoryIcon || item.category_icon || 'expense',
+          amount: Number(item.amount || 0),
+          baseCost: Number(item.baseCost ?? item.base_cost ?? item.amount ?? 0),
+          vatRate: Number(item.vatRate ?? item.vat_rate ?? 0),
+          vatAmount: Number(item.vatAmount ?? item.vat_amount ?? 0),
+          taxRate: Number(item.taxRate ?? item.tax_rate ?? 0),
+          taxAmount: Number(item.taxAmount ?? item.tax_amount ?? 0),
+          details: item.details || {},
+          receiptPhotoUrls: Array.isArray(item.receiptPhotoUrls)
+            ? item.receiptPhotoUrls
+            : Array.isArray(item.receipt_photo_urls) ? item.receipt_photo_urls : [],
+          hasReceipt: item.hasReceipt ?? item.has_receipt ?? true,
+        }))
+      : [];
+    let receiptPhotos = e.receipt_photos || [];
+    if (typeof receiptPhotos === 'string') {
+      try { receiptPhotos = JSON.parse(receiptPhotos); } catch { receiptPhotos = []; }
+    }
     const receiptPhotoUrls = [...new Set([e.receipt_photo_url, ...(Array.isArray(e.receipt_photo_urls) ? e.receipt_photo_urls : [])]
       .filter((url): url is string => typeof url === 'string' && /^(https?:\/\/|\/uploads\/|\/api\/v1\/uploads\/|data:image\/)/i.test(url)))];
 
@@ -41,14 +63,17 @@ export class ExpensesService {
       officeBenefitAmount: Number(e.office_benefit_amount),
       currency: e.currency,
       categoryId: e.category_id,
-      categoryName: e.category_name || 'Category',
+      categoryName: categoryItems.length > 1
+        ? categoryItems.map((item: any) => item.categoryName).join(' + ')
+        : (e.category_name || categoryItems[0]?.categoryName || 'Category'),
       categoryIcon: e.category_icon || 'expense',
+      categoryItems,
       note: e.note || '',
       date: e.date,
       hasReceipt: Boolean(e.has_receipt),
       receiptPhotoUrl: receiptPhotoUrls[0] || null,
       receiptPhotoUrls,
-      receiptPhotos: e.receipt_photos && Array.isArray(e.receipt_photos) ? e.receipt_photos : [],
+      receiptPhotos: Array.isArray(receiptPhotos) ? receiptPhotos : [],
       status: e.status,
       rejectionReason: e.rejection_reason,
       justificationStatus: e.justification_status,
@@ -307,6 +332,10 @@ export class ExpensesService {
     }
 
     const categoryDetails = data.categoryDetails || data.category_details || {};
+    const categoryItems = Array.isArray(data.categoryItems)
+      ? data.categoryItems
+      : Array.isArray(data.category_items) ? data.category_items : [];
+    if (categoryItems.length) categoryDetails.category_items = categoryItems;
     if (data.equipmentDetails) Object.assign(categoryDetails, { equipment_name: data.equipmentDetails.equipmentName, serial_number: data.equipmentDetails.serialNumber });
     if (data.transportationDetails) Object.assign(categoryDetails, { transportation_type: data.transportationDetails.transportationType, from_location: data.transportationDetails.fromLocation, to_location: data.transportationDetails.toLocation });
     if (data.foodDetails) Object.assign(categoryDetails, { meal_type: data.foodDetails.mealType, number_of_people: data.foodDetails.numberOfPeople, cost_per_person: data.foodDetails.costPerPerson });
@@ -322,13 +351,31 @@ export class ExpensesService {
     const taxRate = Number(data.taxRate ?? data.tax_rate ?? 0);
     const taxAmount = Number(data.taxAmount ?? data.tax_amount ?? (taxRate > 0 ? (baseAmount * taxRate / 100) : 0));
 
+    const itemReceiptUrls = categoryItems.flatMap((item: any) =>
+      Array.isArray(item.receiptPhotoUrls)
+        ? item.receiptPhotoUrls
+        : Array.isArray(item.receipt_photo_urls) ? item.receipt_photo_urls : [],
+    );
     const receiptUrls: string[] = Array.isArray(data.receiptPhotoUrls)
       ? data.receiptPhotoUrls
       : (Array.isArray(data.receipt_photo_urls)
         ? data.receipt_photo_urls
-        : (data.receiptPhotoUrl || data.receipt_photo_url ? [data.receiptPhotoUrl || data.receipt_photo_url] : []));
+        : (itemReceiptUrls.length ? itemReceiptUrls : (data.receiptPhotoUrl || data.receipt_photo_url ? [data.receiptPhotoUrl || data.receipt_photo_url] : [])));
     const primaryReceiptUrl = receiptUrls[0] || data.receiptPhotoUrl || data.receipt_photo_url || null;
-    const receiptPhotos = Array.isArray(data.receiptPhotos) ? data.receiptPhotos : (Array.isArray(data.receipt_photos) ? data.receipt_photos : []);
+    const itemReceiptPhotos = categoryItems.flatMap((item: any) => {
+      const urls = Array.isArray(item.receiptPhotoUrls)
+        ? item.receiptPhotoUrls
+        : Array.isArray(item.receipt_photo_urls) ? item.receipt_photo_urls : [];
+      return urls.map((url: string) => ({
+        url,
+        categoryId: item.categoryId || item.category_id || null,
+        categoryName: item.categoryName || item.category_name || 'Expense',
+        categoryIcon: item.categoryIcon || item.category_icon || 'expense',
+      }));
+    });
+    const receiptPhotos = Array.isArray(data.receiptPhotos)
+      ? data.receiptPhotos
+      : (Array.isArray(data.receipt_photos) ? data.receipt_photos : itemReceiptPhotos);
 
     const res = await this.db.query(
       `INSERT INTO expenses (
@@ -490,6 +537,40 @@ export class ExpensesService {
     const values: any[] = [];
     let idx = 1;
 
+    const rawProjectId = data.projectId ?? data.project_id;
+    if (rawProjectId !== undefined && rawProjectId !== null && rawProjectId !== '') {
+      const projectRes = await this.db.query(
+        `SELECT id, name, is_closed, status FROM projects WHERE id::text = $1 OR project_code = $1 LIMIT 1`,
+        [rawProjectId],
+      );
+      if (!projectRes.rows.length) throw new NotFoundException(`Project not found: ${rawProjectId}`);
+      const project = projectRes.rows[0];
+      const changingProject = project.id !== existing.projectId;
+      if (changingProject && project.is_closed === true || changingProject && project.status && ['closed', 'completed'].includes(project.status.toLowerCase())) {
+        throw new BadRequestException('Cannot move an expense to a closed project');
+      }
+      if (changingProject) {
+        if (!isOwner && !isAdminOrFinance) {
+          throw new ForbiddenException('Only the expense submitter can change its project');
+        }
+        if (!isAdminOrFinance) {
+          const permission = await this.db.query(
+            'SELECT can_create_expenses FROM project_members WHERE project_id = $1 AND user_id = $2',
+            [project.id, user.id],
+          );
+          if (!permission.rows.length || permission.rows[0].can_create_expenses === false) {
+            throw new ForbiddenException('You do not have permission to submit expenses for this project');
+          }
+        }
+      }
+      fields.push(`project_id = $${idx++}`);
+      values.push(project.id);
+    }
+    if (data.taskId !== undefined || data.task_id !== undefined) {
+      fields.push(`task_id = $${idx++}`);
+      values.push(data.taskId ?? data.task_id ?? null);
+    }
+
     // Resubmission of rejected expense
     if (isRejectedResubmission) {
       fields.push(`status = 'pending'`);
@@ -556,9 +637,20 @@ export class ExpensesService {
       fields.push(`tax_amount = $${idx++}`);
       values.push(Number(data.taxAmount ?? data.tax_amount));
     }
-    if (data.categoryDetails !== undefined || data.category_details !== undefined) {
+    if (data.categoryDetails !== undefined || data.category_details !== undefined ||
+        data.categoryItems !== undefined || data.category_items !== undefined) {
+      const currentDetails = { ...(data.categoryDetails ?? data.category_details ?? {}) };
+      const items = data.categoryItems ?? data.category_items;
+      if (items !== undefined) currentDetails.category_items = items;
       fields.push(`category_details = $${idx++}`);
-      values.push(JSON.stringify(data.categoryDetails ?? data.category_details ?? {}));
+      values.push(JSON.stringify(currentDetails));
+    }
+    if (data.categoryId !== undefined || data.category_id !== undefined) {
+      const categoryId = data.categoryId ?? data.category_id;
+      const category = await this.db.query('SELECT id FROM categories WHERE id::text = $1', [categoryId]);
+      if (!category.rows.length) throw new NotFoundException('Expense category not found');
+      fields.push(`category_id = $${idx++}`);
+      values.push(category.rows[0].id);
     }
 
     if (fields.length === 0) {
